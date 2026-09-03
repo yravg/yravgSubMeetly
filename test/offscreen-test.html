@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Offscreen pipeline harness</title>
+    <style>body{background:#181818;color:#ddd;font:13px ui-monospace,monospace;padding:16px} pre{white-space:pre-wrap}</style>
+  </head>
+  <body>
+    <h3>offscreen.js harness (mock chrome)</h3>
+    <button id="dl">download whisper-tiny (wasm)</button>
+    <button id="tx">transcribe test/speech.wav via worker</button>
+    <pre id="log"></pre>
+    <script>
+      const logEl = document.getElementById('log');
+      const log = (...a) => { logEl.textContent += a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' ') + '\n'; };
+      window.__events = [];
+      const listeners = [];
+      window.chrome = {
+        runtime: {
+          getURL: (p) => location.origin + '/dist/' + p,
+          sendMessage: async (m) => { window.__events.push(m); if (m.type !== 'model-progress') log('→bg', m.type, JSON.stringify(m.data).slice(0, 160)); else log('progress', Math.round(m.data.pct) + '%'); },
+          onMessage: { addListener: (fn) => listeners.push(fn) },
+        },
+      };
+      window.__dispatch = (msg) => listeners.forEach((fn) => fn(msg));
+      const settings = { mirror: 'huggingface', device: 'wasm', engine: 'browser' };
+      document.getElementById('dl').onclick = () => __dispatch({ target: 'offscreen', type: 'model-download', data: { key: 'whisper-tiny', settings } });
+      window.addEventListener('error', (e) => log('window error:', e.message));
+    </script>
+    <script type="module" src="/dist/offscreen.js"></script>
+  </body>
+</html>

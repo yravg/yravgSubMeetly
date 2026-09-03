@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Panel visual test</title>
+    <link rel="stylesheet" href="../dist/sidepanel.css" />
+    <style>
+      body { max-width: 400px; margin: 0 auto; border-inline: 1px solid #2a3153; min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <script src="chrome-mock.js"></script>
+    <script>
+      // load the real panel markup then its module
+      fetch('../dist/sidepanel.html')
+        .then((r) => r.text())
+        .then((html) => {
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          document.body.append(...doc.body.childNodes);
+          // strip the module script tag the markup carries and load it fresh
+          document.querySelectorAll('script[src="sidepanel.js"]').forEach((s) => s.remove());
+          const s = document.createElement('script');
+          s.type = 'module';
+          s.src = '../dist/sidepanel.js';
+          document.body.appendChild(s);
+        });
+    </script>
+  </body>
+</html>

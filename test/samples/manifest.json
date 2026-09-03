@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "samples": [
+    {
+      "id": "zh-en-1",
+      "label": "Chinese → English",
+      "src": "zh",
+      "tgt": "en",
+      "text": "今天天气很好，我们去公园散步吧。",
+      "file": "zh-en-1.wav",
+      "durationHint": 3.5
+    },
+    {
+      "id": "en-zh-1",
+      "label": "English → Chinese",
+      "src": "en",
+      "tgt": "zh",
+      "text": "The weather is nice today. Let's go for a walk in the park.",
+      "file": "en-zh-1.wav",
+      "durationHint": 4
+    },
+    {
+      "id": "ja-en-1",
+      "label": "Japanese → English",
+      "src": "ja",
+      "tgt": "en",
+      "text": "今日はいい天気ですね。公園を散歩しましょう。",
+      "file": "ja-en-1.wav",
+      "durationHint": 4
+    },
+    {
+      "id": "en-ja-1",
+      "label": "English → Japanese",
+      "src": "en",
+      "tgt": "ja",
+      "text": "It's a beautiful day. Shall we take a walk in the park?",
+      "file": "en-ja-1.wav",
+      "durationHint": 4
+    }
+  ]
+}

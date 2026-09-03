@@ -1,0 +1,20 @@
+{
+  "name": "local-transsub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local TransSub — fully-offline realtime subtitle & translation Chrome extension. All AI runs on-device.",
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "dev:browser": "npm run build && node scripts/dev-browser.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "@ricky0123/vad-web": "^0.0.30"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "puppeteer": "^25.8.0"
+  }
+}

@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>AudioTestPage</title>
+    <style>
+      body { background: #111; color: #ddd; font: 16px sans-serif; display: grid; place-items: center; height: 100vh; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <p>🔊 looping spoken test audio</p>
+      <audio id="a" src="speech.wav" autoplay loop controls></audio>
+    </div>
+    <script>
+      // best-effort start in case autoplay policy blocks
+      const a = document.getElementById('a');
+      const kick = () => a.play().catch(() => {});
+      kick();
+      setInterval(kick, 2000);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,38 @@
+# Dependencies & virtualenvs
+node_modules/
+native/.venv/
+.hf-cache/
+
+# Build output
+dist/
+.build/
+mac/.build/
+mac/build/
+*.icns
+
+# Throwaway Chrome profiles created by the Puppeteer test scripts.
+# These contain cookies and site data — never commit them.
+.dev-profile/
+.e2e-profile/
+
+# Local cache, including exported YouTube cookies.
+.lab-cache/
+
+# Generated test audio (recreate with scripts/gen-samples.sh)
+*.wav
+*.aiff
+
+# Transient sync metadata (config.json and summaries.json are kept)
+.ngodingpakeai/pending.json
+
+# Secrets — never commit
+.env
+.env.*
+*.pem
+*.p12
+*-cookies.txt
+
+# macOS / editor noise
+.DS_Store
+*.log
+*.pid

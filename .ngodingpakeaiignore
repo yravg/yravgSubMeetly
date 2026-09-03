@@ -1,0 +1,32 @@
+# .ngodingpakeaiignore — extra paths to keep out of NgodingPakeAI sync.
+# Uses .gitignore syntax. Secrets, node_modules, build output and .env files
+# are ALWAYS blocked by the CLI regardless of what is listed here.
+
+# Examples:
+# docs/internal/
+# *.snap
+# fixtures/
+
+# --- ditambahkan saat sync pertama ---
+# Profil Chrome sementara yang dibuat skrip test Puppeteer (bukan kode proyek).
+.dev-profile/
+.e2e-profile/
+.lab-cache/
+
+# Output build SwiftPM / esbuild.
+.build/
+mac/.build/
+dist/
+mac/build/
+
+# Lingkungan Python helper + model cache.
+native/.venv/
+node_modules/
+
+# Artefak sementara & backup.
+*.old
+*.tflite
+*.pb
+*.db-journal
+*.store
+test/speech.wav

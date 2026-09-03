@@ -1,0 +1,272 @@
+{
+  "at": "2026-08-22T21:57:26",
+  "url": "http://127.0.0.1:17865",
+  "health": {
+    "ok": true,
+    "engine": "mlx-whisper",
+    "model": "mlx-community/whisper-large-v3-turbo",
+    "ffmpeg": true,
+    "translate": true,
+    "translate_model": "mlx-community/Qwen2.5-3B-Instruct-4bit",
+    "draft_model": "mlx-community/whisper-base-mlx",
+    "features": {
+      "fast_translate": true,
+      "translate_refine": true,
+      "draft": true
+    }
+  },
+  "rows": [
+    {
+      "pair": "zh→en",
+      "stage": "draft 0.35s",
+      "ms": 566,
+      "asr_ms": 82,
+      "translate_ms": 484,
+      "source": "今天",
+      "translation": "Today",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 0.5s",
+      "ms": 557,
+      "asr_ms": 95,
+      "translate_ms": 462,
+      "source": "今天",
+      "translation": "Today",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 1.0s",
+      "ms": 1101,
+      "asr_ms": 190,
+      "translate_ms": 910,
+      "source": "今天天气",
+      "translation": "Today's weather is.",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 2.0s",
+      "ms": 1140,
+      "asr_ms": 189,
+      "translate_ms": 951,
+      "source": "今天天氣很好,我們",
+      "translation": "Today the weather is good, we.",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "final ASR",
+      "ms": 5550,
+      "source": "今天天气很好,我们去公园散步吧。",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "fast MT",
+      "ms": 1951,
+      "source": "今天天气很好，我们去公园散步吧。",
+      "translation": "The weather is nice today, let's go for a walk in the park.",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "refine",
+      "ms": 986,
+      "source": "今天天气很好，我们去公园散步吧。",
+      "translation": "The weather is nice today, let's go for a walk in the park.",
+      "pass": true
+    },
+    {
+      "pair": "en→zh",
+      "stage": "draft 0.35s",
+      "ms": 3726,
+      "asr_ms": 2811,
+      "translate_ms": 915,
+      "source": "the weather.",
+      "translation": "天气。",
+      "pass": false
+    },
+    {
+      "pair": "en→zh",
+      "stage": "draft 0.5s",
+      "ms": 605,
+      "asr_ms": 94,
+      "translate_ms": 510,
+      "source": "the weather is",
+      "translation": "天气是",
+      "pass": false
+    },
+    {
+      "pair": "en→zh",
+      "stage": "draft 1.0s",
+      "ms": 661,
+      "asr_ms": 108,
+      "translate_ms": 553,
+      "source": "The weather is nice today.",
+      "translation": "今天的天气很好。",
+      "pass": false
+    },
+    {
+      "pair": "en→zh",
+      "stage": "draft 2.0s",
+      "ms": 828,
+      "asr_ms": 138,
+      "translate_ms": 689,
+      "source": "The weather is nice today, let's go!",
+      "translation": "天气今天很好，一起去吧！",
+      "pass": false
+    },
+    {
+      "pair": "en→zh",
+      "stage": "final ASR",
+      "ms": 2503,
+      "source": "The weather is nice today, let's go for a walk in the park.",
+      "pass": true
+    },
+    {
+      "pair": "en→zh",
+      "stage": "fast MT",
+      "ms": 1919,
+      "source": "The weather is nice today. Let's go for a walk in the park.",
+      "translation": "天气今天很好，去公园散步如何。",
+      "pass": true
+    },
+    {
+      "pair": "en→zh",
+      "stage": "refine",
+      "ms": 933,
+      "source": "The weather is nice today. Let's go for a walk in the park.",
+      "translation": "天气今天很好，一起去公园散步如何。",
+      "pass": true
+    },
+    {
+      "pair": "ja→en",
+      "stage": "draft 0.35s",
+      "ms": 1059,
+      "asr_ms": 1059,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "ja→en",
+      "stage": "draft 0.5s",
+      "ms": 928,
+      "asr_ms": 114,
+      "translate_ms": 814,
+      "source": "今日は",
+      "translation": "It's today.",
+      "pass": false
+    },
+    {
+      "pair": "ja→en",
+      "stage": "draft 1.0s",
+      "ms": 649,
+      "asr_ms": 93,
+      "translate_ms": 555,
+      "source": "今日は1",
+      "translation": "It's today, this day.",
+      "pass": false
+    },
+    {
+      "pair": "ja→en",
+      "stage": "draft 2.0s",
+      "ms": 646,
+      "asr_ms": 107,
+      "translate_ms": 539,
+      "source": "今日はいい天気ですね",
+      "translation": "It's a nice weather today.",
+      "pass": false
+    },
+    {
+      "pair": "ja→en",
+      "stage": "final ASR",
+      "ms": 3325,
+      "source": "今日はいい天気ですね。公園を散歩しましょう。",
+      "pass": true
+    },
+    {
+      "pair": "ja→en",
+      "stage": "fast MT",
+      "ms": 1797,
+      "source": "今日はいい天気ですね。公園を散歩しましょう。",
+      "translation": "It's a nice day. Let's walk in the park.",
+      "pass": true
+    },
+    {
+      "pair": "ja→en",
+      "stage": "refine",
+      "ms": 871,
+      "source": "今日はいい天気ですね。公園を散歩しましょう。",
+      "translation": "It's a nice day. Let's go for a walk in the park.",
+      "pass": true
+    },
+    {
+      "pair": "en→ja",
+      "stage": "draft 0.35s",
+      "ms": 1929,
+      "asr_ms": 1110,
+      "translate_ms": 818,
+      "source": "It's a bleep.",
+      "translation": "それはブラークです。",
+      "pass": false
+    },
+    {
+      "pair": "en→ja",
+      "stage": "draft 0.5s",
+      "ms": 520,
+      "asr_ms": 86,
+      "translate_ms": 433,
+      "source": "It's a beauty.",
+      "translation": "それは美しさです。",
+      "pass": false
+    },
+    {
+      "pair": "en→ja",
+      "stage": "draft 1.0s",
+      "ms": 904,
+      "asr_ms": 117,
+      "translate_ms": 787,
+      "source": "It's a beautiful day.",
+      "translation": "今日は美しく天気が良い日です。",
+      "pass": false
+    },
+    {
+      "pair": "en→ja",
+      "stage": "draft 2.0s",
+      "ms": 696,
+      "asr_ms": 159,
+      "translate_ms": 536,
+      "source": "It's a beautiful day, shall we take?",
+      "translation": "今日は beautiful 天气、何いかしましょう。",
+      "pass": false
+    },
+    {
+      "pair": "en→ja",
+      "stage": "final ASR",
+      "ms": 2647,
+      "source": "It's a beautiful day. Shall we take a walk in the park?",
+      "pass": true
+    },
+    {
+      "pair": "en→ja",
+      "stage": "fast MT",
+      "ms": 1843,
+      "source": "It's a beautiful day. Shall we take a walk in the park?",
+      "translation": "今日は beautiful 天气です。公園で散歩しましょうか？",
+      "pass": true
+    },
+    {
+      "pair": "en→ja",
+      "stage": "refine",
+      "ms": 900,
+      "source": "It's a beautiful day. Shall we take a walk in the park?",
+      "translation": "今日は美しい天気です。公園で散歩しましょうか？",
+      "pass": true
+    }
+  ]
+}

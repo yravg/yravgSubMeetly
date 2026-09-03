@@ -1,0 +1,62 @@
+---
+description: Native helper start/stop/restart lifecycle — avoid port races and duplicate shutdowns
+globs: native/**/*,scripts/*native*,src/lib/native*.js,src/sidepanel.js
+alwaysApply: false
+---
+
+# Native Helper Lifecycle
+
+The native helper listens on `127.0.0.1:17865`. Restart failures almost always mean **port 17865 is still held** by a dying process.
+
+## Single control path
+
+- **Start / Stop / Restart** must go through `native/messaging_host.py` when the Chrome native launcher is installed.
+- Do **not** call `nativeShutdown()` from the extension *and* `messaging_host` restart — that races and leaves the port busy.
+- `sidepanel.js` → `nativeHostAction(action)` only; fallback to HTTP shutdown only when native messaging is unavailable.
+
+## Stop before start
+
+Before binding the port:
+
+1. POST `/shutdown` and **wait until the port is free** (poll with a short timeout).
+2. If still occupied, `lsof -ti tcp:17865` → `SIGTERM` → wait again.
+3. Only then launch `native/run.sh`.
+
+Never assume a fixed sleep (500 ms) is enough.
+
+## Server startup
+
+- Set `allow_reuse_address = True` on the HTTP server.
+- Log `listening on …` **after** `server_bind()`, not before.
+- Check `.native-server.log` for `Address already in use` when debugging offline helper.
+
+## Scripts
+
+- First-time setup: `./scripts/ensure-native.sh`
+- After every build / native edit: `./scripts/ensure-dev-services.sh` (also runs automatically from `esbuild.config.mjs` and `build.sh`)
+- Restart after native code change: `./scripts/restart-native.sh`
+- Manual start: `./scripts/start-native.sh`
+- Manual stop / unstick port: `./scripts/stop-native.sh`
+- `native/run.sh`: install deps once (`.venv/.deps-installed`), not on every restart.
+
+## Agent workflow
+
+After editing `native/**`, `scripts/*native*`, or native-related extension code (`src/lib/native*.js`, native UI in `sidepanel.js`):
+
+1. Run `./scripts/ensure-dev-services.sh` (or `./scripts/restart-native.sh` if only native Python/shell changed).
+2. Rebuild extension if JS changed: `node esbuild.config.mjs`.
+3. Verify: `curl -sf http://127.0.0.1:17865/health` and lab at `http://127.0.0.1:8799/lab.html`.
+
+## Verify changes
+
+After editing lifecycle code, test: Start → health OK → Restart → health OK → Stop → port free.
+
+## Translation Lab (port 8799)
+
+When the native helper is running, **Translation Lab must also be running** at `http://127.0.0.1:8799/lab.html`.
+
+- Use `scripts/ensure-lab.sh` (idempotent) — never raw `python3 -m http.server` on 8799.
+- Call `ensure-lab.sh` from `start-native.sh`, `ensure-native.sh`, and `messaging_host.py` after native start/restart.
+- Extension: `nativeHostAction('ensure_lab')` once when native health is OK.
+- Lab uses `scripts/lab-server.py` (YouTube proxy + static files), not a bare static server.
+- Stopping native does **not** need to stop lab; starting native **must** ensure lab is up.

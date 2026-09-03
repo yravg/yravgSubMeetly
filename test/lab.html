@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Translation Lab</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #1a1d27;
+        --border: #2a3040;
+        --text: #e8ecf4;
+        --muted: #8892a8;
+        --accent: #5b9cff;
+        --ok: #3dd68c;
+        --warn: #ffb020;
+        --bad: #ff6b6b;
+        --font: system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 var(--font);
+        min-height: 100vh;
+      }
+      header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+      header p { margin: 0; color: var(--muted); font-size: 13px; }
+      .pill {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .pill.ok { background: #1a3d2e; color: var(--ok); }
+      .pill.bad { background: #3d1a1a; color: var(--bad); }
+      main {
+        display: grid;
+        grid-template-columns: 380px 1fr;
+        gap: 0;
+        min-height: calc(100vh - 65px);
+      }
+      @media (max-width: 960px) {
+        main { grid-template-columns: 1fr; }
+      }
+      .sidebar {
+        border-right: 1px solid var(--border);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow-y: auto;
+      }
+      .content { padding: 16px 20px; overflow: auto; }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+      }
+      section h2 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+      label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+      input[type="text"],
+      input[type="url"],
+      select {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        margin-bottom: 8px;
+      }
+      video, audio { width: 100%; border-radius: 8px; background: #000; }
+      .row { display: flex; gap: 8px; align-items: end; }
+      .row > * { flex: 1; }
+      button {
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      button:hover { filter: brightness(1.08); }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button.secondary { background: #2a3040; color: var(--text); }
+      button.danger { background: #5c2020; }
+      .live-box {
+        margin-top: 10px;
+        padding: 12px;
+        border-radius: 8px;
+        background: #12151c;
+        border-left: 3px solid var(--warn);
+      }
+      .live-box .src { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+      .live-box .tgt { font-size: 18px; font-weight: 500; }
+      .live-box .ms { font-size: 12px; margin-top: 8px; }
+      .ok { color: var(--ok); }
+      .warn { color: var(--warn); }
+      .bad { color: var(--bad); }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th, td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+      th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+      td.src, td.tgt { max-width: 220px; word-break: break-word; }
+      #log {
+        max-height: 180px;
+        overflow-y: auto;
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        background: #12151c;
+        border-radius: 6px;
+        padding: 8px;
+      }
+      #log div { padding: 2px 0; border-bottom: 1px solid #1e2230; }
+      #log .ok { color: var(--ok); }
+      #log .warn { color: var(--warn); }
+      #log .bad { color: var(--bad); }
+      .expected { font-size: 12px; color: var(--muted); margin-top: 6px; }
+      details.yt-help { margin: 8px 0; font-size: 12px; color: var(--muted); }
+      details.yt-help summary { cursor: pointer; color: var(--warn); font-weight: 600; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Translation Lab</h1>
+      <p>Benchmark refine speed &amp; quality without the extension UI</p>
+      <span id="health" class="pill bad">Checking…</span>
+      <span id="health-detail" style="font-size:12px;color:var(--muted)"></span>
+    </header>
+
+    <main>
+      <aside class="sidebar">
+        <section>
+          <h2>Native helper</h2>
+          <label for="native-url">Server URL</label>
+          <input id="native-url" type="url" value="http://127.0.0.1:17865" />
+          <button id="btn-health" class="secondary" type="button">Refresh health</button>
+        </section>
+
+        <section>
+          <h2>Media source</h2>
+          <label for="sample-select">Built-in samples</label>
+          <select id="sample-select"></select>
+          <p class="expected">Expected: <span id="expected-text">—</span></p>
+
+          <label for="file-input">Upload audio / video</label>
+          <input id="file-input" type="file" accept="audio/*,video/*" />
+
+          <label for="media-url">YouTube or direct audio URL</label>
+          <input
+            id="media-url"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=… or https://youtu.be/…"
+          />
+
+          <details class="yt-help" open>
+            <summary>YouTube “Sign in / bot check” fix</summary>
+            <p class="expected">
+              YouTube blocks anonymous downloads. Pick one:
+            </p>
+            <ol class="expected" style="margin:0 0 8px 18px;padding:0">
+              <li>
+                <strong>Extension (recommended):</strong>
+                <code>./scripts/dev-browser.sh</code> → open video in tab → Start capture
+              </li>
+              <li>
+                <strong>Cookies file:</strong> sign in to YouTube in Chrome → export
+                <code>cookies.txt</code> → upload below → Load again
+              </li>
+              <li>
+                Terminal:
+                <code>./scripts/export-youtube-cookies.sh chrome</code>
+              </li>
+            </ol>
+            <label for="cookies-input">Upload cookies.txt</label>
+            <input id="cookies-input" type="file" accept=".txt,text/plain" />
+            <button id="btn-upload-cookies" class="secondary" type="button">Upload cookies</button>
+            <p class="expected" id="cookies-status">Checking…</p>
+          </details>
+
+          <div class="row">
+            <button id="btn-load-url" class="secondary" type="button">Load</button>
+            <button id="btn-open-tab" class="secondary" type="button" hidden>Open in tab</button>
+          </div>
+
+          <div id="yt-embed-wrap" hidden>
+            <p class="expected" id="yt-title"></p>
+            <iframe
+              width="100%"
+              height="200"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          </div>
+
+          <video id="player" controls playsinline></video>
+        </section>
+
+        <section>
+          <h2>Language pair</h2>
+          <div class="row">
+            <div>
+              <label for="src-lang">Source</label>
+              <select id="src-lang">
+                <option value="zh">Chinese</option>
+                <option value="en">English</option>
+                <option value="ja">Japanese</option>
+              </select>
+            </div>
+            <div>
+              <label for="tgt-lang">Target</label>
+              <select id="tgt-lang">
+                <option value="en">English</option>
+                <option value="zh">Chinese</option>
+                <option value="ja">Japanese</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Live refine simulator</h2>
+          <label for="live-window">Draft window (seconds)</label>
+          <select id="live-window">
+            <option value="0.35">0.35 s</option>
+            <option value="0.5" selected>0.5 s</option>
+            <option value="1">1.0 s</option>
+            <option value="2">2.0 s</option>
+          </select>
+          <label for="live-interval">Poll interval (ms)</label>
+          <input id="live-interval" type="text" value="300" />
+          <div class="toolbar">
+            <button id="btn-live" type="button">▶ Simulate live refine</button>
+            <button id="btn-draft-once" class="secondary" type="button">One draft</button>
+          </div>
+          <div class="live-box">
+            <div class="src" id="live-src">Source draft…</div>
+            <div class="tgt" id="live-tgt">Translation draft…</div>
+            <div class="ms" id="live-ms">—</div>
+          </div>
+        </section>
+      </aside>
+
+      <div class="content">
+        <section>
+          <h2>Automated benchmark</h2>
+          <p style="margin:0 0 12px;color:var(--muted);font-size:13px">
+            Runs zh→en, en→zh, ja→en, en→ja: draft windows, final ASR, fast MT, and semantic refine.
+            Target draft latency: <strong>≤500 ms</strong>.
+          </p>
+          <div class="toolbar">
+            <button id="btn-run-all" type="button">▶ Run all language pairs</button>
+            <button id="btn-export" class="secondary" type="button">Export JSON</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pair</th>
+                  <th>Stage</th>
+                  <th>Total</th>
+                  <th>ASR</th>
+                  <th>MT</th>
+                  <th>Source</th>
+                  <th>Translation</th>
+                  <th>OK</th>
+                </tr>
+              </thead>
+              <tbody id="results-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section style="margin-top:14px">
+          <h2>Log</h2>
+          <div id="log"></div>
+        </section>
+      </div>
+    </main>
+
+    <script src="lab.js" type="module"></script>
+  </body>
+</html>

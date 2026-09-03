@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Overlay visual test</title>
+    <style>
+      body { margin: 0; background: #111; height: 100vh; display: grid; place-items: center; }
+      .fake-player {
+        width: 90vw; height: 80vh; border-radius: 12px;
+        background: linear-gradient(135deg, #1a2440, #3a2a55);
+        display: grid; place-items: center; color: #667; font: 20px sans-serif;
+      }
+      video { width: 90vw; max-height: 80vh; border-radius: 12px; }
+      .controls { position: fixed; top: 10px; left: 10px; z-index: 2147483647; display: flex; gap: 6px; flex-wrap: wrap; }
+    </style>
+  </head>
+  <body>
+    <video controls src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm"></video>
+    <div class="controls">
+      <button onclick="demoInterim()">interim</button>
+      <button onclick="demoLine()">line</button>
+      <button onclick="demoDual()">dual</button>
+      <button onclick="demoHistory()">history</button>
+      <button onclick="demoOff()">off</button>
+    </div>
+    <script src="chrome-mock.js"></script>
+    <script src="../dist/content.js"></script>
+    <script>
+      const emit = (type, data) => window.__mockEmit({ target: 'content', type, data });
+      emit('session', { active: true, config: { dualLine: true }, cacheCues: [] });
+      function demoInterim() { emit('subtitle', { interim: true }); }
+      function demoLine() {
+        emit('subtitle', {
+          interim: false,
+          final: true,
+          t0: 12,
+          t1: 15,
+          source: '',
+          translation: 'This is a floating local subtitle line.',
+          rawTranslation: 'This is a floating local subtitle line.',
+        });
+      }
+      function demoDual() {
+        emit('subtitle', {
+          interim: false,
+          final: true,
+          t0: 28,
+          t1: 32,
+          source: '今日はとても良い天気ですね。',
+          translation: "The weather is really nice today, isn't it?",
+          rawSource: '今日はとても良い天気ですね。',
+          rawTranslation: "The weather is really nice today, isn't it?",
+        });
+      }
+      function demoHistory() {
+        for (const [t0, src, tgt] of [
+          [3, 'こんにちは', 'Hello'],
+          [8, 'ありがとう', 'Thank you'],
+          [18, '字幕のテスト', 'Subtitle test'],
+        ]) {
+          emit('subtitle', {
+            interim: false,
+            final: true,
+            t0,
+            t1: t0 + 3,
+            source: src,
+            translation: tgt,
+            rawSource: src,
+            rawTranslation: tgt,
+          });
+        }
+      }
+      function demoOff() { emit('session', { active: false }); }
+      setTimeout(demoHistory, 400);
+    </script>
+  </body>
+</html>

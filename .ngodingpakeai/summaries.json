@@ -1,0 +1,398 @@
+{
+ ".claude/launch.json": {
+  "summary": "Claude Code Browser-pane launcher config. Defines a 'static' entry running python3 -m http.server on port 8799, used to open the pages under test/ without starting a server by hand."
+ },
+ ".claude/skills/ngodingpakeai/SKILL.md": {
+  "summary": "The NgodingPakeAI skill installed by `ngodingpakeai init`. Tells an AI agent how to connect, index and sync this repo into the NgodingPakeAI project-memory layer: login/bootstrap flow, how to write summaries.json, and the privacy rule that raw source is never uploaded."
+ },
+ ".cursor/rules/native-helper-lifecycle.mdc": {
+  "summary": "Cursor rule covering the native helper lifecycle: how to start/stop/restart the local server without racing on port 17865 or issuing duplicate shutdowns. Scoped to native/**, scripts/*native*, src/lib/native*.js and src/sidepanel.js."
+ },
+ ".ngodingpakeaiignore": {
+  "summary": "Paths excluded from NgodingPakeAI sync (gitignore syntax). Excludes throwaway Chrome profiles created by the Puppeteer tests (.dev-profile, .e2e-profile), build output (dist, .build, mac/build), the Python virtualenv, node_modules and scratch artifacts, so the index contains only real project code."
+ },
+ "AGENTS.md": {
+  "summary": "Project rules loaded by AI agents. Contains the NgodingPakeAI skill block (connect/index/sync workflow via the CLI) merged with the repo's pre-existing rules."
+ },
+ "README.md": {
+  "summary": "Main README for the Local TransSub Chrome extension: realtime floating subtitles for any tab plus file transcription to SRT/VTT, with every AI model running locally. Covers the side panel → service worker → offscreen document architecture, Realtime/Offline modes, the tiered translation stack (whisper-direct, Chrome Translator API, Opus-MT, native helper), Load-unpacked install steps and open-source licences."
+ },
+ "Start Lab.command": {
+  "summary": "macOS double-click shortcut that runs scripts/start-lab.sh and waits for Enter so the Terminal window does not close immediately."
+ },
+ "Stop Lab.command": {
+  "summary": "macOS double-click shortcut that runs scripts/stop-lab.sh and waits for Enter before closing the window."
+ },
+ "esbuild.config.mjs": {
+  "summary": "Extension build script: wipes dist/, copies static files (manifest.json, sidepanel.html/css, offscreen.html, icons), copies the ORT WASM runtime and Silero VAD worklet assets into the package (mandatory because MV3 forbids CDN scripts), then bundles the background.js, offscreen.js, sidepanel.js, ai-worker.js and content.js entry points. In --watch mode it also watches native/ to restart the helper and calls ensure-dev-services.sh."
+ },
+ "mac/Package.swift": {
+  "summary": "SwiftPM manifest for the macOS app (swift-tools-version 6.0, platform macOS 26). Defines the TransSubKit library holding the core logic, the LocalTransSub menu-bar executable, and two spike targets (spike-capture, spike-engine) used to prove audio capture and the speech/translation engines before the app was built on them."
+ },
+ "mac/README.md": {
+  "summary": "README for the yraverageSub macOS app: floating subtitles over any app's audio, file transcription to SRT/VTT and hold-to-talk dictation. Explains why a native app beats the extension (one Screen Recording grant covers every app), how to build without Xcode, why a signing certificate is required so permissions are not revoked on each rebuild, doctor.sh, the overlay panel controls and the measured translation latency figures."
+ },
+ "mac/Sources/LocalTransSub/App.swift": {
+  "summary": "Menu-bar app entry point: LocalTransSubApp with a MenuBarExtra and a Settings scene, plus AppDelegate which sets the activation policy (Dock icon or menu-bar only) and dispatches the CLI diagnostic modes (--check-perms, --bench-translate, --selftest, --overlay-probe, --overlay-demo). AppController is the shared state: capture targets, running state, Screen Recording permission with periodic re-checking, overlay control wiring and relaunch after a grant."
+ },
+ "mac/Sources/LocalTransSub/BenchTranslate.swift": {
+  "summary": "The --bench-translate mode, which measures translation latency per strategy from inside the app bundle (a plain CLI binary hangs because it cannot reach the Translation daemon). Reports the status of both model variants, prepareTranslation time, first-call time and the warm average across several sample sentences."
+ },
+ "mac/Sources/LocalTransSub/Brand.swift": {
+  "summary": "yraverage brand palette sampled from the wordmark: the teal tag colour plus lighter and deeper variants, and a Wordmark view that renders 'yraverage' with a 'Sub' tag styled like the logo."
+ },
+ "mac/Sources/LocalTransSub/DictationController.swift": {
+  "summary": "Wispr-Flow-style dictation: hold a hotkey, speak, release, and the cleaned-up text is inserted at the cursor of whichever app has focus. Installs a CGEvent tap to watch the hotkey (needs Input Monitoring), records the microphone, transcribes on-device, pastes via the pasteboard and a synthesised Cmd+V (needs Accessibility), shows a floating pill while recording, supports both hold and hands-free modes with an auto-stop timeout, and cancels on Esc."
+ },
+ "mac/Sources/LocalTransSub/LanguagePackInstaller.swift": {
+  "summary": "Requests Apple language-model downloads from inside the app. Apple gates installation behind a SwiftUI modifier: a session vended by .translationTask reports canRequestDownloads == true so prepareTranslation presents the system download sheet, whereas a plain TranslationSession reports false. Contains LanguagePackInstaller (configuration/status/busy state) and the languagePackHost modifier, which must be attached to a visible view."
+ },
+ "mac/Sources/LocalTransSub/LanguageStatusModel.swift": {
+  "summary": "Backing model for the Languages settings tab: PairStatus records availability of the fast (low-latency) and standard (high-fidelity) variants with a human-readable summary, LanguageStatusModel.refresh checks the configured pair and its reverse, and openSystemSettings opens the Language & Region pane that hosts the Translation Languages sheet."
+ },
+ "mac/Sources/LocalTransSub/MainView.swift": {
+  "summary": "Main window with Live subtitles and Transcribe a file tabs. LiveView shows the Screen Recording banner with buttons to open settings and Quit & Reopen, the audio source picker, language pickers, start/stop, the translation-speed note with an install-fast-model button, and the running transcript. FileView handles file selection, progress and export."
+ },
+ "mac/Sources/LocalTransSub/MainWindow.swift": {
+  "summary": "AppKit window controller for the main window, used instead of a SwiftUI Window scene so the window can be opened programmatically on first launch or from the menu — a menu-bar-only app that shows nothing on launch leaves the user no way to grant permissions. Returns the activation policy to accessory when the window closes."
+ },
+ "mac/Sources/LocalTransSub/OverlayPanelView.swift": {
+  "summary": "The floating subtitle panel, the native counterpart of the extension overlay: a toolbar with Refine, Dual line, a Force translate menu (all / selected / untranslated), Auto scroll, minimise and close; a scrollable cue list with per-row checkboxes, timestamps and source/translation text; an interim row for the sentence being spoken; and a status footer. The toolbar uses ViewThatFits so it collapses to icons when the panel is dragged narrow."
+ },
+ "mac/Sources/LocalTransSub/OverlayProbe.swift": {
+  "summary": "The --overlay-probe mode, which verifies the overlay panel can really be moved and resized: inspects the style mask, performs real frame changes and reads the result back, and tests the minimum-size clamp. It restores the user's frame afterwards so diagnostics never disturb the saved layout."
+ },
+ "mac/Sources/LocalTransSub/OverlayWindow.swift": {
+  "summary": "OverlayController builds a non-activating floating NSPanel at screenSaver level so it sits above other apps' fullscreen video. Uses a .titled + .fullSizeContentView style mask with the titlebar hidden so it still gets native dragging and native resizing from every edge (a .borderless window has no resize hit area at all). OverlayModel holds the cue list, interim line, selection, toolbar state (dualLine, autoScroll, refine) and the onForceTranslate/onClose callbacks."
+ },
+ "mac/Sources/LocalTransSub/PermissionReport.swift": {
+  "summary": "The --check-perms diagnostic, which reports real permission and capability state from inside the app bundle's own identity (a CLI probe inherits the terminal's identity, so its answers are meaningless). Writes the report incrementally because enumerating ScreenCaptureKit content can hang when the permission is missing, and also reports installed speech locales and translation model availability."
+ },
+ "mac/Sources/LocalTransSub/PrefsBridge.swift": {
+  "summary": "ObservableObject wrapper so SwiftUI can bind directly to the UserDefaults-backed Prefs; each published property writes straight back to Prefs (source/target language, translateEnabled, dualLine, refineTranslation, font size, opacity, hideDockIcon)."
+ },
+ "mac/Sources/LocalTransSub/SelfTest.swift": {
+  "summary": "The --selftest end-to-end check: runs the real pipeline (system audio capture → transcription → translation → overlay) against an audio file played through the speakers. Measures when the first translation appears, when the first finished line lands, and how many times the live line updates while the sentence is still being spoken, then writes the report to a file."
+ },
+ "mac/Sources/LocalTransSub/SettingsView.swift": {
+  "summary": "Tabbed Settings window: Subtitles (font size, opacity, dual line, Dock icon), Dictation, Languages and Permissions. The Languages tab reports the status of both translation model variants (low-latency and high-fidelity) per language pair, offers an install-fast-model button and a shortcut to System Settings → Language & Region. The Permissions tab checks Screen Recording, Accessibility and Input Monitoring."
+ },
+ "mac/Sources/LocalTransSub/SubtitleSession.swift": {
+  "summary": "The live subtitle session wiring capture → transcription → translation → overlay. Loads the speech model, selects a translation engine, then handles segments: final text becomes a cue while in-progress text is translated by drainPartial, which keeps exactly one request in flight and always picks up the newest text so subtitles appear while the speaker is still talking. Also provides forceTranslate for re-running translation, startTranslationRetry when no engine is ready yet, backfillTranslations and transcript export.",
+  "sections": [
+   {
+    "symbol": "SubtitleSession.start",
+    "startLine": 35,
+    "endLine": 131,
+    "summary": "Starts a session: checks Screen Recording, loads the speech model for the locale, prepares the translation engine (recording its note when only a slower tier is available), starts the Transcriber and begins audio capture, then publishes the listening status including which translation engine was chosen."
+   },
+   {
+    "symbol": "SubtitleSession.handle",
+    "startLine": 138,
+    "endLine": 209,
+    "summary": "Receives each TranscriptSegment. Final text becomes a cue in the overlay and transcript and is translated once; in-progress text is routed to drainPartial instead. Also triggers the optional Refine pass that re-translates a finished line with the higher-quality on-device model."
+   },
+   {
+    "symbol": "SubtitleSession.drainPartial",
+    "startLine": 210,
+    "endLine": 229,
+    "summary": "Self-pacing translation of live partial text: keeps exactly one request in flight and always picks up the newest pending string, so it runs at whatever rate the model sustains rather than queueing or thrashing. This is what makes subtitles appear while the speaker is still talking."
+   },
+   {
+    "symbol": "SubtitleSession.forceTranslate",
+    "startLine": 230,
+    "endLine": 262,
+    "summary": "Re-runs translation across a chosen scope — all cues, only the selected ones, or only those still untranslated — updating both the overlay and the stored transcript while reporting progress in the panel footer."
+   },
+   {
+    "symbol": "SubtitleSession.startTranslationRetry",
+    "startLine": 263,
+    "endLine": 318,
+    "summary": "Keeps retrying engine setup in the background when no translator was available at start (a pack not installed, or the on-device model still warming up), then back-fills translations for lines already captured instead of losing them."
+   }
+  ]
+ },
+ "mac/Sources/LocalTransSub/ViewModels.swift": {
+  "summary": "View-local state as ObservableObjects owned by AppController: UIState for the selected tab and FileTranscribeModel for the file transcription flow (pick, transcribe, export). Uses @ObservedObject rather than @State because @State is a macro in the macOS 26 SDK whose implementation plugin ships only with full Xcode, while this project builds with Command Line Tools."
+ },
+ "mac/Sources/TransSubKit/AudioCapture.swift": {
+  "summary": "System and per-application audio capture via ScreenCaptureKit — the macOS answer to tabCapture: one Screen Recording grant, then any running app's audio (browser, Zoom, VLC) can be tapped with no per-tab permission dance and no picker each session. Contains CaptureTarget, CaptureError, permission checks, target enumeration and AudioStreamOutput which converts buffers to 16 kHz mono PCM."
+ },
+ "mac/Sources/TransSubKit/LLMTranslator.swift": {
+  "summary": "Fallback translator built on the on-device foundation model (FoundationModels), used when no Apple language pack is installed. Uses SystemLanguageModel only, so everything stays local. The session is owned by one task because LanguageModelSession is not Sendable, with a result cache, a refine entry point for improving a draft, and diagnose which surfaces the real error because the availability flag can claim the model is not ready while it answers perfectly."
+ },
+ "mac/Sources/TransSubKit/Languages.swift": {
+  "summary": "Language lists used by the UI: LanguageOption with a BCP-47 id and display name, the sources (spoken locales) and targets (translation languages) collections, the baseCode helper that reduces a locale to its base code, and targetName for display."
+ },
+ "mac/Sources/TransSubKit/Prefs.swift": {
+  "summary": "UserDefaults-backed preferences with no accounts and no telemetry: keys for source locale, target language, translateEnabled, dualLine, refineTranslation, font size, opacity, capture target, overlay frame, autoScroll, panel mode, cue cap, dictation hotkey and hideDockIcon, with their defaults."
+ },
+ "mac/Sources/TransSubKit/Subtitles.swift": {
+  "summary": "Transcript line model plus SRT/VTT/TXT export. SubtitleExporter splits long ASR segments into short cues (a per-cue character budget and two-line wrapping) so players do not show a wall of text, distributes the duration proportionally to text length, and supports dual-language output."
+ },
+ "mac/Sources/TransSubKit/Transcriber.swift": {
+  "summary": "On-device speech recognition using the macOS 26 SpeechAnalyzer stack, chosen over a bundled Whisper because the models are installed and updated by the system, it runs on the Neural Engine, and it emits volatile partial results, which is what makes live subtitles feel instant. The Transcriber actor handles per-locale model download, audio format negotiation, buffer conversion, a stream of TranscriptSegment values and file transcription."
+ },
+ "mac/Sources/TransSubKit/TranslationEngine.swift": {
+  "summary": "Chooses the best available on-device translator: the Apple low-latency model first, then high-fidelity, then the on-device foundation model (Apple Intelligence) which needs no language download but is far slower and therefore only translates finished lines. Exposes canTranslatePartials, refine for polishing a draft, and normalizeScript which forces Chinese output into the requested script because the fast model sometimes answers a zh-Hans request in Traditional.",
+  "sections": [
+   {
+    "symbol": "TranslationEngine.prepare",
+    "startLine": 48,
+    "endLine": 117,
+    "summary": "Walks the engine ladder: the Apple low-latency model first, then high-fidelity, then the on-device foundation model. Each rung is only adopted after it is proven to work, and the returned TranslationSetup carries a note explaining any slower fallback to the user."
+   },
+   {
+    "symbol": "TranslationEngine.translate",
+    "startLine": 118,
+    "endLine": 133,
+    "summary": "Dispatches a translation to whichever engine was adopted and normalises the result before returning it."
+   },
+   {
+    "symbol": "TranslationEngine.normalizeScript",
+    "startLine": 134,
+    "endLine": 146,
+    "summary": "Forces Chinese output into the requested script via an ICU transform, because the low-latency model sometimes answers a zh-Hans request in Traditional. It is a no-op for text already in the right script."
+   }
+  ]
+ },
+ "mac/Sources/TransSubKit/Translator.swift": {
+  "summary": "On-device translation through Apple's Translation framework. The session is owned by a single worker task because TranslationSession is not Sendable. Key detail: availability is per-strategy — the low-latency model is a separate download from high-fidelity, and asking the default object about a low-latency session can report installed for a pair that then throws on every call. The session is therefore verified with one real translation before adoption and the error is never swallowed.",
+  "sections": [
+   {
+    "symbol": "Translator.init worker",
+    "startLine": 37,
+    "endLine": 193,
+    "summary": "Owns the TranslationSession inside a single detached task because the type is not Sendable, serving prepare/translate/reset commands over a stream. The prepare path verifies a new session with one real translation before adopting it, since prepareTranslation can succeed for a pair whose model is missing."
+   },
+   {
+    "symbol": "Translator.availability",
+    "startLine": 194,
+    "endLine": 258,
+    "summary": "Reports availability per strategy and resolves loose language codes against the system's own supported languages. The low-latency and high-fidelity models are separate downloads, so querying the default object about a low-latency session gives a misleading answer."
+   }
+  ]
+ },
+ "mac/Sources/spike-capture/main.swift": {
+  "summary": "Spike proving per-app audio capture via ScreenCaptureKit works on this machine before the app was built on top of it. Can list capturable applications or capture one app's audio for a few seconds and report RMS levels, sample count, peak amplitude and how many seconds contained sound."
+ },
+ "mac/Sources/spike-engine/main.swift": {
+  "summary": "Spike proving the on-device Speech and Translation engines work using a real audio file, so it needs no Screen Recording permission. Loads PCM from a WAV, runs transcription, collects partial and final segments, then summarises time-to-first-result and the final text."
+ },
+ "mac/Tools/make-icon.swift": {
+  "summary": "Generates the app icon from the yraverage brand marks: the rounded teal tag becomes a caption bubble with subtitle bars so it stays legible at small sizes, rendered to a PNG that build-app.sh turns into AppIcon.icns."
+ },
+ "mac/build-app.sh": {
+  "summary": "App bundle build script enforcing the rules that stop the app regressing: quit any running copy first (codesign cannot sign a running binary), assemble in a staging directory and swap atomically, build the icon, sign with the stable certificate, verify the result (certificate-leaf requirement, correct bundle id, icon present) and re-register with Launch Services."
+ },
+ "mac/doctor.sh": {
+  "summary": "Diagnoses everything that has previously broken in the macOS app and says exactly how to fix it: Swift toolchain, presence of the signing certificate, health of the built bundle (stable signature, bundle id, icon) and real permission state. Checks are tri-state so a measurement that did not complete reports unknown rather than success."
+ },
+ "mac/make-signing-cert.sh": {
+  "summary": "Creates a local self-signed code-signing certificate, once. Required because an ad-hoc signature derives its identity from the CDHash, which changes on every rebuild, so macOS silently revokes Screen Recording, Accessibility and Input Monitoring each time while still listing the app as approved in System Settings."
+ },
+ "native/install-host.sh": {
+  "summary": "Installs the Chrome Native Messaging manifest for host com.localtranssub.helper into the relevant browser profile directories using the extension id passed as an argument. Run once after loading the extension so the helper start/stop buttons in Settings work."
+ },
+ "native/messaging_host.py": {
+  "summary": "Chrome Native Messaging host letting the extension start, stop and restart the helper without a terminal. Handles the length-prefixed message protocol, health checks, graceful-then-forced shutdown, freeing a port still held by an old process, and optionally ensuring the Translation Lab is running."
+ },
+ "native/run.sh": {
+  "summary": "Starts the native helper, creating a virtualenv on first run and installing mlx-whisper (Apple Silicon) or faster-whisper. Disables HuggingFace's Xet transfer backend by default because it is unreliable on some networks and corrupts model downloads mid-transfer, whereas classic HTTP downloads resume cleanly. Honours TRANSLATE, WHISPER_MODEL and DRAFT_WHISPER_MODEL."
+ },
+ "native/server.py": {
+  "summary": "The native helper: a small HTTP server bound to 127.0.0.1 only, giving the extension a fast local speech engine (mlx-whisper on Apple Silicon, faster-whisper elsewhere) plus an optional translation LLM via mlx-lm. Endpoints: /health, /transcribe (float32 16 kHz PCM), /transcribe_file, /translate, /translate_refine, /draft for live drafts, and /shutdown. A separate smaller draft model keeps interim subtitles fast."
+ },
+ "package-lock.json": {
+  "summary": "npm lockfile pinning the exact versions of every dependency (transformers.js, vad-web, onnxruntime-web, esbuild, puppeteer) and their transitive tree so extension builds are reproducible."
+ },
+ "package.json": {
+  "summary": "npm manifest for the extension (name local-transsub, type module). Defines the build/watch/dev:browser scripts that drive esbuild.config.mjs, plus runtime deps @huggingface/transformers and @ricky0123/vad-web and dev deps esbuild and puppeteer."
+ },
+ "scripts/bench-lab.py": {
+  "summary": "Headless benchmark for the native helper running the same checks as test/lab.html without a browser: /draft at 0.35 s, 0.5 s, 1 s and 2 s windows, /transcribe for final ASR and /translate in fast mode. Prints a per-language-pair latency summary and stores the raw results as JSON."
+ },
+ "scripts/build.sh": {
+  "summary": "Builds dist/ without requiring Node or npm on PATH by invoking the esbuild binary already present in node_modules — useful when the shell environment does not expose Node."
+ },
+ "scripts/dev-browser.mjs": {
+  "summary": "Launches Chrome with the unpacked extension for manual testing and DevTools inspection: serves the test pages from a small static server, opens the side panel page and a sample tab to caption, and waits for the extension service worker so it can resolve the extension id."
+ },
+ "scripts/dev-browser.sh": {
+  "summary": "Shell version of the development Chrome launcher: ensures the Translation Lab is up, derives the extension id from the dist path, locates the Chrome binary and opens the development profile with the extension loaded."
+ },
+ "scripts/e2e.mjs": {
+  "summary": "End-to-end extension test in a real Chrome: loads dist/, plays real spoken audio in a tab, starts a realtime session from the side panel page and asserts that subtitle lines appear and the overlay is injected. Supports --pick (the manual tab-picker path) and --native (local helper engine). All DOM interaction goes through main-world evaluate because Puppeteer's ElementHandle calls intermittently stall on extension pages."
+ },
+ "scripts/ensure-dev-services.sh": {
+  "summary": "Idempotently ensures the development services are up: the native helper on port 17865 and the Translation Lab on port 8799. Safe to run after every build."
+ },
+ "scripts/ensure-lab.sh": {
+  "summary": "Ensures the Translation Lab is listening on 127.0.0.1:8799 and starts it if not. Idempotent, so it is safe to call after every build."
+ },
+ "scripts/ensure-native.sh": {
+  "summary": "One-shot setup: derives the extension id from the dist path, installs the Chrome native launcher and starts the helper server."
+ },
+ "scripts/export-youtube-cookies.sh": {
+  "summary": "Exports YouTube cookies from a signed-in browser into the lab cache so yt-dlp can fetch audio for videos that require a session. The output lives in the local cache and is excluded from sync."
+ },
+ "scripts/freeze-debug.mjs": {
+  "summary": "UI freeze diagnostic: opens the extension, periodically checks whether the side panel and offscreen documents are still responsive, and if one hangs it pauses the JS thread through the Debugger protocol to print the call stack so the cause is visible."
+ },
+ "scripts/gen-icons.mjs": {
+  "summary": "Generates simple gradient PNG icons with no image library, writing PNG chunks and CRCs by hand and compressing with zlib. Used to produce the extension icons at several sizes."
+ },
+ "scripts/gen-samples.py": {
+  "summary": "Generates 16 kHz mono WAV test samples for the Translation Lab using the macOS say and afconvert tools, verifies the resulting format and writes the sample manifest."
+ },
+ "scripts/gen-samples.sh": {
+  "summary": "Thin shell wrapper that runs scripts/gen-samples.py to create the test speech files."
+ },
+ "scripts/lab-lib.sh": {
+  "summary": "Shared helpers for the Translation Lab start/stop scripts: port and URL resolution, PID file handling, stale-process cleanup, freeing the port, checking whether the lab is running, ensuring yt-dlp is available, and starting or stopping the background server."
+ },
+ "scripts/lab-server.py": {
+  "summary": "Translation Lab server: serves the static lab UI and proxies YouTube audio through yt-dlp, because browsers cannot fetch YouTube audio directly (CORS and signed URLs). Exposes info and WAV endpoints producing cached 16 kHz mono audio, discovers browser profiles for cookies, and tries several yt-dlp strategies as fallbacks."
+ },
+ "scripts/lab-status.sh": {
+  "summary": "Reports whether the Translation Lab is running, along with its URL and PID when it is."
+ },
+ "scripts/native-test.py": {
+  "summary": "Smoke test for the native helper: sends realtime-style PCM to the transcription endpoint, tries whole-file transcription and exercises translation, reporting the time each call took."
+ },
+ "scripts/restart-native.sh": {
+  "summary": "Stops then starts the native helper; used after editing native/server.py or run.sh, and invoked automatically by the esbuild watch mode."
+ },
+ "scripts/run-lab.sh": {
+  "summary": "Runs the Translation Lab as one foreground process: the test server, the native helper and opening the UI in a browser, with process cleanup when the script is interrupted."
+ },
+ "scripts/smoke.mjs": {
+  "summary": "Smoke test of the exact transformers.js pipeline API shapes the extension relies on: loads Whisper tiny with the WASM-path dtypes, runs transcribe and translate, then loads an Opus-MT pipeline, confirming the model ids and options are still valid before they are used inside the extension."
+ },
+ "scripts/start-lab.bat": {
+  "summary": "Windows counterpart of start-lab.sh: checks whether the lab already answers on port 8799, starts the server if not, then opens the lab URL in a browser."
+ },
+ "scripts/start-lab.sh": {
+  "summary": "Starts the Translation Lab server in the background and optionally opens the lab UI in a browser, using the helpers from lab-lib.sh so it is safe to run repeatedly."
+ },
+ "scripts/start-native.sh": {
+  "summary": "Starts the native helper if nothing is listening on 127.0.0.1:17865, then waits for the health endpoint to respond so callers know the server is genuinely ready."
+ },
+ "scripts/stop-lab.bat": {
+  "summary": "Windows counterpart of stop-lab.sh: finds the process listening on the lab port via netstat and terminates it."
+ },
+ "scripts/stop-lab.sh": {
+  "summary": "Stops the Translation Lab server through the lab_stop helper in lab-lib.sh, including PID file cleanup."
+ },
+ "scripts/stop-native.sh": {
+  "summary": "Stops the native helper on port 17865, trying a graceful shutdown first and force-killing whatever still holds the port if necessary."
+ },
+ "src/ai-worker.js": {
+  "summary": "Web Worker where all heavy inference runs (Whisper/Voxtral/Opus-MT and model downloads) so the side panel and the offscreen audio graph never freeze while a model loads. Simple RPC protocol: main sends {id, op, args}, the worker replies with {id, progress} zero or more times then {id, result} or {id, error}. Ops include configure, loadASR, transcribe, transcribeLong, mtLoad, mtTranslate, download and delete."
+ },
+ "src/background.js": {
+  "summary": "MV3 service worker: session state machine (idle/starting/running) and message router between the side panel, offscreen document and content script. Creates and tears down the offscreen document, mints tabCapture stream IDs, injects content.js, handles the 'Start Local TransSub on this page' context menu, watches tab navigation/close to stop capture, and persists history plus model state to chrome.storage (the offscreen document has no storage access)."
+ },
+ "src/content.js": {
+  "summary": "Content-script subtitle overlay in YouTube-CC style: a scrollable panel of cue blocks with a seekable timeline, Shadow DOM so page CSS cannot mangle it, reparenting into document.fullscreenElement for fullscreen, pointer-capture dragging, and the RefineShort, Dual Line, Force Translate and Auto scroll controls. Keeps cues in sync with the video element's currentTime and persists panel position and size."
+ },
+ "src/lib/asr.js": {
+  "summary": "Speech-recognition engine abstraction with three backends: whisper (transformers.js pipeline), voxtral (VoxtralForConditionalGeneration on WebGPU) and native (the local helper server). Handles WebGPU/WASM device selection with fallback, safe dtypes (fp32 encoder because fp16 is broken), warmup, per-utterance transcribe and timestamped transcribeLong for offline mode."
+ },
+ "src/lib/export.js": {
+  "summary": "Transcript export helpers with an optional save folder via the File System Access API. Persists the directory handle in IndexedDB so the choice survives across sessions, and falls back to a normal download when permission is not granted."
+ },
+ "src/lib/hf-env.js": {
+  "summary": "Central transformers.js environment setup for extension pages and the AI worker: points wasmPaths at the in-package ORT files, forces numThreads to 1 (extension pages are not cross-origin isolated so there is no SharedArrayBuffer), enables the browser cache, and selects the HuggingFace host or a mirror. Also provides makeProgressAggregator, which merges per-file progress events into one throttled stream."
+ },
+ "src/lib/i18n.js": {
+  "summary": "Two-language UI string table (English and 中文) for the side panel and overlay: mode labels, buttons, warnings for models that are not downloaded, the direct-translation note, the message shown when Chrome blocks tab capture, manual-picker hints and download status."
+ },
+ "src/lib/models.js": {
+  "summary": "Model download and cache management inside the AI worker: resolveModel maps a model key to its HuggingFace id, downloadModel fetches while reporting aggregated progress, deleteModel removes the matching entries from the Cache API. Downloaded state is persisted through the background worker because the offscreen document has no chrome.storage."
+ },
+ "src/lib/native-host.js": {
+  "summary": "Chrome Native Messaging bridge (host com.localtranssub.helper) so the extension can start/stop/restart the helper without a terminal. Exposes nativeHostSupported and nativeHostAction with timeout handling and a clear error when the host is not installed."
+ },
+ "src/lib/native.js": {
+  "summary": "HTTP client for the local native helper (native/server.py) on 127.0.0.1. Provides nativeHealth, nativeTranscribe (float32 16 kHz PCM), nativeTranscribeFile, nativeDraft for fast partial drafts, nativeTranslate and nativeTranslateRefine for LLM translation, and nativeShutdown."
+ },
+ "src/lib/offline-io.js": {
+  "summary": "Offline media staging through OPFS with chunked writes (CHUNK_BYTES 8 MiB) so multi-GB files work. needsNativeFilePath decides when a file is too large for the browser to decode (the ~2 GiB ArrayBuffer ceiling) and must be handed to the native helper instead."
+ },
+ "src/lib/opus.js": {
+  "summary": "Wrapper around the Opus-MT (Xenova ONNX) pipelines running in the AI worker. Always uses the WASM device because seq2seq models crash on WebGPU, and dtype q8 which is both smaller and faster than q4 for Marian-sized models. Caches one pipeline per language pair."
+ },
+ "src/lib/registry.js": {
+  "summary": "Model and language registry shared by the UI and the pipeline: ASR_MODELS (whisper-tiny/base/small/large-v3-turbo and Voxtral with sizes and dtypes), MT_PAIRS for Opus-MT, SOURCE_LANGS/TARGET_LANGS, the pairLabel and LANG_NAMES helpers, translationPlan which picks the translation strategy, and the blocklist of known Whisper hallucination phrases."
+ },
+ "src/lib/transcript-cache.js": {
+  "summary": "Per-URL transcript cache keyed by normalised page URL plus language pair, and the owner of SRT/VTT/TXT export. Contains normalizeUrl, cacheKey, coverage tracking for cached time ranges, and splitSubtitleCues which breaks long ASR segments into short readable cues instead of a wall of text."
+ },
+ "src/lib/translate.js": {
+  "summary": "Tiered local translation: whisper-direct (Whisper's translate task straight to English with no MT model), the native helper LLM, Chrome's built-in Translator API, Opus-MT inside the AI worker, and an Opus-MT pivot through English when no direct pair exists. Returns an object exposing translate, translateFast and refine so callers can show a fast draft then improve it."
+ },
+ "src/lib/translation-utils.js": {
+  "summary": "Shared helpers for deciding whether a subtitle line still needs translating: sourceText and translationText normalise the various field shapes, and needsTranslation uses a CJK character test to detect text that has not been translated yet."
+ },
+ "src/manifest.json": {
+  "summary": "MV3 manifest: permissions tabCapture, desktopCapture, offscreen, storage, unlimitedStorage, scripting, sidePanel, activeTab, tabs, contextMenus; a CSP with 'wasm-unsafe-eval' so WebAssembly can instantiate; declarations for the background service worker, side panel and the web_accessible_resources covering the ORT/VAD assets."
+ },
+ "src/offscreen.html": {
+  "summary": "Minimal wrapper page for the offscreen document; it only loads offscreen.js as a module. The document is required because MV3 service workers have no DOM, AudioContext or getUserMedia."
+ },
+ "src/offscreen.js": {
+  "summary": "Offscreen document running the whole local pipeline: tab/desktop getUserMedia capture, audio passthrough so the captured tab is not muted, a 16 kHz PCM AudioWorklet tap, Silero VAD segmentation via MicVAD, transcription through the AI worker and tiered translation. Also drives partial drafts for Refine mode, offline file jobs via NonRealTimeVAD, and model download/delete commands."
+ },
+ "src/sidepanel.css": {
+  "summary": "Dark side-panel theme (charcoal surfaces, emerald/teal accent, pill-shaped controls). Defines the colour variables, cards, segmented controls, file dropzone, stacked download progress bars, model rows and settings modal."
+ },
+ "src/sidepanel.html": {
+  "summary": "Side panel markup: header with settings button, Subtitle Generation card with the Offline/Realtime toggle, current-tab card, Task Mode and language pickers, model warning area, stacked download progress rows, Start/End Task buttons, manual tab picker, live subtitle preview, history panel, and the Settings and About/licence modals."
+ },
+ "src/sidepanel.js": {
+  "summary": "Side panel UI logic: Offline/Realtime mode switch, Transcribe/+Translate task modes, source and target language pickers, Start/End buttons, a manual tab picker (desktopCapture) as the fallback when tabCapture is refused, a model manager showing several concurrent download progress bars, session history, settings (EN/中文 UI, download mirror, WASM/WebGPU device), native helper status with start/stop controls, and transcript export."
+ },
+ "test/BENCH-LATEST.md": {
+  "summary": "Auto-generated snapshot of the most recent benchmark from scripts/bench-lab.py, recording the draft latency target and a per-language-pair summary table used as a regression reference."
+ },
+ "test/README.md": {
+  "summary": "Documentation for the Translation Lab: the benchmark UI and headless runner used to measure Refine draft speed and quality across language pairs, including the quick-start via Start Lab.command or the terminal."
+ },
+ "test/audio-page.html": {
+  "summary": "Test page with an audio element looping a speech file; used by the e2e script as a real sound source for the extension to capture."
+ },
+ "test/chrome-mock.js": {
+  "summary": "Minimal mock of the chrome.* APIs (runtime.sendMessage, onMessage, storage, getURL) so extension pages can render in a normal browser for visual testing. Not part of the packaged extension."
+ },
+ "test/index.html": {
+  "summary": "Simple index page linking every test page in the test folder so they can be opened from one place."
+ },
+ "test/lab.html": {
+  "summary": "Translation Lab browser UI: pick an audio sample or a YouTube URL, run drafts across several window lengths, and view a results table of latencies and translated text comparing fast mode against quality mode."
+ },
+ "test/lab.js": {
+  "summary": "Translation Lab client logic: loads the sample manifest, reads PCM from WAV files, slices audio windows, calls the helper's draft and transcription endpoints, times each call against the target and renders the results table and log."
+ },
+ "test/last-bench.json": {
+  "summary": "Raw JSON output of the latest benchmark run: helper health, the engine and model in use, and per-sample per-stage latency figures, used to compare performance across changes."
+ },
+ "test/offscreen-test.html": {
+  "summary": "Harness that runs offscreen.js against a mocked chrome.* API to exercise the model download path and pipeline without loading the full extension."
+ },
+ "test/overlay-test.html": {
+  "summary": "Visual harness for the content-script overlay: injects it into a sample page containing a video so layout, dragging and fullscreen behaviour can be checked in isolation."
+ },
+ "test/panel-test.html": {
+  "summary": "Visual harness that renders the built side panel against a mocked chrome.* API so the UI can be inspected in a normal browser without loading the extension."
+ },
+ "test/samples/manifest.json": {
+  "summary": "Manifest of the Translation Lab audio samples: each WAV's id, label, language pair and reference text, consumed by the lab UI and the headless benchmark."
+ },
+ "test/start-lab.sh": {
+  "summary": "Shortcut to start the Translation Lab from any directory by forwarding arguments to scripts/start-lab.sh."
+ },
+ "test/subtitle-export.test.js": {
+  "summary": "Unit test for subtitle export using node:test: asserts that very long ASR segments are split into readable cues rather than one wall of text, and verifies the SRT and VTT output shapes."
+ }
+}

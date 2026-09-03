@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Local TransSub — Test Pages</title>
+    <style>
+      body {
+        font: 16px/1.5 system-ui, sans-serif;
+        max-width: 640px;
+        margin: 40px auto;
+        padding: 0 20px;
+        color: #1a1a1a;
+      }
+      h1 { font-size: 1.4rem; }
+      a {
+        display: block;
+        padding: 12px 16px;
+        margin: 8px 0;
+        border-radius: 8px;
+        background: #f0f4ff;
+        color: #1a4fd6;
+        text-decoration: none;
+      }
+      a:hover { background: #e0eaff; }
+      .primary { background: #1a4fd6; color: #fff; font-weight: 600; }
+      .primary:hover { background: #153db0; }
+      p { color: #555; }
+    </style>
+  </head>
+  <body>
+    <h1>Local TransSub — Test Pages</h1>
+    <p>Served at <code>http://127.0.0.1:8799/</code> via <code>./scripts/run-lab.sh</code></p>
+
+    <a class="primary" href="lab.html">Translation Lab</a>
+    <p>Media player + automated zh↔en / ja↔en benchmark against the native helper.</p>
+
+    <a href="audio-page.html">Audio test page</a>
+    <p>Looping tab audio for extension e2e / dev-browser.</p>
+
+    <a href="overlay-test.html">Overlay test</a>
+    <a href="panel-test.html">Panel test</a>
+    <a href="offscreen-test.html">Offscreen test</a>
+  </body>
+</html>

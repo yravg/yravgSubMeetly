@@ -1,0 +1,244 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Local TransSub</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="brand">Local TransSub</span>
+      <div class="topbar-actions">
+        <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- ============ Subtitle Generation ============ -->
+      <section class="card">
+        <div class="card-head">
+          <h2 data-i18n="genTitle">💬 Subtitle Generation</h2>
+          <div class="seg" id="mode-toggle">
+            <button data-mode="offline" data-i18n="offline">Offline</button>
+            <button data-mode="realtime" class="active" data-i18n="realtime">Realtime</button>
+          </div>
+        </div>
+
+        <!-- Realtime: current tab -->
+        <div id="rt-target" class="target-card">
+          <img id="tab-favicon" class="favicon" alt="" />
+          <div class="target-meta">
+            <div id="tab-title" class="target-title">—</div>
+            <div id="tab-url" class="target-url"></div>
+          </div>
+          <span class="target-tag" data-i18n="currentPage">Current page</span>
+        </div>
+
+        <!-- Offline: file drop -->
+        <div id="off-drop" class="dropzone hidden">
+          <input type="file" id="off-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.webm,.ogg" hidden />
+          <div class="drop-icon">⬆️</div>
+          <div data-i18n="dropHint">Click or drag audio/video files here</div>
+          <div class="drop-sub" data-i18n="dropFormats">Supports mp3, wav, m4a, mp4, webm, ogg</div>
+          <div id="off-filename" class="drop-file"></div>
+        </div>
+
+        <div class="task-row">
+          <label class="lbl" data-i18n="taskMode">Task Mode</label>
+          <div class="task-toggles">
+            <label class="dual-inline" title="Live draft + semantic refinement when sentence ends">
+              <span data-i18n="refineShort">Refine</span>
+              <input type="checkbox" id="refine-main" class="switch" />
+            </label>
+            <label class="dual-inline" title="Show original + translation">
+              <span data-i18n="dualShort">Dual line</span>
+              <input type="checkbox" id="dual-line-main" class="switch" />
+            </label>
+          </div>
+        </div>
+        <div class="seg wide" id="task-toggle">
+          <button data-task="transcribe" data-i18n="transcribe">Transcribe</button>
+          <button data-task="translate" class="active" data-i18n="plusTranslate">+ Translate</button>
+        </div>
+
+        <div class="lang-row">
+          <div class="lang-col">
+            <label class="lbl" data-i18n="sourceLang">Source Language</label>
+            <select id="src-lang"></select>
+          </div>
+          <div class="lang-col" id="tgt-col">
+            <label class="lbl" data-i18n="targetLang">Translate To</label>
+            <select id="tgt-lang"></select>
+          </div>
+        </div>
+
+        <div id="model-warning" class="warning hidden"></div>
+        <div id="dl-list" class="dl-list hidden"></div>
+
+        <div id="status-line" class="status-line"></div>
+
+        <div class="btn-row">
+          <button id="btn-start" class="btn primary" data-i18n="startTask">Start Task</button>
+          <button id="btn-stop" class="btn" disabled data-i18n="endTask">End Task</button>
+        </div>
+        <button id="btn-pick" class="btn ghost" data-i18n="pickManually">🖥 Pick tab / window manually</button>
+        <div id="pick-hint" class="pick-hint hidden"></div>
+
+        <!-- Live preview: one box (translation only) or two (original + translation) -->
+        <div id="live-preview" class="live-preview hidden">
+          <div id="live-src-box" class="live-box live-src-box hidden">
+            <div class="live-box-label" data-i18n="liveOriginal">Original</div>
+            <div id="live-src-lines" class="live-box-body"></div>
+          </div>
+          <div id="live-tgt-box" class="live-box live-tgt-box">
+            <div class="live-box-label" data-i18n="liveTranslation">Translation</div>
+            <div id="live-tgt-lines" class="live-box-body"></div>
+          </div>
+        </div>
+
+        <!-- Offline results -->
+        <div id="off-results" class="results hidden">
+          <div class="results-head">
+            <span id="off-progress-text"></span>
+            <div class="results-actions">
+              <button id="btn-srt" class="mini-btn">SRT</button>
+              <button id="btn-vtt" class="mini-btn">VTT</button>
+              <button id="btn-txt" class="mini-btn">TXT</button>
+            </div>
+          </div>
+          <div id="off-lines" class="lines"></div>
+        </div>
+      </section>
+
+      <!-- ============ History ============ -->
+      <section class="card">
+        <div class="card-head">
+          <h2 data-i18n="history">🕘 History</h2>
+        </div>
+        <div id="history-list" class="history">
+          <div class="empty" data-i18n="noHistory">No history yet</div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>© 2026 Local TransSub</span>
+      <span class="ver">v1.0.0 <button id="btn-about" class="link-btn">ⓘ</button></span>
+    </footer>
+
+    <!-- ============ Settings modal ============ -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h2>⚙️ <span data-i18n="settings">Settings</span></h2>
+          <button id="btn-close-settings" class="icon-btn">✕</button>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="uiLang">Language / 语言</label>
+          <div class="seg" id="ui-lang-toggle">
+            <button data-lang="zh">中文</button>
+            <button data-lang="en" class="active">English</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="engine">Engine</label>
+          <div class="seg" id="engine-toggle">
+            <button data-engine="browser" class="active" data-i18n="engineBrowser">Browser</button>
+            <button data-engine="native" data-i18n="engineNative">Native helper</button>
+          </div>
+        </div>
+        <div id="native-block" class="native-block hidden">
+          <div class="native-row">
+            <input type="text" id="native-url" value="http://127.0.0.1:17865" spellcheck="false" />
+          </div>
+          <div class="native-status-row">
+            <span id="native-status-dot" class="status-dot unknown"></span>
+            <span id="native-status" class="native-status">…</span>
+          </div>
+          <div class="native-actions">
+            <button id="btn-native-start" class="mini-btn" data-i18n="nativeStart">Start</button>
+            <button id="btn-native-stop" class="mini-btn" data-i18n="nativeStop">Stop</button>
+            <button id="btn-native-restart" class="mini-btn" data-i18n="nativeRestart">Restart</button>
+            <button id="btn-native-check" class="mini-btn" data-i18n="check">Refresh</button>
+          </div>
+          <div id="native-host-hint" class="hint native-host-hint hidden"></div>
+          <div class="hint" data-i18n="nativeNote"></div>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="dlSource">Download source</label>
+          <div class="seg" id="mirror-toggle">
+            <button data-mirror="huggingface" class="active">HuggingFace</button>
+            <button data-mirror="hf-mirror">HF-Mirror</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="device">Inference device</label>
+          <div class="seg" id="device-toggle">
+            <button data-device="auto" class="active">Auto</button>
+            <button data-device="webgpu">WebGPU</button>
+            <button data-device="wasm">WASM</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="exportFolder">Save exports to folder</label>
+          <div class="export-folder-row">
+            <span id="export-folder-label" class="export-folder-label" data-i18n="exportFolderNone">Downloads (default)</span>
+            <button id="btn-pick-export-folder" class="mini-btn" data-i18n="exportFolderPick">Choose…</button>
+            <button id="btn-clear-export-folder" class="mini-btn hidden" data-i18n="exportFolderClear">Clear</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="refineLine">Live refine translation (draft while speaking, correct at end)</label>
+          <input type="checkbox" id="refine" class="switch" />
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="dualLine">Show original + translation (dual line)</label>
+          <input type="checkbox" id="dual-line" class="switch" />
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="fontSize">Subtitle font size</label>
+          <input type="range" id="font-size" min="14" max="40" value="24" />
+        </div>
+
+        <h3 class="models-title" data-i18n="modelFiles">Model Files</h3>
+        <div class="hint" data-i18n="modelHint">
+          Models download once from HuggingFace and are cached locally — everything runs
+          offline afterwards. If downloads stall, switch the download source and retry.
+        </div>
+        <div id="asr-models" class="model-list"></div>
+        <h3 class="models-title" data-i18n="mtModels">Translation models (per language pair)</h3>
+        <div id="mt-models" class="model-list"></div>
+
+        <div id="about-block" class="about hidden">
+          <h3>About / Open-source licenses</h3>
+          <p>
+            Local TransSub runs entirely on your device. No audio, video, or text is ever
+            uploaded. Open-source components used:
+          </p>
+          <ul>
+            <li>OpenAI Whisper — MIT License</li>
+            <li>Mistral Voxtral — Apache License 2.0</li>
+            <li>Apple MLX / mlx-whisper / mlx-lm (native helper) — MIT License</li>
+            <li>Qwen2.5 (native translation) — Apache License 2.0</li>
+            <li>Hugging Face transformers.js — Apache License 2.0</li>
+            <li>Microsoft ONNX Runtime Web — MIT License</li>
+            <li>Helsinki-NLP Opus-MT models — CC BY 4.0</li>
+            <li>Silero VAD — MIT License</li>
+            <li>@ricky0123/vad-web — ISC License</li>
+          </ul>
+          <p>Copyright and trademarks of model weights belong to their original authors.</p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
