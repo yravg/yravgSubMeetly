@@ -1,59 +1,101 @@
 /**
- * Serialisasi ekspor notulen → TXT / Markdown.
+ * Ekspor register v2 → Markdown / CSV.
+ *
+ * Catatan lama (assertMeetingNote atas { summary, decisions:string[], actions[] })
+ * dihapus di v2 — notes-store.js menaikkan versi data v1 sebelum sampai di sini,
+ * jadi UI selalu memegang sebuah Meeting bertipe. XLSX/ICS/DOCX menyusul di 2.1+
+ * lewat native helper (lihat docs/NOTES-V2-SPEC.md §5.4).
+ *
+ * v2 register export — Markdown / CSV. The v1 note serializer
+ * (assertMeetingNote over { summary, decisions:string[], actions[] }) is gone in
+ * v2 — notes-store.js upgrades v1 data before it reaches this layer, so callers
+ * always hold a typed Meeting. XLSX/ICS/DOCX land in 2.1+ via the native helper
+ * (see docs/NOTES-V2-SPEC.md §5.4).
  */
-import { assertMeetingNote } from './notes-schema.js';
+import { pickText, meetingStats } from './notes-schema.js';
 
-export function noteToMarkdown(raw) {
-  const note = assertMeetingNote(raw);
+const DOC_SECTIONS = [
+  ['decision', 'docDecisions', 'Decisions'],
+  ['action', 'docActions', 'Action register'],
+  ['question', 'docQuestions', 'Open questions'],
+  ['risk', 'docRisks', 'Risks'],
+  ['metric', 'docMetrics', 'Progress'],
+  ['info', 'docNotes', 'Discussion notes'],
+];
+
+function label(T, key, fallback) {
+  if (!T) return fallback;
+  const v = T(key);
+  return v === key ? fallback : v;
+}
+
+/**
+ * Notulen lengkap sebagai Markdown. `T` opsional (dari makeT(lang)) untuk judul
+ * seksi terlokalisasi; tanpanya jatuh ke label bahasa Inggris.
+ * @param {import('./notes-schema.js').Meeting} meeting
+ * @param {string} [lang]
+ * @param {(key:string, ...args:any[])=>string} [T]
+ */
+export function serializeMeetingMarkdown(meeting, lang = meeting.locale || 'en', T = null) {
+  const stats = meetingStats(meeting);
   const lines = [
-    `# ${note.title}`,
+    `# ${meeting.title}`,
     '',
-    `_Sumber: ${note.source}_ · _${note.generatedAt}_`,
+    `_${meeting.id}_ · ${meeting.date}${meeting.start ? ` · ${meeting.start}${meeting.end ? `–${meeting.end}` : ''}${meeting.tz ? ` ${meeting.tz}` : ''}` : ''}${meeting.chair ? ` · ${label(T, 'chair', 'Chair')}: ${meeting.chair}` : ''}`,
+    meeting.issuedAt ? `_${label(T, 'issued', 'Issued')}: ${meeting.issuedAt}_` : '_Draft — not yet issued_',
     '',
-    '## Ringkasan',
-    note.summary || '_(kosong)_',
-    '',
-    '## Poin Keputusan',
-    ...(note.decisions.length ? note.decisions.map((d) => `- ${d}`) : ['_(kosong)_']),
-    '',
-    '## Tindak Lanjut',
-    ...(note.actions.length
-      ? note.actions.map((a) => {
-          const box = a.status === 'done' ? '[x]' : '[ ]';
-          const due = a.due ? ` (due ${a.due})` : '';
-          return `- ${box} **${a.owner || '?'}** — ${a.text}${due}`;
-        })
-      : ['_(kosong)_']),
+    `${stats.total} items · ${stats.actionsOpen}/${stats.actionsTotal} actions open · ${stats.decisions} decisions · ${stats.questionsOpen} open questions · agenda ${stats.agendaPct}% covered`,
     '',
   ];
+
+  if (meeting.agenda?.length) {
+    lines.push(`## Agenda`, '');
+    for (const a of meeting.agenda) {
+      lines.push(`- [${a.covered ? 'x' : ' '}] ${a.ref} — ${pickText(a.title, lang)}`);
+    }
+    lines.push('');
+  }
+
+  for (const [type, key, fallback] of DOC_SECTIONS) {
+    const rows = meeting.items.filter((i) => i.type === type);
+    if (!rows.length) continue;
+    lines.push(`## ${label(T, key, fallback)}`, '');
+    for (const it of rows) {
+      const meta = [];
+      if (it.owner) meta.push(it.owner);
+      if (it.due) meta.push(`due ${it.due}`);
+      if (it.status && it.status !== 'open') meta.push(it.status);
+      if (it.type === 'metric' && it.metric) {
+        meta.push(`${it.metric.value}${it.metric.unit}${it.metric.baseline != null ? ` (baseline ${it.metric.baseline}${it.metric.unit})` : ''}`);
+      }
+      const suffix = meta.length ? ` — ${meta.join(' · ')}` : '';
+      const flag = it.review === 'ai' ? ' ‡' : '';
+      lines.push(`- **${it.ref}** ${pickText(it.text, lang)}${suffix}${flag}`);
+    }
+    lines.push('');
+  }
+
+  const unreviewed = meeting.items.filter((i) => i.review === 'ai');
+  lines.push(
+    '---',
+    unreviewed.length
+      ? `‡ ${unreviewed.length} item(s) still AI-drafted, not yet reviewed by a human.`
+      : 'Every item has been reviewed by a human.',
+    `Drafted on-device${meeting.engine ? ` — ${meeting.engine.asr}` : ''}. Nothing left this machine.`,
+    '',
+  );
   return lines.join('\n');
 }
 
-export function noteToTxt(raw) {
-  const note = assertMeetingNote(raw);
-  return [
-    note.title,
-    `Sumber: ${note.source}`,
-    `Dibuat: ${note.generatedAt}`,
-    '',
-    'RINGKASAN',
-    note.summary || '(kosong)',
-    '',
-    'POIN KEPUTUSAN',
-    ...(note.decisions.length ? note.decisions.map((d) => `- ${d}`) : ['(kosong)']),
-    '',
-    'TINDAK LANJUT',
-    ...(note.actions.length
-      ? note.actions.map(
-          (a) =>
-            `- [${a.status}] ${a.owner || '?'} | ${a.text}${a.due ? ` | due ${a.due}` : ''}`,
-        )
-      : ['(kosong)']),
-    '',
-  ].join('\n');
-}
-
-export function serializeNote(note, format) {
-  if (format === 'md' || format === 'markdown') return noteToMarkdown(note);
-  return noteToTxt(note);
+/** Register sebagai CSV datar — satu baris per butir. */
+export function serializeMeetingCsv(meeting, lang = meeting.locale || 'en') {
+  const cols = ['ref', 'type', 'topic', 'text', 'owner', 'due', 'status', 'review', 'confidence'];
+  const esc = (v) => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const rows = meeting.items.map((it) => [
+    it.ref, it.type, it.topic, pickText(it.text, lang), it.owner || '', it.due || '', it.status, it.review, it.confidence,
+  ]);
+  return [cols.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
 }
