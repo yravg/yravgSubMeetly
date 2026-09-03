@@ -1,37 +1,42 @@
-# Chrome Web Store assets (Fase 3)
+# Chrome Web Store assets (1.1.0)
 
-Materi listing: [`listing.md`](./listing.md)  
-Privasi: [`PRIVACY.md`](./PRIVACY.md)  
-Audit MV3: [`MV3-AUDIT.md`](./MV3-AUDIT.md)  
-Panduan kirim: [`SUBMIT.md`](./SUBMIT.md)
+| Doc | Path |
+|---|---|
+| Listing copy | [`listing.md`](./listing.md) |
+| Privacy policy | [`PRIVACY.md`](./PRIVACY.md) |
+| MV3 permission audit | [`MV3-AUDIT.md`](./MV3-AUDIT.md) |
+| Submit steps | [`SUBMIT.md`](./SUBMIT.md) |
 
-## Ikon
-Gunakan `icons/icon16.png`, `icons/icon48.png`, `icons/icon128.png` (sudah ada di repo).
-Untuk toko, sediakan juga **128×128** dan **440×280** promo bila diminta.
+## Icons
+Ship `icons/icon16.png`, `icon48.png`, `icon128.png` (mirrors of repo `icons/`).
 
-Salinan kerja untuk unggahan:
+Optional promo: **440×280** small tile / **1400×560** marquee if you create them later.
 
-```bash
-mkdir -p store/icons
-cp icons/icon128.png store/icons/icon128.png
-cp icons/icon48.png store/icons/icon48.png
-cp icons/icon16.png store/icons/icon16.png
-```
+## Screenshots
+Saved under `store/screenshots/` (1280×800 PNG):
 
-## Tangkapan layar
-Rekam alur berikut (simpan di `store/screenshots/`):
+1. `01-sidepanel-realtime.png` — **primary CWS shot** (Side Panel harness via lab)
+2. `02-offline-studio.png` — Offline Studio lab page (dev harness; optional listing image)
+3. `03-notes-helper.png` — Notes stub harness (optional; shows Notulen UI)
 
-1. Side Panel Realtime + overlay subtitel  
-2. Offline Studio (`test/studio.html`)  
-3. Native Helper status + Notulen  
+Regenerate:
 
-Placeholder HTML preview: buka `test/studio.html` dan `test/notes-panel.html` via lab server.
-
-## Paket ZIP
 ```bash
 npm run build
-node scripts/pack-store.mjs
+# lab must be up on :8799
+npm run pack:store:screens
 ```
 
-## Deskripsi singkat
-Local TransSub — subtitel & terjemahan real-time 100% on-device. Tanpa akun, tanpa cloud.
+For the dashboard, prefer at least one capture from the **loaded extension** (overlay on a real tab) in addition to `01-…`.
+
+## Package ZIP
+
+```bash
+npm run build
+npm run pack:store
+```
+
+Canonical upload path: **`store/releases/local-transsub-1.1.0.zip`**.
+
+## Short blurb
+Local TransSub — on-device realtime subtitles & translation. No Local TransSub cloud inference; models download once when you choose them.

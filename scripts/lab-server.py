@@ -271,6 +271,23 @@ def download_youtube_wav(url: str) -> tuple[Path, dict]:
             return wav_path, meta
 
 
+MIME = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".wasm": "application/wasm",
+    ".onnx": "application/octet-stream",
+    ".map": "application/json",
+}
+
+
 class LabHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(TEST_DIR), **kwargs)
@@ -297,7 +314,35 @@ class LabHandler(SimpleHTTPRequestHandler):
             return self._youtube_info(parsed)
         if parsed.path == "/api/youtube-audio":
             return self._youtube_audio(parsed)
+        # Browser harnesses load built UI + source via absolute /dist and /src.
+        if parsed.path == "/dist" or parsed.path.startswith("/dist/"):
+            return self._serve_under(ROOT / "dist", parsed.path[len("/dist") :].lstrip("/"))
+        if parsed.path == "/src" or parsed.path.startswith("/src/"):
+            return self._serve_under(ROOT / "src", parsed.path[len("/src") :].lstrip("/"))
         return super().do_GET()
+
+    def _serve_under(self, base: Path, rel: str):
+        """Serve a file under base; rejects path traversal. 404 if missing."""
+        root = base.resolve()
+        if not rel:
+            self.send_error(404)
+            return
+        target = (root / rel).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError:
+            self.send_error(403)
+            return
+        if not target.is_file():
+            self.send_error(404)
+            return
+        data = target.read_bytes()
+        ctype = MIME.get(target.suffix.lower(), "application/octet-stream")
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -360,6 +405,7 @@ def _yt_error_hint(msg: str) -> str:
 
 def main():
     print(f"Translation Lab server → http://{HOST}:{PORT}/lab.html")
+    print(f"Browser app UI       → http://{HOST}:{PORT}/app.html")
     print(f"YouTube proxy: GET /api/youtube-audio?url=...")
     try:
         find_yt_dlp()

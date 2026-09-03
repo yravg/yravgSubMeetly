@@ -1,14 +1,14 @@
 {
   "source": "smoke",
-  "generatedAt": "2026-09-03T04:29:34.989Z",
+  "generatedAt": "2026-09-03T06:52:30.104Z",
   "target": 26,
   "pipeline": false,
   "live": false,
   "command": "node scripts/smoke.mjs",
   "counts": {
-    "pass": 23,
+    "pass": 26,
     "fail": 0,
-    "warn": 3,
+    "warn": 0,
     "pending": 0,
     "skip": 0
   },
@@ -19,7 +19,7 @@
       "group": "Ekstensi Chrome",
       "status": "pass",
       "detail": "Wiring tabCapture + skrip e2e + dist/ siap",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "ext-tab-picker",
@@ -35,7 +35,7 @@
       "group": "Ekstensi Chrome",
       "status": "pass",
       "detail": "offscreen mengimpor Silero MicVAD / NonRealTimeVAD",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "ext-overlay",
@@ -67,7 +67,7 @@
       "group": "Ekstensi Chrome",
       "status": "pass",
       "detail": "makeTranslator di translate.js",
-      "durationMs": 0
+      "durationMs": 4
     },
     {
       "id": "ext-dual-line",
@@ -75,7 +75,7 @@
       "group": "Ekstensi Chrome",
       "status": "pass",
       "detail": "Harness overlay punya demo dual-line",
-      "durationMs": 1
+      "durationMs": 3
     },
     {
       "id": "ext-refine",
@@ -115,7 +115,7 @@
       "group": "Terjemahan berjenjang",
       "status": "pass",
       "detail": "Jalur Whisper-direct ada di asr.js; --pipeline untuk smoke bentuk keluaran",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "mt-chrome",
@@ -137,9 +137,9 @@
       "id": "mt-native-llm",
       "name": "LLM native (Qwen / MLX)",
       "group": "Terjemahan berjenjang",
-      "status": "warn",
-      "detail": "LLM di server.py ada; helper offline (ECONNREFUSED)",
-      "durationMs": 16
+      "status": "pass",
+      "detail": "Helper hidup: engine=mlx-whisper model=mlx-community/whisper-large-v3-turbo; translate=true",
+      "durationMs": 39
     },
     {
       "id": "export-srt",
@@ -147,7 +147,7 @@
       "group": "Ekspor",
       "status": "pass",
       "detail": "formatSrt menghasilkan cue berwaktu + dual-line",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "export-vtt",
@@ -163,22 +163,22 @@
       "group": "Ekspor",
       "status": "pass",
       "detail": "formatTxt menghasilkan header + baris sumber/terjemahan",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "helper-http",
       "name": "HTTP lokal + Native Messaging",
       "group": "Native Helper",
-      "status": "warn",
-      "detail": "Host + server ada; /health offline (ECONNREFUSED)",
+      "status": "pass",
+      "detail": "HTTP helper OK — engine=mlx-whisper model=mlx-community/whisper-large-v3-turbo",
       "durationMs": 0
     },
     {
       "id": "helper-asr",
       "name": "ASR native (mlx-whisper / faster-whisper)",
       "group": "Native Helper",
-      "status": "warn",
-      "detail": "Kode ASR ada; helper offline (ECONNREFUSED)",
+      "status": "pass",
+      "detail": "ASR helper hidup — engine=mlx-whisper model=mlx-community/whisper-large-v3-turbo",
       "durationMs": 0
     },
     {
@@ -187,7 +187,7 @@
       "group": "Native Helper",
       "status": "pass",
       "detail": "Klien native.js memanggil /transcribe_file",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "mac-capture",
@@ -235,11 +235,11 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Wiring tabCapture + skrip e2e + dist/ siap",
-        "durationMs": 0
+        "durationMs": 1
       }
     },
     {
@@ -254,7 +254,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "e2e.mjs mendukung --pick",
@@ -273,11 +273,11 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "offscreen mengimpor Silero MicVAD / NonRealTimeVAD",
-        "durationMs": 0
+        "durationMs": 1
       }
     },
     {
@@ -292,7 +292,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "content.js + harness overlay-test.html",
@@ -311,7 +311,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Side Panel sumber + harness panel-test.html",
@@ -330,7 +330,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Mode Transcribe terhubung (UI + asr.js); --pipeline untuk bentuk keluaran",
@@ -349,11 +349,11 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "makeTranslator di translate.js",
-        "durationMs": 0
+        "durationMs": 4
       }
     },
     {
@@ -368,11 +368,11 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Harness overlay punya demo dual-line",
-        "durationMs": 1
+        "durationMs": 3
       }
     },
     {
@@ -387,7 +387,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Refine terhubung; last-bench.json ada (ok)",
@@ -406,7 +406,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "offscreen punya jalur berkas / transcribeLong",
@@ -425,7 +425,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "background menyimpan riwayat ke chrome.storage",
@@ -444,7 +444,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Manajer model + registry",
@@ -463,11 +463,11 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Jalur Whisper-direct ada di asr.js; --pipeline untuk smoke bentuk keluaran",
-        "durationMs": 0
+        "durationMs": 1
       }
     },
     {
@@ -482,7 +482,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Chrome Translator API di translate.js (skip runtime di Node)",
@@ -501,7 +501,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "opus.js terhubung; --pipeline untuk inferensi q8",
@@ -514,17 +514,17 @@
       "group": "Terjemahan berjenjang",
       "summary": "Terjemahan berkualitas lewat helper (translate / translate_refine).",
       "surface": "native/server.py · src/lib/native.js",
-      "status": "warn",
+      "status": "pass",
       "evidence": {
         "kind": "smoke",
-        "label": "scripts/smoke.mjs · warn",
+        "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
-        "status": "warn",
-        "detail": "LLM di server.py ada; helper offline (ECONNREFUSED)",
-        "durationMs": 16
+        "status": "pass",
+        "detail": "Helper hidup: engine=mlx-whisper model=mlx-community/whisper-large-v3-turbo; translate=true",
+        "durationMs": 39
       }
     },
     {
@@ -539,11 +539,11 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "formatSrt menghasilkan cue berwaktu + dual-line",
-        "durationMs": 0
+        "durationMs": 1
       }
     },
     {
@@ -558,7 +558,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "formatVtt dual/single OK",
@@ -577,11 +577,11 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "formatTxt menghasilkan header + baris sumber/terjemahan",
-        "durationMs": 1
+        "durationMs": 0
       }
     },
     {
@@ -590,16 +590,16 @@
       "group": "Native Helper",
       "summary": "Server 127.0.0.1:17865 dan host com.localtranssub.helper.",
       "surface": "native/server.py · native/messaging_host.py",
-      "status": "warn",
+      "status": "pass",
       "evidence": {
         "kind": "smoke",
-        "label": "scripts/smoke.mjs · warn",
+        "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
-        "status": "warn",
-        "detail": "Host + server ada; /health offline (ECONNREFUSED)",
+        "status": "pass",
+        "detail": "HTTP helper OK — engine=mlx-whisper model=mlx-community/whisper-large-v3-turbo",
         "durationMs": 0
       }
     },
@@ -609,16 +609,16 @@
       "group": "Native Helper",
       "summary": "Whisper di GPU Apple (MLX) atau CPU/CUDA di OS lain.",
       "surface": "native/server.py",
-      "status": "warn",
+      "status": "pass",
       "evidence": {
         "kind": "smoke",
-        "label": "scripts/smoke.mjs · warn",
+        "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
-        "status": "warn",
-        "detail": "Kode ASR ada; helper offline (ECONNREFUSED)",
+        "status": "pass",
+        "detail": "ASR helper hidup — engine=mlx-whisper model=mlx-community/whisper-large-v3-turbo",
         "durationMs": 0
       }
     },
@@ -634,11 +634,11 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "Klien native.js memanggil /transcribe_file",
-        "durationMs": 1
+        "durationMs": 0
       }
     },
     {
@@ -653,7 +653,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "TransSubKit (ScreenCaptureKit)",
@@ -672,7 +672,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "OverlayWindow.swift (NSPanel)",
@@ -691,7 +691,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "DictationController.swift",
@@ -710,7 +710,7 @@
         "label": "scripts/smoke.mjs · pass",
         "href": null
       },
-      "lastRun": "2026-09-03T04:29:34.990Z",
+      "lastRun": "2026-09-03T06:52:30.108Z",
       "smoke": {
         "status": "pass",
         "detail": "MainView.swift berkas + ekspor",

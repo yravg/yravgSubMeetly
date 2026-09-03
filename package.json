@@ -2,7 +2,7 @@
   "name": "local-transsub",
   "version": "1.1.0",
   "private": true,
-  "description": "Local TransSub — fully-offline realtime subtitle & translation Chrome extension. All AI runs on-device.",
+  "description": "Local TransSub — on-device realtime subtitle & translation Chrome extension. Inference stays local after models download.",
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs",
@@ -20,7 +20,9 @@
     "bench:report": "node scripts/bench-report.mjs",
     "defects:gen": "node scripts/gen-defects.mjs",
     "release:gate": "node scripts/mark-release-priorities.mjs",
-    "release:check": "node scripts/mark-release-priorities.mjs --check"
+    "release:check": "node scripts/mark-release-priorities.mjs --check",
+    "pack:store": "node scripts/pack-store.mjs",
+    "pack:store:screens": "node scripts/capture-store-screens.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

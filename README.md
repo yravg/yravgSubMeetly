@@ -1,7 +1,7 @@
 # yraverageSub
 
-Live subtitles, transcription and translation that run **entirely on your device**.
-No accounts, no telemetry — no audio, video or text ever leaves your machine.
+Live subtitles, transcription and translation that run **on your device**.
+No accounts, no telemetry — we do not upload your audio, video, or transcripts to a Local TransSub cloud. Model weights may download once when you choose them, then stay cached locally.
 
 This repo holds two clients built on that same idea:
 
@@ -19,9 +19,9 @@ Inspired by the "Local AI Subtitle" extension, rebuilt from scratch on an open s
 
 ## The browser extension
 
-A fully-offline Chrome extension that generates **realtime floating subtitles** for any
-browser tab, and transcribes/translates **uploaded audio/video files** to SRT/VTT — with
-every AI model running **locally on your device**.
+An on-device Chrome extension that generates **realtime floating subtitles** for any
+browser tab, and transcribes/translates **uploaded audio/video files** to SRT/VTT —
+inference runs **locally** after models are downloaded and cached.
 
 ## Features
 

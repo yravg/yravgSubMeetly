@@ -1,1177 +1,1177 @@
 {
-  ".claude/launch.json": {
-    "summary": "Konfigurasi atau data JSON proyek. Berkas `launch.json` (json). Ringkasan dari komentar/header: \"version\": \"0.0.1\","
-  },
-  ".claude/skills/ngodingpakeai/SKILL.md": {
-    "summary": "Instruksi skill agen untuk sync/task NgodingPakeAI. Berkas `SKILL.md` (markdown). Ringkasan dari komentar/header: --- NgodingPakeAI — Codebase Sync # Prerequisites # How sync works (one mode — YOU write the summaries) # Existing codebase? The summary sync builds the pending plan for you"
-  },
-  ".cursor/rules/native-helper-lifecycle.mdc": {
-    "summary": "Dokumentasi atau aturan proyek. Berkas `native-helper-lifecycle.mdc`. Ringkasan dari komentar/header: --- Native Helper Lifecycle # Single control path # Stop before start # Server startup # Scripts"
-  },
-  ".ngodingpakeaiignore": {
-    "summary": "Berkas pendukung proyek Local TransSub. Berkas `.ngodingpakeaiignore`. Ringkasan dari komentar/header: .ngodingpakeaiignore — extra paths to keep out of NgodingPakeAI sync. Uses .gitignore syntax. Secrets, node_modules, build output and .env files are ALWAYS blocked by the CLI regardless of what is listed here. Examples: docs/internal/ *.snap fixtures/ --- ditambahkan saat sync pertama ---"
-  },
-  "AGENTS.md": {
-    "summary": "Aturan workspace agen AI termasuk alur NgodingPakeAI. Berkas `AGENTS.md` (markdown). Ringkasan dari komentar/header: ngodingpakeai:skill:start NgodingPakeAI — Codebase Sync # Prerequisites # How sync works (one mode — YOU write the summaries) # Existing codebase? The summary sync builds the pending plan for you"
-  },
-  "README.md": {
-    "summary": "Dokumentasi pengantar repositori atau paket. Berkas `README.md` (markdown). Ringkasan dari komentar/header: yraverageSub # The browser extension # Features"
-  },
-  "Start Lab.command": {
-    "summary": "Skrip shell/batch untuk menjalankan layanan lokal. Berkas `Start Lab.command`. Ringkasan dari komentar/header: !/bin/bash"
-  },
-  "Stop Lab.command": {
-    "summary": "Skrip shell/batch untuk menjalankan layanan lokal. Berkas `Stop Lab.command`. Ringkasan dari komentar/header: !/bin/bash"
-  },
-  "esbuild.config.mjs": {
-    "summary": "Konfigurasi bundler esbuild untuk paket ekstensi. Berkas `esbuild.config.mjs` (javascript)."
-  },
-  "mac/Package.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `Package.swift` (swift). Ringkasan dari komentar/header: swift-tools-version: 6.0"
-  },
-  "mac/README.md": {
-    "summary": "Dokumentasi pengantar repositori atau paket. Berkas `README.md` (markdown). Ringkasan dari komentar/header: yraverageSub for macOS # Why a Mac app (vs the browser extension) # Engines # If anything misbehaves, run the doctor first"
-  },
-  "mac/Sources/LocalTransSub/App.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `App.swift` (swift). Ringkasan dari komentar/header: yraverageSub — menu bar app. No accounts, no telemetry; all speech and translation run on-device. Simbol penting: AppDelegate, AppController.",
-    "sections": [
-      {
-        "symbol": "AppDelegate",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait AppDelegate pada App.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
-      },
-      {
-        "symbol": "AppController",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait AppController pada App.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
-      }
-    ]
-  },
-  "mac/Sources/LocalTransSub/BenchTranslate.swift": {
-    "summary": "Terjemahan lokal berjenjang dan registri model. Berkas `BenchTranslate.swift` (swift). Ringkasan dari komentar/header: `--bench-translate`: measures real translation latency per strategy from inside the app bundle. A bare CLI binary cannot reach the Translation daemon (it hangs), so the benchmark has to live here."
-  },
-  "mac/Sources/LocalTransSub/Brand.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `Brand.swift` (swift). Ringkasan dari komentar/header: yraverage brand palette, sampled from the wordmark."
-  },
-  "mac/Sources/LocalTransSub/DictationController.swift": {
-    "summary": "Layanan native macOS untuk audio, ASR, atau dikte. Berkas `DictationController.swift` (swift). Ringkasan dari komentar/header: Wispr-Flow-style dictation: hold a hotkey, speak, release → the cleaned-up text is inserted at the cursor in whatever app has focus. Permissions needed: Input Monitoring (to watch the hotkey), Accessibility (to synthesize ⌘V), Microphone. Simbol penting: DictationController, PCMBuffer, SegmentCollector, DictationPill.",
-    "sections": [
-      {
-        "symbol": "DictationController",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait DictationController pada DictationController.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
-      },
-      {
-        "symbol": "PCMBuffer",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait PCMBuffer pada DictationController.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
-      },
-      {
-        "symbol": "SegmentCollector",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait SegmentCollector pada DictationController.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
-      },
-      {
-        "symbol": "DictationPill",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait DictationPill pada DictationController.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
-      }
-    ]
-  },
-  "mac/Sources/LocalTransSub/LanguagePackInstaller.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `LanguagePackInstaller.swift` (swift). Ringkasan dari komentar/header: Requests Apple language-model downloads from inside the app. Apple gates pack installation behind a SwiftUI view modifier: a session vended by `.translationTask` reports `canRequestDownloads == true`, so `prepareTranslation()` presents the system \"Download language?\" sheet. A session built with `TranslationSession(inst Simbol penting: LanguagePackInstaller.",
-    "sections": [
-      {
-        "symbol": "LanguagePackInstaller",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait LanguagePackInstaller pada LanguagePackInstaller.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
-      }
-    ]
-  },
-  "mac/Sources/LocalTransSub/LanguageStatusModel.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `LanguageStatusModel.swift` (swift). Ringkasan dari komentar/header: Live view of which translation models are installed, shown in Settings so the state is visible without starting a session first. Simbol penting: LanguageStatusModel."
-  },
-  "mac/Sources/LocalTransSub/MainView.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `MainView.swift` (swift). Ringkasan dari komentar/header: Main window: live subtitles control + file transcription."
-  },
-  "mac/Sources/LocalTransSub/MainWindow.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `MainWindow.swift` (swift). Ringkasan dari komentar/header: AppKit-owned main window. Using an NSWindow instead of a SwiftUI `Window` scene so the app can open it programmatically (first launch, menu item) — a menu-bar-only app that shows nothing on first launch leaves the user with no way to grant permissions. Simbol penting: MainWindowController."
-  },
-  "mac/Sources/LocalTransSub/OverlayPanelView.swift": {
-    "summary": "Overlay subtitel mengambang macOS. Berkas `OverlayPanelView.swift` (swift). Ringkasan dari komentar/header: The floating subtitle panel — native equivalent of the browser extension's in-page overlay: a toolbar of live controls, a scrollable transcript with timestamps and per-line selection, and a status footer."
-  },
-  "mac/Sources/LocalTransSub/OverlayProbe.swift": {
-    "summary": "Overlay subtitel mengambang macOS. Berkas `OverlayProbe.swift` (swift). Ringkasan dari komentar/header: `--overlay-probe`: shows the overlay and reports whether the window can actually be moved and resized, by inspecting its style and by performing real frame changes and reading the result back."
-  },
-  "mac/Sources/LocalTransSub/OverlayWindow.swift": {
-    "summary": "Overlay subtitel mengambang macOS. Berkas `OverlayWindow.swift` (swift). Ringkasan dari komentar/header: The floating subtitle window. A real non-activating panel that floats above everything (including other apps' fullscreen video), never fights page CSS, and can't be blocked by a site — the main advantage over the browser extension's in-page overlay. Simbol penting: OverlayController, OverlayModel.",
-    "sections": [
-      {
-        "symbol": "OverlayController",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait OverlayController pada OverlayWindow.swift: mendukung peran Overlay subtitel mengambang macOS."
-      },
-      {
-        "symbol": "OverlayModel",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait OverlayModel pada OverlayWindow.swift: mendukung peran Overlay subtitel mengambang macOS."
-      }
-    ]
-  },
-  "mac/Sources/LocalTransSub/PermissionReport.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `PermissionReport.swift` (swift). Ringkasan dari komentar/header: Prints the app's real permission + capability state (`--check-perms`). Runs inside the app bundle's own identity, which is the only place these answers are meaningful — a CLI probe inherits the terminal's identity."
-  },
-  "mac/Sources/LocalTransSub/PrefsBridge.swift": {
-    "summary": "Preferensi pengguna lokal (UserDefaults / bridge SwiftUI). Berkas `PrefsBridge.swift` (swift). Ringkasan dari komentar/header: Observable wrapper so SwiftUI can bind directly to Prefs. Simbol penting: PrefsBridge."
-  },
-  "mac/Sources/LocalTransSub/SelfTest.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `SelfTest.swift` (swift). Ringkasan dari komentar/header: End-to-end self test (`--selftest`): runs the real pipeline — system audio capture → transcription → translation → overlay — against audio played through the speakers, and writes the result to /tmp/transsub-selftest.txt."
-  },
-  "mac/Sources/LocalTransSub/SettingsView.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `SettingsView.swift` (swift). Ringkasan dari komentar/header: Settings: appearance, dictation, permissions, language packs."
-  },
-  "mac/Sources/LocalTransSub/SubtitleSession.swift": {
-    "summary": "The live subtitle session wiring capture → transcription → translation → overlay. Loads the speech model, selects a translation engine, then handles segments: final text becomes a cue while in-progress text is translated by drainPartial, which keeps exactly one request in flight and always picks up the newest text so subtitles appear while the speaker is still talking. Also provides forceTranslate for re-running translation, startTranslationRetry when no engine is ready yet, backfillTranslations and transcript export.",
-    "sections": [
-      {
-        "symbol": "SubtitleSession.start",
-        "startLine": 35,
-        "endLine": 131,
-        "summary": "Starts a session: checks Screen Recording, loads the speech model for the locale, prepares the translation engine (recording its note when only a slower tier is available), starts the Transcriber and begins audio capture, then publishes the listening status including which translation engine was chosen."
-      },
-      {
-        "symbol": "SubtitleSession.handle",
-        "startLine": 138,
-        "endLine": 209,
-        "summary": "Receives each TranscriptSegment. Final text becomes a cue in the overlay and transcript and is translated once; in-progress text is routed to drainPartial instead. Also triggers the optional Refine pass that re-translates a finished line with the higher-quality on-device model."
-      },
-      {
-        "symbol": "SubtitleSession.drainPartial",
-        "startLine": 210,
-        "endLine": 229,
-        "summary": "Self-pacing translation of live partial text: keeps exactly one request in flight and always picks up the newest pending string, so it runs at whatever rate the model sustains rather than queueing or thrashing. This is what makes subtitles appear while the speaker is still talking."
-      },
-      {
-        "symbol": "SubtitleSession.forceTranslate",
-        "startLine": 230,
-        "endLine": 262,
-        "summary": "Re-runs translation across a chosen scope — all cues, only the selected ones, or only those still untranslated — updating both the overlay and the stored transcript while reporting progress in the panel footer."
-      },
-      {
-        "symbol": "SubtitleSession.startTranslationRetry",
-        "startLine": 263,
-        "endLine": 318,
-        "summary": "Keeps retrying engine setup in the background when no translator was available at start (a pack not installed, or the on-device model still warming up), then back-fills translations for lines already captured instead of losing them."
-      }
-    ]
-  },
-  "mac/Sources/LocalTransSub/ViewModels.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `ViewModels.swift` (swift). Ringkasan dari komentar/header: View-local state lives in ObservableObjects owned by AppController. Why not @State: SwiftUI's @State is a macro in the macOS 26 SDK and its implementation plugin ships only with full Xcode — this project builds with Command Line Tools, so @State cannot be expanded. @ObservedObject is a plain Simbol penting: UIState, FileTranscribeModel.",
-    "sections": [
-      {
-        "symbol": "UIState",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait UIState pada ViewModels.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
-      },
-      {
-        "symbol": "FileTranscribeModel",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait FileTranscribeModel pada ViewModels.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
-      }
-    ]
-  },
-  "mac/Sources/TransSubKit/AudioCapture.swift": {
-    "summary": "Layanan native macOS untuk audio, ASR, atau dikte. Berkas `AudioCapture.swift` (swift). Ringkasan dari komentar/header: System / per-application audio capture via ScreenCaptureKit. This is the macOS answer to the browser extension's tabCapture: one Screen Recording grant, then we can tap the audio of ANY running app (browser, Zoom, VLC…) with no per-tab permission dance and no picker each session. Simbol penting: AudioCapture.",
-    "sections": [
-      {
-        "symbol": "AudioCapture",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait AudioCapture pada AudioCapture.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
-      }
-    ]
-  },
-  "mac/Sources/TransSubKit/LLMTranslator.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `LLMTranslator.swift` (swift). Ringkasan dari komentar/header: Fallback translator built on Apple's on-device foundation model. Why this exists: the Translation framework can only use language pairs the user has installed, and an app cannot trigger that download itself (`canRequestDownloads` is false and `prepareTranslation` throws). When no Simbol penting: LLMTranslator.",
-    "sections": [
-      {
-        "symbol": "LLMTranslator",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait LLMTranslator pada LLMTranslator.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
-      }
-    ]
-  },
-  "mac/Sources/TransSubKit/Languages.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `Languages.swift` (swift). Ringkasan dari komentar/header: Language lists shared by the UI."
-  },
-  "mac/Sources/TransSubKit/Prefs.swift": {
-    "summary": "Preferensi pengguna lokal (UserDefaults / bridge SwiftUI). Berkas `Prefs.swift` (swift). Ringkasan dari komentar/header: UserDefaults-backed preferences (no accounts, no telemetry, no cloud). Simbol penting: Prefs.",
-    "sections": [
-      {
-        "symbol": "Prefs",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait Prefs pada Prefs.swift: mendukung peran Preferensi pengguna lokal (UserDefaults / bridge SwiftUI)."
-      }
-    ]
-  },
-  "mac/Sources/TransSubKit/Subtitles.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `Subtitles.swift` (swift). Ringkasan dari komentar/header: Transcript line model + SRT / VTT / TXT export. Long ASR segments are split into short cues so players don't cover the screen with a wall of text (and lag rendering it)."
-  },
-  "mac/Sources/TransSubKit/Transcriber.swift": {
-    "summary": "Layanan native macOS untuk audio, ASR, atau dikte. Berkas `Transcriber.swift` (swift). Ringkasan dari komentar/header: On-device speech recognition via Apple's SpeechAnalyzer stack (macOS 26+). Chosen over a bundled Whisper build because the models are installed and updated by the system (no multi-GB downloads for us to manage or for a flaky network to corrupt), it runs on the Neural Engine, and it emits Simbol penting: SegmentBox.",
-    "sections": [
-      {
-        "symbol": "SegmentBox",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait SegmentBox pada Transcriber.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
-      }
-    ]
-  },
-  "mac/Sources/TransSubKit/TranslationEngine.swift": {
-    "summary": "Chooses the best available on-device translator: the Apple low-latency model first, then high-fidelity, then the on-device foundation model (Apple Intelligence) which needs no language download but is far slower and therefore only translates finished lines. Exposes canTranslatePartials, refine for polishing a draft, and normalizeScript which forces Chinese output into the requested script because the fast model sometimes answers a zh-Hans request in Traditional.",
-    "sections": [
-      {
-        "symbol": "TranslationEngine.prepare",
-        "startLine": 48,
-        "endLine": 117,
-        "summary": "Walks the engine ladder: the Apple low-latency model first, then high-fidelity, then the on-device foundation model. Each rung is only adopted after it is proven to work, and the returned TranslationSetup carries a note explaining any slower fallback to the user."
-      },
-      {
-        "symbol": "TranslationEngine.translate",
-        "startLine": 118,
-        "endLine": 133,
-        "summary": "Dispatches a translation to whichever engine was adopted and normalises the result before returning it."
-      },
-      {
-        "symbol": "TranslationEngine.normalizeScript",
-        "startLine": 134,
-        "endLine": 146,
-        "summary": "Forces Chinese output into the requested script via an ICU transform, because the low-latency model sometimes answers a zh-Hans request in Traditional. It is a no-op for text already in the right script."
-      }
-    ]
-  },
-  "mac/Sources/TransSubKit/Translator.swift": {
-    "summary": "On-device translation through Apple's Translation framework. The session is owned by a single worker task because TranslationSession is not Sendable. Key detail: availability is per-strategy — the low-latency model is a separate download from high-fidelity, and asking the default object about a low-latency session can report installed for a pair that then throws on every call. The session is therefore verified with one real translation before adoption and the error is never swallowed.",
-    "sections": [
-      {
-        "symbol": "Translator.init worker",
-        "startLine": 37,
-        "endLine": 193,
-        "summary": "Owns the TranslationSession inside a single detached task because the type is not Sendable, serving prepare/translate/reset commands over a stream. The prepare path verifies a new session with one real translation before adopting it, since prepareTranslation can succeed for a pair whose model is missing."
-      },
-      {
-        "symbol": "Translator.availability",
-        "startLine": 194,
-        "endLine": 258,
-        "summary": "Reports availability per strategy and resolves loose language codes against the system's own supported languages. The low-latency and high-fidelity models are separate downloads, so querying the default object about a low-latency session gives a misleading answer."
-      }
-    ]
-  },
-  "mac/Sources/spike-capture/main.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `main.swift` (swift). Ringkasan dari komentar/header: Spike: prove ScreenCaptureKit per-app audio capture works on this machine before the rest of the app is built on top of it. swift run spike-capture → list capturable apps swift run spike-capture <name> [sec] → capture that app's audio, report levels Simbol penting: Meter.",
-    "sections": [
-      {
-        "symbol": "Meter",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait Meter pada main.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
-      }
-    ]
-  },
-  "mac/Sources/spike-engine/main.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `main.swift` (swift). Ringkasan dari komentar/header: Spike: prove the on-device Speech + Translation engines work, using a real audio file (no Screen Recording permission needed). swift run spike-engine ../test/speech.wav [locale] Simbol penting: Collector.",
-    "sections": [
-      {
-        "symbol": "Collector",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait Collector pada main.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
-      }
-    ]
-  },
-  "mac/Tools/make-icon.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `make-icon.swift` (swift). Ringkasan dari komentar/header: Generates the app icon from the yraverage brand marks. The logo's signature element is the teal rounded tag holding white text, so the icon is that tag turned into a caption bubble with subtitle bars — recognisably the same brand, and still legible at 16pt. swift Tools/make-icon.swift branding/logo.png"
-  },
-  "mac/build-app.sh": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `build-app.sh` (shell). Ringkasan dari komentar/header: !/bin/bash Build yraverageSub.app. Design rules this script enforces, so the app cannot regress again: 1. Stop any running copy first. codesign cannot sign a running binary; when that failed mid-script it left a bundle carrying SwiftPM's own ad-hoc signature and no icon — which silently revoked every macOS permission."
-  },
-  "mac/doctor.sh": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `doctor.sh` (shell). Ringkasan dari komentar/header: !/bin/bash yraverageSub doctor — checks everything that has ever broken, and says exactly how to fix it. Run this first whenever something misbehaves. ./doctor.sh --- toolchain -------------------------------------------------------------- ) bad \"macOS $OSV\" \"needs macOS 26+ for on-device speech and translation\" ;;"
-  },
-  "mac/make-signing-cert.sh": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `make-signing-cert.sh` (shell). Ringkasan dari komentar/header: !/bin/bash Create a local self-signed code-signing certificate — ONCE. Why this exists: an ad-hoc signature (`codesign -s -`) gives the app an identity derived from its CDHash, which changes on every rebuild. macOS TCC stores Screen Recording / Accessibility / Input Monitoring grants against that"
-  },
-  "native/install-host.sh": {
-    "summary": "Skrip instal Native Messaging Host per OS. Berkas `install-host.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Install the Chrome Native Messaging host so the extension can start/stop the helper from Settings. Run once after loading the extension: cd native && ./install-host.sh YOUR_EXTENSION_ID Find YOUR_EXTENSION_ID on chrome://extensions (Developer mode → ID column)."
-  },
-  "native/messaging_host.py": {
-    "summary": "Komponen Native Helper Python (server/host lokal). Berkas `messaging_host.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: read_msg, write_msg, health, shutdown, port_open, wait_port_free, kill_port_listeners, force_stop.",
-    "sections": [
-      {
-        "symbol": "read_msg",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait read_msg pada messaging_host.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
-      },
-      {
-        "symbol": "write_msg",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait write_msg pada messaging_host.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
-      },
-      {
-        "symbol": "health",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait health pada messaging_host.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
-      },
-      {
-        "symbol": "shutdown",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait shutdown pada messaging_host.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
-      }
-    ]
-  },
-  "native/run.sh": {
-    "summary": "Skrip shell/batch untuk menjalankan layanan lokal. Berkas `run.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start the Local TransSub native helper (creates a venv on first run). TRANSLATE=off ./run.sh → skip the translation LLM WHISPER_MODEL=mlx-community/whisper-small-mlx ./run.sh → smaller/faster model DRAFT_WHISPER_MODEL=mlx-community/whisper-base-mlx ./run.sh → fast live drafts (default)"
-  },
-  "native/server.py": {
-    "summary": "Komponen Native Helper Python (server/host lokal). Berkas `server.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Apple Silicon → mlx-whisper (Whisper Large v3 Turbo on the GPU via MLX) anything else → faster-whisper (CTranslate2, CPU/CUDA) Simbol penting: ReuseHTTPServer, _resolve_ffmpeg, _lang, _draft_source_ok, _clip_fast_text, asr_array, asr_file, draft_asr_array. Endpoint lokal /health, /transcribe, /transcribe_file, jobs, dan notes pada 127.0.0.1.",
-    "sections": [
-      {
-        "symbol": "ReuseHTTPServer",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait ReuseHTTPServer pada server.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
-      },
-      {
-        "symbol": "_resolve_ffmpeg",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait _resolve_ffmpeg pada server.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
-      },
-      {
-        "symbol": "_lang",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait _lang pada server.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
-      },
-      {
-        "symbol": "_draft_source_ok",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait _draft_source_ok pada server.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
-      }
-    ]
-  },
-  "package-lock.json": {
-    "summary": "Konfigurasi atau data JSON proyek. Berkas `package-lock.json` (json). Ringkasan dari komentar/header: \"name\": \"local-transsub\","
-  },
-  "package.json": {
-    "summary": "Metadata npm dan skrip proyek. Berkas `package.json` (json). Ringkasan dari komentar/header: \"name\": \"local-transsub\","
-  },
-  "scripts/bench-lab.py": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench-lab.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: load_manifest, read_wav_pcm, pcm_slice, post_bytes, post_json, post_text, get_health, ensure_samples.",
-    "sections": [
-      {
-        "symbol": "load_manifest",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait load_manifest pada bench-lab.py: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "read_wav_pcm",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait read_wav_pcm pada bench-lab.py: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "pcm_slice",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait pcm_slice pada bench-lab.py: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "post_bytes",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait post_bytes pada bench-lab.py: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      }
-    ]
-  },
-  "scripts/build.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `build.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Build dist/ without requiring Node/npm on PATH (uses bundled esbuild binary)."
-  },
-  "scripts/dev-browser.mjs": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `dev-browser.mjs` (javascript). Ringkasan dari komentar/header: Launch Chrome with the unpacked extension for manual testing / DevTools inspect. Opens the side panel page and a sample tab you can caption."
-  },
-  "scripts/dev-browser.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `dev-browser.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Open Chrome with the unpacked extension for DevTools / inspect testing. shellcheck source=lab-lib.sh Rebuild dist when npm is missing from PATH (common on fresh shells)."
-  },
-  "scripts/e2e.mjs": {
-    "summary": "Skrip uji asap atau ujung-ke-ujung. Berkas `e2e.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node E2E transkripsi langsung (realtime tab subtitle). Memuat ekstensi ter-build di Chrome (Puppeteer), memutar test/audio-page.html, Start Task / --pick / --native, lalu menegaskan baris subtitel di Side Panel + overlay Shadow DOM. Usage: node scripts/e2e.mjs # tabCapture allowlisted"
-  },
-  "scripts/ensure-dev-services.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `ensure-dev-services.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Idempotent: native helper (17865) + Translation Lab (8799). Safe to run after every build."
-  },
-  "scripts/ensure-lab.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `ensure-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start Translation Lab if it is not already listening on 127.0.0.1:8799. shellcheck source=lab-lib.sh"
-  },
-  "scripts/ensure-native.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `ensure-native.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash One-shot setup: install the Chrome native launcher + start the helper server."
-  },
-  "scripts/export-youtube-cookies.sh": {
-    "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `export-youtube-cookies.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Export YouTube cookies from your browser into the lab cache (run while signed in)."
-  },
-  "scripts/freeze-debug.mjs": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `freeze-debug.mjs` (javascript). Ringkasan dari komentar/header: Reproduce the panel freeze and dump the JS stack of whichever extension document is spinning (panel or offscreen) via Debugger.pause."
-  },
-  "scripts/gen-icons.mjs": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `gen-icons.mjs` (javascript). Ringkasan dari komentar/header: Generates simple solid-gradient PNG icons without any image library."
-  },
-  "scripts/gen-samples.py": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `gen-samples.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: aiff_to_wav16, verify_wav, main."
-  },
-  "scripts/gen-samples.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `gen-samples.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Generate test speech WAV files (16 kHz mono) for the translation lab."
-  },
-  "scripts/lab-lib.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `lab-lib.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Shared helpers for Translation Lab start/stop scripts."
-  },
-  "scripts/lab-server.py": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `lab-server.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: LabHandler, discover_browser_profiles, build_ytdlp_strategies, ytdlp_run, youtube_auth_status, find_yt_dlp, youtube_id, is_youtube. Endpoint lokal /health, /transcribe, /transcribe_file, jobs, dan notes pada 127.0.0.1.",
-    "sections": [
-      {
-        "symbol": "LabHandler",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait LabHandler pada lab-server.py: mendukung peran Skrip build, lab, native lifecycle, atau rilis."
-      },
-      {
-        "symbol": "discover_browser_profiles",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait discover_browser_profiles pada lab-server.py: mendukung peran Skrip build, lab, native lifecycle, atau rilis."
-      },
-      {
-        "symbol": "build_ytdlp_strategies",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait build_ytdlp_strategies pada lab-server.py: mendukung peran Skrip build, lab, native lifecycle, atau rilis."
-      },
-      {
-        "symbol": "ytdlp_run",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait ytdlp_run pada lab-server.py: mendukung peran Skrip build, lab, native lifecycle, atau rilis."
-      }
-    ]
-  },
-  "scripts/lab-status.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `lab-status.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash shellcheck source=lab-lib.sh"
-  },
-  "scripts/native-test.py": {
-    "summary": "Komponen Native Helper Python (server/host lokal). Berkas `native-test.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: post."
-  },
-  "scripts/restart-native.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `restart-native.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Stop then start the native helper (use after editing native/server.py or run.sh)."
-  },
-  "scripts/run-lab.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `run-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Translation Lab — test server + native helper + browser UI. Lab server: static files + YouTube audio proxy (yt-dlp)"
-  },
-  "scripts/smoke.mjs": {
-    "summary": "Skrip uji asap atau ujung-ke-ujung. Berkas `smoke.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node Uji asap Fase 1 — 26 sub-fitur (katalog = test/verify-data.js). Pemeriksaan default: cepat, tanpa unduh model — kontrak sumber, harness, unit export, skrip e2e, dan probe HTTP helper jika hidup. Usage: node scripts/smoke.mjs node scripts/smoke.mjs --pipeline # + smoke transformers.js (ASR + Opus)"
-  },
-  "scripts/start-lab.bat": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `start-lab.bat`. Ringkasan dari komentar/header: @echo off"
-  },
-  "scripts/start-lab.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `start-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start Translation Lab server (background). Mac: double-click \"Start Lab.command\" shellcheck source=lab-lib.sh"
-  },
-  "scripts/start-native.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `start-native.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start the native helper if it is not already listening on 127.0.0.1:17865. shellcheck disable=SC1091"
-  },
-  "scripts/stop-lab.bat": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `stop-lab.bat`. Ringkasan dari komentar/header: @echo off"
-  },
-  "scripts/stop-lab.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `stop-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Stop Translation Lab server. Mac: double-click \"Stop Lab.command\" shellcheck source=lab-lib.sh"
-  },
-  "scripts/stop-native.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `stop-native.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Stop the native helper on 127.0.0.1:17865 (graceful shutdown, then force if needed)."
-  },
-  "src/ai-worker.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `ai-worker.js` (javascript). Ringkasan dari komentar/header: AI worker: all heavy inference (Whisper / Voxtral / Opus-MT / downloads) runs here, on its own thread, so the side panel and offscreen audio graph never freeze while a model loads or decodes. Protocol: main → {id, op, args}; worker → {id, progress} (0..n times) then {id, result} | {id, error}."
-  },
-  "src/background.js": {
-    "summary": "Service worker latar: orkestrasi sesi, cache, pesan, native helper. Berkas `background.js` (javascript). Ringkasan dari komentar/header: Background service worker: session state machine + message router. The heavy pipeline (capture, VAD, ASR, MT) lives in the offscreen document."
-  },
-  "src/content.js": {
-    "summary": "Content script overlay subtitel di halaman tab. Berkas `content.js` (javascript). Ringkasan dari komentar/header: Floating subtitle overlay — YouTube CC-style scrollable blocks + seekable timeline."
-  },
-  "src/lib/asr.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `asr.js` (javascript). Ringkasan dari komentar/header: Speech-recognition engine abstraction. whisper : transformers.js ASR pipeline (tiny … large-v3-turbo) voxtral : transformers.js VoxtralForConditionalGeneration (WebGPU) native : local helper server over localhost (see lib/native.js) Simbol penting: hasWebGPU, pickDevice, loadASR, activeDevice, activeBackend, warmup, transcribe, transcribeLong.",
-    "sections": [
-      {
-        "symbol": "hasWebGPU",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait hasWebGPU pada asr.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "pickDevice",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait pickDevice pada asr.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "loadASR",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait loadASR pada asr.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "activeDevice",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait activeDevice pada asr.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      }
-    ]
-  },
-  "src/lib/export.js": {
-    "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `export.js` (javascript). Ringkasan dari komentar/header: Export helpers — optional save folder via File System Access API. Simbol penting: loadExportDir, pickExportDir, clearExportDir, saveExportFile, exportDirLabel.",
-    "sections": [
-      {
-        "symbol": "loadExportDir",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait loadExportDir pada export.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
-      },
-      {
-        "symbol": "pickExportDir",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait pickExportDir pada export.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
-      },
-      {
-        "symbol": "clearExportDir",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait clearExportDir pada export.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
-      },
-      {
-        "symbol": "saveExportFile",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait saveExportFile pada export.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
-      }
-    ]
-  },
-  "src/lib/hf-env.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `hf-env.js` (javascript). Ringkasan dari komentar/header: Central transformers.js environment config. Works on the main thread and inside the AI worker (which has no chrome.runtime — pass baseUrl instead). Simbol penting: configureHF, makeProgressAggregator."
-  },
-  "src/lib/i18n.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `i18n.js` (javascript). Simbol penting: I18N.",
-    "sections": [
-      {
-        "symbol": "I18N",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait I18N pada i18n.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      }
-    ]
-  },
-  "src/lib/models.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `models.js` (javascript). Ringkasan dari komentar/header: Model download / cache management. Runs inside the AI worker; the caller (offscreen main thread) persists the downloaded-state via the background. Simbol penting: resolveModel, downloadModel, deleteModel."
-  },
-  "src/lib/native-host.js": {
-    "summary": "Kontrak/bridge Native Messaging dan protokol JSON lokal. Berkas `native-host.js` (javascript). Ringkasan dari komentar/header: Chrome Native Messaging bridge — lets the extension start/stop the helper without opening a terminal. Install once: cd native && ./install-host.sh Simbol penting: nativeHostSupported, nativeHostAction, NATIVE_HOST_NAME."
-  },
-  "src/lib/native.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `native.js` (javascript). Ringkasan dari komentar/header: Client for the local native helper server (native/server.py). Everything stays on the machine — the extension just talks to 127.0.0.1. Simbol penting: nativeHealth, nativeTranscribe, nativeTranscribeFile, nativeDraft, nativeTranslate, nativeTranslateRefine, nativeShutdown.",
-    "sections": [
-      {
-        "symbol": "nativeHealth",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait nativeHealth pada native.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "nativeTranscribe",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait nativeTranscribe pada native.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "nativeTranscribeFile",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait nativeTranscribeFile pada native.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "nativeDraft",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait nativeDraft pada native.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      }
-    ]
-  },
-  "src/lib/offline-io.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `offline-io.js` (javascript). Ringkasan dari komentar/header: Shared offline media staging (OPFS) — chunked so multi-GB files work in Chrome. Simbol penting: needsNativeFilePath, getOfflineInputFile, stageFileToOpfs, readOfflineInputBytes, OFFLINE_INPUT_NAME, CHUNK_BYTES, BROWSER_MAX_BYTES."
-  },
-  "src/lib/opus.js": {
-    "summary": "Terjemahan lokal berjenjang dan registri model. Berkas `opus.js` (javascript). Ringkasan dari komentar/header: Opus-MT (Xenova ONNX) translation pipelines. Runs inside the AI worker. Simbol penting: loadOpusMT, translateWith, preloadPair, releasePair."
-  },
-  "src/lib/registry.js": {
-    "summary": "Terjemahan lokal berjenjang dan registri model. Berkas `registry.js` (javascript). Ringkasan dari komentar/header: Model & language registry shared by the side panel UI and the offscreen pipeline. --------------------------------------------------------------------------- ASR (Whisper) models — onnx-community ONNX exports for transformers.js. Sizes are approximate total downloads (encoder + decoder + tokenizer). Simbol penting: pairLabel, translationPlan, isHallucination, ASR_MODELS, DEFAULT_ASR, ENGINES, DEFAULT_NATIVE_URL, SOURCE_LANGS.",
-    "sections": [
-      {
-        "symbol": "pairLabel",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait pairLabel pada registry.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
-      },
-      {
-        "symbol": "translationPlan",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait translationPlan pada registry.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
-      },
-      {
-        "symbol": "isHallucination",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait isHallucination pada registry.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
-      },
-      {
-        "symbol": "ASR_MODELS",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait ASR_MODELS pada registry.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
-      }
-    ]
-  },
-  "src/lib/transcript-cache.js": {
-    "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `transcript-cache.js` (javascript). Ringkasan dari komentar/header: Per-URL transcript cache — keyed by page URL + language pair. Also owns SRT/VTT/TXT export, including readable cue splitting. Simbol penting: normalizeUrl, cacheKey, maxCachedTime, isRangeCached, mergeLine, splitSubtitleCues, formatSrt, formatVtt.",
-    "sections": [
-      {
-        "symbol": "normalizeUrl",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait normalizeUrl pada transcript-cache.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
-      },
-      {
-        "symbol": "cacheKey",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait cacheKey pada transcript-cache.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
-      },
-      {
-        "symbol": "maxCachedTime",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait maxCachedTime pada transcript-cache.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
-      },
-      {
-        "symbol": "isRangeCached",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait isRangeCached pada transcript-cache.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
-      }
-    ]
-  },
-  "src/lib/translate.js": {
-    "summary": "Terjemahan lokal berjenjang dan registri model. Berkas `translate.js` (javascript). Ringkasan dari komentar/header: Tiered local translation (main thread of the offscreen document): 1. whisper-direct — Whisper task:'translate' (audio → English, no MT model) 2. native helper LLM (when the native engine is on and has mlx-lm) 3. Chrome built-in Translator API (on-device, Chrome 138+) when creatable Simbol penting: makeTranslator.",
-    "sections": [
-      {
-        "symbol": "makeTranslator",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait makeTranslator pada translate.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
-      }
-    ]
-  },
-  "src/lib/translation-utils.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `translation-utils.js` (javascript). Ringkasan dari komentar/header: Shared helpers for detecting whether a subtitle line still needs translation. Simbol penting: sourceText, translationText, needsTranslation, mergeLinesByTime, pickUntranslatedLines."
-  },
-  "src/manifest.json": {
-    "summary": "Manifest ekstensi Chrome MV3 (izin, service worker, ikon). Berkas `manifest.json` (json). Ringkasan dari komentar/header: \"manifest_version\": 3,"
-  },
-  "src/offscreen.html": {
-    "summary": "Dokumen offscreen untuk pipeline audio, VAD, dan inferensi. Berkas `offscreen.html` (html). Ringkasan dari komentar/header: <html>"
-  },
-  "src/offscreen.js": {
-    "summary": "Dokumen offscreen untuk pipeline audio, VAD, dan inferensi. Berkas `offscreen.js` (javascript). Ringkasan dari komentar/header: Offscreen document: the entire local AI pipeline. tab capture → speaker passthrough → Silero VAD → Whisper → translation plus model management and offline file jobs."
-  },
-  "src/sidepanel.css": {
-    "summary": "UI Side Panel ekstensi untuk kontrol sesi realtime/offline. Berkas `sidepanel.css` (css). Ringkasan dari komentar/header: Unsloth-inspired theme: charcoal surfaces, emerald accent, pill controls { box-sizing: border-box; margin: 0; padding: 0; }"
-  },
-  "src/sidepanel.html": {
-    "summary": "UI Side Panel ekstensi untuk kontrol sesi realtime/offline. Berkas `sidepanel.html` (html). Ringkasan dari komentar/header: <html> ============ Subtitle Generation ============ Realtime: current tab Offline: file drop"
-  },
-  "src/sidepanel.js": {
-    "summary": "UI Side Panel ekstensi untuk kontrol sesi realtime/offline. Berkas `sidepanel.js` (javascript). Ringkasan dari komentar/header: Side panel UI logic."
-  },
-  "test/BENCH-LATEST.md": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `BENCH-LATEST.md` (markdown). Ringkasan dari komentar/header: Latest benchmark snapshot *Target:** draft (`POST /draft`) ≤ **500 ms** per update. # Summary (last run) # Per-pair highlights ## zh→en ## en→zh ## ja→en ## en→ja # How to re-run"
-  },
-  "test/README.md": {
-    "summary": "Dokumentasi pengantar repositori atau paket. Berkas `README.md` (markdown). Ringkasan dari komentar/header: Translation Lab # Quick start *Mac (double-click):** `Start Lab.command` / `Stop Lab.command` in the project folder. *Terminal:** *Windows:** `scripts\\start-lab.bat` / `scripts\\stop-lab.bat` # What it tests"
-  },
-  "test/audio-page.html": {
-    "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `audio-page.html` (html). Ringkasan dari komentar/header: <html> best-effort start in case autoplay policy blocks"
-  },
-  "test/chrome-mock.js": {
-    "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `chrome-mock.js` (javascript). Ringkasan dari komentar/header: Minimal chrome.* mock so extension pages can be rendered in a plain browser for visual testing. Not used in the packaged extension."
-  },
-  "test/index.html": {
-    "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `index.html` (html). Ringkasan dari komentar/header: <html lang=\"en\">"
-  },
-  "test/lab.html": {
-    "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `lab.html` (html). Ringkasan dari komentar/header: <html lang=\"en\"> { box-sizing: border-box; }"
-  },
-  "test/lab.js": {
-    "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `lab.js` (javascript). Ringkasan dari komentar/header: Local TransSub Translation Lab — client logic"
-  },
-  "test/last-bench.json": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `last-bench.json` (json). Ringkasan dari komentar/header: \"at\": \"2026-08-22T21:57:26\","
-  },
-  "test/offscreen-test.html": {
-    "summary": "Dokumen offscreen untuk pipeline audio, VAD, dan inferensi. Berkas `offscreen-test.html` (html). Ringkasan dari komentar/header: <html>"
-  },
-  "test/overlay-test.html": {
-    "summary": "Overlay subtitel mengambang macOS. Berkas `overlay-test.html` (html). Ringkasan dari komentar/header: <html>"
-  },
-  "test/panel-test.html": {
-    "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `panel-test.html` (html). Ringkasan dari komentar/header: <html> load the real panel markup then its module"
-  },
-  "test/samples/manifest.json": {
-    "summary": "Manifest ekstensi Chrome MV3 (izin, service worker, ikon). Berkas `manifest.json` (json). Ringkasan dari komentar/header: \"version\": 1,"
-  },
-  "test/start-lab.sh": {
-    "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `start-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start Translation Lab from any directory (opens http://127.0.0.1:8799/lab.html)."
-  },
-  "test/subtitle-export.test.js": {
-    "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `subtitle-export.test.js` (javascript). Ringkasan dari komentar/header: Subtitle export: long ASR segments must become readable cues, not a wall of text."
-  },
-  ".codex/skills/ngodingpakeai/SKILL.md": {
-    "summary": "Instruksi skill agen untuk sync/task NgodingPakeAI. Berkas `SKILL.md` (markdown). Ringkasan dari komentar/header: --- NgodingPakeAI — Codebase Sync # Prerequisites # How sync works (one mode — YOU write the summaries) # Existing codebase? The summary sync builds the pending plan for you"
-  },
-  ".cursor/skills/ngodingpakeai/SKILL.md": {
-    "summary": "Instruksi skill agen untuk sync/task NgodingPakeAI. Berkas `SKILL.md` (markdown). Ringkasan dari komentar/header: --- NgodingPakeAI — Codebase Sync # Prerequisites # How sync works (one mode — YOU write the summaries) # Existing codebase? The summary sync builds the pending plan for you"
-  },
-  ".gitignore": {
-    "summary": "Berkas pendukung proyek Local TransSub. Berkas `.gitignore`. Ringkasan dari komentar/header: Dependencies & virtualenvs Build output .icns Throwaway Chrome profiles created by the Puppeteer test scripts. These contain cookies and site data — never commit them. Local cache, including exported YouTube cookies. Generated test audio (recreate with scripts/gen-samples.sh) .wav"
-  },
-  "CHANGELOG.md": {
-    "summary": "Riwayat versi dan catatan rilis proyek. Berkas `CHANGELOG.md` (markdown). Ringkasan dari komentar/header: Riwayat rilis # 1.1.0 — 2026-09-03 # 1.0.0"
-  },
-  "mac/Sources/LocalTransSub/MockSession.swift": {
-    "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `MockSession.swift` (swift). Ringkasan dari komentar/header: Mock session/preferences state for UI development & screenshots (Fase 3)."
-  },
-  "mac/Sources/LocalTransSub/NotesView.swift": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `NotesView.swift` (swift). Ringkasan dari komentar/header: Meeting notes panel (Fase 2) — stub lokal, selaras dengan Side Panel ekstensi."
-  },
-  "native/SETUP.md": {
-    "summary": "Dokumentasi atau aturan proyek. Berkas `SETUP.md` (markdown). Ringkasan dari komentar/header: Native Helper — Windows, Linux, macOS # Prasyarat # macOS # Linux atau: ./install-host.sh <EXT_ID> # Windows"
-  },
-  "native/install-host-linux.sh": {
-    "summary": "Skrip instal Native Messaging Host per OS. Berkas `install-host-linux.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Linux-only installer for Chrome/Chromium Native Messaging host. Usage: ./install-host-linux.sh <chrome-extension-id>"
-  },
-  "native/install-host.bat": {
-    "summary": "Skrip instal Native Messaging Host per OS. Berkas `install-host.bat`. Ringkasan dari komentar/header: @echo off"
-  },
-  "scripts/bench-models.mjs": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench-models.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node Benchmark kinerja model lokal (browser transformers.js + native helper). Usage: node scripts/bench-models.mjs # gabung last-bench + ukur browser bila cache/HF ada node scripts/bench-models.mjs --browser # paksa ukur Whisper Tiny (q8) di Node"
-  },
-  "scripts/bench-report.mjs": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench-report.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node Simpan hasil benchmark sebagai laporan pembanding (Markdown). Membaca test/last-models-bench.json (atau membangunnya via --refresh) dan last-bench.json, lalu menulis: - test/BENCH-COMPARE.md — tabel pembanding antar model - test/BENCH-LATEST.md — ringkasan native (kompatibel lab)"
-  },
-  "scripts/e2e-file.mjs": {
-    "summary": "Skrip uji asap atau ujung-ke-ujung. Berkas `e2e-file.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node E2E berkas offline + ekspor SRT / VTT / TXT. Default (cepat): uji kontrak formatSrt/formatVtt/formatTxt + wiring Side Panel offline (tanpa Chrome headed). Usage: node scripts/e2e-file.mjs # export + wiring (default) node scripts/e2e-file.mjs --harness-only"
-  },
-  "scripts/gen-defects.mjs": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `gen-defects.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node Generator daftar cacat rilis dari hasil uji (smoke / e2e / bench). Usage: node scripts/gen-defects.mjs node scripts/gen-defects.mjs --with-stubs # sertakan STUB_DEFECTS sebagai basis Menulis test/last-defects.json (bentuk sama dengan defects-data.js). Task berikutnya menandai mustFix / gerbang rilis."
-  },
-  "scripts/mark-release-priorities.mjs": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `mark-release-priorities.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node Tandai prioritas wajib diperbaiki sebelum rilis (gerbang rilis Fase 1). Menjalankan gen-defects, lalu menerapkan kebijakan mustFix kanonis, menulis ulang test/last-defects.json + test/RELEASE-GATE.md. Usage: node scripts/mark-release-priorities.mjs node scripts/mark-release-priorities.mjs --check # e"
-  },
-  "scripts/pack-store.mjs": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `pack-store.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node Buat paket ZIP produksi untuk Chrome Web Store dari folder dist/. / Membuat ZIP produksi dist/ untuk unggahan Chrome Web Store."
-  },
-  "scripts/pack-store.sh": {
-    "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `pack-store.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Buat ZIP produksi untuk Chrome Web Store dari dist/. Pastikan aset statis Membuat ZIP produksi dist/ untuk unggahan Chrome Web Store."
-  },
-  "src/helper-status.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `helper-status.js` (javascript). Ringkasan dari komentar/header: Kartu status helper lintas platform + indikator mode + berkas besar (stub UI). / Simbol penting: renderHelperStatusCard, mountHelperStatusCard.",
-    "sections": [
-      {
-        "symbol": "renderHelperStatusCard",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait renderHelperStatusCard pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "mountHelperStatusCard",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait mountHelperStatusCard pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      }
-    ]
-  },
-  "src/lib/device-tier.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `device-tier.js` (javascript). Ringkasan dari komentar/header: Deteksi kemampuan perangkat → tier mesin (Fase 3). / Simbol penting: detectCapabilities, tierFromCapabilities, selectEngine."
-  },
-  "src/lib/engine-session.js": {
-    "summary": "Deteksi tier perangkat dan sesi mesin dengan fallback. Berkas `engine-session.js` (javascript). Ringkasan dari komentar/header: Pengelola sesi mesin ASR/terjemahan dengan fallback otomatis. / Simbol penting: createEngineSession."
-  },
-  "src/lib/engine-tier.js": {
-    "summary": "Deteksi tier perangkat dan sesi mesin dengan fallback. Berkas `engine-tier.js` (javascript). Ringkasan dari komentar/header: Deteksi kemampuan perangkat + tier mesin ASR/terjemahan lokal. Digunakan UI Settings dan pemilih mesin (frontend + kontrak backend). / Simbol penting: detectDeviceCapabilities, tierFromScore, pickEngineFromTier, withEngineFallback."
-  },
-  "src/lib/helper-status.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `helper-status.js` (javascript). Ringkasan dari komentar/header: Status Native Helper lintas platform (Fase 2 — Windows/Linux/macOS). Frontend-first: panduan per OS + indikator; health nyata dari /health. / @typedef {'macos' | 'windows' | 'linux' | 'unknown'} HelperOS Simbol penting: detectOs, exportBasename, formatBytes, OS_GUIDES, STUB_LARGE_FILE.",
-    "sections": [
-      {
-        "symbol": "detectOs",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait detectOs pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "exportBasename",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait exportBasename pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "formatBytes",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait formatBytes pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      },
-      {
-        "symbol": "OS_GUIDES",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait OS_GUIDES pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
-      }
-    ]
-  },
-  "src/lib/native-host-registry.js": {
-    "summary": "Kontrak/bridge Native Messaging dan protokol JSON lokal. Berkas `native-host-registry.js` (javascript). Ringkasan dari komentar/header: Registrasi host Native Messaging yang diharapkan ekstensi. Izin `\"nativeMessaging\"` ada di src/manifest.json; nama host dipakai via chrome.runtime.connectNative (lihat src/lib/native-host.js). Instal host OS: native/install-host.sh | install-host.bat | install-host-linux.sh / Simbol penting: REGISTERED_NATIVE_HOST, NATIVE_MESSAGING_PERMISSION."
-  },
-  "src/lib/native-protocol.js": {
-    "summary": "Kontrak/bridge Native Messaging dan protokol JSON lokal. Berkas `native-protocol.js` (javascript). Ringkasan dari komentar/header: Protokol JSON bridge ekstensi ↔ Native Helper (kontrak lokal). Transport: Chrome Native Messaging (`com.localtranssub.helper`) atau HTTP loopback `http://127.0.0.1:17865`. / Simbol penting: assertLocalUrl, wrapTranscriptPayload, NATIVE_MESSAGING_HOST, LOCAL_HELPER_ORIGIN, NATIVE_HOST_ACTIONS."
-  },
-  "src/lib/notes-api.js": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-api.js` (javascript). Ringkasan dari komentar/header: Klien API notulen di Native Helper (127.0.0.1:17865). / Simbol penting: notesGenerate, notesList, notesSave, startTranscribeFileJob, getJob, cancelJob."
-  },
-  "src/lib/notes-export.js": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-export.js` (javascript). Ringkasan dari komentar/header: Serialisasi ekspor notulen → TXT / Markdown. / Simbol penting: noteToMarkdown, noteToTxt, serializeNote."
-  },
-  "src/lib/notes-generate.js": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-generate.js` (javascript). Ringkasan dari komentar/header: Generator notulen lokal (heuristic stub + hook LLM nanti). Ringkasan / keputusan / tindak lanjut dari baris transkrip. / Simbol penting: generateNotesFromTranscript, extractDecisions, extractActions."
-  },
-  "src/lib/notes-schema.js": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-schema.js` (javascript). Ringkasan dari komentar/header: Skema data Notulen Rapat + tindak lanjut (Fase 2). Dipakai ekstensi (chrome.storage / OPFS) dan kontrak API helper. / @typedef {'open' | 'done'} ActionStatus @typedef {'idle' | 'generating' | 'ready' | 'error' | 'saved'} NoteStatus @typedef {object} ActionItem @property {string} id Simbol penting: createActionItem, createMeetingNote, assertMeetingNote, wrapNotesStore, NOTE_SCHEMA_VERSION.",
-    "sections": [
-      {
-        "symbol": "createActionItem",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait createActionItem pada notes-schema.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "createMeetingNote",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait createMeetingNote pada notes-schema.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "assertMeetingNote",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait assertMeetingNote pada notes-schema.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "wrapNotesStore",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait wrapNotesStore pada notes-schema.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      }
-    ]
-  },
-  "src/lib/notes-store.js": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-store.js` (javascript). Ringkasan dari komentar/header: Penyimpanan notulen lokal di chrome.storage.local (kunci `meetingNotes`). / Simbol penting: listNotes, getNote, saveNote, deleteNote."
-  },
-  "src/lib/notes-stub.js": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-stub.js` (javascript). Ringkasan dari komentar/header: Data tiruan Notulen Rapat Cerdas (Fase 2) — frontend-first. Bentuk kontrak yang nanti diisi LLM lokal / native helper. / @typedef {'idle' | 'generating' | 'ready' | 'error' | 'saved'} NotesLocalStatus @typedef {object} ActionItem @property {string} id @property {string} text @property {string | null} owner Simbol penting: loadNotesState, statusLabel, STUB_TRANSCRIPT, STUB_NOTE, STUB_SAVED_NOTES, STUB_NOTES_STATE.",
-    "sections": [
-      {
-        "symbol": "loadNotesState",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait loadNotesState pada notes-stub.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "statusLabel",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait statusLabel pada notes-stub.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "STUB_TRANSCRIPT",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait STUB_TRANSCRIPT pada notes-stub.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "STUB_NOTE",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait STUB_NOTE pada notes-stub.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      }
-    ]
-  },
-  "src/lib/transcript-protocol.js": {
-    "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `transcript-protocol.js` (javascript). Ringkasan dari komentar/header: Protokol JSON sederhana untuk cuplikan transkrip/terjemahan (Fase 3). / @typedef {object} TranscriptCue @property {number} t0 @property {number} t1 @property {string} src @property {string} [tgt] @property {string} [id] / Simbol penting: encodeTranscriptMessage, decodeTranscriptMessage."
-  },
-  "src/notes-panel.css": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-panel.css` (css). Ringkasan dari komentar/header: Panel Notulen Rapat — memakai token yang sama dengan sidepanel.css"
-  },
-  "src/notes-panel.js": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-panel.js` (javascript). Ringkasan dari komentar/header: Renderer panel Notulen Rapat (frontend stub). Dipakai harness test/notes-panel.html; nanti diintegrasikan ke Side Panel. / Simbol penting: renderNotesPanel, formatNoteExport, downloadText, mountNotesPanel.",
-    "sections": [
-      {
-        "symbol": "renderNotesPanel",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait renderNotesPanel pada notes-panel.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "formatNoteExport",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait formatNoteExport pada notes-panel.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "downloadText",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait downloadText pada notes-panel.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      },
-      {
-        "symbol": "mountNotesPanel",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait mountNotesPanel pada notes-panel.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
-      }
-    ]
-  },
-  "store/MV3-AUDIT.md": {
-    "summary": "Aset atau panduan listing Chrome Web Store. Berkas `MV3-AUDIT.md` (markdown). Ringkasan dari komentar/header: Audit izin & kepatuhan Manifest V3 # Izin yang dipakai # Larangan yang dipatuhi # Catatan peninjauan toko Justifikasi izin MV3 dan batasan keamanan."
-  },
-  "store/PRIVACY.md": {
-    "summary": "Dokumen kebijakan privasi untuk distribusi toko. Berkas `PRIVACY.md` (markdown). Ringkasan dari komentar/header: Kebijakan Privasi — Local TransSub *Berlaku sejak:** 3 September 2026 *Produk:** Local TransSub (ekstensi Chrome MV3, Native Helper opsional, aplikasi macOS) # Ringkasan # Data yang diproses # Yang tidak kami lakukan # Izin ekstensi # Native Helper # Kontak # Perubahan Menegaskan tanpa akun, tanpa telemetri, dan pemrosesan on-device."
-  },
-  "store/README.md": {
-    "summary": "Dokumentasi pengantar repositori atau paket. Berkas `README.md` (markdown). Ringkasan dari komentar/header: Chrome Web Store assets (Fase 3) # Ikon # Tangkapan layar # Paket ZIP # Deskripsi singkat"
-  },
-  "store/SUBMIT.md": {
-    "summary": "Aset atau panduan listing Chrome Web Store. Berkas `SUBMIT.md` (markdown). Ringkasan dari komentar/header: Panduan pengiriman Chrome Web Store Langkah pengiriman dan pembaruan item di Chrome Web Store."
-  },
-  "store/listing.md": {
-    "summary": "Aset atau panduan listing Chrome Web Store. Berkas `listing.md` (markdown). Ringkasan dari komentar/header: Materi listing Chrome Web Store # Nama # Ringkasan singkat (132 karakter) # Deskripsi # Kategori # Bahasa # Aset Salinan nama, deskripsi, keyword, dan catatan peninjau toko."
-  },
-  "test/BENCH-COMPARE.md": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `BENCH-COMPARE.md` (markdown). Ringkasan dari komentar/header: Laporan pembanding kinerja model # Tabel pembanding # Native draft (dari last-bench) # Cara menjalankan ulang"
-  },
-  "test/RELEASE-GATE.md": {
-    "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `RELEASE-GATE.md` (markdown). Ringkasan dari komentar/header: Gerbang rilis Fase 1 — prioritas wajib *Status: DITAHAN** — 4 cacat wajib masih terbuka. # Ringkasan # Wajib sebelum rilis # Kebijakan"
-  },
-  "test/bench-models-data.js": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench-models-data.js` (javascript). Ringkasan dari komentar/header: Lab benchmark kinerja model (Fase 1). Frontend-first: katalog model + angka tiruan. Jika `last-bench.json` ada (keluaran scripts/bench-lab.py), bagian Native Helper digabung dari file itu. Halaman ini tidak menjalankan inferensi. / Simbol penting: mergeLastBench, loadBenchReport, summarizeModels, TARGET_DRAFT_MS, STUB_MODELS, STUB_BENCH.",
-    "sections": [
-      {
-        "symbol": "mergeLastBench",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait mergeLastBench pada bench-models-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "loadBenchReport",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait loadBenchReport pada bench-models-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "summarizeModels",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait summarizeModels pada bench-models-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "TARGET_DRAFT_MS",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait TARGET_DRAFT_MS pada bench-models-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      }
-    ]
-  },
-  "test/bench-models.js": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench-models.js` (javascript). Ringkasan dari komentar/header: Lab benchmark kinerja model."
-  },
-  "test/bench.html": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench.html` (html). Ringkasan dari komentar/header: <html lang=\"id\"> { box-sizing: border-box; }"
-  },
-  "test/defects-data.js": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `defects-data.js` (javascript). Ringkasan dari komentar/header: Daftar cacat rilis Fase 1. Frontend-first: data tiruan yang merangkum kendala terdokumentasi (README), hasil lab (last-bench), dan celah uji. Nanti GET /api/release-defects. / @typedef {'blocker' | 'high' | 'medium' | 'low'} Severity @typedef {'open' | 'accepted' | 'fixed'} DefectStatus Simbol penting: loadDefectList, summarizeDefects, STUB_DEFECTS, STUB_DEFECT_LIST.",
-    "sections": [
-      {
-        "symbol": "loadDefectList",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait loadDefectList pada defects-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "summarizeDefects",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait summarizeDefects pada defects-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "STUB_DEFECTS",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait STUB_DEFECTS pada defects-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "STUB_DEFECT_LIST",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait STUB_DEFECT_LIST pada defects-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      }
-    ]
-  },
-  "test/defects.html": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `defects.html` (html). Ringkasan dari komentar/header: <html lang=\"id\"> { box-sizing: border-box; }"
-  },
-  "test/defects.js": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `defects.js` (javascript). Ringkasan dari komentar/header: Halaman daftar cacat rilis."
-  },
-  "test/last-defects.json": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `last-defects.json` (json). Ringkasan dari komentar/header: \"source\": \"release-gate\","
-  },
-  "test/last-e2e.json": {
-    "summary": "Skrip uji asap atau ujung-ke-ujung. Berkas `last-e2e.json` (json). Ringkasan dari komentar/header: \"source\": \"e2e\","
-  },
-  "test/last-models-bench.json": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `last-models-bench.json` (json). Ringkasan dari komentar/header: \"source\": \"catalog+last-bench\","
-  },
-  "test/last-smoke.json": {
-    "summary": "Skrip uji asap atau ujung-ke-ujung. Berkas `last-smoke.json` (json). Ringkasan dari komentar/header: \"source\": \"smoke\","
-  },
-  "test/notes-panel.html": {
-    "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-panel.html` (html). Ringkasan dari komentar/header: <html lang=\"id\">"
-  },
-  "test/qa-report-data.js": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `qa-report-data.js` (javascript). Ringkasan dari komentar/header: Laporan uji asap (smoke) dan E2E untuk verifikasi rilis Fase 1. Frontend-first: `loadQaReport()` mengembalikan data tiruan dengan bentuk yang sama seperti kontrak nanti (GET /api/qa-report atau last-smoke.json / last-e2e.json). Halaman ini tidak menjalankan skrip uji. / @typedef {'pass' | 'fail' | 'unverified' | 'skip' Simbol penting: loadQaReport, summarizeSuites, STUB_SUITES, STUB_QA_REPORT.",
-    "sections": [
-      {
-        "symbol": "loadQaReport",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait loadQaReport pada qa-report-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "summarizeSuites",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait summarizeSuites pada qa-report-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "STUB_SUITES",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait STUB_SUITES pada qa-report-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "STUB_QA_REPORT",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait STUB_QA_REPORT pada qa-report-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      }
-    ]
-  },
-  "test/qa-report.html": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `qa-report.html` (html). Ringkasan dari komentar/header: <html lang=\"id\"> { box-sizing: border-box; }"
-  },
-  "test/qa-report.js": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `qa-report.js` (javascript). Ringkasan dari komentar/header: Halaman laporan uji asap dan E2E."
-  },
-  "test/studio-export.js": {
-    "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `studio-export.js` (javascript). Ringkasan dari komentar/header: Generator format ekspor untuk studio (membungkus transcript-cache). / Simbol penting: toCues, generateSrt, generateVtt, generateTxt."
-  },
-  "test/studio-export.test.js": {
-    "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `studio-export.test.js` (javascript)."
-  },
-  "test/studio-lib.js": {
-    "summary": "Harness frontend Offline Studio (tiruan transkripsi/ekspor). Berkas `studio-lib.js` (javascript). Ringkasan dari komentar/header: Utilitas + data tiruan untuk halaman Transkripsi Berkas / Studio (Fase 3). / Simbol penting: wrapLines, scoreDevice, pickEngineMode, simulateFallback, formatTimecode, STUB_SEGMENTS, STUB_FILE."
-  },
-  "test/studio.html": {
-    "summary": "Harness frontend Offline Studio (tiruan transkripsi/ekspor). Berkas `studio.html` (html). Ringkasan dari komentar/header: <html lang=\"id\">"
-  },
-  "test/studio.js": {
-    "summary": "Harness frontend Offline Studio (tiruan transkripsi/ekspor). Berkas `studio.js` (javascript)."
-  },
-  "test/verify-data.js": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `verify-data.js` (javascript). Ringkasan dari komentar/header: Katalog 26 sub-fitur Fase 1 untuk dashboard verifikasi rilis. Frontend-first: `loadVerifyCatalog()` mengembalikan data tiruan dengan bentuk yang sama seperti kontrak yang akan diisi smoke/E2E/lab nanti (GET /api/verify-status). Jangan mengandalkan backend di halaman ini. / Simbol penting: loadVerifyCatalog, summarize, VERIFY_TARGET, STUB_FEATURES, STUB_CATALOG.",
-    "sections": [
-      {
-        "symbol": "loadVerifyCatalog",
-        "startLine": 1,
-        "endLine": 20,
-        "summary": "Bagian terkait loadVerifyCatalog pada verify-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "summarize",
-        "startLine": 21,
-        "endLine": 40,
-        "summary": "Bagian terkait summarize pada verify-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "VERIFY_TARGET",
-        "startLine": 41,
-        "endLine": 60,
-        "summary": "Bagian terkait VERIFY_TARGET pada verify-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      },
-      {
-        "symbol": "STUB_FEATURES",
-        "startLine": 61,
-        "endLine": 80,
-        "summary": "Bagian terkait STUB_FEATURES pada verify-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
-      }
-    ]
-  },
-  "test/verify.html": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `verify.html` (html). Ringkasan dari komentar/header: <html lang=\"id\"> { box-sizing: border-box; }"
-  },
-  "test/verify.js": {
-    "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `verify.js` (javascript). Ringkasan dari komentar/header: Dashboard status verifikasi 26 sub-fitur Fase 1."
-  }
+ ".claude/launch.json": {
+  "summary": "Konfigurasi atau data JSON proyek. Berkas `launch.json` (json). Ringkasan dari komentar/header: \"version\": \"0.0.1\","
+ },
+ ".claude/skills/ngodingpakeai/SKILL.md": {
+  "summary": "Instruksi skill agen untuk sync/task NgodingPakeAI. Berkas `SKILL.md` (markdown). Ringkasan dari komentar/header: --- NgodingPakeAI — Codebase Sync # Prerequisites # How sync works (one mode — YOU write the summaries) # Existing codebase? The summary sync builds the pending plan for you"
+ },
+ ".cursor/rules/native-helper-lifecycle.mdc": {
+  "summary": "Dokumentasi atau aturan proyek. Berkas `native-helper-lifecycle.mdc`. Ringkasan dari komentar/header: --- Native Helper Lifecycle # Single control path # Stop before start # Server startup # Scripts"
+ },
+ ".ngodingpakeaiignore": {
+  "summary": "Berkas pendukung proyek Local TransSub. Berkas `.ngodingpakeaiignore`. Ringkasan dari komentar/header: .ngodingpakeaiignore — extra paths to keep out of NgodingPakeAI sync. Uses .gitignore syntax. Secrets, node_modules, build output and .env files are ALWAYS blocked by the CLI regardless of what is listed here. Examples: docs/internal/ *.snap fixtures/ --- ditambahkan saat sync pertama ---"
+ },
+ "AGENTS.md": {
+  "summary": "Aturan workspace agen AI termasuk alur NgodingPakeAI. Berkas `AGENTS.md` (markdown). Ringkasan dari komentar/header: ngodingpakeai:skill:start NgodingPakeAI — Codebase Sync # Prerequisites # How sync works (one mode — YOU write the summaries) # Existing codebase? The summary sync builds the pending plan for you"
+ },
+ "README.md": {
+  "summary": "Dokumentasi pengantar repositori atau paket. Berkas `README.md` (markdown). Ringkasan dari komentar/header: yraverageSub # The browser extension # Features"
+ },
+ "Start Lab.command": {
+  "summary": "Skrip shell/batch untuk menjalankan layanan lokal. Berkas `Start Lab.command`. Ringkasan dari komentar/header: !/bin/bash"
+ },
+ "Stop Lab.command": {
+  "summary": "Skrip shell/batch untuk menjalankan layanan lokal. Berkas `Stop Lab.command`. Ringkasan dari komentar/header: !/bin/bash"
+ },
+ "esbuild.config.mjs": {
+  "summary": "Build: salin notes-panel.css ke dist bersama aset statis."
+ },
+ "mac/Package.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `Package.swift` (swift). Ringkasan dari komentar/header: swift-tools-version: 6.0"
+ },
+ "mac/README.md": {
+  "summary": "Dokumentasi pengantar repositori atau paket. Berkas `README.md` (markdown). Ringkasan dari komentar/header: yraverageSub for macOS # Why a Mac app (vs the browser extension) # Engines # If anything misbehaves, run the doctor first"
+ },
+ "mac/Sources/LocalTransSub/App.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `App.swift` (swift). Ringkasan dari komentar/header: yraverageSub — menu bar app. No accounts, no telemetry; all speech and translation run on-device. Simbol penting: AppDelegate, AppController.",
+  "sections": [
+   {
+    "symbol": "AppDelegate",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait AppDelegate pada App.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
+   },
+   {
+    "symbol": "AppController",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait AppController pada App.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
+   }
+  ]
+ },
+ "mac/Sources/LocalTransSub/BenchTranslate.swift": {
+  "summary": "Terjemahan lokal berjenjang dan registri model. Berkas `BenchTranslate.swift` (swift). Ringkasan dari komentar/header: `--bench-translate`: measures real translation latency per strategy from inside the app bundle. A bare CLI binary cannot reach the Translation daemon (it hangs), so the benchmark has to live here."
+ },
+ "mac/Sources/LocalTransSub/Brand.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `Brand.swift` (swift). Ringkasan dari komentar/header: yraverage brand palette, sampled from the wordmark."
+ },
+ "mac/Sources/LocalTransSub/DictationController.swift": {
+  "summary": "Layanan native macOS untuk audio, ASR, atau dikte. Berkas `DictationController.swift` (swift). Ringkasan dari komentar/header: Wispr-Flow-style dictation: hold a hotkey, speak, release → the cleaned-up text is inserted at the cursor in whatever app has focus. Permissions needed: Input Monitoring (to watch the hotkey), Accessibility (to synthesize ⌘V), Microphone. Simbol penting: DictationController, PCMBuffer, SegmentCollector, DictationPill.",
+  "sections": [
+   {
+    "symbol": "DictationController",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait DictationController pada DictationController.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
+   },
+   {
+    "symbol": "PCMBuffer",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait PCMBuffer pada DictationController.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
+   },
+   {
+    "symbol": "SegmentCollector",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait SegmentCollector pada DictationController.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
+   },
+   {
+    "symbol": "DictationPill",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait DictationPill pada DictationController.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
+   }
+  ]
+ },
+ "mac/Sources/LocalTransSub/LanguagePackInstaller.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `LanguagePackInstaller.swift` (swift). Ringkasan dari komentar/header: Requests Apple language-model downloads from inside the app. Apple gates pack installation behind a SwiftUI view modifier: a session vended by `.translationTask` reports `canRequestDownloads == true`, so `prepareTranslation()` presents the system \"Download language?\" sheet. A session built with `TranslationSession(inst Simbol penting: LanguagePackInstaller.",
+  "sections": [
+   {
+    "symbol": "LanguagePackInstaller",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait LanguagePackInstaller pada LanguagePackInstaller.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
+   }
+  ]
+ },
+ "mac/Sources/LocalTransSub/LanguageStatusModel.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `LanguageStatusModel.swift` (swift). Ringkasan dari komentar/header: Live view of which translation models are installed, shown in Settings so the state is visible without starting a session first. Simbol penting: LanguageStatusModel."
+ },
+ "mac/Sources/LocalTransSub/MainView.swift": {
+  "summary": "Main window dengan tab Live, File, dan Meeting notes."
+ },
+ "mac/Sources/LocalTransSub/MainWindow.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `MainWindow.swift` (swift). Ringkasan dari komentar/header: AppKit-owned main window. Using an NSWindow instead of a SwiftUI `Window` scene so the app can open it programmatically (first launch, menu item) — a menu-bar-only app that shows nothing on first launch leaves the user with no way to grant permissions. Simbol penting: MainWindowController."
+ },
+ "mac/Sources/LocalTransSub/OverlayPanelView.swift": {
+  "summary": "Overlay subtitel mengambang macOS. Berkas `OverlayPanelView.swift` (swift). Ringkasan dari komentar/header: The floating subtitle panel — native equivalent of the browser extension's in-page overlay: a toolbar of live controls, a scrollable transcript with timestamps and per-line selection, and a status footer."
+ },
+ "mac/Sources/LocalTransSub/OverlayProbe.swift": {
+  "summary": "Overlay subtitel mengambang macOS. Berkas `OverlayProbe.swift` (swift). Ringkasan dari komentar/header: `--overlay-probe`: shows the overlay and reports whether the window can actually be moved and resized, by inspecting its style and by performing real frame changes and reading the result back."
+ },
+ "mac/Sources/LocalTransSub/OverlayWindow.swift": {
+  "summary": "Overlay subtitel mengambang macOS. Berkas `OverlayWindow.swift` (swift). Ringkasan dari komentar/header: The floating subtitle window. A real non-activating panel that floats above everything (including other apps' fullscreen video), never fights page CSS, and can't be blocked by a site — the main advantage over the browser extension's in-page overlay. Simbol penting: OverlayController, OverlayModel.",
+  "sections": [
+   {
+    "symbol": "OverlayController",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait OverlayController pada OverlayWindow.swift: mendukung peran Overlay subtitel mengambang macOS."
+   },
+   {
+    "symbol": "OverlayModel",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait OverlayModel pada OverlayWindow.swift: mendukung peran Overlay subtitel mengambang macOS."
+   }
+  ]
+ },
+ "mac/Sources/LocalTransSub/PermissionReport.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `PermissionReport.swift` (swift). Ringkasan dari komentar/header: Prints the app's real permission + capability state (`--check-perms`). Runs inside the app bundle's own identity, which is the only place these answers are meaningful — a CLI probe inherits the terminal's identity."
+ },
+ "mac/Sources/LocalTransSub/PrefsBridge.swift": {
+  "summary": "Bridge SwiftUI ke Prefs termasuk audioSourceMode, languageMode, dictationHotkey."
+ },
+ "mac/Sources/LocalTransSub/SelfTest.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `SelfTest.swift` (swift). Ringkasan dari komentar/header: End-to-end self test (`--selftest`): runs the real pipeline — system audio capture → transcription → translation → overlay — against audio played through the speakers, and writes the result to /tmp/transsub-selftest.txt."
+ },
+ "mac/Sources/LocalTransSub/SettingsView.swift": {
+  "summary": "Settings macOS: tab Capture (sumber audio + mode bahasa) dan hotkey dikte."
+ },
+ "mac/Sources/LocalTransSub/SubtitleSession.swift": {
+  "summary": "The live subtitle session wiring capture → transcription → translation → overlay. Loads the speech model, selects a translation engine, then handles segments: final text becomes a cue while in-progress text is translated by drainPartial, which keeps exactly one request in flight and always picks up the newest text so subtitles appear while the speaker is still talking. Also provides forceTranslate for re-running translation, startTranslationRetry when no engine is ready yet, backfillTranslations and transcript export.",
+  "sections": [
+   {
+    "symbol": "SubtitleSession.start",
+    "startLine": 35,
+    "endLine": 131,
+    "summary": "Starts a session: checks Screen Recording, loads the speech model for the locale, prepares the translation engine (recording its note when only a slower tier is available), starts the Transcriber and begins audio capture, then publishes the listening status including which translation engine was chosen."
+   },
+   {
+    "symbol": "SubtitleSession.handle",
+    "startLine": 138,
+    "endLine": 209,
+    "summary": "Receives each TranscriptSegment. Final text becomes a cue in the overlay and transcript and is translated once; in-progress text is routed to drainPartial instead. Also triggers the optional Refine pass that re-translates a finished line with the higher-quality on-device model."
+   },
+   {
+    "symbol": "SubtitleSession.drainPartial",
+    "startLine": 210,
+    "endLine": 229,
+    "summary": "Self-pacing translation of live partial text: keeps exactly one request in flight and always picks up the newest pending string, so it runs at whatever rate the model sustains rather than queueing or thrashing. This is what makes subtitles appear while the speaker is still talking."
+   },
+   {
+    "symbol": "SubtitleSession.forceTranslate",
+    "startLine": 230,
+    "endLine": 262,
+    "summary": "Re-runs translation across a chosen scope — all cues, only the selected ones, or only those still untranslated — updating both the overlay and the stored transcript while reporting progress in the panel footer."
+   },
+   {
+    "symbol": "SubtitleSession.startTranslationRetry",
+    "startLine": 263,
+    "endLine": 318,
+    "summary": "Keeps retrying engine setup in the background when no translator was available at start (a pack not installed, or the on-device model still warming up), then back-fills translations for lines already captured instead of losing them."
+   }
+  ]
+ },
+ "mac/Sources/LocalTransSub/ViewModels.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `ViewModels.swift` (swift). Ringkasan dari komentar/header: View-local state lives in ObservableObjects owned by AppController. Why not @State: SwiftUI's @State is a macro in the macOS 26 SDK and its implementation plugin ships only with full Xcode — this project builds with Command Line Tools, so @State cannot be expanded. @ObservedObject is a plain Simbol penting: UIState, FileTranscribeModel.",
+  "sections": [
+   {
+    "symbol": "UIState",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait UIState pada ViewModels.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
+   },
+   {
+    "symbol": "FileTranscribeModel",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait FileTranscribeModel pada ViewModels.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
+   }
+  ]
+ },
+ "mac/Sources/TransSubKit/AudioCapture.swift": {
+  "summary": "Layanan native macOS untuk audio, ASR, atau dikte. Berkas `AudioCapture.swift` (swift). Ringkasan dari komentar/header: System / per-application audio capture via ScreenCaptureKit. This is the macOS answer to the browser extension's tabCapture: one Screen Recording grant, then we can tap the audio of ANY running app (browser, Zoom, VLC…) with no per-tab permission dance and no picker each session. Simbol penting: AudioCapture.",
+  "sections": [
+   {
+    "symbol": "AudioCapture",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait AudioCapture pada AudioCapture.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
+   }
+  ]
+ },
+ "mac/Sources/TransSubKit/LLMTranslator.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `LLMTranslator.swift` (swift). Ringkasan dari komentar/header: Fallback translator built on Apple's on-device foundation model. Why this exists: the Translation framework can only use language pairs the user has installed, and an app cannot trigger that download itself (`canRequestDownloads` is false and `prepareTranslation` throws). When no Simbol penting: LLMTranslator.",
+  "sections": [
+   {
+    "symbol": "LLMTranslator",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait LLMTranslator pada LLMTranslator.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
+   }
+  ]
+ },
+ "mac/Sources/TransSubKit/Languages.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `Languages.swift` (swift). Ringkasan dari komentar/header: Language lists shared by the UI."
+ },
+ "mac/Sources/TransSubKit/Prefs.swift": {
+  "summary": "Preferensi pengguna lokal (UserDefaults / bridge SwiftUI). Berkas `Prefs.swift` (swift). Ringkasan dari komentar/header: UserDefaults-backed preferences (no accounts, no telemetry, no cloud). Simbol penting: Prefs.",
+  "sections": [
+   {
+    "symbol": "Prefs",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait Prefs pada Prefs.swift: mendukung peran Preferensi pengguna lokal (UserDefaults / bridge SwiftUI)."
+   }
+  ]
+ },
+ "mac/Sources/TransSubKit/Subtitles.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `Subtitles.swift` (swift). Ringkasan dari komentar/header: Transcript line model + SRT / VTT / TXT export. Long ASR segments are split into short cues so players don't cover the screen with a wall of text (and lag rendering it)."
+ },
+ "mac/Sources/TransSubKit/Transcriber.swift": {
+  "summary": "Layanan native macOS untuk audio, ASR, atau dikte. Berkas `Transcriber.swift` (swift). Ringkasan dari komentar/header: On-device speech recognition via Apple's SpeechAnalyzer stack (macOS 26+). Chosen over a bundled Whisper build because the models are installed and updated by the system (no multi-GB downloads for us to manage or for a flaky network to corrupt), it runs on the Neural Engine, and it emits Simbol penting: SegmentBox.",
+  "sections": [
+   {
+    "symbol": "SegmentBox",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait SegmentBox pada Transcriber.swift: mendukung peran Layanan native macOS untuk audio, ASR, atau dikte."
+   }
+  ]
+ },
+ "mac/Sources/TransSubKit/TranslationEngine.swift": {
+  "summary": "Chooses the best available on-device translator: the Apple low-latency model first, then high-fidelity, then the on-device foundation model (Apple Intelligence) which needs no language download but is far slower and therefore only translates finished lines. Exposes canTranslatePartials, refine for polishing a draft, and normalizeScript which forces Chinese output into the requested script because the fast model sometimes answers a zh-Hans request in Traditional.",
+  "sections": [
+   {
+    "symbol": "TranslationEngine.prepare",
+    "startLine": 48,
+    "endLine": 117,
+    "summary": "Walks the engine ladder: the Apple low-latency model first, then high-fidelity, then the on-device foundation model. Each rung is only adopted after it is proven to work, and the returned TranslationSetup carries a note explaining any slower fallback to the user."
+   },
+   {
+    "symbol": "TranslationEngine.translate",
+    "startLine": 118,
+    "endLine": 133,
+    "summary": "Dispatches a translation to whichever engine was adopted and normalises the result before returning it."
+   },
+   {
+    "symbol": "TranslationEngine.normalizeScript",
+    "startLine": 134,
+    "endLine": 146,
+    "summary": "Forces Chinese output into the requested script via an ICU transform, because the low-latency model sometimes answers a zh-Hans request in Traditional. It is a no-op for text already in the right script."
+   }
+  ]
+ },
+ "mac/Sources/TransSubKit/Translator.swift": {
+  "summary": "On-device translation through Apple's Translation framework. The session is owned by a single worker task because TranslationSession is not Sendable. Key detail: availability is per-strategy — the low-latency model is a separate download from high-fidelity, and asking the default object about a low-latency session can report installed for a pair that then throws on every call. The session is therefore verified with one real translation before adoption and the error is never swallowed.",
+  "sections": [
+   {
+    "symbol": "Translator.init worker",
+    "startLine": 37,
+    "endLine": 193,
+    "summary": "Owns the TranslationSession inside a single detached task because the type is not Sendable, serving prepare/translate/reset commands over a stream. The prepare path verifies a new session with one real translation before adopting it, since prepareTranslation can succeed for a pair whose model is missing."
+   },
+   {
+    "symbol": "Translator.availability",
+    "startLine": 194,
+    "endLine": 258,
+    "summary": "Reports availability per strategy and resolves loose language codes against the system's own supported languages. The low-latency and high-fidelity models are separate downloads, so querying the default object about a low-latency session gives a misleading answer."
+   }
+  ]
+ },
+ "mac/Sources/spike-capture/main.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `main.swift` (swift). Ringkasan dari komentar/header: Spike: prove ScreenCaptureKit per-app audio capture works on this machine before the rest of the app is built on top of it. swift run spike-capture → list capturable apps swift run spike-capture <name> [sec] → capture that app's audio, report levels Simbol penting: Meter.",
+  "sections": [
+   {
+    "symbol": "Meter",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait Meter pada main.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
+   }
+  ]
+ },
+ "mac/Sources/spike-engine/main.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `main.swift` (swift). Ringkasan dari komentar/header: Spike: prove the on-device Speech + Translation engines work, using a real audio file (no Screen Recording permission needed). swift run spike-engine ../test/speech.wav [locale] Simbol penting: Collector.",
+  "sections": [
+   {
+    "symbol": "Collector",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait Collector pada main.swift: mendukung peran Kode aplikasi native macOS Local TransSub / TransSubKit."
+   }
+  ]
+ },
+ "mac/Tools/make-icon.swift": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `make-icon.swift` (swift). Ringkasan dari komentar/header: Generates the app icon from the yraverage brand marks. The logo's signature element is the teal rounded tag holding white text, so the icon is that tag turned into a caption bubble with subtitle bars — recognisably the same brand, and still legible at 16pt. swift Tools/make-icon.swift branding/logo.png"
+ },
+ "mac/build-app.sh": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `build-app.sh` (shell). Ringkasan dari komentar/header: !/bin/bash Build yraverageSub.app. Design rules this script enforces, so the app cannot regress again: 1. Stop any running copy first. codesign cannot sign a running binary; when that failed mid-script it left a bundle carrying SwiftPM's own ad-hoc signature and no icon — which silently revoked every macOS permission."
+ },
+ "mac/doctor.sh": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `doctor.sh` (shell). Ringkasan dari komentar/header: !/bin/bash yraverageSub doctor — checks everything that has ever broken, and says exactly how to fix it. Run this first whenever something misbehaves. ./doctor.sh --- toolchain -------------------------------------------------------------- ) bad \"macOS $OSV\" \"needs macOS 26+ for on-device speech and translation\" ;;"
+ },
+ "mac/make-signing-cert.sh": {
+  "summary": "Kode aplikasi native macOS Local TransSub / TransSubKit. Berkas `make-signing-cert.sh` (shell). Ringkasan dari komentar/header: !/bin/bash Create a local self-signed code-signing certificate — ONCE. Why this exists: an ad-hoc signature (`codesign -s -`) gives the app an identity derived from its CDHash, which changes on every rebuild. macOS TCC stores Screen Recording / Accessibility / Input Monitoring grants against that"
+ },
+ "native/install-host.sh": {
+  "summary": "Skrip instal Native Messaging Host per OS. Berkas `install-host.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Install the Chrome Native Messaging host so the extension can start/stop the helper from Settings. Run once after loading the extension: cd native && ./install-host.sh YOUR_EXTENSION_ID Find YOUR_EXTENSION_ID on chrome://extensions (Developer mode → ID column)."
+ },
+ "native/messaging_host.py": {
+  "summary": "Komponen Native Helper Python (server/host lokal). Berkas `messaging_host.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: read_msg, write_msg, health, shutdown, port_open, wait_port_free, kill_port_listeners, force_stop.",
+  "sections": [
+   {
+    "symbol": "read_msg",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait read_msg pada messaging_host.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
+   },
+   {
+    "symbol": "write_msg",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait write_msg pada messaging_host.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
+   },
+   {
+    "symbol": "health",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait health pada messaging_host.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
+   },
+   {
+    "symbol": "shutdown",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait shutdown pada messaging_host.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
+   }
+  ]
+ },
+ "native/run.sh": {
+  "summary": "Skrip shell/batch untuk menjalankan layanan lokal. Berkas `run.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start the Local TransSub native helper (creates a venv on first run). TRANSLATE=off ./run.sh → skip the translation LLM WHISPER_MODEL=mlx-community/whisper-small-mlx ./run.sh → smaller/faster model DRAFT_WHISPER_MODEL=mlx-community/whisper-base-mlx ./run.sh → fast live drafts (default)"
+ },
+ "native/server.py": {
+  "summary": "Komponen Native Helper Python (server/host lokal). Berkas `server.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Apple Silicon → mlx-whisper (Whisper Large v3 Turbo on the GPU via MLX) anything else → faster-whisper (CTranslate2, CPU/CUDA) Simbol penting: ReuseHTTPServer, _resolve_ffmpeg, _lang, _draft_source_ok, _clip_fast_text, asr_array, asr_file, draft_asr_array. Endpoint lokal /health, /transcribe, /transcribe_file, jobs, dan notes pada 127.0.0.1.",
+  "sections": [
+   {
+    "symbol": "ReuseHTTPServer",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait ReuseHTTPServer pada server.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
+   },
+   {
+    "symbol": "_resolve_ffmpeg",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait _resolve_ffmpeg pada server.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
+   },
+   {
+    "symbol": "_lang",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait _lang pada server.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
+   },
+   {
+    "symbol": "_draft_source_ok",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait _draft_source_ok pada server.py: mendukung peran Komponen Native Helper Python (server/host lokal)."
+   }
+  ]
+ },
+ "package-lock.json": {
+  "summary": "Konfigurasi atau data JSON proyek. Berkas `package-lock.json` (json). Ringkasan dari komentar/header: \"name\": \"local-transsub\","
+ },
+ "package.json": {
+  "summary": "Manifest npm: skrip smoke/e2e/bench/defects/release, versi 1.1.0."
+ },
+ "scripts/bench-lab.py": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench-lab.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: load_manifest, read_wav_pcm, pcm_slice, post_bytes, post_json, post_text, get_health, ensure_samples.",
+  "sections": [
+   {
+    "symbol": "load_manifest",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait load_manifest pada bench-lab.py: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "read_wav_pcm",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait read_wav_pcm pada bench-lab.py: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "pcm_slice",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait pcm_slice pada bench-lab.py: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "post_bytes",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait post_bytes pada bench-lab.py: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   }
+  ]
+ },
+ "scripts/build.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `build.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Build dist/ without requiring Node/npm on PATH (uses bundled esbuild binary)."
+ },
+ "scripts/dev-browser.mjs": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `dev-browser.mjs` (javascript). Ringkasan dari komentar/header: Launch Chrome with the unpacked extension for manual testing / DevTools inspect. Opens the side panel page and a sample tab you can caption."
+ },
+ "scripts/dev-browser.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `dev-browser.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Open Chrome with the unpacked extension for DevTools / inspect testing. shellcheck source=lab-lib.sh Rebuild dist when npm is missing from PATH (common on fresh shells)."
+ },
+ "scripts/e2e.mjs": {
+  "summary": "E2E transkripsi langsung via Puppeteer: tabCapture/--pick/--native, harness-only, menulis suite ke test/last-e2e.json."
+ },
+ "scripts/ensure-dev-services.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `ensure-dev-services.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Idempotent: native helper (17865) + Translation Lab (8799). Safe to run after every build."
+ },
+ "scripts/ensure-lab.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `ensure-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start Translation Lab if it is not already listening on 127.0.0.1:8799. shellcheck source=lab-lib.sh"
+ },
+ "scripts/ensure-native.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `ensure-native.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash One-shot setup: install the Chrome native launcher + start the helper server."
+ },
+ "scripts/export-youtube-cookies.sh": {
+  "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `export-youtube-cookies.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Export YouTube cookies from your browser into the lab cache (run while signed in)."
+ },
+ "scripts/freeze-debug.mjs": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `freeze-debug.mjs` (javascript). Ringkasan dari komentar/header: Reproduce the panel freeze and dump the JS stack of whichever extension document is spinning (panel or offscreen) via Debugger.pause."
+ },
+ "scripts/gen-icons.mjs": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `gen-icons.mjs` (javascript). Ringkasan dari komentar/header: Generates simple solid-gradient PNG icons without any image library."
+ },
+ "scripts/gen-samples.py": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `gen-samples.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: aiff_to_wav16, verify_wav, main."
+ },
+ "scripts/gen-samples.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `gen-samples.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Generate test speech WAV files (16 kHz mono) for the translation lab."
+ },
+ "scripts/lab-lib.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `lab-lib.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Shared helpers for Translation Lab start/stop scripts."
+ },
+ "scripts/lab-server.py": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `lab-server.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: LabHandler, discover_browser_profiles, build_ytdlp_strategies, ytdlp_run, youtube_auth_status, find_yt_dlp, youtube_id, is_youtube. Endpoint lokal /health, /transcribe, /transcribe_file, jobs, dan notes pada 127.0.0.1.",
+  "sections": [
+   {
+    "symbol": "LabHandler",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait LabHandler pada lab-server.py: mendukung peran Skrip build, lab, native lifecycle, atau rilis."
+   },
+   {
+    "symbol": "discover_browser_profiles",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait discover_browser_profiles pada lab-server.py: mendukung peran Skrip build, lab, native lifecycle, atau rilis."
+   },
+   {
+    "symbol": "build_ytdlp_strategies",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait build_ytdlp_strategies pada lab-server.py: mendukung peran Skrip build, lab, native lifecycle, atau rilis."
+   },
+   {
+    "symbol": "ytdlp_run",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait ytdlp_run pada lab-server.py: mendukung peran Skrip build, lab, native lifecycle, atau rilis."
+   }
+  ]
+ },
+ "scripts/lab-status.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `lab-status.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash shellcheck source=lab-lib.sh"
+ },
+ "scripts/native-test.py": {
+  "summary": "Komponen Native Helper Python (server/host lokal). Berkas `native-test.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: post."
+ },
+ "scripts/restart-native.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `restart-native.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Stop then start the native helper (use after editing native/server.py or run.sh)."
+ },
+ "scripts/run-lab.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `run-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Translation Lab — test server + native helper + browser UI. Lab server: static files + YouTube audio proxy (yt-dlp)"
+ },
+ "scripts/smoke.mjs": {
+  "summary": "Kerangka dan runner uji asap 26 sub-fitur Fase 1: membaca katalog STUB_FEATURES, menjalankan pemeriksaan kontrak sumber/export/helper, opsi --pipeline untuk Whisper/Opus, menulis test/last-smoke.json."
+ },
+ "scripts/start-lab.bat": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `start-lab.bat`. Ringkasan dari komentar/header: @echo off"
+ },
+ "scripts/start-lab.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `start-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start Translation Lab server (background). Mac: double-click \"Start Lab.command\" shellcheck source=lab-lib.sh"
+ },
+ "scripts/start-native.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `start-native.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start the native helper if it is not already listening on 127.0.0.1:17865. shellcheck disable=SC1091"
+ },
+ "scripts/stop-lab.bat": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `stop-lab.bat`. Ringkasan dari komentar/header: @echo off"
+ },
+ "scripts/stop-lab.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `stop-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Stop Translation Lab server. Mac: double-click \"Stop Lab.command\" shellcheck source=lab-lib.sh"
+ },
+ "scripts/stop-native.sh": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `stop-native.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Stop the native helper on 127.0.0.1:17865 (graceful shutdown, then force if needed)."
+ },
+ "src/ai-worker.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `ai-worker.js` (javascript). Ringkasan dari komentar/header: AI worker: all heavy inference (Whisper / Voxtral / Opus-MT / downloads) runs here, on its own thread, so the side panel and offscreen audio graph never freeze while a model loads or decodes. Protocol: main → {id, op, args}; worker → {id, progress} (0..n times) then {id, result} | {id, error}."
+ },
+ "src/background.js": {
+  "summary": "Service worker latar: orkestrasi sesi, cache, pesan, native helper. Berkas `background.js` (javascript). Ringkasan dari komentar/header: Background service worker: session state machine + message router. The heavy pipeline (capture, VAD, ASR, MT) lives in the offscreen document."
+ },
+ "src/content.js": {
+  "summary": "Content script overlay subtitel di halaman tab. Berkas `content.js` (javascript). Ringkasan dari komentar/header: Floating subtitle overlay — YouTube CC-style scrollable blocks + seekable timeline."
+ },
+ "src/lib/asr.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `asr.js` (javascript). Ringkasan dari komentar/header: Speech-recognition engine abstraction. whisper : transformers.js ASR pipeline (tiny … large-v3-turbo) voxtral : transformers.js VoxtralForConditionalGeneration (WebGPU) native : local helper server over localhost (see lib/native.js) Simbol penting: hasWebGPU, pickDevice, loadASR, activeDevice, activeBackend, warmup, transcribe, transcribeLong.",
+  "sections": [
+   {
+    "symbol": "hasWebGPU",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait hasWebGPU pada asr.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "pickDevice",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait pickDevice pada asr.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "loadASR",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait loadASR pada asr.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "activeDevice",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait activeDevice pada asr.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   }
+  ]
+ },
+ "src/lib/export.js": {
+  "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `export.js` (javascript). Ringkasan dari komentar/header: Export helpers — optional save folder via File System Access API. Simbol penting: loadExportDir, pickExportDir, clearExportDir, saveExportFile, exportDirLabel.",
+  "sections": [
+   {
+    "symbol": "loadExportDir",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait loadExportDir pada export.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
+   },
+   {
+    "symbol": "pickExportDir",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait pickExportDir pada export.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
+   },
+   {
+    "symbol": "clearExportDir",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait clearExportDir pada export.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
+   },
+   {
+    "symbol": "saveExportFile",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait saveExportFile pada export.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
+   }
+  ]
+ },
+ "src/lib/hf-env.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `hf-env.js` (javascript). Ringkasan dari komentar/header: Central transformers.js environment config. Works on the main thread and inside the AI worker (which has no chrome.runtime — pass baseUrl instead). Simbol penting: configureHF, makeProgressAggregator."
+ },
+ "src/lib/i18n.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `i18n.js` (javascript). Simbol penting: I18N.",
+  "sections": [
+   {
+    "symbol": "I18N",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait I18N pada i18n.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   }
+  ]
+ },
+ "src/lib/models.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `models.js` (javascript). Ringkasan dari komentar/header: Model download / cache management. Runs inside the AI worker; the caller (offscreen main thread) persists the downloaded-state via the background. Simbol penting: resolveModel, downloadModel, deleteModel."
+ },
+ "src/lib/native-host.js": {
+  "summary": "Kontrak/bridge Native Messaging dan protokol JSON lokal. Berkas `native-host.js` (javascript). Ringkasan dari komentar/header: Chrome Native Messaging bridge — lets the extension start/stop the helper without opening a terminal. Install once: cd native && ./install-host.sh Simbol penting: nativeHostSupported, nativeHostAction, NATIVE_HOST_NAME."
+ },
+ "src/lib/native.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `native.js` (javascript). Ringkasan dari komentar/header: Client for the local native helper server (native/server.py). Everything stays on the machine — the extension just talks to 127.0.0.1. Simbol penting: nativeHealth, nativeTranscribe, nativeTranscribeFile, nativeDraft, nativeTranslate, nativeTranslateRefine, nativeShutdown.",
+  "sections": [
+   {
+    "symbol": "nativeHealth",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait nativeHealth pada native.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "nativeTranscribe",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait nativeTranscribe pada native.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "nativeTranscribeFile",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait nativeTranscribeFile pada native.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "nativeDraft",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait nativeDraft pada native.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   }
+  ]
+ },
+ "src/lib/offline-io.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `offline-io.js` (javascript). Ringkasan dari komentar/header: Shared offline media staging (OPFS) — chunked so multi-GB files work in Chrome. Simbol penting: needsNativeFilePath, getOfflineInputFile, stageFileToOpfs, readOfflineInputBytes, OFFLINE_INPUT_NAME, CHUNK_BYTES, BROWSER_MAX_BYTES."
+ },
+ "src/lib/opus.js": {
+  "summary": "Terjemahan lokal berjenjang dan registri model. Berkas `opus.js` (javascript). Ringkasan dari komentar/header: Opus-MT (Xenova ONNX) translation pipelines. Runs inside the AI worker. Simbol penting: loadOpusMT, translateWith, preloadPair, releasePair."
+ },
+ "src/lib/registry.js": {
+  "summary": "Terjemahan lokal berjenjang dan registri model. Berkas `registry.js` (javascript). Ringkasan dari komentar/header: Model & language registry shared by the side panel UI and the offscreen pipeline. --------------------------------------------------------------------------- ASR (Whisper) models — onnx-community ONNX exports for transformers.js. Sizes are approximate total downloads (encoder + decoder + tokenizer). Simbol penting: pairLabel, translationPlan, isHallucination, ASR_MODELS, DEFAULT_ASR, ENGINES, DEFAULT_NATIVE_URL, SOURCE_LANGS.",
+  "sections": [
+   {
+    "symbol": "pairLabel",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait pairLabel pada registry.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
+   },
+   {
+    "symbol": "translationPlan",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait translationPlan pada registry.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
+   },
+   {
+    "symbol": "isHallucination",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait isHallucination pada registry.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
+   },
+   {
+    "symbol": "ASR_MODELS",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait ASR_MODELS pada registry.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
+   }
+  ]
+ },
+ "src/lib/transcript-cache.js": {
+  "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `transcript-cache.js` (javascript). Ringkasan dari komentar/header: Per-URL transcript cache — keyed by page URL + language pair. Also owns SRT/VTT/TXT export, including readable cue splitting. Simbol penting: normalizeUrl, cacheKey, maxCachedTime, isRangeCached, mergeLine, splitSubtitleCues, formatSrt, formatVtt.",
+  "sections": [
+   {
+    "symbol": "normalizeUrl",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait normalizeUrl pada transcript-cache.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
+   },
+   {
+    "symbol": "cacheKey",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait cacheKey pada transcript-cache.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
+   },
+   {
+    "symbol": "maxCachedTime",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait maxCachedTime pada transcript-cache.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
+   },
+   {
+    "symbol": "isRangeCached",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait isRangeCached pada transcript-cache.js: mendukung peran Format/ekspor subtitel SRT VTT TXT dan cache transkrip."
+   }
+  ]
+ },
+ "src/lib/translate.js": {
+  "summary": "Terjemahan lokal berjenjang dan registri model. Berkas `translate.js` (javascript). Ringkasan dari komentar/header: Tiered local translation (main thread of the offscreen document): 1. whisper-direct — Whisper task:'translate' (audio → English, no MT model) 2. native helper LLM (when the native engine is on and has mlx-lm) 3. Chrome built-in Translator API (on-device, Chrome 138+) when creatable Simbol penting: makeTranslator.",
+  "sections": [
+   {
+    "symbol": "makeTranslator",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait makeTranslator pada translate.js: mendukung peran Terjemahan lokal berjenjang dan registri model."
+   }
+  ]
+ },
+ "src/lib/translation-utils.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `translation-utils.js` (javascript). Ringkasan dari komentar/header: Shared helpers for detecting whether a subtitle line still needs translation. Simbol penting: sourceText, translationText, needsTranslation, mergeLinesByTime, pickUntranslatedLines."
+ },
+ "src/manifest.json": {
+  "summary": "Manifest V3 ekstensi versi 1.1.0 dengan nativeMessaging."
+ },
+ "src/offscreen.html": {
+  "summary": "Dokumen offscreen untuk pipeline audio, VAD, dan inferensi. Berkas `offscreen.html` (html). Ringkasan dari komentar/header: <html>"
+ },
+ "src/offscreen.js": {
+  "summary": "Dokumen offscreen untuk pipeline audio, VAD, dan inferensi. Berkas `offscreen.js` (javascript). Ringkasan dari komentar/header: Offscreen document: the entire local AI pipeline. tab capture → speaker passthrough → Silero VAD → Whisper → translation plus model management and offline file jobs."
+ },
+ "src/sidepanel.css": {
+  "summary": "UI Side Panel ekstensi untuk kontrol sesi realtime/offline. Berkas `sidepanel.css` (css). Ringkasan dari komentar/header: Unsloth-inspired theme: charcoal surfaces, emerald accent, pill controls { box-sizing: border-box; margin: 0; padding: 0; }"
+ },
+ "src/sidepanel.html": {
+  "summary": "Side Panel: kartu Native Helper, mount Notulen, CSS notes-panel."
+ },
+ "src/sidepanel.js": {
+  "summary": "Logika Side Panel: mount notes/helper, exportBasename, redraw status."
+ },
+ "test/BENCH-LATEST.md": {
+  "summary": "Snapshot benchmark native terbaru."
+ },
+ "test/README.md": {
+  "summary": "Dokumentasi pengantar repositori atau paket. Berkas `README.md` (markdown). Ringkasan dari komentar/header: Translation Lab # Quick start *Mac (double-click):** `Start Lab.command` / `Stop Lab.command` in the project folder. *Terminal:** *Windows:** `scripts\\start-lab.bat` / `scripts\\stop-lab.bat` # What it tests"
+ },
+ "test/audio-page.html": {
+  "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `audio-page.html` (html). Ringkasan dari komentar/header: <html> best-effort start in case autoplay policy blocks"
+ },
+ "test/chrome-mock.js": {
+  "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `chrome-mock.js` (javascript). Ringkasan dari komentar/header: Minimal chrome.* mock so extension pages can be rendered in a plain browser for visual testing. Not used in the packaged extension."
+ },
+ "test/index.html": {
+  "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `index.html` (html). Ringkasan dari komentar/header: <html lang=\"en\">"
+ },
+ "test/lab.html": {
+  "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `lab.html` (html). Ringkasan dari komentar/header: <html lang=\"en\"> { box-sizing: border-box; }"
+ },
+ "test/lab.js": {
+  "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `lab.js` (javascript). Ringkasan dari komentar/header: Local TransSub Translation Lab — client logic"
+ },
+ "test/last-bench.json": {
+  "summary": "Hasil bench-lab.py native."
+ },
+ "test/offscreen-test.html": {
+  "summary": "Dokumen offscreen untuk pipeline audio, VAD, dan inferensi. Berkas `offscreen-test.html` (html). Ringkasan dari komentar/header: <html>"
+ },
+ "test/overlay-test.html": {
+  "summary": "Overlay subtitel mengambang macOS. Berkas `overlay-test.html` (html). Ringkasan dari komentar/header: <html>"
+ },
+ "test/panel-test.html": {
+  "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `panel-test.html` (html). Ringkasan dari komentar/header: <html> load the real panel markup then its module"
+ },
+ "test/samples/manifest.json": {
+  "summary": "Manifest ekstensi Chrome MV3 (izin, service worker, ikon). Berkas `manifest.json` (json). Ringkasan dari komentar/header: \"version\": 1,"
+ },
+ "test/start-lab.sh": {
+  "summary": "Halaman atau utilitas harness pengujian lokal. Berkas `start-lab.sh` (shell). Ringkasan dari komentar/header: !/usr/bin/env bash Start Translation Lab from any directory (opens http://127.0.0.1:8799/lab.html)."
+ },
+ "test/subtitle-export.test.js": {
+  "summary": "Format/ekspor subtitel SRT VTT TXT dan cache transkrip. Berkas `subtitle-export.test.js` (javascript). Ringkasan dari komentar/header: Subtitle export: long ASR segments must become readable cues, not a wall of text."
+ },
+ ".codex/skills/ngodingpakeai/SKILL.md": {
+  "summary": "Instruksi skill agen untuk sync/task NgodingPakeAI. Berkas `SKILL.md` (markdown). Ringkasan dari komentar/header: --- NgodingPakeAI — Codebase Sync # Prerequisites # How sync works (one mode — YOU write the summaries) # Existing codebase? The summary sync builds the pending plan for you"
+ },
+ ".cursor/skills/ngodingpakeai/SKILL.md": {
+  "summary": "Instruksi skill agen untuk sync/task NgodingPakeAI. Berkas `SKILL.md` (markdown). Ringkasan dari komentar/header: --- NgodingPakeAI — Codebase Sync # Prerequisites # How sync works (one mode — YOU write the summaries) # Existing codebase? The summary sync builds the pending plan for you"
+ },
+ ".gitignore": {
+  "summary": "Berkas pendukung proyek Local TransSub. Berkas `.gitignore`. Ringkasan dari komentar/header: Dependencies & virtualenvs Build output .icns Throwaway Chrome profiles created by the Puppeteer test scripts. These contain cookies and site data — never commit them. Local cache, including exported YouTube cookies. Generated test audio (recreate with scripts/gen-samples.sh) .wav"
+ },
+ "CHANGELOG.md": {
+  "summary": "Riwayat rilis 1.1.0 dan 1.0.0."
+ },
+ "mac/Sources/LocalTransSub/MockSession.swift": {
+  "summary": "Data mock overlay untuk --overlay-demo / pratinjau UI."
+ },
+ "mac/Sources/LocalTransSub/NotesView.swift": {
+  "summary": "Tab Meeting notes di app macOS dengan stub ringkasan/keputusan/tindak lanjut."
+ },
+ "native/SETUP.md": {
+  "summary": "Dokumentasi pemasangan Native Helper di macOS, Linux, dan Windows."
+ },
+ "native/install-host-linux.sh": {
+  "summary": "Wrapper Linux untuk install-host.sh."
+ },
+ "native/install-host.bat": {
+  "summary": "Installer Native Messaging Host Chrome di Windows (JSON + registry)."
+ },
+ "scripts/bench-models.mjs": {
+  "summary": "Benchmark model lokal: gabung last-bench.json, opsi --browser/--native/--catalog-only, menulis test/last-models-bench.json."
+ },
+ "scripts/bench-report.mjs": {
+  "summary": "Generator laporan pembanding Markdown (BENCH-COMPARE.md + BENCH-LATEST.md) dari last-models-bench/last-bench."
+ },
+ "scripts/e2e-file.mjs": {
+  "summary": "E2E berkas offline + ekspor SRT/VTT/TXT: kontrak formatTxt/Srt/Vtt, wiring Side Panel, opsional --browser Puppeteer."
+ },
+ "scripts/gen-defects.mjs": {
+  "summary": "Generator daftar cacat rilis dari last-smoke/last-e2e/last-bench ke test/last-defects.json."
+ },
+ "scripts/mark-release-priorities.mjs": {
+  "summary": "Menandai mustFix gerbang rilis (REL-01–04), menulis RELEASE-GATE.md; opsi --check untuk CI."
+ },
+ "scripts/pack-store.mjs": {
+  "summary": "Skrip build, lab, native lifecycle, atau rilis. Berkas `pack-store.mjs` (javascript). Ringkasan dari komentar/header: !/usr/bin/env node Buat paket ZIP produksi untuk Chrome Web Store dari folder dist/. / Membuat ZIP produksi dist/ untuk unggahan Chrome Web Store."
+ },
+ "scripts/pack-store.sh": {
+  "summary": "Membangun ZIP produksi Chrome Web Store dari folder dist/ ke store/releases/."
+ },
+ "src/helper-status.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `helper-status.js` (javascript). Ringkasan dari komentar/header: Kartu status helper lintas platform + indikator mode + berkas besar (stub UI). / Simbol penting: renderHelperStatusCard, mountHelperStatusCard.",
+  "sections": [
+   {
+    "symbol": "renderHelperStatusCard",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait renderHelperStatusCard pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "mountHelperStatusCard",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait mountHelperStatusCard pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   }
+  ]
+ },
+ "src/lib/device-tier.js": {
+  "summary": "Deteksi kemampuan perangkat dan pemilihan tier/mesin (webgpu/wasm/native)."
+ },
+ "src/lib/engine-session.js": {
+  "summary": "Deteksi tier perangkat dan sesi mesin dengan fallback. Berkas `engine-session.js` (javascript). Ringkasan dari komentar/header: Pengelola sesi mesin ASR/terjemahan dengan fallback otomatis. / Simbol penting: createEngineSession."
+ },
+ "src/lib/engine-tier.js": {
+  "summary": "Deteksi tier perangkat dan sesi mesin dengan fallback. Berkas `engine-tier.js` (javascript). Ringkasan dari komentar/header: Deteksi kemampuan perangkat + tier mesin ASR/terjemahan lokal. Digunakan UI Settings dan pemilih mesin (frontend + kontrak backend). / Simbol penting: detectDeviceCapabilities, tierFromScore, pickEngineFromTier, withEngineFallback."
+ },
+ "src/lib/helper-status.js": {
+  "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `helper-status.js` (javascript). Ringkasan dari komentar/header: Status Native Helper lintas platform (Fase 2 — Windows/Linux/macOS). Frontend-first: panduan per OS + indikator; health nyata dari /health. / @typedef {'macos' | 'windows' | 'linux' | 'unknown'} HelperOS Simbol penting: detectOs, exportBasename, formatBytes, OS_GUIDES, STUB_LARGE_FILE.",
+  "sections": [
+   {
+    "symbol": "detectOs",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait detectOs pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "exportBasename",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait exportBasename pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "formatBytes",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait formatBytes pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   },
+   {
+    "symbol": "OS_GUIDES",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait OS_GUIDES pada helper-status.js: mendukung peran Modul JavaScript aplikasi atau skrip alat."
+   }
+  ]
+ },
+ "src/lib/native-host-registry.js": {
+  "summary": "Kontrak/bridge Native Messaging dan protokol JSON lokal. Berkas `native-host-registry.js` (javascript). Ringkasan dari komentar/header: Registrasi host Native Messaging yang diharapkan ekstensi. Izin `\"nativeMessaging\"` ada di src/manifest.json; nama host dipakai via chrome.runtime.connectNative (lihat src/lib/native-host.js). Instal host OS: native/install-host.sh | install-host.bat | install-host-linux.sh / Simbol penting: REGISTERED_NATIVE_HOST, NATIVE_MESSAGING_PERMISSION."
+ },
+ "src/lib/native-protocol.js": {
+  "summary": "Kontrak/bridge Native Messaging dan protokol JSON lokal. Berkas `native-protocol.js` (javascript). Ringkasan dari komentar/header: Protokol JSON bridge ekstensi ↔ Native Helper (kontrak lokal). Transport: Chrome Native Messaging (`com.localtranssub.helper`) atau HTTP loopback `http://127.0.0.1:17865`. / Simbol penting: assertLocalUrl, wrapTranscriptPayload, NATIVE_MESSAGING_HOST, LOCAL_HELPER_ORIGIN, NATIVE_HOST_ACTIONS."
+ },
+ "src/lib/notes-api.js": {
+  "summary": "Klien HTTP helper untuk /notes, /notes/generate, dan job transcribe_file."
+ },
+ "src/lib/notes-export.js": {
+  "summary": "Serialisasi notulen ke TXT dan Markdown."
+ },
+ "src/lib/notes-generate.js": {
+  "summary": "Generator heuristik ringkasan, keputusan, dan tindak lanjut dari baris transkrip."
+ },
+ "src/lib/notes-schema.js": {
+  "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-schema.js` (javascript). Ringkasan dari komentar/header: Skema data Notulen Rapat + tindak lanjut (Fase 2). Dipakai ekstensi (chrome.storage / OPFS) dan kontrak API helper. / @typedef {'open' | 'done'} ActionStatus @typedef {'idle' | 'generating' | 'ready' | 'error' | 'saved'} NoteStatus @typedef {object} ActionItem @property {string} id Simbol penting: createActionItem, createMeetingNote, assertMeetingNote, wrapNotesStore, NOTE_SCHEMA_VERSION.",
+  "sections": [
+   {
+    "symbol": "createActionItem",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait createActionItem pada notes-schema.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "createMeetingNote",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait createMeetingNote pada notes-schema.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "assertMeetingNote",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait assertMeetingNote pada notes-schema.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "wrapNotesStore",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait wrapNotesStore pada notes-schema.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   }
+  ]
+ },
+ "src/lib/notes-store.js": {
+  "summary": "Penyimpanan notulen di chrome.storage.local (kunci meetingNotes): list/get/save/delete."
+ },
+ "src/lib/notes-stub.js": {
+  "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-stub.js` (javascript). Ringkasan dari komentar/header: Data tiruan Notulen Rapat Cerdas (Fase 2) — frontend-first. Bentuk kontrak yang nanti diisi LLM lokal / native helper. / @typedef {'idle' | 'generating' | 'ready' | 'error' | 'saved'} NotesLocalStatus @typedef {object} ActionItem @property {string} id @property {string} text @property {string | null} owner Simbol penting: loadNotesState, statusLabel, STUB_TRANSCRIPT, STUB_NOTE, STUB_SAVED_NOTES, STUB_NOTES_STATE.",
+  "sections": [
+   {
+    "symbol": "loadNotesState",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait loadNotesState pada notes-stub.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "statusLabel",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait statusLabel pada notes-stub.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "STUB_TRANSCRIPT",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait STUB_TRANSCRIPT pada notes-stub.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "STUB_NOTE",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait STUB_NOTE pada notes-stub.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   }
+  ]
+ },
+ "src/lib/transcript-protocol.js": {
+  "summary": "Protokol JSON v1 untuk cuplikan transkrip/terjemahan antar komponen."
+ },
+ "src/notes-panel.css": {
+  "summary": "Gaya panel Notulen dan kartu Native Helper (pill, progress, dialog)."
+ },
+ "src/notes-panel.js": {
+  "summary": "Modul notulen rapat lokal (skema, store, ekspor, UI). Berkas `notes-panel.js` (javascript). Ringkasan dari komentar/header: Renderer panel Notulen Rapat (frontend stub). Dipakai harness test/notes-panel.html; nanti diintegrasikan ke Side Panel. / Simbol penting: renderNotesPanel, formatNoteExport, downloadText, mountNotesPanel.",
+  "sections": [
+   {
+    "symbol": "renderNotesPanel",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait renderNotesPanel pada notes-panel.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "formatNoteExport",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait formatNoteExport pada notes-panel.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "downloadText",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait downloadText pada notes-panel.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   },
+   {
+    "symbol": "mountNotesPanel",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait mountNotesPanel pada notes-panel.js: mendukung peran Modul notulen rapat lokal (skema, store, ekspor, UI)."
+   }
+  ]
+ },
+ "store/MV3-AUDIT.md": {
+  "summary": "Audit izin dan kepatuhan Manifest V3."
+ },
+ "store/PRIVACY.md": {
+  "summary": "Kebijakan privasi lokal: tanpa cloud, tanpa akun, tanpa telemetri."
+ },
+ "store/README.md": {
+  "summary": "Indeks aset toko: ikon dan screenshot."
+ },
+ "store/SUBMIT.md": {
+  "summary": "Panduan pengiriman paket ke Chrome Web Store."
+ },
+ "store/listing.md": {
+  "summary": "Materi listing Chrome Web Store (salinan/alias)."
+ },
+ "test/BENCH-COMPARE.md": {
+  "summary": "Laporan pembanding kinerja model (dihasilkan bench-report)."
+ },
+ "test/RELEASE-GATE.md": {
+  "summary": "Gerbang rilis: daftar mustFix terbuka."
+ },
+ "test/bench-models-data.js": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench-models-data.js` (javascript). Ringkasan dari komentar/header: Lab benchmark kinerja model (Fase 1). Frontend-first: katalog model + angka tiruan. Jika `last-bench.json` ada (keluaran scripts/bench-lab.py), bagian Native Helper digabung dari file itu. Halaman ini tidak menjalankan inferensi. / Simbol penting: mergeLastBench, loadBenchReport, summarizeModels, TARGET_DRAFT_MS, STUB_MODELS, STUB_BENCH.",
+  "sections": [
+   {
+    "symbol": "mergeLastBench",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait mergeLastBench pada bench-models-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "loadBenchReport",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait loadBenchReport pada bench-models-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "summarizeModels",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait summarizeModels pada bench-models-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "TARGET_DRAFT_MS",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait TARGET_DRAFT_MS pada bench-models-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   }
+  ]
+ },
+ "test/bench-models.js": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench-models.js` (javascript). Ringkasan dari komentar/header: Lab benchmark kinerja model."
+ },
+ "test/bench.html": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `bench.html` (html). Ringkasan dari komentar/header: <html lang=\"id\"> { box-sizing: border-box; }"
+ },
+ "test/defects-data.js": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `defects-data.js` (javascript). Ringkasan dari komentar/header: Daftar cacat rilis Fase 1. Frontend-first: data tiruan yang merangkum kendala terdokumentasi (README), hasil lab (last-bench), dan celah uji. Nanti GET /api/release-defects. / @typedef {'blocker' | 'high' | 'medium' | 'low'} Severity @typedef {'open' | 'accepted' | 'fixed'} DefectStatus Simbol penting: loadDefectList, summarizeDefects, STUB_DEFECTS, STUB_DEFECT_LIST.",
+  "sections": [
+   {
+    "symbol": "loadDefectList",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait loadDefectList pada defects-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "summarizeDefects",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait summarizeDefects pada defects-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "STUB_DEFECTS",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait STUB_DEFECTS pada defects-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "STUB_DEFECT_LIST",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait STUB_DEFECT_LIST pada defects-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   }
+  ]
+ },
+ "test/defects.html": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `defects.html` (html). Ringkasan dari komentar/header: <html lang=\"id\"> { box-sizing: border-box; }"
+ },
+ "test/defects.js": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `defects.js` (javascript). Ringkasan dari komentar/header: Halaman daftar cacat rilis."
+ },
+ "test/last-defects.json": {
+  "summary": "Daftar cacat yang digenerate + prioritas rilis."
+ },
+ "test/last-e2e.json": {
+  "summary": "Hasil terakhir suite E2E."
+ },
+ "test/last-models-bench.json": {
+  "summary": "Hasil gabungan benchmark model."
+ },
+ "test/last-smoke.json": {
+  "summary": "Hasil terakhir scripts/smoke.mjs (metadata uji)."
+ },
+ "test/notes-panel.html": {
+  "summary": "Harness visual panel Notulen."
+ },
+ "test/qa-report-data.js": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `qa-report-data.js` (javascript). Ringkasan dari komentar/header: Laporan uji asap (smoke) dan E2E untuk verifikasi rilis Fase 1. Frontend-first: `loadQaReport()` mengembalikan data tiruan dengan bentuk yang sama seperti kontrak nanti (GET /api/qa-report atau last-smoke.json / last-e2e.json). Halaman ini tidak menjalankan skrip uji. / @typedef {'pass' | 'fail' | 'unverified' | 'skip' Simbol penting: loadQaReport, summarizeSuites, STUB_SUITES, STUB_QA_REPORT.",
+  "sections": [
+   {
+    "symbol": "loadQaReport",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait loadQaReport pada qa-report-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "summarizeSuites",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait summarizeSuites pada qa-report-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "STUB_SUITES",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait STUB_SUITES pada qa-report-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "STUB_QA_REPORT",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait STUB_QA_REPORT pada qa-report-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   }
+  ]
+ },
+ "test/qa-report.html": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `qa-report.html` (html). Ringkasan dari komentar/header: <html lang=\"id\"> { box-sizing: border-box; }"
+ },
+ "test/qa-report.js": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `qa-report.js` (javascript). Ringkasan dari komentar/header: Halaman laporan uji asap dan E2E."
+ },
+ "test/studio-export.js": {
+  "summary": "Generator SRT/VTT/TXT studio memakai transcript-cache + wrapLines."
+ },
+ "test/studio-export.test.js": {
+  "summary": "Unit test node:test untuk generator ekspor dan wrapLines."
+ },
+ "test/studio-lib.js": {
+  "summary": "Util wrapLines, scoreDevice, pickEngineMode, STUB_SEGMENTS."
+ },
+ "test/studio.html": {
+  "summary": "Halaman Offline Studio: transkripsi/terjemahan/ekspor stub, helper pill, player segmen."
+ },
+ "test/studio.js": {
+  "summary": "Logika UI studio: progress, fallback mesin, unduhan SRT/VTT/TXT, salin semua."
+ },
+ "test/verify-data.js": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `verify-data.js` (javascript). Ringkasan dari komentar/header: Katalog 26 sub-fitur Fase 1 untuk dashboard verifikasi rilis. Frontend-first: `loadVerifyCatalog()` mengembalikan data tiruan dengan bentuk yang sama seperti kontrak yang akan diisi smoke/E2E/lab nanti (GET /api/verify-status). Jangan mengandalkan backend di halaman ini. / Simbol penting: loadVerifyCatalog, summarize, VERIFY_TARGET, STUB_FEATURES, STUB_CATALOG.",
+  "sections": [
+   {
+    "symbol": "loadVerifyCatalog",
+    "startLine": 1,
+    "endLine": 20,
+    "summary": "Bagian terkait loadVerifyCatalog pada verify-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "summarize",
+    "startLine": 21,
+    "endLine": 40,
+    "summary": "Bagian terkait summarize pada verify-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "VERIFY_TARGET",
+    "startLine": 41,
+    "endLine": 60,
+    "summary": "Bagian terkait VERIFY_TARGET pada verify-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   },
+   {
+    "symbol": "STUB_FEATURES",
+    "startLine": 61,
+    "endLine": 80,
+    "summary": "Bagian terkait STUB_FEATURES pada verify-data.js: mendukung peran Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat."
+   }
+  ]
+ },
+ "test/verify.html": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `verify.html` (html). Ringkasan dari komentar/header: <html lang=\"id\"> { box-sizing: border-box; }"
+ },
+ "test/verify.js": {
+  "summary": "Halaman/skrip verifikasi rilis, benchmark, atau daftar cacat. Berkas `verify.js` (javascript). Ringkasan dari komentar/header: Dashboard status verifikasi 26 sub-fitur Fase 1."
+ }
 }

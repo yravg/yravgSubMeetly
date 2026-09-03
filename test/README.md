@@ -66,10 +66,30 @@ Requires `yt-dlp` (`pip install yt-dlp`) and `ffmpeg`. Restart lab after install
 
 Latest automated run is saved to `test/last-bench.json` when using `--json`.
 
+## Browser-tab app
+
+Open the main side-panel UI in a normal tab with **real on-device Whisper** (same stack as the extension browser engine):
+
+```text
+http://127.0.0.1:8799/app.html
+```
+
+Requires a built `dist/` (`npm run build`). Lab serves `/dist/` (UI, `offscreen.js`, `ai-worker.js`, ORT/VAD assets).
+
+**How it works:** `chrome-mock.js` acts as a mini background; the page loads `/dist/offscreen.js`, which spawns `/dist/ai-worker.js` (transformers.js Whisper via `src/lib/asr.js`). Offline file jobs stage to OPFS and run decode → VAD → ASR → optional MT, like the extension.
+
+**Limits**
+
+- Realtime **tabCapture** / desktopCapture — Chrome extension only
+- First Offline run downloads Whisper (and MT models if translating) from Hugging Face; then Cache API / offline
+- Native messaging launcher unavailable in a plain tab (HTTP native helper still usable if Engine → Native and helper is running)
+- Notes panel still uses local stub generation unless wired to a live transcript
+
 ## Other test pages
 
 | URL | Purpose |
 |-----|---------|
+| `/app.html` | Side-panel UI in a normal browser tab |
 | `/index.html` | Test page index |
 | `/audio-page.html` | Tab audio loop for extension e2e |
 | `/lab.html` | Translation Lab (this doc) |

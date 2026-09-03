@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Browser</title>
+    <link rel="stylesheet" href="/dist/sidepanel.css" />
+    <link rel="stylesheet" href="/dist/notes-panel.css" />
+    <style>
+      html,
+      body {
+        min-height: 100%;
+      }
+      body.app-shell {
+        max-width: 440px;
+        margin: 0 auto;
+        border-inline: 1px solid var(--border, #3a3a3a);
+        min-height: 100vh;
+        position: relative;
+      }
+      .app-banner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 8px 12px;
+        padding: 10px 14px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--muted, #b4b4b4);
+        background: var(--card2, #292929);
+        border-bottom: 1px solid var(--border, #3a3a3a);
+      }
+      .app-banner strong {
+        color: var(--accent-soft, #6ce0b8);
+        font-weight: 600;
+      }
+      .app-banner .banner-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-left: auto;
+        align-items: center;
+      }
+      .app-banner a {
+        color: var(--accent-soft, #6ce0b8);
+      }
+      #app-mount:empty::before {
+        content: 'Loading Local TransSub (Whisper pipeline)…';
+        display: block;
+        padding: 24px 16px;
+        color: var(--muted, #b4b4b4);
+        font-size: 13px;
+      }
+      @media (min-width: 720px) {
+        body.app-shell {
+          max-width: 480px;
+          margin: 24px auto;
+          min-height: calc(100vh - 48px);
+          border-radius: 12px;
+          border: 1px solid var(--border, #3a3a3a);
+          overflow: hidden;
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+        }
+      }
+    </style>
+  </head>
+  <body class="app-shell">
+    <div class="app-banner" role="note">
+      <div>
+        <strong>Browser tab · on-device Whisper</strong> —
+        Offline file transcription uses the same transformers.js / AI worker path as the
+        extension (<code>offscreen.js</code> → <code>ai-worker.js</code> → <code>lib/asr.js</code>).
+        Models download once via Hugging Face and cache in the browser.
+        Realtime tab capture still needs the Chrome extension.
+      </div>
+      <div class="banner-actions">
+        <a href="/">All test pages</a>
+      </div>
+    </div>
+    <div id="app-mount"></div>
+
+    <!-- chrome mock must run before offscreen (Worker uses getURL) -->
+    <script src="/chrome-mock.js"></script>
+    <script type="module">
+      import '/dist/offscreen.js';
+      window.__browserOffscreenLoaded = true;
+
+      const mount = document.getElementById('app-mount');
+
+      try {
+        const r = await fetch('/dist/sidepanel.html');
+        if (!r.ok) throw new Error('dist/sidepanel.html missing — run npm run build');
+        const html = await r.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const nodes = [...doc.body.childNodes].filter((n) => {
+          if (n.nodeType !== 1) return true;
+          return n.tagName !== 'SCRIPT';
+        });
+        mount.replaceChildren(...nodes);
+
+        const s = document.createElement('script');
+        s.type = 'module';
+        s.src = '/dist/sidepanel.js';
+        s.onerror = () => {
+          mount.insertAdjacentHTML(
+            'afterbegin',
+            '<p style="padding:16px;color:#e06c75">Failed to load /dist/sidepanel.js — rebuild with <code>npm run build</code>.</p>',
+          );
+        };
+        s.addEventListener('load', async () => {
+          // After sidepanel init() defaults to realtime, switch to Offline (no tabCapture here).
+          for (let i = 0; i < 50; i++) {
+            await new Promise((r) => setTimeout(r, 40));
+            const offlineBtn = document.querySelector('#mode-toggle [data-mode="offline"]');
+            if (offlineBtn && document.getElementById('btn-start')) {
+              offlineBtn.click();
+              break;
+            }
+          }
+        });
+        document.body.appendChild(s);
+      } catch (err) {
+        mount.innerHTML =
+          '<p style="padding:16px;color:#e06c75">' +
+          String(err.message || err) +
+          '. Lab serves <code>/dist/</code> from the project build output.</p>';
+      }
+    </script>
+  </body>
+</html>

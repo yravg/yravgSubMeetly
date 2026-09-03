@@ -1,29 +1,34 @@
-# Kebijakan Privasi — Local TransSub
+# Privacy Policy — Local TransSub
 
-**Berlaku sejak:** 3 September 2026  
-**Produk:** Local TransSub (ekstensi Chrome MV3, Native Helper opsional, aplikasi macOS)
+**Effective:** 3 September 2026  
+**Product:** Local TransSub (Chrome MV3 extension, optional Native Helper, optional macOS app)
 
-## Ringkasan
-Local TransSub **tidak mengumpulkan**, **tidak menjual**, dan **tidak mengunggah** audio, transkrip, atau data pribadi ke server cloud milik kami. Semua pengenalan suara dan terjemahan berjalan **di perangkat Anda**.
+## Summary
+Local TransSub does **not** collect, sell, or upload your audio, transcripts, or personal content to servers we operate. Speech recognition and translation run **on your device** after any required model files are present locally.
 
-## Data yang diproses
-- **Audio tab / berkas / mikrofon** — diproses lokal di browser (WASM/WebGPU) atau Native Helper (`127.0.0.1`) / aplikasi macOS.
-- **Transkrip & subtitel** — disimpan opsional di `chrome.storage`, OPFS, atau penyimpanan lokal aplikasi.
-- **Preferensi** — bahasa, mesin, ukuran font, dll. disimpan lokal.
+## Data processed on device
+- **Tab / file / microphone / screen audio** you explicitly start capturing — processed in the browser (WASM/WebGPU) and/or an optional Native Helper bound to `127.0.0.1`, or the macOS app.
+- **Transcripts & subtitles** — may be kept in `chrome.storage`, Origin Private File System (OPFS), or local app storage if you use history/export features.
+- **Preferences** — language, engine, font size, and similar settings stored locally.
 
-## Yang tidak kami lakukan
-- Tidak ada akun pengguna.
-- Tidak ada telemetri analitik atau pelacakan iklan.
-- Tidak ada pengiriman audio/teks ke layanan pihak ketiga untuk inferensi (kecuali Anda sendiri mengunduh bobot model dari sumber yang Anda pilih, misalnya Hugging Face, ke cache lokal).
+## Network activity that is not “our cloud”
+- **Model weight downloads** you trigger (for example from Hugging Face or a mirror you select) land in a local cache; they are not our inference API.
+- **Chrome Translator** language packs (when you use that path) are fetched by the browser from Google’s on-device translation infrastructure, not by a Local TransSub backend.
+- We do **not** send audio or transcript text to a Local TransSub server for recognition or translation.
 
-## Izin ekstensi
-Izin Manifest V3 (tabCapture, storage, offscreen, dll.) dipakai semata untuk menangkap audio tab yang Anda mulai, menampilkan overlay, dan menyimpan preferensi — bukan untuk menjangkau situs arbitrary di luar alur fitur.
+## What we do not do
+- No user accounts for the extension.
+- No analytics telemetry or advertising trackers from this extension.
+- No remote code loading from CDNs for the packaged extension runtime (ORT/VAD assets ship inside the package).
+
+## Extension permissions
+Permissions such as `tabCapture`, `desktopCapture`, `storage` / `unlimitedStorage`, `offscreen`, `scripting`, `sidePanel`, `tabs` / `activeTab`, `contextMenus`, `nativeMessaging`, and host access needed to inject the overlay on the page you are captioning exist only to implement those features. They are not used to scrape unrelated browsing for a remote service.
 
 ## Native Helper
-Helper opsional mendengarkan **hanya** di `127.0.0.1` (loopback). Tidak membuka port publik.
+The optional helper listens on **loopback only** (`127.0.0.1`). It does not open a public internet port. First-time helper model installs may download weights to local disk.
 
-## Kontak
-Untuk pertanyaan privasi terkait proyek open-source ini, buka isu di repositori sumber Anda.
+## Contact
+For privacy questions about this open-source project, open an issue on the source repository you obtained the extension from.
 
-## Perubahan
-Versi kebijakan ini dapat diperbarui bersama rilis aplikasi; perubahan material akan dicantumkan di riwayat rilis.
+## Changes
+Material updates to this policy will be noted in the product changelog / store listing.
