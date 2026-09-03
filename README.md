@@ -1,11 +1,27 @@
-# Local TransSub
+# yraverageSub
+
+Live subtitles, transcription and translation that run **entirely on your device**.
+No accounts, no telemetry — no audio, video or text ever leaves your machine.
+
+This repo holds two clients built on that same idea:
+
+| Client | What it does |
+|---|---|
+| **Browser extension** (`src/`) | Realtime floating subtitles over any Chrome/Edge tab, plus file transcription to SRT/VTT. Documented below. |
+| **macOS app** (`mac/`) | Menu-bar app putting subtitles over *any* application's audio — not just a browser tab — with file transcription and hold-to-talk dictation. See **[mac/README.md](mac/README.md)**. |
+
+An optional **native helper** (`native/`) runs Whisper large-v3-turbo on the Apple
+Silicon GPU via MLX, giving both clients a faster and more accurate engine.
+
+Inspired by the "Local AI Subtitle" extension, rebuilt from scratch on an open stack.
+
+---
+
+## The browser extension
 
 A fully-offline Chrome extension that generates **realtime floating subtitles** for any
 browser tab, and transcribes/translates **uploaded audio/video files** to SRT/VTT — with
-every AI model running **locally on your device**. No audio, video, or text ever leaves
-your machine.
-
-Inspired by the "Local AI Subtitle" extension, rebuilt from scratch on an open stack.
+every AI model running **locally on your device**.
 
 ## Features
 
