@@ -1,11 +1,20 @@
 /**
- * Renderer panel Notulen Rapat (frontend stub).
- * Dipakai harness test/notes-panel.html; nanti diintegrasikan ke Side Panel.
+ * Panel Notulen (rel samping) — tiket ringkas hidup, BUKAN tempat tabel.
+ * Register lengkap ada di src/minutes.html (tab penuh); panel ini hanya
+ * menunjukkan status rapat aktif + tindak lanjut terbuka, lalu satu tombol
+ * ke sana. Menggantikan draf lama yang memakai bentuk data v1
+ * (saveNote/listNotes) yang sudah tidak ada sejak register v2.
+ *
+ * Side-panel notes ticker — NOT the table surface. The full register lives
+ * at src/minutes.html (a full tab); this panel only shows the active
+ * meeting's status and open follow-ups, plus one button to get there.
+ * Replaces the old draft, which called the v1 store shape (saveNote/
+ * listNotes) that no longer exists since the v2 register landed.
  */
-import { loadNotesState, statusLabel, STUB_NOTE, STUB_TRANSCRIPT } from './lib/notes-stub.js';
-import { serializeNote } from './lib/notes-export.js';
-import { generateNotesFromTranscript } from './lib/notes-generate.js';
-import { saveNote, listNotes } from './lib/notes-store.js';
+import { pickText, meetingStats } from './lib/notes-schema.js';
+import { listMeetings, backendName } from './lib/notes-store.js';
+import { makeT } from './lib/notes-i18n.js';
+import { seedSampleData } from './lib/notes-fixture.js';
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -15,229 +24,135 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-function decisionsHtml(note, state) {
-  const decisions = note.decisions || [];
-  if (!decisions.length) {
-    return `<p class="notes-empty" id="notes-decisions-empty">${escapeHtml(state.emptyDecisionsMessage)}</p>`;
-  }
-  return `<ul id="notes-decisions-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>`;
+function registerUrl() {
+  return typeof chrome !== 'undefined' && chrome.runtime?.getURL
+    ? chrome.runtime.getURL('minutes.html')
+    : 'minutes.html';
 }
 
-function actionsHtml(note, state) {
-  const actions = note.actions || [];
-  if (!actions.length) {
-    return `<p class="notes-empty" id="notes-actions-empty">${escapeHtml(state.emptyActionsMessage)}</p>`;
-  }
-  return `<ul class="notes-actions-list" id="notes-actions-list">${actions
-    .map(
-      (a) => `
-        <li data-act-id="${escapeHtml(a.id)}">
-          <div class="act-text">${escapeHtml(a.text)}</div>
-          <span class="act-meta">${escapeHtml(a.owner || '—')}</span>
-          <span class="act-meta">${escapeHtml(a.due || 'tanpa tenggat')} · ${a.status}</span>
-        </li>`,
-    )
-    .join('')}</ul>`;
+function openRegister() {
+  const url = registerUrl();
+  if (typeof chrome !== 'undefined' && chrome.tabs?.create) chrome.tabs.create({ url });
+  else window.open(url, '_blank');
 }
 
-/**
- * @param {HTMLElement} root
- * @param {Awaited<ReturnType<typeof loadNotesState>>} state
- * @param {object} [handlers]
- */
+function openFollowUps(meeting, T, lang) {
+  if (!meeting) return [];
+  return meeting.items
+    .filter((i) => i.status !== 'closed' && (i.type === 'action' || i.type === 'question' || i.type === 'risk'))
+    .slice(0, 5)
+    .map((i) => ({
+      ref: i.ref,
+      type: T(i.type),
+      text: pickText(i.text, lang),
+      owner: i.owner,
+      due: i.due,
+      status: T(i.status),
+    }));
+}
+
 export function renderNotesPanel(root, state, handlers = {}) {
-  const note = state.note;
-  const local = state.localStatus || note.status;
+  const { meetings, active, lang, T } = state;
+  const stats = active ? meetingStats(active) : null;
+  const openItems = openFollowUps(active, T, lang);
 
   root.innerHTML = `
     <div class="notes-panel" data-notes-root>
       <div class="notes-status-row">
-        <span class="notes-pill ${escapeHtml(local)}" id="notes-local-status" data-status="${escapeHtml(local)}">
+        <span class="notes-pill ${active ? 'ready' : 'idle'}">
           <span aria-hidden="true">●</span>
-          ${escapeHtml(statusLabel(local))}
+          ${active ? escapeHtml(T('onDevice')) : escapeHtml(T('msgNoMeeting'))}
         </span>
-        <span class="notes-meta" id="notes-source-line">
-          ${note.savedLocally ? '📦 Tersimpan di perangkat' : 'Draft lokal'} · ${escapeHtml(note.source)}
-        </span>
+        <span class="notes-meta">${escapeHtml(backendName())}</span>
       </div>
 
-      <div class="notes-block">
-        <h3 id="notes-title">${escapeHtml(note.title)}</h3>
-        <p class="notes-meta">Dibuat ${escapeHtml(note.generatedAt || '—')}</p>
+      <div class="notes-block" id="notes-active-block">
+        <h3>${active ? escapeHtml(active.title) : escapeHtml(T('minutes'))}</h3>
+        ${active
+          ? `<p class="notes-meta">${escapeHtml(active.date)} · ${stats.total} ${escapeHtml(T('sItems')).toLowerCase()} · ${stats.unreviewed} ${escapeHtml(T('needReview'))}</p>`
+          : `<p class="notes-empty">${escapeHtml(T('nothingLeft'))}</p>`}
+      </div>
+
+      <div class="notes-block" id="notes-open-block">
+        <h3>${escapeHtml(T('sActions'))}</h3>
+        ${openItems.length
+          ? `<ul class="notes-actions-list" id="notes-open-list">${openItems
+              .map(
+                (i) => `
+              <li data-ref="${escapeHtml(i.ref)}">
+                <div class="act-text">${escapeHtml(i.text)}</div>
+                <span class="act-meta">${escapeHtml(i.owner || T('noOwner'))}</span>
+                <span class="act-meta">${escapeHtml(i.due || T('noDue'))} · ${escapeHtml(i.status)}</span>
+              </li>`,
+              )
+              .join('')}</ul>`
+          : `<p class="notes-empty">${escapeHtml(T('noneYet'))}</p>`}
       </div>
 
       <div class="notes-toolbar">
-        <button type="button" class="btn primary" id="btn-notes-generate">
-          Buat Notulen dari contoh
+        <button type="button" class="btn primary" id="btn-open-register">
+          ${escapeHtml(T('openRegister'))}
         </button>
-        <button type="button" class="btn ghost" id="btn-notes-clear-decisions" title="Demo pesan kosong">
-          Kosongkan keputusan
-        </button>
-        <button type="button" class="btn" id="btn-notes-export">
-          Ekspor…
-        </button>
+        ${!meetings.length ? `<button type="button" class="btn ghost" id="btn-notes-sample">${escapeHtml(T('startNext'))} (${escapeHtml(T('minutes'))} demo)</button>` : ''}
       </div>
+      <p class="notes-meta">${escapeHtml(T('registerHint'))}</p>
 
-      <div class="notes-block" id="notes-summary-block">
-        <h3>Ringkasan</h3>
-        <p id="notes-summary">${escapeHtml(note.summary)}</p>
-        <details class="notes-transcript" id="notes-transcript-details">
-          <summary>Transkrip contoh</summary>
-          <pre id="notes-transcript-preview">${escapeHtml(note.transcriptPreview || '')}</pre>
-        </details>
-      </div>
-
-      <div class="notes-block" id="notes-decisions-block">
-        <h3>Poin Keputusan</h3>
-        <div id="notes-decisions">${decisionsHtml(note, state)}</div>
-      </div>
-
-      <div class="notes-block" id="notes-actions-block">
-        <h3>Tindak Lanjut</h3>
-        <div id="notes-actions">${actionsHtml(note, state)}</div>
-      </div>
-
-      <div class="notes-block" id="notes-saved-block">
-        <h3>Notulen tersimpan (lokal)</h3>
-        <div class="notes-saved-list" id="notes-saved-list">
-          ${(state.saved || [])
-            .map(
-              (n) => `
-            <button type="button" class="notes-saved-item${n.id === note.id ? ' active' : ''}" data-note-id="${escapeHtml(n.id)}">
-              <div>
-                <div class="ns-title">${escapeHtml(n.title)}</div>
-                <div class="ns-meta">${escapeHtml(n.source)} · ${escapeHtml(statusLabel(n.status))}</div>
-              </div>
-              <span class="notes-pill ${escapeHtml(n.status)}">${n.savedLocally ? 'lokal' : 'draft'}</span>
-            </button>`,
-            )
-            .join('')}
-        </div>
-      </div>
-
-      <dialog id="notes-export-dialog" class="notes-dialog">
-        <form method="dialog" class="notes-dialog-body">
-          <h3>Ekspor notulen</h3>
-          <p class="notes-meta">Unduh sebagai teks polos atau Markdown (100% lokal).</p>
-          <div class="notes-toolbar">
-            <button type="submit" class="btn primary" value="txt" id="btn-export-txt">TXT</button>
-            <button type="submit" class="btn primary" value="md" id="btn-export-md">Markdown</button>
-            <button type="submit" class="btn ghost" value="cancel">Batal</button>
-          </div>
-        </form>
-      </dialog>
+      ${meetings.length > 1
+        ? `<div class="notes-block" id="notes-recent-block">
+            <h3>${escapeHtml(T('meetings'))}</h3>
+            <div class="notes-saved-list" id="notes-saved-list">
+              ${meetings
+                .slice(0, 6)
+                .map(
+                  (m) => `
+                <button type="button" class="notes-saved-item${m.id === active?.id ? ' active' : ''}" data-meeting-id="${escapeHtml(m.id)}">
+                  <div>
+                    <div class="ns-title">${escapeHtml(m.title)}</div>
+                    <div class="ns-meta">${escapeHtml(m.date)}${m.issuedAt ? ` · ${escapeHtml(T('issued'))}` : ''}</div>
+                  </div>
+                </button>`,
+                )
+                .join('')}
+            </div>
+          </div>`
+        : ''}
     </div>
   `;
 
-  root.querySelector('#btn-notes-generate')?.addEventListener('click', () => handlers.onGenerate?.());
-  root.querySelector('#btn-notes-export')?.addEventListener('click', () => {
-    handlers.onExport?.();
-    root.querySelector('#notes-export-dialog')?.showModal();
+  root.querySelector('#btn-open-register')?.addEventListener('click', () => handlers.onOpenRegister?.());
+  root.querySelector('#btn-notes-sample')?.addEventListener('click', () => handlers.onLoadSample?.());
+  root.querySelectorAll('[data-meeting-id]').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onSelectMeeting?.(btn.getAttribute('data-meeting-id')));
   });
-  root.querySelector('#btn-notes-clear-decisions')?.addEventListener('click', () => {
-    handlers.onClearDecisions?.();
-  });
-  root.querySelectorAll('[data-note-id]').forEach((btn) => {
-    btn.addEventListener('click', () => handlers.onSelectSaved?.(btn.getAttribute('data-note-id')));
-  });
-  root.querySelector('#notes-export-dialog')?.addEventListener('close', (ev) => {
-    const val = /** @type {HTMLDialogElement} */ (ev.target).returnValue;
-    if (val === 'txt' || val === 'md') handlers.onExportFormat?.(val);
-  });
-}
-
-export function formatNoteExport(note, format) {
-  return serializeNote(note, format === 'md' ? 'md' : 'txt');
-}
-
-export function downloadText(filename, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export async function mountNotesPanel(root) {
-  let state = await loadNotesState();
+  const lang = (document.documentElement.lang || 'en').startsWith('id') ? 'id' : 'en';
+  const T = makeT(lang);
+  let meetings = await listMeetings();
+  let activeId = meetings[0]?.id || null;
 
   const redraw = () => {
-    renderNotesPanel(root, state, {
-      onGenerate: () => {
-        state = {
-          ...state,
-          localStatus: 'generating',
-          note: {
-            ...state.note,
-            status: 'generating',
-            summary: 'Menyusun notulen dari transkrip contoh…',
-            decisions: [],
-            actions: [],
-          },
-        };
-        redraw();
-        setTimeout(async () => {
-          const built = generateNotesFromTranscript(
-            STUB_TRANSCRIPT.map((l) => ({ text: l.text, speaker: l.speaker, t0: l.t0, t1: l.t1 })),
-            {
-              title: 'Standup rilis Fase 1 — contoh',
-              source: 'transkrip contoh (dibuat sekarang)',
-            },
-          );
-          built.decisions = STUB_NOTE.decisions;
-          built.actions = STUB_NOTE.actions;
-          built.summary = STUB_NOTE.summary;
-          built.status = 'saved';
-          built.savedLocally = true;
-          try {
-            await saveNote(built);
-            const saved = await listNotes();
-            state = {
-              ...state,
-              localStatus: 'saved',
-              note: built,
-              activeNoteId: built.id,
-              saved: saved.length ? saved : [built, ...state.saved],
-            };
-          } catch {
-            state = {
-              ...state,
-              localStatus: 'saved',
-              note: built,
-              activeNoteId: built.id,
-              saved: [built, ...state.saved.filter((n) => n.id !== built.id)],
-            };
-          }
+    renderNotesPanel(
+      root,
+      { meetings, active: meetings.find((m) => m.id === activeId) || null, lang, T },
+      {
+        onOpenRegister: openRegister,
+        onSelectMeeting: (id) => {
+          activeId = id;
           redraw();
-        }, 600);
+        },
+        onLoadSample: async () => {
+          await seedSampleData();
+          meetings = await listMeetings();
+          activeId = meetings[0]?.id || null;
+          redraw();
+          openRegister();
+        },
       },
-      onClearDecisions: () => {
-        state = {
-          ...state,
-          note: { ...state.note, decisions: [] },
-        };
-        redraw();
-      },
-      onSelectSaved: (id) => {
-        const found = state.saved.find((n) => n.id === id);
-        if (!found) return;
-        state = {
-          ...state,
-          note: { ...found },
-          activeNoteId: id,
-          localStatus: found.status === 'saved' ? 'saved' : found.status,
-        };
-        redraw();
-      },
-      onExportFormat: (fmt) => {
-        const safe = (state.note.title || 'notulen').replace(/[^\w\s.-]+/g, '_').slice(0, 60);
-        const ext = fmt === 'md' ? 'md' : 'txt';
-        downloadText(`${safe}.${ext}`, formatNoteExport(state.note, fmt));
-      },
-    });
+    );
   };
 
   redraw();
-  return () => state;
+  return () => ({ meetings, activeId });
 }
