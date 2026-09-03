@@ -176,4 +176,9 @@ final class OverlayModel: ObservableObject {
         guard let i = cues.firstIndex(where: { $0.id == id }) else { return }
         cues[i].translation = text
     }
+
+    /// Load demo cues for UI previews / store screenshots without live capture.
+    func loadMockSession() {
+        MockSession.apply(to: self)
+    }
 }

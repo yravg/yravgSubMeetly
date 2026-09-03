@@ -1,0 +1,244 @@
+/* Panel Notulen Rapat — memakai token yang sama dengan sidepanel.css */
+.notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notes-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notes-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  color: var(--muted);
+}
+.notes-pill.ready,
+.notes-pill.saved {
+  color: var(--accent-soft);
+  border-color: rgba(20, 183, 137, 0.45);
+  background: var(--accent-dim);
+}
+.notes-pill.generating {
+  color: var(--warn-text);
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+}
+.notes-pill.error {
+  color: var(--danger);
+  border-color: rgba(224, 108, 117, 0.45);
+}
+.notes-pill.idle {
+  color: var(--muted);
+}
+
+.notes-meta {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.notes-block {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.notes-block h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text2);
+}
+.notes-block p,
+.notes-block li {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.notes-block ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.notes-empty {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.notes-actions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.notes-actions-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--card3);
+  border: 1px solid var(--border);
+}
+.notes-actions-list .act-text {
+  grid-column: 1 / -1;
+  font-weight: 500;
+}
+.notes-actions-list .act-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.notes-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.notes-toolbar .btn {
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+
+.notes-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.notes-saved-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card3);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  width: 100%;
+}
+.notes-saved-item:hover,
+.notes-saved-item.active {
+  border-color: rgba(20, 183, 137, 0.5);
+  background: var(--accent-dim);
+}
+.notes-saved-item .ns-title {
+  font-weight: 550;
+  font-size: 13px;
+}
+.notes-saved-item .ns-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.notes-transcript {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.notes-transcript summary {
+  cursor: pointer;
+  color: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 550;
+}
+.notes-transcript pre {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  max-height: 160px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.notes-dialog {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0;
+  background: var(--card);
+  color: var(--text);
+  max-width: 360px;
+}
+.notes-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+.notes-dialog-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.notes-dialog-body h3 {
+  font-size: 15px;
+}
+
+/* Helper status (Windows / Linux / macOS) */
+.helper-status {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.helper-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.helper-indicators strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.helper-steps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.helper-banner {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(224, 108, 117, 0.45);
+  background: rgba(224, 108, 117, 0.1);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.helper-banner.hidden {
+  display: none;
+}
+.helper-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--card3);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.helper-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}

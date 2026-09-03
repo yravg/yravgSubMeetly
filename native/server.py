@@ -23,10 +23,8 @@ Endpoints (all CORS-enabled for the extension):
 import io
 import json
 import os
-
-# Prefer resumable classic HTTP downloads over the flaky Xet/CAS backend.
-os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -34,13 +32,17 @@ import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+# Prefer resumable classic HTTP downloads over the flaky Xet/CAS backend.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+
+import numpy as np
 
 
 class ReuseHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
-from urllib.parse import parse_qs, urlparse
-
-import numpy as np
 
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "17865"))
@@ -66,10 +68,20 @@ except ImportError:
 if ENGINE is None:
     try:
         from faster_whisper import WhisperModel
+        import ctranslate2
 
         ENGINE = "faster-whisper"
         MODEL = os.environ.get("WHISPER_MODEL", "large-v3-turbo")
-        _fw = WhisperModel(MODEL, device="auto", compute_type=os.environ.get("COMPUTE", "auto"))
+        _cuda = False
+        try:
+            _cuda = ctranslate2.get_cuda_device_count() > 0
+        except Exception:
+            _cuda = False
+        _fw_device = os.environ.get("DEVICE") or ("cuda" if _cuda else "cpu")
+        _fw_compute = os.environ.get("COMPUTE") or ("float16" if _fw_device == "cuda" else "int8")
+        _fw = WhisperModel(MODEL, device=_fw_device, compute_type=_fw_compute)
+        FW_DEVICE = _fw_device
+        FW_COMPUTE = _fw_compute
     except ImportError:
         print(
             "No ASR engine installed. Run native/run.sh (installs mlx-whisper on Apple Silicon, "
@@ -77,6 +89,9 @@ if ENGINE is None:
             file=sys.stderr,
         )
         sys.exit(1)
+else:
+    FW_DEVICE = None
+    FW_COMPUTE = None
 
 def _resolve_ffmpeg() -> str | None:
     """Pick an ffmpeg that actually runs (Intel binaries fail on Apple Silicon)."""
@@ -341,6 +356,65 @@ def draft_pipeline(audio: np.ndarray, language, src: str, tgt: str):
 
 
 # ---------------------------------------------------------------------------
+# Notes store + large-file jobs (Fase 2)
+NOTES_PATH = Path(os.environ.get("NOTES_PATH", Path.home() / ".localtranssub" / "notes.json"))
+_jobs: dict[str, dict] = {}
+_jobs_lock = threading.Lock()
+
+
+def _load_notes() -> list:
+    try:
+        if NOTES_PATH.is_file():
+            return json.loads(NOTES_PATH.read_text(encoding="utf-8")).get("notes", [])
+    except Exception:
+        pass
+    return []
+
+
+def _save_notes(notes: list) -> None:
+    NOTES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    NOTES_PATH.write_text(
+        json.dumps({"updatedAt": time.strftime("%Y-%m-%dT%H:%M:%S"), "notes": notes}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _heuristic_notes(lines: list, title: str, source: str) -> dict:
+    texts = [str(l.get("text") or l.get("src") or "").strip() for l in lines if isinstance(l, dict)]
+    texts = [t for t in texts if t]
+    blob = " ".join(texts)
+    summary = (
+        "Transkrip kosong."
+        if not texts
+        else (texts[0] if len(texts) == 1 else f"{texts[0]} … {texts[-1]} ({len(texts)} segmen).")
+    )
+    decisions = []
+    for m in re.finditer(r"(?i)\b(keputusan|diputuskan|decision)\b[:\s-]*([^.!?\n]{8,200})", blob):
+        decisions.append(m.group(2).strip())
+        if len(decisions) >= 8:
+            break
+    actions = []
+    for m in re.finditer(r"(?i)\b(action|tindak lanjut|todo)\b[:\s-]*([^.!?\n]{8,160})", blob):
+        actions.append(
+            {"id": f"act-{len(actions)+1}", "text": m.group(2).strip(), "owner": None, "due": None, "status": "open"}
+        )
+        if len(actions) >= 12:
+            break
+    return {
+        "id": f"note-{int(time.time())}",
+        "title": title or "Notulen sesi",
+        "source": source or "helper",
+        "status": "ready",
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "summary": summary,
+        "decisions": decisions,
+        "actions": actions,
+        "transcriptPreview": "\n".join(texts[:6]),
+        "savedLocally": False,
+    }
+
+
+# ---------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -393,18 +467,34 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "ok": True,
                     "engine": ENGINE,
+                    "engine_label": ENGINE,
                     "model": MODEL,
                     "ffmpeg": FFMPEG,
                     "translate": _translate_available,
                     "translate_model": TRANSLATE_MODEL if _translate_available else None,
                     "draft_model": DRAFT_MODEL if _draft_available else None,
+                    "device": FW_DEVICE or ("apple-silicon" if IS_APPLE_SILICON else "cpu"),
+                    "compute": FW_COMPUTE,
+                    "platform": platform.system().lower(),
                     "features": {
                         "fast_translate": True,
                         "translate_refine": _translate_available,
                         "draft": _draft_available and _translate_available,
+                        "notes": True,
+                        "transcribe_file_jobs": True,
+                        "faster_whisper": ENGINE == "faster-whisper",
                     },
                 },
             )
+        if u.path == "/notes":
+            return self._json(200, {"notes": _load_notes()})
+        if u.path.startswith("/jobs/"):
+            job_id = u.path.split("/", 2)[-1]
+            with _jobs_lock:
+                job = _jobs.get(job_id)
+            if not job:
+                return self._json(404, {"error": "job not found"})
+            return self._json(200, job)
         self._json(404, {"error": "not found"})
 
     def do_POST(self):
@@ -490,6 +580,90 @@ class Handler(BaseHTTPRequestHandler):
 
                 threading.Thread(target=_stop, daemon=True).start()
                 return self._json(200, {"ok": True, "shutting_down": True})
+
+            if u.path == "/notes/generate":
+                try:
+                    payload = json.loads(self._body().decode("utf-8", "replace") or "{}")
+                except json.JSONDecodeError:
+                    return self._json(400, {"error": "invalid JSON body"})
+                note = _heuristic_notes(
+                    payload.get("lines") or [],
+                    payload.get("title") or "Notulen sesi",
+                    payload.get("source") or "helper",
+                )
+                return self._json(200, {"note": note})
+
+            if u.path == "/notes":
+                try:
+                    payload = json.loads(self._body().decode("utf-8", "replace") or "{}")
+                except json.JSONDecodeError:
+                    return self._json(400, {"error": "invalid JSON body"})
+                note = payload.get("note") or payload
+                notes = _load_notes()
+                notes = [n for n in notes if n.get("id") != note.get("id")]
+                note["savedLocally"] = True
+                notes.insert(0, note)
+                _save_notes(notes[:50])
+                return self._json(200, {"ok": True, "note": note})
+
+            if u.path == "/transcribe_file_job":
+                # Async job wrapper for large files: streams body to disk, reports progress.
+                if not FFMPEG:
+                    return self._json(500, {"error": "ffmpeg not installed"})
+                name = q.get("filename") or "input.bin"
+                suffix = os.path.splitext(name)[1] or ".bin"
+                job_id = f"job-{int(time.time() * 1000)}"
+                path = self._body_to_tempfile(suffix)
+                size = os.path.getsize(path)
+                with _jobs_lock:
+                    _jobs[job_id] = {
+                        "id": job_id,
+                        "status": "running",
+                        "progress": 0.05,
+                        "filename": name,
+                        "sizeBytes": size,
+                        "segments": None,
+                        "error": None,
+                        "cancel": False,
+                    }
+
+                def _run(jid=job_id, p=path, lang=language, tsk=task):
+                    try:
+                        with _jobs_lock:
+                            if _jobs[jid].get("cancel"):
+                                _jobs[jid]["status"] = "cancelled"
+                                return
+                            _jobs[jid]["progress"] = 0.2
+                        segs = asr_file(p, lang, tsk)
+                        with _jobs_lock:
+                            if _jobs[jid].get("cancel"):
+                                _jobs[jid]["status"] = "cancelled"
+                            else:
+                                _jobs[jid].update(
+                                    {"status": "done", "progress": 1.0, "segments": segs}
+                                )
+                    except Exception as exc:  # noqa: BLE001
+                        with _jobs_lock:
+                            _jobs[jid].update({"status": "error", "error": str(exc)})
+                    finally:
+                        try:
+                            os.unlink(p)
+                        except OSError:
+                            pass
+
+                threading.Thread(target=_run, daemon=True).start()
+                return self._json(202, {"jobId": job_id})
+
+            if u.path.startswith("/jobs/") and u.path.endswith("/cancel"):
+                job_id = u.path.split("/")[2]
+                with _jobs_lock:
+                    job = _jobs.get(job_id)
+                    if not job:
+                        return self._json(404, {"error": "job not found"})
+                    job["cancel"] = True
+                    if job["status"] == "running":
+                        job["status"] = "cancelling"
+                return self._json(200, {"ok": True, "jobId": job_id})
 
             self._json(404, {"error": "not found"})
         except Exception as e:  # noqa: BLE001

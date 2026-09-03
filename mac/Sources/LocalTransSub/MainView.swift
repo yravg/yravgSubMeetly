@@ -24,6 +24,7 @@ struct MainView: View {
             Picker("", selection: $ui.tab) {
                 Text("Live subtitles").tag(0)
                 Text("Transcribe a file").tag(1)
+                Text("Meeting notes").tag(2)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -33,8 +34,10 @@ struct MainView: View {
 
             if ui.tab == 0 {
                 LiveView(app: app)
-            } else {
+            } else if ui.tab == 1 {
                 FileView(model: app.fileModel)
+            } else {
+                NotesView()
             }
         }
         .frame(minWidth: 480, minHeight: 560)

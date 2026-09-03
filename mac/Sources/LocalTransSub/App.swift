@@ -267,17 +267,9 @@ final class AppController: ObservableObject {
 
     /// Renders the overlay with sample text (used by --overlay-demo).
     func showOverlayDemo() {
-        overlayModel.dualLine = true
         overlayModel.fontSize = Prefs.shared.fontSize
         overlayModel.opacity = Prefs.shared.opacity
-        overlayModel.appendFinal(SubtitleLine(
-            start: 12, end: 15, source: "これはローカル字幕のテストです",
-            translation: "This is a local subtitle test."))
-        overlayModel.appendFinal(SubtitleLine(
-            start: 15, end: 19, source: "機械学習はこのデバイスで完全に動作します",
-            translation: "Machine learning runs completely on this device."))
-        overlayModel.setInterim(source: "次の文を話しています", translation: "Speaking the next sentence")
-        overlayModel.status = "Listening — Safari · translation: Apple Translation (instant)"
+        overlayModel.loadMockSession()
         overlay.show()
     }
 }

@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Daftar cacat rilis</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #1a1d27;
+        --border: #2a3040;
+        --text: #e8ecf4;
+        --muted: #8892a8;
+        --accent: #5b9cff;
+        --ok: #3dd68c;
+        --warn: #ffb020;
+        --bad: #ff6b6b;
+        --font: system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 var(--font);
+        min-height: 100vh;
+      }
+      header.page {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header.page h1 { margin: 0; font-size: 18px; font-weight: 600; }
+      header.page p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; min-width: 220px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .pill {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill.pass, .pill.fixed { background: #1a3d2e; color: var(--ok); }
+      .pill.fail, .pill.open { background: #3d1a1a; color: var(--bad); }
+      .pill.warn, .pill.accepted { background: #3d3018; color: var(--warn); }
+      .pill.sev-blocker { background: #4a1010; color: #ff8a8a; }
+      .pill.sev-high { background: #3d1a1a; color: var(--bad); }
+      .pill.sev-medium { background: #3d3018; color: var(--warn); }
+      .pill.sev-low { background: #1e2433; color: var(--muted); }
+      main { padding: 20px 24px 40px; max-width: 1100px; margin: 0 auto; }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .stat .n { font-size: 22px; font-weight: 700; }
+      .stat .l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+      .stat.fail .n { color: var(--bad); }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+      .chip {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+      label.check {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-left: auto;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: auto;
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        position: sticky;
+        top: 0;
+        background: var(--panel);
+      }
+      .feat-name { font-weight: 600; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .empty-row { text-align: center; color: var(--muted); padding: 24px; }
+      footer.page {
+        margin-top: 18px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page">
+      <div>
+        <h1>Daftar cacat rilis</h1>
+        <p>Temuan yang harus ditutup atau diterima sebelum publikasi Fase 1. Cacat bertanda wajib menahan gerbang rilis.</p>
+      </div>
+      <span id="data-source" class="pill warn">Memuat…</span>
+      <span id="release-gate" class="pill fail">…</span>
+      <a href="index.html">← Test pages</a>
+    </header>
+
+    <main>
+      <div class="stats">
+        <div class="stat">
+          <div class="l">Total</div>
+          <div class="n" id="stat-total">0</div>
+        </div>
+        <div class="stat fail">
+          <div class="l">Terbuka</div>
+          <div class="n" id="stat-open">0</div>
+        </div>
+        <div class="stat fail">
+          <div class="l">Wajib terbuka</div>
+          <div class="n" id="stat-must">0</div>
+        </div>
+        <div class="stat">
+          <div class="l">Diterima</div>
+          <div class="n" id="stat-accepted">0</div>
+        </div>
+      </div>
+
+      <div class="toolbar" id="status-filters">
+        <button type="button" class="chip active" data-status="all">Semua status</button>
+        <button type="button" class="chip" data-status="open">Terbuka</button>
+        <button type="button" class="chip" data-status="accepted">Diterima</button>
+        <button type="button" class="chip" data-status="fixed">Selesai</button>
+      </div>
+      <div class="toolbar" id="sev-filters">
+        <button type="button" class="chip active" data-sev="all">Semua prioritas</button>
+        <button type="button" class="chip" data-sev="blocker">Blocker</button>
+        <button type="button" class="chip" data-sev="high">Tinggi</button>
+        <button type="button" class="chip" data-sev="medium">Sedang</button>
+        <button type="button" class="chip" data-sev="low">Rendah</button>
+        <label class="check">
+          <input type="checkbox" id="must-only" />
+          Hanya wajib sebelum rilis
+        </label>
+        <span id="visible-count" class="muted"></span>
+      </div>
+
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Cacat</th>
+              <th>Prioritas</th>
+              <th>Status</th>
+              <th>Wajib</th>
+              <th>Area / bukti</th>
+            </tr>
+          </thead>
+          <tbody id="defect-body"></tbody>
+        </table>
+      </div>
+
+      <footer class="page">
+        <span>Local TransSub · Fase 1 verifikasi rilis</span>
+        <span>
+          <a href="verify.html">Dashboard 26 sub-fitur</a>
+          ·
+          <a href="qa-report.html">Asap &amp; E2E</a>
+          ·
+          <a href="bench.html">Benchmark model</a>
+        </span>
+      </footer>
+    </main>
+
+    <script type="module" src="defects.js"></script>
+  </body>
+</html>

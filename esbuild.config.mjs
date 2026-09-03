@@ -46,6 +46,7 @@ const statics = [
   ['src/offscreen.html', 'offscreen.html'],
   ['src/sidepanel.html', 'sidepanel.html'],
   ['src/sidepanel.css', 'sidepanel.css'],
+  ['src/notes-panel.css', 'notes-panel.css'],
 ];
 for (const [from, to] of statics) {
   await copyFile(path.join(root, from), path.join(dist, to));

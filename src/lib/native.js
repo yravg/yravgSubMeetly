@@ -1,9 +1,10 @@
 // Client for the local native helper server (native/server.py). Everything
 // stays on the machine — the extension just talks to 127.0.0.1.
 import { DEFAULT_NATIVE_URL } from './registry.js';
+import { assertLocalUrl } from './native-protocol.js';
 
 function base(url) {
-  return (url || DEFAULT_NATIVE_URL).replace(/\/+$/, '');
+  return assertLocalUrl(url || DEFAULT_NATIVE_URL);
 }
 
 export async function nativeHealth(url, timeoutMs = 1500) {

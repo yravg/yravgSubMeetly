@@ -20,6 +20,8 @@ public enum PrefKey {
     public static let overlayPanelMode = "overlayPanelMode"
     public static let refineTranslation = "refineTranslation"
     public static let maxOverlayCues = "maxOverlayCues"
+    public static let audioSourceMode = "audioSourceMode" // app | system | mic
+    public static let languageMode = "languageMode" // transcribe | translate
 }
 
 public final class Prefs: @unchecked Sendable {
@@ -44,6 +46,8 @@ public final class Prefs: @unchecked Sendable {
             PrefKey.overlayPanelMode: true,
             PrefKey.refineTranslation: false,
             PrefKey.maxOverlayCues: 400,
+            PrefKey.audioSourceMode: "app",
+            PrefKey.languageMode: "transcribe",
         ])
     }
 
@@ -79,6 +83,10 @@ public final class Prefs: @unchecked Sendable {
         get { d.bool(forKey: PrefKey.dictationCleanup) }
         set { d.set(newValue, forKey: PrefKey.dictationCleanup) }
     }
+    public var dictationHotkey: String {
+        get { d.string(forKey: PrefKey.dictationHotkey) ?? "fn" }
+        set { d.set(newValue, forKey: PrefKey.dictationHotkey) }
+    }
     public var restoreClipboard: Bool {
         get { d.bool(forKey: PrefKey.restoreClipboard) }
         set { d.set(newValue, forKey: PrefKey.restoreClipboard) }
@@ -107,6 +115,16 @@ public final class Prefs: @unchecked Sendable {
     public var maxOverlayCues: Int {
         get { max(50, d.integer(forKey: PrefKey.maxOverlayCues)) }
         set { d.set(newValue, forKey: PrefKey.maxOverlayCues) }
+    }
+    /// app = single application · system = all system audio · mic = microphone
+    public var audioSourceMode: String {
+        get { d.string(forKey: PrefKey.audioSourceMode) ?? "app" }
+        set { d.set(newValue, forKey: PrefKey.audioSourceMode) }
+    }
+    /// transcribe = ASR only · translate = ASR + translation
+    public var languageMode: String {
+        get { d.string(forKey: PrefKey.languageMode) ?? "transcribe" }
+        set { d.set(newValue, forKey: PrefKey.languageMode) }
     }
     public var overlayFrame: String {
         get { d.string(forKey: PrefKey.overlayFrame) ?? "" }

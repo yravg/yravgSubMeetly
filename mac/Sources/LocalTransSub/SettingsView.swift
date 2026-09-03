@@ -21,12 +21,13 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
+            captureTab.tabItem { Label("Capture", systemImage: "waveform") }
             appearance.tabItem { Label("Subtitles", systemImage: "captions.bubble") }
             dictationTab.tabItem { Label("Dictation", systemImage: "mic") }
             languagesTab.tabItem { Label("Languages", systemImage: "globe") }
             permissions.tabItem { Label("Permissions", systemImage: "lock.shield") }
         }
-        .frame(width: 470, height: 400)
+        .frame(width: 470, height: 420)
         // The Settings window needs its own host: .translationTask only
         // fires on a visible view, and the main window may be closed.
         .languagePackHost(installer)
@@ -131,6 +132,45 @@ struct SettingsView: View {
         }
     }
 
+    private var captureTab: some View {
+        Form {
+            Picker("Audio source", selection: $prefs.audioSourceMode) {
+                Text("Application").tag("app")
+                Text("System audio").tag("system")
+                Text("Microphone").tag("mic")
+            }
+            Text(prefs.audioSourceMode == "mic"
+                  ? "Uses the default input device for live dictation-style capture."
+                  : (prefs.audioSourceMode == "system"
+                     ? "Captures all system audio via ScreenCaptureKit."
+                     : "Captures a single app chosen in the main window."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            Picker("Language mode", selection: $prefs.languageMode) {
+                Text("Transcribe only").tag("transcribe")
+                Text("Transcribe + Translate").tag("translate")
+            }
+            .onChange(of: prefs.languageMode) { _, mode in
+                prefs.translateEnabled = mode == "translate"
+            }
+
+            Picker("Spoken language", selection: $prefs.sourceLocale) {
+                ForEach(Languages.sources) { Text($0.name).tag($0.id) }
+            }
+            Picker("Translate into", selection: $prefs.targetLanguage) {
+                ForEach(Languages.targets) { Text($0.name).tag($0.id) }
+            }
+            .disabled(prefs.languageMode != "translate")
+
+            Toggle("Show original + translation", isOn: $prefs.dualLine)
+                .disabled(prefs.languageMode != "translate")
+        }
+    }
+
     private var appearance: some View {
         Form {
             Slider(value: $prefs.fontSize, in: 14...48, step: 1) {
@@ -158,10 +198,16 @@ struct SettingsView: View {
 
     private var dictationTab: some View {
         Form {
-            Text("Hold **fn** to dictate; release to insert at the cursor.")
-            Text("Double-tap **fn** for a hands-free session (tap again to stop). **Esc** cancels.")
+            Picker("Hold-to-talk hotkey", selection: $prefs.dictationHotkey) {
+                Text("fn (Globe)").tag("fn")
+                Text("Right ⌥ Option").tag("rightOption")
+                Text("Right ⌘ Command").tag("rightCommand")
+                Text("F5").tag("f5")
+            }
+            Text("Hold to dictate; release to paste at the cursor. Double-tap for hands-free; Esc cancels.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Divider()
             Toggle("Remove filler words (um, uh…)", isOn: $prefs.dictationCleanup)
             Toggle("Restore my previous clipboard afterwards", isOn: $prefs.restoreClipboard)

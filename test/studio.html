@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline Studio — Local TransSub</title>
+    <link rel="stylesheet" href="../src/sidepanel.css" />
+    <link rel="stylesheet" href="../src/notes-panel.css" />
+    <style>
+      body { max-width: 880px; margin: 0 auto; }
+      .studio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      @media (max-width: 720px) { .studio-grid { grid-template-columns: 1fr; } }
+      .seg-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; padding: 8px; border-radius: 10px; }
+      .seg-row.active { background: var(--accent-dim); border: 1px solid rgba(20,183,137,.4); }
+      .seg-row .tc { font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); }
+      .player { width: 100%; margin-top: 8px; }
+      .page-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="brand">Local TransSub · Studio</span>
+      <span id="helper-pill" class="notes-pill error">Helper …</span>
+    </header>
+    <main>
+      <div class="page-tabs" id="page-tabs">
+        <button type="button" class="mini-btn" data-page="transcribe">Transkripsi</button>
+        <button type="button" class="mini-btn" data-page="translate">Terjemahan</button>
+        <button type="button" class="mini-btn" data-page="extension">Ekstensi</button>
+      </div>
+
+      <section class="card" id="page-transcribe">
+        <div class="card-head"><h2>Bangun halaman utama transkripsi</h2></div>
+        <div id="file-picker" class="dropzone">
+          <input type="file" id="studio-file" accept="audio/*,video/*" hidden />
+          <div class="drop-icon">⬆️</div>
+          <div>Klik atau jatuhkan audio/video</div>
+          <div id="file-info" class="drop-file notes-meta"></div>
+        </div>
+        <div class="notes-status-row" style="margin-top:10px">
+          <span id="engine-pill" class="notes-pill idle">Mesin: …</span>
+          <span id="progress-text" class="notes-meta">0%</span>
+        </div>
+        <div class="helper-progress-track"><div class="helper-progress-bar" id="progress-bar" style="width:0%"></div></div>
+        <button type="button" class="btn primary" id="btn-run-mock" style="margin-top:10px">Jalankan sesi tiruan</button>
+        <button type="button" class="btn ghost" id="btn-fail-engine">Simulasikan gagal mesin</button>
+        <div class="notes-block" id="offline-export-controls" style="margin-top:12px">
+          <h3>Kontrol ekspor subtitle</h3>
+          <p class="notes-meta">Unduh hasil transkripsi tiruan ke SRT, WebVTT, atau TXT.</p>
+          <label class="dual-inline"><span>Dual line (sumber + terjemahan)</span><input type="checkbox" id="export-dual-toggle" class="switch" checked /></label>
+          <div class="notes-toolbar" style="margin-top:8px">
+            <button type="button" class="mini-btn" id="btn-export-srt" data-dl="srt" disabled>SRT</button>
+            <button type="button" class="mini-btn" id="btn-export-vtt" data-dl="vtt" disabled>VTT</button>
+            <button type="button" class="mini-btn" id="btn-export-txt" data-dl="txt" disabled>TXT</button>
+          </div>
+          <p class="notes-meta" id="offline-export-status">Jalankan sesi tiruan untuk mengaktifkan ekspor.</p>
+        </div>
+      </section>
+
+      <section class="card hidden" id="page-translate">
+        <div class="card-head"><h2>Halaman utama terjemahan</h2></div>
+        <p class="notes-meta">Mode +Translate memakai segmen dual-line dari sesi tiruan.</p>
+        <label class="dual-inline"><span>Dual line</span><input type="checkbox" id="dual-toggle" class="switch" checked /></label>
+        <pre id="translate-preview" class="notes-block" style="margin-top:10px;white-space:pre-wrap"></pre>
+      </section>
+
+      <section class="card hidden" id="page-extension">
+        <div class="card-head"><h2>Halaman utama ekstensi (tiruan)</h2></div>
+        <p class="notes-meta">Ringkasan Side Panel: Realtime / Offline / Notulen / Native Helper.</p>
+        <div class="notes-status-row" id="ext-helper-indicators">
+          <span class="notes-pill idle" id="ext-mode-pill">Mode: offline</span>
+          <span class="notes-pill idle" id="ext-task-pill">Tugas: transcribe</span>
+          <span class="notes-pill idle" id="ext-engine-pill">Mesin: …</span>
+        </div>
+        <div id="ext-helper-mount" class="notes-block" style="margin-top:10px"></div>
+        <ul class="helper-steps">
+          <li>Realtime tabCapture + overlay</li>
+          <li>Offline OPFS + ekspor</li>
+          <li>Notulen lokal</li>
+          <li>Helper Win/Linux/macOS</li>
+        </ul>
+      </section>
+
+      <div class="studio-grid">
+        <section class="card">
+          <div class="card-head"><h2>Segmen berstempel waktu</h2></div>
+          <audio class="player" id="media-player" controls src="speech.wav"></audio>
+          <div id="segments"></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Panel ekspor</h2></div>
+          <div class="notes-toolbar">
+            <button type="button" class="mini-btn" data-dl="srt">SRT</button>
+            <button type="button" class="mini-btn" data-dl="vtt">VTT</button>
+            <button type="button" class="mini-btn" data-dl="txt">TXT</button>
+            <button type="button" class="mini-btn" id="btn-copy-all">Salin semua</button>
+          </div>
+          <p class="notes-meta" id="export-hint"></p>
+          <pre id="export-preview" class="notes-block" style="max-height:220px;overflow:auto;font-size:12px;white-space:pre-wrap"></pre>
+        </section>
+      </div>
+    </main>
+    <script type="module" src="./studio.js"></script>
+  </body>
+</html>

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Verifikasi Rilis Fase 1</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #1a1d27;
+        --border: #2a3040;
+        --text: #e8ecf4;
+        --muted: #8892a8;
+        --accent: #5b9cff;
+        --ok: #3dd68c;
+        --warn: #ffb020;
+        --bad: #ff6b6b;
+        --font: system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 var(--font);
+        min-height: 100vh;
+      }
+      header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+      header p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; min-width: 200px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .pill {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill.ok, .pill.pass { background: #1a3d2e; color: var(--ok); }
+      .pill.bad, .pill.fail { background: #3d1a1a; color: var(--bad); }
+      .pill.warn { background: #3d3018; color: var(--warn); }
+      .pill.unverified { background: #1e2433; color: var(--muted); }
+      main { padding: 20px 24px 40px; max-width: 1200px; margin: 0 auto; }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      @media (max-width: 720px) {
+        .stats { grid-template-columns: repeat(2, 1fr); }
+      }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .stat .n { font-size: 22px; font-weight: 700; }
+      .stat .l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+      .stat.pass .n { color: var(--ok); }
+      .stat.warn .n { color: var(--warn); }
+      .stat.fail .n { color: var(--bad); }
+      .progress-wrap {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 16px;
+      }
+      .progress-track {
+        height: 8px;
+        background: #12151c;
+        border-radius: 99px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      .progress-bar {
+        height: 100%;
+        width: 0;
+        background: var(--ok);
+        border-radius: 99px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .chip {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .chip:hover { filter: brightness(1.08); }
+      .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+      input[type="search"] {
+        margin-left: auto;
+        min-width: 220px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: auto;
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        position: sticky;
+        top: 0;
+        background: var(--panel);
+      }
+      .group-row td {
+        background: #12151c;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 700;
+      }
+      .feat-name { font-weight: 600; }
+      .feat-sum, .muted { color: var(--muted); font-size: 12px; }
+      code {
+        font-size: 11px;
+        background: #12151c;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .empty-row { text-align: center; color: var(--muted); padding: 28px; }
+      .alert {
+        margin: 0 0 16px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #3d1a1a;
+        color: var(--bad);
+        font-size: 13px;
+      }
+      .meta { color: var(--muted); font-size: 12px; }
+      footer {
+        margin-top: 18px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Verifikasi Rilis Fase 1</h1>
+        <p>Status 26 sub-fitur baseline sebelum rilis — smoke, E2E, lab, dan uji visual.</p>
+      </div>
+      <span id="data-source" class="pill warn">Memuat…</span>
+      <a href="index.html">← Test pages</a>
+    </header>
+
+    <main>
+      <p id="count-mismatch" class="alert" hidden></p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="l">Sub-fitur</div>
+          <div class="n" id="stat-total">0</div>
+        </div>
+        <div class="stat pass">
+          <div class="l">Lulus</div>
+          <div class="n" id="stat-pass">0</div>
+        </div>
+        <div class="stat warn">
+          <div class="l">Peringatan</div>
+          <div class="n" id="stat-warn">0</div>
+        </div>
+        <div class="stat fail">
+          <div class="l">Gagal</div>
+          <div class="n" id="stat-fail">0</div>
+        </div>
+        <div class="stat">
+          <div class="l">Belum diuji</div>
+          <div class="n" id="stat-unverified">0</div>
+        </div>
+      </div>
+
+      <div class="progress-wrap">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <strong id="progress-label">0 / 26 lulus</strong>
+          <span id="generated-at" class="meta"></span>
+        </div>
+        <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+      </div>
+
+      <div class="toolbar" id="group-filters" aria-label="Filter grup"></div>
+      <div class="toolbar">
+        <div id="status-filters">
+          <button type="button" class="chip active" data-status="all">Semua status</button>
+          <button type="button" class="chip" data-status="pass">Lulus</button>
+          <button type="button" class="chip" data-status="warn">Peringatan</button>
+          <button type="button" class="chip" data-status="fail">Gagal</button>
+          <button type="button" class="chip" data-status="unverified">Belum diuji</button>
+        </div>
+        <input id="search" type="search" placeholder="Cari nama, id, atau permukaan…" />
+        <span id="visible-count" class="meta"></span>
+      </div>
+
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Sub-fitur</th>
+              <th>Permukaan</th>
+              <th>Status</th>
+              <th>Bukti</th>
+              <th>Terakhir</th>
+            </tr>
+          </thead>
+          <tbody id="feature-body"></tbody>
+        </table>
+      </div>
+
+      <footer>
+        <span>Local TransSub · Fase 1 verifikasi rilis</span>
+        <span>
+          <a href="qa-report.html">Laporan asap &amp; E2E</a>
+          ·
+          <a href="bench.html">Benchmark model</a>
+          ·
+          <a href="defects.html">Cacat rilis</a>
+          ·
+          <a href="lab.html">Translation Lab</a>
+          ·
+          <a href="overlay-test.html">Overlay test</a>
+        </span>
+      </footer>
+    </main>
+
+    <script type="module" src="verify.js"></script>
+  </body>
+</html>

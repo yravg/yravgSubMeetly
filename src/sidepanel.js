@@ -16,6 +16,9 @@ import { formatSrt, formatVtt, formatTxt } from './lib/transcript-cache.js';
 import { loadExportDir, pickExportDir, clearExportDir, saveExportFile, exportDirLabel } from './lib/export.js';
 import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
+import { mountNotesPanel } from './notes-panel.js';
+import { mountHelperStatusCard } from './helper-status.js';
+import { exportBasename } from './lib/helper-status.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -92,6 +95,7 @@ function setMode(mode) {
   $('live-preview').classList.add('hidden');
   updateButtons();
   updateWarning();
+  redrawHelperStatus?.();
 }
 
 function syncDualLineCheckboxes() {
@@ -149,6 +153,7 @@ function setTask(task) {
   $('tgt-col').style.opacity = task === 'translate' ? '1' : '0.4';
   $('tgt-lang').disabled = task !== 'translate';
   updateWarning();
+  redrawHelperStatus?.();
 }
 
 // ---------------------------------------------------------------------------
@@ -413,6 +418,8 @@ async function loadSettings() {
 }
 
 let nativeInfo = null; // last /health result (null = offline/unknown)
+/** @type {null | (() => void)} */
+let redrawHelperStatus = null;
 let nativePollTimer = null;
 let nativeBusy = false;
 let lastNativeAutoStartMs = 0;
@@ -489,6 +496,7 @@ async function checkNative({ allowAutoStart = false } = {}) {
   }
   updateWarning();
   updateNativeHostHint();
+  redrawHelperStatus?.();
   return nativeInfo;
 }
 
@@ -836,7 +844,7 @@ async function exportSession({ lines, title, url, kind, dualLine }) {
   if (kind === 'srt') out = formatSrt(norm, meta);
   else if (kind === 'vtt') out = formatVtt(norm, meta);
   else out = formatTxt(norm, meta);
-  const safe = (title || 'subtitles').replace(/[^\w\s.-]/g, '_').slice(0, 60);
+  const safe = exportBasename(title || 'subtitles', kind).replace(/\.(srt|vtt|txt)$/i, '');
   const name = `${safe}.${kind}`;
   const res = await saveExportFile(name, out);
   if (res.saved) setStatus(t('savedTo', res.path), 'ok');
@@ -1128,6 +1136,18 @@ async function init() {
   await refreshTab();
   await refreshExportFolderUi();
   await renderHistory();
+  const notesMount = $('notes-mount');
+  if (notesMount) await mountNotesPanel(notesMount);
+  const helperMount = $('helper-status-mount');
+  if (helperMount) {
+    redrawHelperStatus = mountHelperStatusCard(helperMount, () => ({
+      online: !!nativeInfo,
+      health: nativeInfo,
+      engine: state.settings.engine || 'browser',
+      task: state.task,
+      mode: state.mode,
+    }));
+  }
   // resync with a session that may already be running
   const s = await toBG('get-state', {});
   if (s?.active) {

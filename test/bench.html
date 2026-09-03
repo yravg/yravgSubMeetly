@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Lab benchmark kinerja model</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #1a1d27;
+        --border: #2a3040;
+        --text: #e8ecf4;
+        --muted: #8892a8;
+        --accent: #5b9cff;
+        --ok: #3dd68c;
+        --warn: #ffb020;
+        --bad: #ff6b6b;
+        --font: system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 var(--font);
+        min-height: 100vh;
+      }
+      header.page {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header.page h1 { margin: 0; font-size: 18px; font-weight: 600; }
+      header.page p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; min-width: 220px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .pill {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill.ok, .pill.pass { background: #1a3d2e; color: var(--ok); }
+      .pill.bad, .pill.fail { background: #3d1a1a; color: var(--bad); }
+      .pill.warn { background: #3d3018; color: var(--warn); }
+      .pill.unverified { background: #1e2433; color: var(--muted); }
+      main { padding: 20px 24px 40px; max-width: 1180px; margin: 0 auto; }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .stat .n { font-size: 22px; font-weight: 700; }
+      .stat .l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+      .stat.pass .n { color: var(--ok); }
+      .stat.warn .n { color: var(--warn); }
+      .stat.fail .n { color: var(--bad); }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+      .chip {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: auto;
+        margin-bottom: 18px;
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        position: sticky;
+        top: 0;
+        background: var(--panel);
+      }
+      .feat-name { font-weight: 600; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .ok { color: var(--ok); font-weight: 600; }
+      .warn { color: var(--warn); font-weight: 600; }
+      .bad { color: var(--bad); font-weight: 600; }
+      .note-row td { padding-top: 0; border-bottom-color: #3a4258; }
+      .empty-row { text-align: center; color: var(--muted); padding: 24px; }
+      section h2 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+      footer.page {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page">
+      <div>
+        <h1>Lab benchmark kinerja model</h1>
+        <p>
+          Bandingkan Whisper / Voxtral / Opus-MT / native MLX.
+          Target draft <strong>≤500 ms</strong>. Jalankan ulang native:
+          <code>python3 scripts/bench-lab.py --json test/last-bench.json</code>
+        </p>
+      </div>
+      <span id="data-source" class="pill warn">Memuat…</span>
+      <span id="native-health" class="pill unverified">Native…</span>
+      <a href="index.html">← Test pages</a>
+    </header>
+
+    <main>
+      <div class="stats">
+        <div class="stat">
+          <div class="l">Model</div>
+          <div class="n" id="stat-total">0</div>
+        </div>
+        <div class="stat pass">
+          <div class="l">Lulus target</div>
+          <div class="n" id="stat-pass">0</div>
+        </div>
+        <div class="stat warn">
+          <div class="l">Peringatan</div>
+          <div class="n" id="stat-warn">0</div>
+        </div>
+        <div class="stat fail">
+          <div class="l">Di atas target</div>
+          <div class="n" id="stat-fail">0</div>
+        </div>
+      </div>
+
+      <div class="toolbar" id="engine-filters">
+        <button type="button" class="chip active" data-engine="all">Semua mesin</button>
+        <button type="button" class="chip" data-engine="browser">Browser</button>
+        <button type="button" class="chip" data-engine="native">Native helper</button>
+        <span id="target-label" class="muted"></span>
+        <span id="generated-at" class="muted"></span>
+      </div>
+      <div class="toolbar" id="status-filters">
+        <button type="button" class="chip active" data-status="all">Semua status</button>
+        <button type="button" class="chip" data-status="pass">Lulus</button>
+        <button type="button" class="chip" data-status="warn">Peringatan</button>
+        <button type="button" class="chip" data-status="fail">Di atas target</button>
+        <span id="visible-count" class="muted"></span>
+      </div>
+
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Mesin</th>
+              <th>Perangkat</th>
+              <th>Draft</th>
+              <th>ASR</th>
+              <th>MT</th>
+              <th>RTF</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="model-body"></tbody>
+        </table>
+      </div>
+
+      <section id="native-rows-wrap" hidden>
+        <h2>Baris last-bench.json (native helper)</h2>
+        <p class="muted" style="margin-top:0">
+          Interaktif: <a href="lab.html">Translation Lab</a>
+        </p>
+        <div class="panel">
+          <table>
+            <thead>
+              <tr>
+                <th>Pair</th>
+                <th>Stage</th>
+                <th>Total</th>
+                <th>ASR</th>
+                <th>MT</th>
+                <th>Source</th>
+                <th>Translation</th>
+                <th>OK</th>
+              </tr>
+            </thead>
+            <tbody id="native-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="page">
+        <span>Local TransSub · Fase 1 verifikasi rilis</span>
+        <span>
+          <a href="verify.html">Dashboard 26 sub-fitur</a>
+          ·
+          <a href="qa-report.html">Asap &amp; E2E</a>
+          ·
+          <a href="defects.html">Cacat rilis</a>
+          ·
+          <a href="lab.html">Translation Lab</a>
+        </span>
+      </footer>
+    </main>
+
+    <script type="module" src="bench-models.js"></script>
+  </body>
+</html>

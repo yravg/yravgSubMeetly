@@ -1,0 +1,231 @@
+{
+  "source": "release-gate",
+  "generatedAt": "2026-09-03T03:58:34.488Z",
+  "inputs": {
+    "smoke": true,
+    "e2e": true,
+    "nativeBench": true,
+    "modelsBench": true
+  },
+  "defects": [
+    {
+      "id": "REL-01",
+      "title": "Draft native sering di atas target 500 ms",
+      "severity": "high",
+      "status": "open",
+      "mustFix": true,
+      "area": "Native Helper",
+      "featureId": "ext-refine",
+      "summary": "last-bench: 0/16 draft ≤500 ms (terbaik 520 ms).",
+      "evidence": "test/last-bench.json · test/BENCH-COMPARE.md",
+      "priority": "release-blocker",
+      "releaseGate": true
+    },
+    {
+      "id": "REL-02",
+      "title": "E2E jalur pemilih tab (--pick) belum diverifikasi penuh",
+      "severity": "high",
+      "status": "open",
+      "mustFix": true,
+      "area": "Ekstensi Chrome",
+      "featureId": "ext-tab-picker",
+      "summary": "Jalankan node scripts/e2e.mjs --pick dengan lab server + Chrome headed.",
+      "evidence": "scripts/e2e.mjs --pick · test/last-e2e.json",
+      "priority": "release-blocker",
+      "releaseGate": true
+    },
+    {
+      "id": "REL-03",
+      "title": "E2E mesin native (--native) belum diverifikasi penuh",
+      "severity": "high",
+      "status": "open",
+      "mustFix": true,
+      "area": "Native Helper",
+      "featureId": "helper-asr",
+      "summary": "Jalankan helper lalu node scripts/e2e.mjs --native.",
+      "evidence": "scripts/e2e.mjs --native",
+      "priority": "release-blocker",
+      "releaseGate": true
+    },
+    {
+      "id": "REL-04",
+      "title": "E2E berkas offline (--browser) belum dijalankan",
+      "severity": "high",
+      "status": "open",
+      "mustFix": true,
+      "area": "Ekstensi Chrome",
+      "featureId": "ext-offline-file",
+      "summary": "scripts/e2e-file.mjs sudah menguji kontrak ekspor; jalur Puppeteer offline masih perlu --browser.",
+      "evidence": "scripts/e2e-file.mjs --browser",
+      "priority": "release-blocker",
+      "releaseGate": true
+    },
+    {
+      "id": "BENCH-voxtral-mini-webgpu",
+      "title": "Model browser di luar target: Voxtral Mini 3B",
+      "severity": "medium",
+      "status": "open",
+      "mustFix": false,
+      "area": "Benchmark",
+      "featureId": "voxtral-mini-webgpu",
+      "summary": "Kualitas tinggi, butuh ≥16 GB RAM. Tidak untuk caption live. Angka stub.",
+      "evidence": "test/last-models-bench.json · test/BENCH-COMPARE.md",
+      "priority": "track",
+      "releaseGate": false
+    },
+    {
+      "id": "BENCH-whisper-small-wasm",
+      "title": "Model browser di luar target: Whisper Small",
+      "severity": "medium",
+      "status": "open",
+      "mustFix": false,
+      "area": "Benchmark",
+      "featureId": "whisper-small-wasm",
+      "summary": "Lambat di WASM; lebih masuk akal di WebGPU. Angka stub.",
+      "evidence": "test/last-models-bench.json · test/BENCH-COMPARE.md",
+      "priority": "track",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-05",
+      "title": "Ekspor TXT tanpa unit test",
+      "severity": "medium",
+      "status": "fixed",
+      "mustFix": false,
+      "area": "Ekspor",
+      "featureId": "export-txt",
+      "summary": "Ditutup oleh scripts/smoke.mjs (export-txt) + scripts/e2e-file.mjs.",
+      "evidence": "test/last-smoke.json · scripts/e2e-file.mjs",
+      "priority": "resolved",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-07",
+      "title": "Satu tab sekaligus; capture putus saat navigasi",
+      "severity": "medium",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "Ekstensi Chrome",
+      "featureId": "ext-tab-capture",
+      "summary": "Keterbatasan MV3 tabCapture. Didokumentasikan; bukan regresi yang harus ditutup di Fase 1.",
+      "evidence": "README Dev notes",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-10",
+      "title": "Chrome menolak tabCapture jika ekstensi belum “invoked”",
+      "severity": "medium",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "Ekstensi Chrome",
+      "featureId": "ext-tab-picker",
+      "summary": "Mitigasi sudah ada: context menu + pemilih manual. Tetap mengganggu UX first-run.",
+      "evidence": "src/lib/i18n.js needInvoke · scripts/e2e.mjs --allowlisted-extension-id",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-11",
+      "title": "Picker window/screen tidak membawa audio sistem di macOS",
+      "severity": "medium",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "Ekstensi Chrome",
+      "featureId": "ext-tab-picker",
+      "summary": "Harus pilih Chrome Tab + “Also share tab audio”. Audio sistem adalah wilayah app macOS.",
+      "evidence": "src/lib/i18n.js pickHint",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    },
+    {
+      "id": "SMOKE-W-helper-asr",
+      "title": "Smoke peringatan: ASR native (mlx-whisper / faster-whisper)",
+      "severity": "medium",
+      "status": "open",
+      "mustFix": false,
+      "area": "Native Helper",
+      "featureId": "helper-asr",
+      "summary": "Kode ASR ada; helper offline (ECONNREFUSED)",
+      "evidence": "test/last-smoke.json",
+      "priority": "track",
+      "releaseGate": false
+    },
+    {
+      "id": "SMOKE-W-helper-http",
+      "title": "Smoke peringatan: HTTP lokal + Native Messaging",
+      "severity": "medium",
+      "status": "open",
+      "mustFix": false,
+      "area": "Native Helper",
+      "featureId": "helper-http",
+      "summary": "Host + server ada; /health offline (ECONNREFUSED)",
+      "evidence": "test/last-smoke.json",
+      "priority": "track",
+      "releaseGate": false
+    },
+    {
+      "id": "SMOKE-W-mt-native-llm",
+      "title": "Smoke peringatan: LLM native (Qwen / MLX)",
+      "severity": "medium",
+      "status": "open",
+      "mustFix": false,
+      "area": "Terjemahan berjenjang",
+      "featureId": "mt-native-llm",
+      "summary": "LLM di server.py ada; helper offline (ECONNREFUSED)",
+      "evidence": "test/last-smoke.json",
+      "priority": "track",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-08",
+      "title": "Situs DRM dapat memblokir tabCapture",
+      "severity": "low",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "Ekstensi Chrome",
+      "featureId": "ext-tab-capture",
+      "summary": "Widevine/Fairplay sering menolak capture. Pengguna perlu sumber non-DRM atau app macOS.",
+      "evidence": "README Known constraints",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-09",
+      "title": "Berkas MKV tidak didekode Chrome decodeAudioData",
+      "severity": "low",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "Ekstensi Chrome",
+      "featureId": "ext-offline-file",
+      "summary": "Format tidak didukung pipeline browser. Native helper + ffmpeg adalah jalan keluar.",
+      "evidence": "README Known constraints",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-12",
+      "title": "Chrome Translator API hanya Chrome 138+",
+      "severity": "low",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "Terjemahan berjenjang",
+      "featureId": "mt-chrome",
+      "summary": "Fallback Opus-MT sudah ada. Bukan blocker rilis; perlu dicatat di catatan rilis.",
+      "evidence": "README · src/lib/translate.js",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    }
+  ],
+  "policy": {
+    "alwaysMustFix": [
+      "REL-01",
+      "REL-02",
+      "REL-03",
+      "REL-04"
+    ],
+    "autoFixed": [
+      "REL-05"
+    ]
+  }
+}

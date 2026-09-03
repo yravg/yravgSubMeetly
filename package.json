@@ -1,13 +1,26 @@
 {
   "name": "local-transsub",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Local TransSub — fully-offline realtime subtitle & translation Chrome extension. All AI runs on-device.",
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "dev:browser": "npm run build && node scripts/dev-browser.mjs"
+    "dev:browser": "npm run build && node scripts/dev-browser.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:pipeline": "node scripts/smoke.mjs --pipeline",
+    "e2e": "node scripts/e2e.mjs",
+    "e2e:pick": "node scripts/e2e.mjs --pick",
+    "e2e:native": "node scripts/e2e.mjs --native",
+    "e2e:harness": "node scripts/e2e.mjs --harness-only",
+    "e2e:file": "node scripts/e2e-file.mjs",
+    "bench:models": "node scripts/bench-models.mjs",
+    "bench:models:catalog": "node scripts/bench-models.mjs --catalog-only",
+    "bench:report": "node scripts/bench-report.mjs",
+    "defects:gen": "node scripts/gen-defects.mjs",
+    "release:gate": "node scripts/mark-release-priorities.mjs",
+    "release:check": "node scripts/mark-release-priorities.mjs --check"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

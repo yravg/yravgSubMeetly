@@ -1,0 +1,131 @@
+{
+  "source": "e2e",
+  "generatedAt": "2026-09-03T03:52:13.414Z",
+  "mode": "e2e-file",
+  "suites": [
+    {
+      "id": "e2e-realtime",
+      "kind": "e2e",
+      "name": "E2E subtitel tab (tabCapture)",
+      "command": "node scripts/e2e.mjs --harness-only",
+      "script": "scripts/e2e.mjs",
+      "status": "pass",
+      "durationMs": 17,
+      "lastRun": "2026-09-03T03:50:29.785Z",
+      "covers": "Puppeteer + tabCapture allowlisted → subtitel + overlay",
+      "checks": [
+        {
+          "id": "e2e-dist",
+          "name": "Paket dist/ ada",
+          "status": "pass",
+          "detail": "Jalankan npm run build"
+        },
+        {
+          "id": "e2e-audio-page",
+          "name": "Halaman audio uji ada",
+          "status": "pass",
+          "detail": "test/audio-page.html"
+        },
+        {
+          "id": "e2e-speech",
+          "name": "Berkas speech.wav ada",
+          "status": "pass",
+          "detail": "test/speech.wav dibutuhkan audio-page"
+        },
+        {
+          "id": "e2e-lab-server",
+          "name": "Lab server audio-page",
+          "status": "pass",
+          "detail": "http://127.0.0.1:8799/audio-page.html → 200"
+        },
+        {
+          "id": "e2e-puppeteer",
+          "name": "Paket puppeteer terpasang",
+          "status": "pass",
+          "detail": "npm i (devDependency puppeteer)"
+        }
+      ],
+      "log": [
+        "[e2e] harness-only: prasyarat dicek, Chrome headed dilewati"
+      ],
+      "error": null
+    },
+    {
+      "id": "e2e-file",
+      "kind": "e2e",
+      "name": "E2E berkas offline + ekspor SRT/VTT/TXT",
+      "command": "node scripts/e2e-file.mjs",
+      "script": "scripts/e2e-file.mjs",
+      "status": "pass",
+      "durationMs": 9,
+      "lastRun": "2026-09-03T03:52:13.409Z",
+      "covers": "formatSrt/formatVtt/formatTxt + wiring Offline dropzone; opsional Puppeteer --browser",
+      "checks": [
+        {
+          "id": "e2e-offline-io",
+          "name": "Modul staging OPFS",
+          "status": "pass",
+          "detail": "src/lib/offline-io.js"
+        },
+        {
+          "id": "e2e-off-drop",
+          "name": "Dropzone Offline di Side Panel",
+          "status": "pass",
+          "detail": "src/sidepanel.html"
+        },
+        {
+          "id": "e2e-export-btns",
+          "name": "Tombol ekspor SRT/VTT/TXT",
+          "status": "pass",
+          "detail": "src/sidepanel.html"
+        },
+        {
+          "id": "e2e-export-handlers",
+          "name": "Handler ekspor di sidepanel.js",
+          "status": "pass",
+          "detail": "src/sidepanel.js"
+        },
+        {
+          "id": "e2e-offscreen-offline",
+          "name": "Offscreen memproses berkas offline",
+          "status": "pass",
+          "detail": "src/offscreen.js"
+        },
+        {
+          "id": "e2e-sample-wav",
+          "name": "Berkas audio sampel untuk uji berkas",
+          "status": "pass",
+          "detail": "test/samples/en-zh-1.wav"
+        },
+        {
+          "id": "e2e-split",
+          "name": "splitSubtitleCues memecah segmen panjang",
+          "status": "pass",
+          "detail": "4 cues"
+        },
+        {
+          "id": "e2e-export-srt",
+          "name": "Ekspor SRT",
+          "status": "pass",
+          "detail": "3 blok"
+        },
+        {
+          "id": "e2e-export-vtt",
+          "name": "Ekspor WebVTT",
+          "status": "pass",
+          "detail": "dual + single OK"
+        },
+        {
+          "id": "e2e-export-txt",
+          "name": "Ekspor TXT",
+          "status": "pass",
+          "detail": "header + src/tgt"
+        }
+      ],
+      "log": [
+        "[e2e-file] mode default: kontrak ekspor + wiring (pakai --browser untuk Puppeteer offline)"
+      ],
+      "error": null
+    }
+  ]
+}

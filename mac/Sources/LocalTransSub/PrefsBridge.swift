@@ -18,6 +18,14 @@ final class PrefsBridge: ObservableObject {
     @Published var hideDockIcon: Bool { didSet { Prefs.shared.hideDockIcon = hideDockIcon } }
     @Published var refineTranslation: Bool { didSet { Prefs.shared.refineTranslation = refineTranslation } }
     @Published var overlayPanelMode: Bool { didSet { Prefs.shared.overlayPanelMode = overlayPanelMode } }
+    @Published var audioSourceMode: String { didSet { Prefs.shared.audioSourceMode = audioSourceMode } }
+    @Published var languageMode: String {
+        didSet {
+            Prefs.shared.languageMode = languageMode
+            translateEnabled = languageMode == "translate"
+        }
+    }
+    @Published var dictationHotkey: String { didSet { Prefs.shared.dictationHotkey = dictationHotkey } }
 
     private init() {
         let p = Prefs.shared
@@ -32,5 +40,8 @@ final class PrefsBridge: ObservableObject {
         hideDockIcon = p.hideDockIcon
         refineTranslation = p.refineTranslation
         overlayPanelMode = p.overlayPanelMode
+        audioSourceMode = p.audioSourceMode
+        languageMode = p.languageMode
+        dictationHotkey = p.dictationHotkey
     }
 }

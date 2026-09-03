@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Laporan uji asap &amp; E2E</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #1a1d27;
+        --border: #2a3040;
+        --text: #e8ecf4;
+        --muted: #8892a8;
+        --accent: #5b9cff;
+        --ok: #3dd68c;
+        --warn: #ffb020;
+        --bad: #ff6b6b;
+        --font: system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 var(--font);
+        min-height: 100vh;
+      }
+      header.page {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header.page h1 { margin: 0; font-size: 18px; font-weight: 600; }
+      header.page p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; min-width: 200px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .pill {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill.ok, .pill.pass { background: #1a3d2e; color: var(--ok); }
+      .pill.bad, .pill.fail { background: #3d1a1a; color: var(--bad); }
+      .pill.warn { background: #3d3018; color: var(--warn); }
+      .pill.unverified, .pill.skip { background: #1e2433; color: var(--muted); }
+      main { padding: 20px 24px 40px; max-width: 960px; margin: 0 auto; }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      @media (max-width: 800px) {
+        .stats { grid-template-columns: repeat(2, 1fr); }
+      }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .stat .n { font-size: 22px; font-weight: 700; }
+      .stat .l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+      .stat.pass .n { color: var(--ok); }
+      .stat.fail .n { color: var(--bad); }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+      .chip {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .suite {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 14px;
+      }
+      .suite-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .suite-kind {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .suite h2 { margin: 2px 0 0; font-size: 16px; }
+      .covers { color: var(--muted); font-size: 13px; }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      @media (max-width: 640px) {
+        .meta-grid { grid-template-columns: 1fr; }
+      }
+      dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+      dd { margin: 2px 0 0; }
+      code {
+        font-size: 12px;
+        background: #12151c;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      table.checks { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .checks th, .checks td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+      .checks th {
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .muted { color: var(--muted); font-size: 12px; }
+      .log-wrap { margin-top: 12px; }
+      .log-wrap summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 12px; }
+      pre.log {
+        margin: 8px 0 0;
+        padding: 10px;
+        background: #12151c;
+        border-radius: 8px;
+        overflow: auto;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #c5cddc;
+      }
+      .empty { text-align: center; color: var(--muted); padding: 24px; }
+      footer.page {
+        margin-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page">
+      <div>
+        <h1>Laporan uji asap &amp; E2E</h1>
+        <p>Hasil <code>scripts/smoke.mjs</code> dan <code>scripts/e2e.mjs</code> (termasuk <code>--pick</code> / <code>--native</code>).</p>
+      </div>
+      <span id="data-source" class="pill warn">Memuat…</span>
+      <a href="index.html">← Test pages</a>
+    </header>
+
+    <main>
+      <div class="stats">
+        <div class="stat">
+          <div class="l">Suite</div>
+          <div class="n" id="stat-suites">0</div>
+        </div>
+        <div class="stat">
+          <div class="l">Asap</div>
+          <div class="n" id="stat-smoke">0</div>
+        </div>
+        <div class="stat">
+          <div class="l">E2E</div>
+          <div class="n" id="stat-e2e">0</div>
+        </div>
+        <div class="stat pass">
+          <div class="l">Lulus</div>
+          <div class="n" id="stat-pass">0</div>
+        </div>
+        <div class="stat">
+          <div class="l">Belum diuji</div>
+          <div class="n" id="stat-unverified">0</div>
+        </div>
+        <div class="stat fail">
+          <div class="l">Gagal</div>
+          <div class="n" id="stat-fail">0</div>
+        </div>
+      </div>
+
+      <div class="toolbar" id="kind-filters">
+        <button type="button" class="chip active" data-kind="all">Semua jenis</button>
+        <button type="button" class="chip" data-kind="smoke">Uji asap</button>
+        <button type="button" class="chip" data-kind="e2e">E2E</button>
+        <span id="checks-label" class="muted"></span>
+        <span id="generated-at" class="muted"></span>
+      </div>
+      <div class="toolbar" id="status-filters">
+        <button type="button" class="chip active" data-status="all">Semua status</button>
+        <button type="button" class="chip" data-status="pass">Lulus</button>
+        <button type="button" class="chip" data-status="fail">Gagal</button>
+        <button type="button" class="chip" data-status="unverified">Belum diuji</button>
+        <span id="visible-count" class="muted"></span>
+      </div>
+
+      <div id="suite-list"></div>
+
+      <footer class="page">
+        <span>Local TransSub · Fase 1 verifikasi rilis</span>
+        <span>
+          <a href="verify.html">Dashboard 26 sub-fitur</a>
+          ·
+          <a href="bench.html">Benchmark model</a>
+          ·
+          <a href="defects.html">Cacat rilis</a>
+          ·
+          <a href="lab.html">Translation Lab</a>
+        </span>
+      </footer>
+    </main>
+
+    <script type="module" src="qa-report.js"></script>
+  </body>
+</html>

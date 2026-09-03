@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Local TransSub</title>
     <link rel="stylesheet" href="sidepanel.css" />
+    <link rel="stylesheet" href="notes-panel.css" />
   </head>
   <body>
     <header class="topbar">
@@ -118,6 +119,22 @@
         <div id="history-list" class="history">
           <div class="empty" data-i18n="noHistory">No history yet</div>
         </div>
+      </section>
+
+      <!-- ============ Native helper status (Win/Linux/mac) ============ -->
+      <section class="card" id="helper-status-card">
+        <div class="card-head">
+          <h2>🖥️ Native Helper</h2>
+        </div>
+        <div id="helper-status-mount"></div>
+      </section>
+
+      <!-- ============ Meeting notes (Fase 2 stub) ============ -->
+      <section class="card" id="notes-card">
+        <div class="card-head">
+          <h2 data-i18n="notesTitle">📝 Notulen Rapat</h2>
+        </div>
+        <div id="notes-mount"></div>
       </section>
     </main>
 

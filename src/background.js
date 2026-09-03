@@ -7,6 +7,9 @@ import {
   mergeLine,
 } from './lib/transcript-cache.js';
 import { needsTranslation, pickUntranslatedLines, mergeLinesByTime, sourceText, translationText } from './lib/translation-utils.js';
+import { nativeHostAction, nativeHostSupported, NATIVE_HOST_NAME } from './lib/native-host.js';
+import { nativeHealth } from './lib/native.js';
+import { NATIVE_MESSAGING_HOST, LOCAL_HELPER_ORIGIN } from './lib/native-protocol.js';
 
 let session = {
   active: false,
@@ -308,6 +311,41 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'get-state':
         sendResponse(publicState());
         break;
+
+      case 'native-host-action': {
+        const action = msg.data?.action || 'status';
+        if (!nativeHostSupported()) {
+          sendResponse({
+            ok: false,
+            error: 'nativeMessaging unavailable',
+            host: NATIVE_HOST_NAME || NATIVE_MESSAGING_HOST,
+          });
+          break;
+        }
+        try {
+          const res = await nativeHostAction(action, { timeoutMs: msg.data?.timeoutMs || 45_000 });
+          sendResponse({ ok: true, host: NATIVE_HOST_NAME, result: res });
+        } catch (e) {
+          sendResponse({ ok: false, host: NATIVE_HOST_NAME, error: String(e.message || e) });
+        }
+        break;
+      }
+
+      case 'native-helper-status': {
+        const settings = await getSettings();
+        const url = settings.nativeUrl || LOCAL_HELPER_ORIGIN;
+        const health = await nativeHealth(url);
+        sendResponse({
+          ok: !!health?.ok,
+          online: !!health?.ok,
+          host: NATIVE_MESSAGING_HOST,
+          nativeMessaging: nativeHostSupported(),
+          health,
+          engine_label: health?.engine_label || health?.engine || null,
+          url,
+        });
+        break;
+      }
 
       case 'update-config':
         await updateSessionConfig(msg.data || {});

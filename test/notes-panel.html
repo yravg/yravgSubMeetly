@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel Notulen — Local TransSub</title>
+    <link rel="stylesheet" href="../src/sidepanel.css" />
+    <link rel="stylesheet" href="../src/notes-panel.css" />
+    <style>
+      body {
+        max-width: 420px;
+        margin: 0 auto;
+        min-height: 100vh;
+        border-inline: 1px solid var(--border);
+      }
+      .harness-banner {
+        padding: 10px 16px;
+        font-size: 12px;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        background: var(--card2);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="harness-banner">
+      Harness frontend Notulen (stub lokal) — nanti diintegrasikan ke Side Panel.
+    </div>
+    <header class="topbar">
+      <span class="brand">Local TransSub</span>
+      <span class="notes-pill ready">Notulen</span>
+    </header>
+    <main>
+      <section class="card">
+        <div class="card-head">
+          <h2>📝 Notulen Rapat</h2>
+        </div>
+        <div id="notes-mount"></div>
+      </section>
+    </main>
+    <script type="module">
+      import { mountNotesPanel } from '../src/notes-panel.js';
+      const root = document.getElementById('notes-mount');
+      await mountNotesPanel(root);
+    </script>
+  </body>
+</html>
