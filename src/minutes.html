@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Minutes Register — Local TransSub</title>
+<link rel="stylesheet" href="minutes.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ app bar ============ -->
+  <div class="appbar">
+    <div class="brand">📝 Local TransSub</div>
+    <div class="crumbs"><span class="sep">/</span><span class="now" data-t="minutes">Minutes</span></div>
+    <div class="grow"></div>
+    <select id="m-switch" class="mswitch" aria-label="Meeting"></select>
+    <button type="button" class="btn sm" id="btn-add-item">＋ <span data-t="addItem">Add item</span></button>
+    <div class="langsw" role="group" aria-label="Interface language">
+      <button data-lang="en" aria-pressed="true">EN</button>
+      <button data-lang="id" aria-pressed="false">ID</button>
+    </div>
+  </div>
+
+  <!-- ============ empty state (no meetings yet) ============ -->
+  <div class="empty-page" id="empty-state" hidden>
+    <div class="empty">
+      <h2 data-t="msgNoMeeting">No meeting selected.</h2>
+      <p>Record a meeting from the side panel, or load a sample register to explore the workspace.</p>
+      <button type="button" class="btn primary" id="btn-load-sample">Load sample data</button>
+    </div>
+  </div>
+
+  <!-- ============ workspace ============ -->
+  <div id="workspace" class="workspace" style="display:contents" hidden>
+
+    <header class="mhead">
+      <div class="mhead-top">
+        <div class="mtitle-wrap">
+          <h1 id="m-title">—</h1>
+          <div class="facts">
+            <span><span class="k" data-t="date">Date</span> <span class="v mono" id="m-date">—</span></span>
+            <span><span class="k" data-t="time">Time</span> <span class="v mono" id="m-time">—</span></span>
+            <span><span class="k" data-t="chair">Chair</span> <span class="v" id="m-chair">—</span></span>
+            <span><span class="k" data-t="mom">MoM</span> <span class="v mono" id="m-mom">—</span></span>
+          </div>
+        </div>
+        <div class="head-actions">
+          <span class="sample-badge hidden" id="issued-badge"></span>
+          <div style="position:relative">
+            <button type="button" class="btn" id="btn-export">⤓ <span data-t="export">Export</span></button>
+            <div class="export-menu" id="export-menu" hidden>
+              <button type="button" data-export="md">Markdown (.md)</button>
+              <button type="button" data-export="csv">CSV (.csv)</button>
+              <button type="button" data-export="json">JSON (.json)</button>
+            </div>
+          </div>
+          <button type="button" class="btn" id="btn-amend">↻ <span data-t="applyCorrection">Amend</span></button>
+          <button type="button" class="btn primary" id="btn-issue">✓ <span data-t="issue">Issue MoM</span></button>
+        </div>
+      </div>
+
+      <div class="prov">
+        <b data-t="draftedOnDevice">Drafted on this Mac</b>
+        <span class="sep">·</span>
+        <span id="prov-line"></span>
+        <span class="sep">·</span>
+        <span><b id="prov-unreviewed">0</b> <span data-t="needReview">need review</span></span>
+      </div>
+
+      <div class="strip" id="strip"></div>
+    </header>
+
+    <!-- ============ view tabs + toolbar ============ -->
+    <div class="bar">
+      <div class="tabs" role="tablist" id="tabs">
+        <button role="tab" aria-selected="true" data-view="table" data-t="vRegister">Register</button>
+        <button role="tab" aria-selected="false" data-view="topic" data-t="vTopic">By topic</button>
+        <button role="tab" aria-selected="false" data-view="doc" data-t="vDoc">Minutes</button>
+        <button role="tab" aria-selected="false" data-view="carry" data-t="vCarry">Carry-forward</button>
+        <button role="tab" aria-selected="false" data-view="series" data-t="vSeries">Series</button>
+      </div>
+      <div class="grow"></div>
+      <span class="crumbs" id="showing"></span>
+      <label class="srch"><span>⌕</span><input id="q" type="search" /></label>
+      <button class="btn sm" id="btn-mine" aria-pressed="false">◑ <span data-t="mine">Mine</span></button>
+      <button class="btn sm" id="btn-dual" aria-pressed="false">⇅ <span data-t="dual">Dual text</span></button>
+    </div>
+
+    <div class="chips" id="chips"></div>
+
+    <!-- ============ main ============ -->
+    <div class="main">
+      <div class="pane" id="pane"></div>
+
+      <aside class="drawer" id="drawer" hidden aria-label="Item detail">
+        <div class="dhead">
+          <div style="flex:1;min-width:0">
+            <div class="ref" id="d-id" style="font-size:13px;color:var(--text2)">—</div>
+            <div id="d-type" style="margin-top:3px"></div>
+          </div>
+          <button class="x" id="d-close" aria-label="Close">✕</button>
+        </div>
+        <div class="dbody" id="d-body"></div>
+        <div class="dfoot" id="d-foot"></div>
+      </aside>
+    </div>
+
+    <div class="foot">
+      <span><kbd>/</kbd> search</span>
+      <span><kbd>Esc</kbd> close</span>
+      <span class="grow"></span>
+      <span data-t="nothingLeft">No audio, transcript or text left this device.</span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+<script type="module" src="minutes.js"></script>
+</body>
+</html>

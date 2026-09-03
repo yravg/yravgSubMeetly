@@ -50,7 +50,7 @@ const en = {
   ai: 'AI draft', accepted: 'Accepted', edited: 'Edited',
 
   /* stats */
-  sItems: 'Register items', sActions: 'Actions open', sOverdue: 'Overdue',
+  sItems: 'Register items', sActions: 'Actions open', sOverdue: 'Overdue', sDecisions: 'Decisions',
   sQuestions: 'Open questions', sUnreviewed: 'Unreviewed', sCoverage: 'Agenda covered',
   sVariance: 'Progress vs baseline', sMeanAge: 'Mean age, open', sOldest: 'Oldest open item',
 
@@ -96,6 +96,8 @@ const en = {
   msgBlocked: (n) => `${n} items still need review — issue anyway?`,
   msgIssuedFrozen: 'This MoM is issued and read-only. Create an amendment to correct it.',
   msgMigrated: (n) => `${n} meeting(s) upgraded from the old notes format`,
+  msgItemAdded: 'Item added to the register',
+  msgAmended: (id) => `Amendment created — ${id}`,
   msgSeeking: 'Seeking transcript to',
   msgEmpty: 'No items match the current filters.',
   msgNoMeeting: 'No meeting selected.',
@@ -137,7 +139,7 @@ const id = {
 
   ai: 'Draf AI', accepted: 'Disetujui', edited: 'Disunting',
 
-  sItems: 'Butir register', sActions: 'Tindak lanjut terbuka', sOverdue: 'Lewat tenggat',
+  sItems: 'Butir register', sActions: 'Tindak lanjut terbuka', sOverdue: 'Lewat tenggat', sDecisions: 'Keputusan',
   sQuestions: 'Pertanyaan terbuka', sUnreviewed: 'Belum ditinjau', sCoverage: 'Agenda terbahas',
   sVariance: 'Progres vs baseline', sMeanAge: 'Umur rata-rata', sOldest: 'Butir tertua',
 
@@ -177,6 +179,8 @@ const id = {
   msgBlocked: (n) => `${n} butir belum ditinjau — tetap terbitkan?`,
   msgIssuedFrozen: 'Notulen ini sudah terbit dan hanya-baca. Buat amandemen untuk mengoreksi.',
   msgMigrated: (n) => `${n} rapat dinaikkan dari format notulen lama`,
+  msgItemAdded: 'Butir ditambahkan ke register',
+  msgAmended: (id) => `Amandemen dibuat — ${id}`,
   msgSeeking: 'Menggeser transkrip ke',
   msgEmpty: 'Tidak ada butir yang cocok dengan filter.',
   msgNoMeeting: 'Belum ada rapat yang dipilih.',
