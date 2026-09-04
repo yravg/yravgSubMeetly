@@ -9,7 +9,7 @@
 - CC0/Public Domain spoken QA samples (3+ per Opus-MT source language, 10–30s) + attribution
 - Easy sample test: Offline sample picker and Settings → MT pair → Test (lab / app.html)
 - UI language toggle expanded to all Opus-MT source languages
-- Realtime lab mock tab uses MDN CC0 flower.webm (removed personal YouTube example)
+- Realtime lab mock tab loops the CC0 speech.wav demo clip (removed personal YouTube example)
 
 ## 1.1.0 — 2026-09-03
 - Chrome Web Store package: on-device captions, notes stub, helper status, store listing/privacy/MV3 audit

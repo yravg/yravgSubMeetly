@@ -685,9 +685,6 @@ async function nativeControl(action) {
   });
   try {
     if (nativeHostSupported()) {
-      // #region agent log
-      fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'post-fix',hypothesisId:'F',location:'sidepanel.js:nativeControl',message:'native host action',data:{action},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const res = await nativeHostAction(action, { timeoutMs: 130_000 });
       if (!res?.ok) throw new Error(res?.error || 'Native host failed');
     } else if (action === 'stop') {

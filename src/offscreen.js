@@ -296,9 +296,6 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
 
     toBG('pipeline-status', { state: 'loading', detail: 'translator' });
     rt.translator = await makeTranslator(config, mtProgress(config), { ...engineOpts(), rpc });
-    // #region agent log
-    fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'pre-fix',hypothesisId:'D',location:'offscreen.js:startCapture',message:'pipeline ready',data:{engine:engineOpts().engine,asrBackend:info?.backend||backend,translatorKind:rt.translator?.kind,refine:!!config.refineTranslation},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     toBG('pipeline-status', { state: 'warmup', device: info.device });
     await rpc('warmup');

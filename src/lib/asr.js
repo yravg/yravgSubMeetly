@@ -70,9 +70,6 @@ async function disposeLoaded() {
 export async function loadASR(modelKey = DEFAULT_ASR, devicePref = 'auto', progress_callback, opts = {}) {
   if (opts.engine === 'native') {
     const h = await nativeHealth(opts.nativeUrl);
-    // #region agent log
-    fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'pre-fix',hypothesisId:'D',location:'asr.js:loadASR',message:'native ASR load attempt',data:{nativeUrl:opts.nativeUrl,reachable:!!h,engine:h?.engine},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!h) {
       throw new Error(
         'Native helper not reachable. Start it with  native/run.sh  (see README), or switch Engine to Browser in Settings.',
