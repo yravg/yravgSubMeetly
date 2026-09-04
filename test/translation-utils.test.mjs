@@ -11,6 +11,7 @@ import {
   needsTranslation,
   lineDirection,
   pickUntranslatedLines,
+  cueToLine,
 } from '../src/lib/translation-utils.js';
 
 test('a two-way EN->ZH line is judged by its own dir, not the zh/en session config', () => {
@@ -99,4 +100,42 @@ test('pickUntranslatedLines carries dir through onto the returned lines', () => 
   assert.deepEqual(withDir.dir, { src: 'zh', tgt: 'en' });
   const withoutDir = picked.find((l) => l.t0 === 6);
   assert.equal(withoutDir.dir, undefined);
+});
+
+// --- overlay cue -> force-translate line payload (src/content.js mappers) ---
+
+test('an overlay EN->ZH cue is not untranslated under a zh->en session', () => {
+  // The shape the injected overlay keeps in its `cues` map.
+  const cue = { t0: 1, t1: 3, rawSrc: 'Hello, how are you?', rawTgt: '你好，你怎么样？', dir: { src: 'en', tgt: 'zh' } };
+  assert.equal(needsTranslation(cue, 'zh', 'en'), false);
+  // …and would be wrongly flagged if the cue had lost its dir on the way in.
+  assert.equal(needsTranslation({ ...cue, dir: undefined }, 'zh', 'en'), true);
+});
+
+test('cueToLine carries dir onto the mapped payload', () => {
+  const line = cueToLine({ t0: 1, t1: 3, rawSrc: 'Hello', rawTgt: '你好', dir: { src: 'en', tgt: 'zh' } });
+  assert.deepEqual(line.dir, { src: 'en', tgt: 'zh' });
+  assert.equal(line.src, 'Hello');
+  assert.equal(line.rawSrc, 'Hello');
+  assert.equal(line.tgt, '你好');
+  assert.equal(line.rawTgt, '你好');
+  assert.equal(line.translation, '你好');
+  assert.equal(line.t1, 3);
+});
+
+test('cueToLine omits dir for one-way cues and defaults t1', () => {
+  const line = cueToLine({ t0: 4, rawSrc: 'Hello', rawTgt: 'Hola' });
+  assert.equal('dir' in line, false);
+  assert.equal(line.t1, 6);
+});
+
+test('a mapped two-way payload survives the round trip through pickUntranslatedLines', () => {
+  const cues = [
+    { t0: 0, t1: 2, rawSrc: 'Hello', rawTgt: '你好', dir: { src: 'en', tgt: 'zh' } },
+    { t0: 3, t1: 5, rawSrc: '你好吗', rawTgt: '你好吗', dir: { src: 'zh', tgt: 'en' } },
+  ].map(cueToLine);
+  const picked = pickUntranslatedLines([cues], 'zh', 'en');
+  assert.equal(picked.length, 1);
+  assert.equal(picked[0].t0, 3);
+  assert.deepEqual(picked[0].dir, { src: 'zh', tgt: 'en' });
 });

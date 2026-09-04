@@ -39,6 +39,9 @@ tell in 30 seconds where things stand without reading the whole spec.
   `language` to the helper's `/transcribe` response is the whole change.
 - The injected overlay (`src/content.js`) renders no language labels today, so
   it carries no direction tag; the side-panel live boxes do.
+- Offline (file) jobs ignore two-way entirely and run one-way `a → b`: the
+  offline path has no per-utterance language detection, so a two-way setting
+  only affects live capture.
 
 ## Done — Phase 2.0 (schema + register UI)
 

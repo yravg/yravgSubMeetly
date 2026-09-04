@@ -1,5 +1,10 @@
 // Floating subtitle overlay — YouTube CC-style scrollable blocks + seekable timeline.
-import { needsTranslation, sourceText, translationText } from './lib/translation-utils.js';
+import {
+  needsTranslation,
+  sourceText,
+  translationText,
+  cueToLine,
+} from './lib/translation-utils.js';
 
 (() => {
   if (window.__localTransSubInjected) return;
@@ -312,6 +317,8 @@ import { needsTranslation, sourceText, translationText } from './lib/translation
       t1: data.t1,
       rawSrc: rawSrc || rawTgt,
       rawTgt,
+      // two-way lines run opposite to the session config half the time
+      dir: data.dir,
     });
     if (panelVisible) showPanel();
   }
@@ -320,29 +327,13 @@ import { needsTranslation, sourceText, translationText } from './lib/translation
     return [...cues.values()]
       .filter(isUntranslated)
       .sort((a, b) => a.t0 - b.t0)
-      .map((c) => ({
-        t0: c.t0,
-        t1: c.t1,
-        src: c.rawSrc,
-        rawSrc: c.rawSrc,
-        tgt: c.rawTgt,
-        rawTgt: c.rawTgt,
-        translation: c.rawTgt,
-      }));
+      .map(cueToLine);
   }
 
   function allTranscriptLines() {
     return [...cues.values()]
       .sort((a, b) => a.t0 - b.t0)
-      .map((c) => ({
-        t0: c.t0,
-        t1: c.t1,
-        src: c.rawSrc,
-        rawSrc: c.rawSrc,
-        tgt: c.rawTgt,
-        rawTgt: c.rawTgt,
-        translation: c.rawTgt,
-      }))
+      .map(cueToLine)
       .filter((c) => c.rawSrc);
   }
 
@@ -1285,7 +1276,14 @@ import { needsTranslation, sourceText, translationText } from './lib/translation
       const rawSrc = (cue.src || cue.source || cue.rawSrc || '').trim();
       const rawTgt = (cue.tgt || cue.translation || cue.rawTgt || '').trim();
       if (!rawSrc && !rawTgt) continue;
-      cues.set(key, { t0, t1: cue.t1 ?? t0 + 2, rawSrc, rawTgt: rawTgt || rawSrc });
+      const dir = cue.dir?.src && cue.dir?.tgt ? { src: cue.dir.src, tgt: cue.dir.tgt } : null;
+      cues.set(key, {
+        t0,
+        t1: cue.t1 ?? t0 + 2,
+        rawSrc,
+        rawTgt: rawTgt || rawSrc,
+        ...(dir ? { dir } : {}),
+      });
     }
     pendingInterim = false;
     interimCue = null;
@@ -1413,6 +1411,7 @@ import { needsTranslation, sourceText, translationText } from './lib/translation
             t1: c.t1,
             rawSrc: c.src || c.source || '',
             rawTgt: c.tgt || c.translation || '',
+            dir: c.dir,
           });
           cacheMaxTime = Math.max(cacheMaxTime, c.t1 ?? 0);
         }
@@ -1421,8 +1420,16 @@ import { needsTranslation, sourceText, translationText } from './lib/translation
         resetForceTranslateBtn();
         if (msg.data?.error) setStatus(msg.data.error);
         else if (msg.data?.translated > 0) {
-          setStatus(`Force translated ${msg.data.translated} line(s)`);
-          setTimeout(() => setStatus(''), 3000);
+          const skipped = msg.data.skipped || 0;
+          const dirs = (msg.data.skippedDirections || []).join(', ');
+          // Say what was left behind: a two-way batch can be missing the model
+          // for one direction and still report a healthy-looking count.
+          setStatus(
+            skipped
+              ? `Force translated ${msg.data.translated} line(s) — skipped ${skipped}${dirs ? ` (no model for ${dirs})` : ''}`
+              : `Force translated ${msg.data.translated} line(s)`,
+          );
+          setTimeout(() => setStatus(''), skipped ? 6000 : 3000);
         } else {
           setStatus('Translation model returned no results — download the language pair model in Settings');
         }

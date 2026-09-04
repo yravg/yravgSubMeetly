@@ -130,6 +130,7 @@ function renderInterpreterUi() {
   if (two) two.textContent = `${t('interpTwoWay')} \u00b7 ${t('interpPreview')}`;
   const one = $('interp-badge-simultaneous');
   if (one) one.textContent = t('interpOneWay');
+  syncInterpreterLock();
 }
 
 /**
@@ -186,6 +187,7 @@ function openInterpreterModal() {
   setSelectValue($('interp-lang-one'), state.tgtLang);
   showInterpreterError('');
   selectInterpreterCard(it.mode);
+  syncInterpreterLock();
   $('interpreter-modal').classList.remove('hidden');
 }
 
@@ -242,6 +244,26 @@ function syncCaptureStamp() {
   const on = state.running || state.offlineRunning;
   if (on && !state.startedAt) state.startedAt = Date.now();
   else if (!on) state.startedAt = null;
+  syncInterpreterLock();
+}
+
+/**
+ * The pipeline builds its translators once, at start: switching Interpreter
+ * mode mid-capture would change the UI and nothing else. So while a task runs
+ * the Change button is locked, and the modal says the truth out loud.
+ */
+function captureRunning() {
+  return !!(state.running || state.offlineRunning);
+}
+
+function syncInterpreterLock() {
+  const btn = $('btn-interpreter');
+  if (!btn) return;
+  const busy = captureRunning();
+  btn.disabled = busy;
+  btn.title = busy ? t('interpAppliesNextTask') : '';
+  const note = $('interp-running-note');
+  if (note) note.classList.toggle('hidden', !busy);
 }
 
 /** Lencana mesin di kartu rekam — apa yang benar-benar mentranskripsi. */

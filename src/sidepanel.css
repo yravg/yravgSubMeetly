@@ -513,3 +513,9 @@ input[type="range"] { accent-color: var(--accent); width: 130px; }
   background: var(--warn-bg); border: 1px solid var(--warn-border);
   color: var(--warn-text); font-size: 12.5px; line-height: 1.5;
 }
+
+/* Mid-capture the running pipeline keeps its languages: say so in the modal. */
+.interp-running-note {
+  margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted);
+}
+.mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -276,9 +276,9 @@ function metricLine(it) {
   const max = Math.max(...pts.map((p) => Math.abs(p.value)), 1);
   const spark = pts.length > 1 ? `<span class="spark" aria-hidden="true">${pts.map((p) => `<i class="${p.variance == null ? '' : p.variance >= 0 ? 'lit' : 'neg'}" style="height:${Math.max(4, Math.round((Math.abs(p.value) / max) * 19))}px"></i>`).join('')}</span>` : '';
   return `<span class="metricline">
-    <span class="big">${esc(fmtNum(mt.value))}${esc(mt.unit)}</span>
-    ${mt.baseline != null ? `<span class="base">${esc(T('vsBaseline'))} <span class="mono">${esc(fmtNum(mt.baseline))}${esc(mt.unit)}</span></span>` : ''}
-    ${v != null ? `<span class="var ${v >= 0 ? 'up' : 'down'}">${sign(v)}${esc(fmtNum(v))}${esc(mt.unit)} ${esc(T(v >= 0 ? 'ahead' : 'behind'))}</span>` : ''}
+    <span class="big">${esc(fmtMeasure(mt.value))}${esc(mt.unit)}</span>
+    ${mt.baseline != null ? `<span class="base">${esc(T('vsBaseline'))} <span class="mono">${esc(fmtMeasure(mt.baseline))}${esc(mt.unit)}</span></span>` : ''}
+    ${v != null ? `<span class="var ${v >= 0 ? 'up' : 'down'}">${sign(v)}${esc(fmtMeasure(v))}${esc(mt.unit)} ${esc(T(v >= 0 ? 'ahead' : 'behind'))}</span>` : ''}
     ${spark}
     ${mt.asOf ? `<span class="note">${esc(fmtShortDate(mt.asOf))} ${esc(T('reported'))}${mt.sourceDoc ? ` · ${esc(mt.sourceDoc)}` : ''}</span>` : ''}
   </span>`;

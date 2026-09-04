@@ -122,6 +122,7 @@ const en = {
   interpCancel: 'Cancel',
   interpNeedsBoth: 'Two-way mode needs both translation directions:',
   interpCannotApply: 'Pick two different languages for two-way interpreting.',
+  interpAppliesNextTask: 'Changes apply to the next task',
   interpSummaryOneWay: (a, b) => `One-way \u00b7 ${a} \u2192 ${b}`,
   interpSummaryTwoWay: (a, b) => `Two-way \u00b7 ${a} \u21c4 ${b}`,
 };
@@ -243,6 +244,7 @@ const zh = {
   interpCancel: '取消',
   interpNeedsBoth: '双向模式需要两个翻译方向：',
   interpCannotApply: '双向口译需要选择两种不同的语言。',
+  interpAppliesNextTask: '更改将在下一个任务生效',
   interpSummaryOneWay: (a, b) => `单向 \u00b7 ${a} \u2192 ${b}`,
   interpSummaryTwoWay: (a, b) => `双向 \u00b7 ${a} \u21c4 ${b}`,
 };
@@ -282,6 +284,7 @@ export const I18N = {
     interpCancel: 'Batal',
     interpNeedsBoth: 'Mode dua arah membutuhkan kedua arah terjemahan:',
     interpCannotApply: 'Pilih dua bahasa yang berbeda untuk mode dua arah.',
+    interpAppliesNextTask: 'Perubahan berlaku pada tugas berikutnya',
     interpSummaryOneWay: (a, b) => `Satu arah \u00b7 ${a} \u2192 ${b}`,
     interpSummaryTwoWay: (a, b) => `Dua arah \u00b7 ${a} \u21c4 ${b}`,
     offline: 'Luring',

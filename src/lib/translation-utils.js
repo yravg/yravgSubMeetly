@@ -79,3 +79,25 @@ export function pickUntranslatedLines(lists, srcLang, tgtLang) {
     }))
     .filter((l) => l.src);
 }
+
+/**
+ * Map one overlay cue (the shape the injected page panel keeps in its `cues`
+ * map) onto the line payload sent to background force-translate. Two-way lines
+ * carry their own `dir`; dropping it here would make the background translate
+ * the whole batch one way and overwrite the opposite-direction lines.
+ */
+export function cueToLine(cue) {
+  const t0 = cue?.t0 ?? 0;
+  const rawSrc = (cue?.rawSrc ?? '').trim();
+  const rawTgt = (cue?.rawTgt ?? '').trim();
+  return {
+    t0,
+    t1: cue?.t1 ?? t0 + 2,
+    src: rawSrc,
+    rawSrc,
+    tgt: rawTgt,
+    rawTgt,
+    translation: rawTgt,
+    ...(cue?.dir?.src && cue?.dir?.tgt ? { dir: { src: cue.dir.src, tgt: cue.dir.tgt } } : {}),
+  };
+}

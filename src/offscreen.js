@@ -840,6 +840,9 @@ async function runForceTranslate({ lines, config, settings, retranslate = false 
   let translated = 0;
   let candidates = 0; // lines that actually wanted translating
   let usable = 0; // …of those, the ones a translator exists for
+  // Directions we had to give up on, and how many lines each one cost —
+  // silently translating "some" of a two-way transcript is a lie.
+  const skippedByDir = new Map();
   for (const line of lines || []) {
     const src = sourceText(line);
     if (!src) continue;
@@ -849,7 +852,11 @@ async function runForceTranslate({ lines, config, settings, retranslate = false 
     candidates++;
 
     const t = await translatorFor(from, to);
-    if (!t) continue;
+    if (!t) {
+      const key = `${from} \u2192 ${to}`;
+      skippedByDir.set(key, (skippedByDir.get(key) || 0) + 1);
+      continue;
+    }
     usable++;
 
     const out = (await t.translate(src)).trim();
@@ -873,7 +880,13 @@ async function runForceTranslate({ lines, config, settings, retranslate = false 
       `No text translation model for ${missing.join(', ') || `${cfg.srcLang} \u2192 ${cfg.tgtLang}`}. Download the pair model in Settings.`,
     );
   }
-  return translated;
+  let skipped = 0;
+  for (const n of skippedByDir.values()) skipped += n;
+  return {
+    translated,
+    skipped,
+    skippedDirections: [...skippedByDir.keys()],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -897,8 +910,8 @@ chrome.runtime.onMessage.addListener((msg) => {
     case 'force-translate':
       (async () => {
         try {
-          const translated = await runForceTranslate(msg.data || {});
-          toBG('force-translate-done', { translated });
+          const res = await runForceTranslate(msg.data || {});
+          toBG('force-translate-done', res);
         } catch (e) {
           toBG('force-translate-done', { translated: 0, error: String(e.message || e) });
         }
