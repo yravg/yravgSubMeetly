@@ -1,41 +1,505 @@
 {
-  "version": 1,
+  "version": 2,
   "samples": [
     {
-      "id": "zh-en-1",
-      "label": "Chinese → English",
-      "src": "zh",
-      "tgt": "en",
-      "text": "今天天气很好，我们去公园散步吧。",
-      "file": "zh-en-1.wav",
-      "durationHint": 3.5
-    },
-    {
-      "id": "en-zh-1",
-      "label": "English → Chinese",
+      "id": "en-1",
+      "label": "English → Chinese (Grant memoirs ch.13)",
       "src": "en",
       "tgt": "zh",
-      "text": "The weather is nice today. Let's go for a walk in the park.",
-      "file": "en-zh-1.wav",
-      "durationHint": 4
+      "file": "cc0/en-1.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Personal_Memoirs_of_U._S._Grant_13.mp3"
     },
     {
-      "id": "ja-en-1",
-      "label": "Japanese → English",
+      "id": "en-2",
+      "label": "English → German (Grant memoirs ch.24)",
+      "src": "en",
+      "tgt": "de",
+      "file": "cc0/en-2.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Personal_Memoirs_of_U._S._Grant_24.mp3"
+    },
+    {
+      "id": "en-3",
+      "label": "English → French (Grant memoirs ch.26)",
+      "src": "en",
+      "tgt": "fr",
+      "file": "cc0/en-3.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Personal_Memoirs_of_U._S._Grant_26.mp3"
+    },
+    {
+      "id": "ja-1",
+      "label": "Japanese → English (Eijitsu Syohin 01)",
       "src": "ja",
       "tgt": "en",
-      "text": "今日はいい天気ですね。公園を散歩しましょう。",
-      "file": "ja-en-1.wav",
-      "durationHint": 4
+      "file": "cc0/ja-1.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/eijitsu_syohin_um_librivox"
     },
     {
-      "id": "en-ja-1",
-      "label": "English → Japanese",
+      "id": "ja-2",
+      "label": "Japanese → English (Eijitsu Syohin 02)",
+      "src": "ja",
+      "tgt": "en",
+      "file": "cc0/ja-2.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/eijitsu_syohin_um_librivox"
+    },
+    {
+      "id": "ja-3",
+      "label": "Japanese → English (Futon 01)",
+      "src": "ja",
+      "tgt": "en",
+      "file": "cc0/ja-3.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/futon_ek_1303_librivox"
+    },
+    {
+      "id": "zh-1",
+      "label": "Chinese → English (Art of War)",
+      "src": "zh",
+      "tgt": "en",
+      "file": "cc0/zh-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/art_of_war_chinese_1506_librivox"
+    },
+    {
+      "id": "zh-2",
+      "label": "Chinese → English (Di Zi Gui)",
+      "src": "zh",
+      "tgt": "en",
+      "file": "cc0/zh-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/di_zi_gui_0805_librivox"
+    },
+    {
+      "id": "zh-3",
+      "label": "Chinese → English (Bible John 3:16, Commons CC0)",
+      "src": "zh",
+      "tgt": "en",
+      "file": "cc0/zh-3.mp3",
+      "durationHint": 25.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bible_John_3-16_In_Standard_Chinese.ogg"
+    },
+    {
+      "id": "ko-1",
+      "label": "Korean → English (Hyun short stories 01)",
+      "src": "ko",
+      "tgt": "en",
+      "file": "cc0/ko-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/short_stories_hyun_1411_librivox"
+    },
+    {
+      "id": "ko-2",
+      "label": "Korean → English (Hyun short stories 02)",
+      "src": "ko",
+      "tgt": "en",
+      "file": "cc0/ko-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/short_stories_hyun_1411_librivox"
+    },
+    {
+      "id": "ko-3",
+      "label": "Korean → English (Assembly of Animals)",
+      "src": "ko",
+      "tgt": "en",
+      "file": "cc0/ko-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/animal_meeting_1509_librivox"
+    },
+    {
+      "id": "de-1",
+      "label": "German → English (Bergkristall)",
+      "src": "de",
+      "tgt": "en",
+      "file": "cc0/de-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Bergkristall.ogg"
+    },
+    {
+      "id": "de-2",
+      "label": "German → English (Rosegger Drachenbinderin)",
+      "src": "de",
+      "tgt": "en",
+      "file": "cc0/de-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Als_ich_zur_Drachenbinderin_ritt.ogg"
+    },
+    {
+      "id": "de-3",
+      "label": "German → English (Stifter Eigennutz)",
+      "src": "de",
+      "tgt": "en",
+      "file": "cc0/de-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Stifter_Eigennutz_und_Vaterland.ogg"
+    },
+    {
+      "id": "fr-1",
+      "label": "French → English (J'accuse)",
+      "src": "fr",
+      "tgt": "en",
+      "file": "cc0/fr-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/jaccuse_librivox"
+    },
+    {
+      "id": "fr-2",
+      "label": "French → English (Fables La Fontaine 06)",
+      "src": "fr",
+      "tgt": "en",
+      "file": "cc0/fr-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/fables_de_la_fontaine_06-2_sm_0904_librivox"
+    },
+    {
+      "id": "fr-3",
+      "label": "French → English (Essais Livre I)",
+      "src": "fr",
+      "tgt": "en",
+      "file": "cc0/fr-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/essaislivre1_2411_librivox"
+    },
+    {
+      "id": "es-1",
+      "label": "Spanish → English (Ester 01)",
+      "src": "es",
+      "tgt": "en",
+      "file": "cc0/es-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/biblia_ester_1604_librivox"
+    },
+    {
+      "id": "es-2",
+      "label": "Spanish → English (Ester 02)",
+      "src": "es",
+      "tgt": "en",
+      "file": "cc0/es-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/biblia_ester_1604_librivox"
+    },
+    {
+      "id": "es-3",
+      "label": "Spanish → English (El Equipaje del Rey José)",
+      "src": "es",
+      "tgt": "en",
+      "file": "cc0/es-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/equipaje_1807_librivox"
+    },
+    {
+      "id": "ru-1",
+      "label": "Russian → English (Belkin tales 00)",
+      "src": "ru",
+      "tgt": "en",
+      "file": "cc0/ru-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/belkintales_1406_librivox"
+    },
+    {
+      "id": "ru-2",
+      "label": "Russian → English (Belkin tales 01)",
+      "src": "ru",
+      "tgt": "en",
+      "file": "cc0/ru-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/belkintales_1406_librivox"
+    },
+    {
+      "id": "ru-3",
+      "label": "Russian → English (Dvoryanskoe gnezdo)",
+      "src": "ru",
+      "tgt": "en",
+      "file": "cc0/ru-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/dvoryanskoegnezdo_1906_librivox"
+    },
+    {
+      "id": "it-1",
+      "label": "Italian → English (I Malavoglia 00)",
+      "src": "it",
+      "tgt": "en",
+      "file": "cc0/it-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/i_malavoglia_1303_librivox"
+    },
+    {
+      "id": "it-2",
+      "label": "Italian → English (I Malavoglia 01)",
+      "src": "it",
+      "tgt": "en",
+      "file": "cc0/it-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/i_malavoglia_1303_librivox"
+    },
+    {
+      "id": "it-3",
+      "label": "Italian → English (Spoken Wikipedia Journey)",
+      "src": "it",
+      "tgt": "en",
+      "file": "cc0/it-3.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:It-Journey_(videogioco)-article.ogg"
+    },
+    {
+      "id": "nl-1",
+      "label": "Dutch → English (Dik Trom 01)",
+      "src": "nl",
+      "tgt": "en",
+      "file": "cc0/nl-1.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/dik_trom_4_1104_librivox"
+    },
+    {
+      "id": "nl-2",
+      "label": "Dutch → English (Dik Trom 02)",
+      "src": "nl",
+      "tgt": "en",
+      "file": "cc0/nl-2.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/dik_trom_4_1104_librivox"
+    },
+    {
+      "id": "nl-3",
+      "label": "Dutch → English (Spoken Wikipedia Minecraft)",
+      "src": "nl",
+      "tgt": "en",
+      "file": "cc0/nl-3.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Spoken_Wikipedia_-_A_Minecraft_Movie_(Dutch).ogg"
+    },
+    {
+      "id": "pl-1",
+      "label": "Polish → English (Wigilja)",
+      "src": "pl",
+      "tgt": "en",
+      "file": "cc0/pl-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/wigilja_bozego_narodzenia_1201_librivox"
+    },
+    {
+      "id": "pl-2",
+      "label": "Polish → English (Tajemnica Baskerville)",
+      "src": "pl",
+      "tgt": "en",
+      "file": "cc0/pl-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/tajemnica_baskervile_1302_librivox"
+    },
+    {
+      "id": "pl-3",
+      "label": "Polish → English (FLAMRIC lesson, USGov PD)",
+      "src": "pl",
+      "tgt": "en",
+      "file": "cc0/pl-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Polish_FLAMRIC_Phase_02_Book_01_Less_04_Si.ogg"
+    },
+    {
+      "id": "ar-1",
+      "label": "Arabic → English (Spoken Wikipedia Airplane)",
+      "src": "ar",
+      "tgt": "en",
+      "file": "cc0/ar-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Airplane_article_in_Arabic_Wikipedia.ogg"
+    },
+    {
+      "id": "ar-2",
+      "label": "Arabic → English (Spoken Wikipedia Guitar)",
+      "src": "ar",
+      "tgt": "en",
+      "file": "cc0/ar-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gitarre_article_Arabic_Wikipedia.ogg"
+    },
+    {
+      "id": "ar-3",
+      "label": "Arabic → English (Kalila wa Dimna)",
+      "src": "ar",
+      "tgt": "en",
+      "file": "cc0/ar-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/kalilawadimna_2608_librivox"
+    },
+    {
+      "id": "vi-1",
+      "label": "Vietnamese → English (Tắt Đèn part 3)",
+      "src": "vi",
+      "tgt": "en",
+      "file": "cc0/vi-1.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/tat-den-audio"
+    },
+    {
+      "id": "vi-2",
+      "label": "Vietnamese → English (Tắt Đèn part 2)",
+      "src": "vi",
+      "tgt": "en",
+      "file": "cc0/vi-2.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/tat-den-audio"
+    },
+    {
+      "id": "vi-3",
+      "label": "Vietnamese → English (Thiệu 1972 speech)",
+      "src": "vi",
+      "tgt": "en",
+      "file": "cc0/vi-3.mp3",
+      "durationHint": 25.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Thieu-Organization-Speech-1972.wav"
+    },
+    {
+      "id": "id-1",
+      "label": "Indonesian → English (80 Hari ch.01, LibriVox PD)",
+      "src": "id",
+      "tgt": "en",
+      "file": "cc0/id-1.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/mengelilingi_doenia_dalam_80_hari_2212_librivox"
+    },
+    {
+      "id": "id-2",
+      "label": "Indonesian → English (80 Hari ch.02, LibriVox PD)",
+      "src": "id",
+      "tgt": "en",
+      "file": "cc0/id-2.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/mengelilingi_doenia_dalam_80_hari_2212_librivox"
+    },
+    {
+      "id": "id-3",
+      "label": "Indonesian → English (80 Hari ch.03, LibriVox PD)",
+      "src": "id",
+      "tgt": "en",
+      "file": "cc0/id-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/mengelilingi_doenia_dalam_80_hari_2212_librivox"
+    },
+    {
+      "id": "uk-1",
+      "label": "Ukrainian → English (Glibov fables 005)",
+      "src": "uk",
+      "tgt": "en",
+      "file": "cc0/uk-1.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/fables_glibov_1212_librivox"
+    },
+    {
+      "id": "uk-2",
+      "label": "Ukrainian → English (Glibov fables 056)",
+      "src": "uk",
+      "tgt": "en",
+      "file": "cc0/uk-2.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://archive.org/details/fables_glibov_1212_librivox"
+    },
+    {
+      "id": "uk-3",
+      "label": "Ukrainian → English (Folk tales)",
+      "src": "uk",
+      "tgt": "en",
+      "file": "cc0/uk-3.mp3",
+      "durationHint": 20.0,
+      "license": "Public Domain",
+      "sourceUrl": "https://archive.org/details/folk_tales_2412_librivox"
+    },
+    {
+      "id": "en-4",
+      "label": "English → Spanish (Grant ch.13 @2m)",
       "src": "en",
-      "tgt": "ja",
-      "text": "It's a beautiful day. Shall we take a walk in the park?",
-      "file": "en-ja-1.wav",
-      "durationHint": 4
+      "tgt": "es",
+      "file": "cc0/en-4.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Personal_Memoirs_of_U._S._Grant_13.mp3"
+    },
+    {
+      "id": "en-5",
+      "label": "English → Russian (Grant ch.24 @3m)",
+      "src": "en",
+      "tgt": "ru",
+      "file": "cc0/en-5.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Personal_Memoirs_of_U._S._Grant_24.mp3"
+    },
+    {
+      "id": "en-6",
+      "label": "English → Italian (Grant ch.26 @2m)",
+      "src": "en",
+      "tgt": "it",
+      "file": "cc0/en-6.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Personal_Memoirs_of_U._S._Grant_26.mp3"
+    },
+    {
+      "id": "en-7",
+      "label": "English → Indonesian (Grant ch.13 @3m)",
+      "src": "en",
+      "tgt": "id",
+      "file": "cc0/en-7.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Personal_Memoirs_of_U._S._Grant_13.mp3"
+    },
+    {
+      "id": "en-8",
+      "label": "English → Vietnamese (Grant ch.24 @4m)",
+      "src": "en",
+      "tgt": "vi",
+      "file": "cc0/en-8.mp3",
+      "durationHint": 20.0,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LibriVox_-_Personal_Memoirs_of_U._S._Grant_24.mp3"
     }
   ]
 }

@@ -28,15 +28,15 @@ Or full setup with native helper:
 
 Language pairs (built-in samples):
 
-- **zh → en** — Chinese → English  
-- **en → zh** — English → Chinese  
-- **ja → en** — Japanese → English  
-- **en → ja** — English → Japanese  
+- **15 source languages** from Opus-MT pairs in `src/lib/registry.js` — ja, zh, ko, de, fr, es, ru, it, nl, pl, ar, vi, id, uk, en
+- **3 clips per language** (English has extras for each `en→*` MT target)
+- Files live under `test/samples/cc0/` (mono 16 kHz MP3, ~10–30 s)
+- Catalog: `test/samples/manifest.json` · licenses: `test/samples/ATTRIBUTION.md` (**CC0-1.0 / Public Domain only**)
 
-Samples are macOS TTS speech (`scripts/gen-samples.py`). Regenerate with:
+Re-download / regenerate:
 
 ```bash
-./scripts/gen-samples.sh
+python3 scripts/fetch-cc0-samples.py
 ```
 
 ### YouTube videos
@@ -80,8 +80,9 @@ Requires a built `dist/` (`npm run build`). Lab serves `/dist/` (UI, `offscreen.
 
 **Limits**
 
-- Realtime **tabCapture** / desktopCapture — Chrome extension only
-- First Offline run downloads Whisper (and MT models if translating) from Hugging Face; then Cache API / offline
+- Realtime in the lab uses **demo `captureStream`** (Start) or **`getDisplayMedia`** (Pick) — not Chrome `tabCapture`
+- Floating overlay injection on arbitrary tabs still requires the Chrome extension
+- First Offline/Realtime run downloads Whisper (and MT models if translating) from Hugging Face; then Cache API / offline
 - Native messaging launcher unavailable in a plain tab (HTTP native helper still usable if Engine → Native and helper is running)
 - Notes panel still uses local stub generation unless wired to a live transcript
 
