@@ -41,7 +41,13 @@
     <script type="module">
       import { mountNotesPanel } from '../src/notes-panel.js';
       const root = document.getElementById('notes-mount');
-      await mountNotesPanel(root);
+      // Harness only: a fake capture task so the live-capture rail (recording
+      // card + "Flag this moment") is inspectable without the extension.
+      const capture = { running: true, startedAt: Date.now() - 65000, engine: 'MLX \u00b7 GPU' };
+      await mountNotesPanel(root, {
+        getCapture: () => capture,
+        onEndCapture: () => { capture.running = false; },
+      });
     </script>
   </body>
 </html>
