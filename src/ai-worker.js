@@ -32,6 +32,9 @@ async function handle(op, a, progress) {
     case 'transcribe':
       return await asr.transcribe(a.audio, a.opts);
 
+    case 'transcribeDetailed':
+      return await asr.transcribeDetailed(a.audio, a.opts);
+
     case 'transcribeLong':
       return await asr.transcribeLong(a.audio, a.opts);
 

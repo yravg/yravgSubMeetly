@@ -8,7 +8,7 @@ import {
   VoxtralProcessor,
 } from '@huggingface/transformers';
 import { ASR_MODELS, DEFAULT_ASR } from './registry.js';
-import { nativeHealth, nativeTranscribe } from './native.js';
+import { nativeHealth, nativeTranscribe, nativeTranscribeDetailed } from './native.js';
 
 let backend = null; // 'whisper' | 'voxtral' | 'native'
 let asrPipe = null; // whisper pipeline
@@ -168,6 +168,22 @@ export async function transcribe(audio, { language = 'auto', task = 'transcribe'
   if (language && language !== 'auto') opts.language = language;
   const out = await asrPipe(audio, opts);
   return (out?.text || '').trim();
+}
+
+// Same as transcribe(), but returns {text, language} where `language` is the
+// language the ENGINE reported — null whenever it reports none. Never guessed:
+// callers that need a language fall back to their own heuristic.
+export async function transcribeDetailed(audio, { language = 'auto', task = 'transcribe' } = {}) {
+  if (backend === 'native') return nativeTranscribeDetailed(nativeUrl, audio, { language, task });
+  if (backend === 'voxtral') {
+    return { text: await voxtralGenerate(audio, { language, task }), language: null };
+  }
+  if (!asrPipe) throw new Error('ASR model not loaded');
+  const opts = { task };
+  if (language && language !== 'auto') opts.language = language;
+  const out = await asrPipe(audio, opts);
+  const reported = typeof out?.language === 'string' ? out.language : null;
+  return { text: (out?.text || '').trim(), language: reported };
 }
 
 // Long audio with timestamps (browser engines). Returns [{t0, t1, text}].

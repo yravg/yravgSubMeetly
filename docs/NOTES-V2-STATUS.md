@@ -9,6 +9,37 @@ update it as part of the same commit whenever you finish or start a chunk of
 work, so anyone opening this repo cold (Cursor, Claude Code, future-you) can
 tell in 30 seconds where things stand without reading the whole spec.
 
+## Interpreter mode (Task 3, artboard gaps)
+
+- `state.settings.interpreter = { mode: 'simultaneous' | 'consecutive', a, b }`,
+  normalised on load by `normalizeInterpreter()` in `src/lib/interpreter.js`.
+  Installs without the key get `{ simultaneous, a: srcLang, b: tgtLang }` — the
+  one-way path is byte-for-byte what it always was.
+- Entry point: the `Interpreter mode · <summary>` pill under the Task Mode row
+  in the Captions view (`#interpreter-row`), `Change` opens `#interpreter-modal`
+  — two radio cards ("Two-way · Preview" / "One-way") in the usual
+  `.modal/.modal-card` chrome.
+- Consecutive hides the From/To selects (they still hold `a`/`b`), forces
+  `+ Translate`, and makes `updateWarning()` require BOTH `a→b` and `b→a`
+  models, each with its own Download button.
+- Pipeline: `src/offscreen.js` transcribes each finalised utterance with
+  `language: 'auto'`, picks the spoken language with
+  `detectLanguage(text, [a, b])` (`src/lib/lang-detect.js` — script rules first,
+  then stop-word lists; pure, no models, no network), translates into the other
+  language and emits `dir: { src, tgt }` on every caption line. Live-refine
+  drafting is off in two-way (it needs a fixed source language).
+- Tests: `node --test test/lang-detect.test.mjs test/interpreter.test.mjs`.
+
+**Follow-ups**
+
+- The native helper (`native/server.py`) returns `{text}` only, so the engine
+  never reports a language and the heuristic always decides.
+  `transcribeDetailed()` (`src/lib/asr.js` → `nativeTranscribeDetailed()`)
+  already prefers an engine-reported language when one arrives — adding
+  `language` to the helper's `/transcribe` response is the whole change.
+- The injected overlay (`src/content.js`) renders no language labels today, so
+  it carries no direction tag; the side-panel live boxes do.
+
 ## Done — Phase 2.0 (schema + register UI)
 
 - **Data layer** (`src/lib/notes-schema.js`, `notes-migrate.js`,

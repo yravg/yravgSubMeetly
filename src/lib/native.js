@@ -21,7 +21,26 @@ export async function nativeHealth(url, timeoutMs = 1500) {
   }
 }
 
-// audio: Float32Array @16 kHz → {text}
+// audio: Float32Array @16 kHz → trimmed text.
+// `nativeTranscribeDetailed` additionally surfaces the helper's own language
+// field when it sends one — today it only returns {text}, so it stays null.
+export async function nativeTranscribeDetailed(
+  url,
+  audio,
+  { language = 'auto', task = 'transcribe' } = {},
+) {
+  const q = new URLSearchParams({ language, task });
+  const r = await fetch(`${base(url)}/transcribe?${q}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength),
+  });
+  if (!r.ok) throw new Error(`native /transcribe ${r.status}: ${await r.text()}`);
+  const j = await r.json();
+  const lang = typeof j.language === 'string' ? j.language : typeof j.lang === 'string' ? j.lang : null;
+  return { text: (j.text || '').trim(), language: lang || null };
+}
+
 export async function nativeTranscribe(url, audio, { language = 'auto', task = 'transcribe' } = {}) {
   const q = new URLSearchParams({ language, task });
   const r = await fetch(`${base(url)}/transcribe?${q}`, {

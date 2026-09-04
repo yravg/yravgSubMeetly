@@ -85,7 +85,7 @@
           <button data-task="translate" class="active" data-i18n="plusTranslate">+ Translate</button>
         </div>
 
-        <div class="lang-row">
+        <div class="lang-row" id="lang-row">
           <div class="lang-col">
             <label class="lbl" for="src-lang" data-i18n="sourceLang">From (speech)</label>
             <select id="src-lang" aria-label="Source speech language"></select>
@@ -94,6 +94,15 @@
             <label class="lbl" for="tgt-lang" data-i18n="targetLang">To (translation)</label>
             <select id="tgt-lang" aria-label="Target translation language"></select>
           </div>
+        </div>
+
+        <div class="interp-row" id="interpreter-row">
+          <span class="interp-row-title" data-i18n="interpreterMode">Interpreter mode</span>
+          <span class="interp-row-sep">·</span>
+          <span class="interp-row-summary" id="interpreter-summary"></span>
+          <button type="button" id="btn-interpreter" class="mini-btn" data-i18n="interpreterChange">
+            Change
+          </button>
         </div>
 
         <div id="model-warning" class="warning hidden"></div>
@@ -168,6 +177,87 @@
       <span>© 2026 Local TransSub</span>
       <span class="ver">v1.1.1 <button id="btn-about" class="link-btn">ⓘ</button></span>
     </footer>
+
+    <!-- ============ Interpreter mode modal ============ -->
+    <div id="interpreter-modal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h2 id="interpreter-title" data-i18n="interpreterChoose">Choose an Interpreter mode</h2>
+          <button id="btn-close-interpreter" class="icon-btn">✕</button>
+        </div>
+
+        <div class="interp-hero" aria-hidden="true">
+          <svg viewBox="0 0 160 90" width="160" height="90" role="presentation" focusable="false">
+            <rect x="6" y="14" width="86" height="40" rx="12" fill="var(--card2)" stroke="var(--border)" />
+            <path d="M26 54 L26 66 L40 54 Z" fill="var(--card2)" stroke="var(--border)" />
+            <rect x="18" y="26" width="52" height="5" rx="2.5" fill="var(--muted)" />
+            <rect x="18" y="37" width="34" height="5" rx="2.5" fill="var(--muted)" />
+            <rect x="68" y="36" width="86" height="40" rx="12" fill="var(--accent-dim)" stroke="var(--accent)" />
+            <path d="M134 76 L134 88 L120 76 Z" fill="var(--accent-dim)" stroke="var(--accent)" />
+            <rect x="80" y="48" width="52" height="5" rx="2.5" fill="var(--accent-soft)" />
+            <rect x="80" y="59" width="34" height="5" rx="2.5" fill="var(--accent-soft)" />
+          </svg>
+        </div>
+
+        <div class="interp-cards" role="radiogroup" aria-labelledby="interpreter-title">
+          <div
+            class="interp-card"
+            id="interp-card-consecutive"
+            data-mode="consecutive"
+            role="radio"
+            aria-checked="false"
+            tabindex="0"
+          >
+            <div class="interp-card-head">
+              <span class="interp-radio" aria-hidden="true"></span>
+              <span class="interp-card-title" data-i18n="interpConsecutive">
+                Consecutive interpretation
+              </span>
+              <span class="interp-badge" id="interp-badge-consecutive"></span>
+            </div>
+            <p class="interp-card-desc" data-i18n="interpConsecutiveDesc">
+              Interpreter translates after each speaker. Good for interactive discussions in two
+              languages.
+            </p>
+            <div class="interp-pair">
+              <select id="interp-lang-a" aria-label="First conversation language"></select>
+              <span class="interp-swap" aria-hidden="true">⇄</span>
+              <select id="interp-lang-b" aria-label="Second conversation language"></select>
+            </div>
+          </div>
+
+          <div
+            class="interp-card"
+            id="interp-card-simultaneous"
+            data-mode="simultaneous"
+            role="radio"
+            aria-checked="true"
+            tabindex="0"
+          >
+            <div class="interp-card-head">
+              <span class="interp-radio" aria-hidden="true"></span>
+              <span class="interp-card-title" data-i18n="interpSimultaneous">
+                Simultaneous interpretation
+              </span>
+              <span class="interp-badge" id="interp-badge-simultaneous"></span>
+            </div>
+            <p class="interp-card-desc" data-i18n="interpSimultaneousDesc">
+              Real-time translation into your chosen language. Good for one-way communication like
+              town halls.
+            </p>
+            <label class="lbl" for="interp-lang-one" data-i18n="interpYourLang">
+              Your interpretation language
+            </label>
+            <select id="interp-lang-one"></select>
+          </div>
+        </div>
+
+        <div class="interp-foot">
+          <button id="btn-interp-cancel" class="btn ghost" data-i18n="interpCancel">Cancel</button>
+          <button id="btn-interp-apply" class="btn primary" data-i18n="interpTurnOn">Turn on</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ============ Settings modal ============ -->
     <div id="settings-modal" class="modal hidden">

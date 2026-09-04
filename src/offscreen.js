@@ -6,6 +6,8 @@ import { makeTranslator } from './lib/translate.js';
 import { isHallucination } from './lib/registry.js';
 import { sourceText, needsTranslation } from './lib/translation-utils.js';
 import { nativeDraft, nativeHealth, nativeTranscribeFile } from './lib/native.js';
+import { detectLanguage } from './lib/lang-detect.js';
+import { isConsecutive, interpreterPairs } from './lib/interpreter.js';
 import {
   getOfflineInputFile,
   needsNativeFilePath,
@@ -66,6 +68,11 @@ async function loadEngine(config) {
     (p) => toBG('model-progress', { key: config.asrModel, ...p }),
   );
 }
+function transcribeDetailed(audio, opts) {
+  const ownsBuffer = audio.byteOffset === 0 && audio.byteLength === audio.buffer.byteLength;
+  const payload = ownsBuffer ? audio : audio.slice();
+  return rpc('transcribeDetailed', { audio: payload, opts }, null, [payload.buffer]);
+}
 function transcribe(audio, opts) {
   // Only transfer when `audio` owns its whole buffer (realtime utterances are
   // fresh arrays). Offline segments are subarray views into one big buffer —
@@ -75,7 +82,10 @@ function transcribe(audio, opts) {
   return rpc('transcribe', { audio: payload, opts }, null, [payload.buffer]);
 }
 function mtProgress(config) {
-  return (p) => toBG('model-progress', { key: `${config.srcLang}-${config.tgtLang}`, ...p });
+  return mtProgressPair(config.srcLang, config.tgtLang);
+}
+function mtProgressPair(srcLang, tgtLang) {
+  return (p) => toBG('model-progress', { key: `${srcLang}-${tgtLang}`, ...p });
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +97,7 @@ const rt = {
   ctx: null,
   vad: null,
   translator: null,
+  translators: null, // two-way: { 'a>b': translator, 'b>a': translator }
   config: null,
   queue: [],
   processing: false,
@@ -98,8 +109,14 @@ const rt = {
   partialBusy: false,
 };
 
+/** Two-way (consecutive) interpreting: direction is decided per utterance. */
+function twoWay() {
+  return isConsecutive(rt.config?.interpreter);
+}
+
 function refineEnabled() {
-  return !!(rt.config?.refineTranslation && rt.config?.taskMode === 'translate');
+  // Drafting mid-utterance needs a fixed source language; two-way has none.
+  return !!(rt.config?.refineTranslation && rt.config?.taskMode === 'translate' && !twoWay());
 }
 
 function concatSpeechBuffer() {
@@ -295,7 +312,21 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
     info = await loadEngine(config);
 
     toBG('pipeline-status', { state: 'loading', detail: 'translator' });
-    rt.translator = await makeTranslator(config, mtProgress(config), { ...engineOpts(), rpc });
+    rt.translator = null;
+    rt.translators = null;
+    if (twoWay()) {
+      // Both directions must be ready before the first utterance arrives.
+      rt.translators = {};
+      for (const [from, to] of interpreterPairs(config.interpreter)) {
+        rt.translators[`${from}>${to}`] = await makeTranslator(
+          { ...config, srcLang: from, tgtLang: to, taskMode: 'translate', refineTranslation: false },
+          mtProgressPair(from, to),
+          { ...engineOpts(), rpc },
+        );
+      }
+    } else {
+      rt.translator = await makeTranslator(config, mtProgress(config), { ...engineOpts(), rpc });
+    }
 
     toBG('pipeline-status', { state: 'warmup', device: info.device });
     await rpc('warmup');
@@ -413,6 +444,11 @@ async function processUtterance({ audio, draft = null }) {
     // Skip only when this exact segment is already in the transcript cache.
     if (await isCachedRange(t0, t1)) return;
 
+    if (twoWay()) {
+      await processTwoWayUtterance(audio, t0, t1);
+      return;
+    }
+
     if (t && t.kind === 'whisper-direct') {
       const en = await transcribe(audio, { language: srcLang, task: 'translate' });
       if (isHallucination(en)) return;
@@ -456,6 +492,51 @@ async function processUtterance({ audio, draft = null }) {
   }
 }
 
+/**
+ * One utterance in two-way mode: transcribe with language:'auto', work out
+ * which of the two conversation languages was spoken, and translate it into
+ * the other one.
+ */
+async function processTwoWayUtterance(audio, t0, t1) {
+  const { a, b } = rt.config.interpreter;
+  // transcribeDetailed transfers the buffer it is handed; when one direction is
+  // Whisper-direct we may need the samples again, so send it a copy.
+  const reuseAudio = Object.values(rt.translators || {}).some((x) => x?.kind === 'whisper-direct');
+  const out = await transcribeDetailed(reuseAudio ? audio.slice() : audio, {
+    language: 'auto',
+    task: 'transcribe',
+  });
+  const text = (out?.text || '').trim();
+  if (!text || isHallucination(text)) return;
+
+  // Trust the engine only when it actually named one of our two languages.
+  const reported = typeof out?.language === 'string' ? out.language.slice(0, 2).toLowerCase() : '';
+  const src = reported === a || reported === b ? reported : detectLanguage(text, [a, b]);
+  const tgt = src === a ? b : a;
+
+  const t = rt.translators?.[`${src}>${tgt}`];
+  let translation = '';
+  if (t && t.kind === 'whisper-direct') {
+    // tgt is English — Whisper's own translate task does it without an MT model.
+    translation = await transcribe(audio, { language: src, task: 'translate' });
+    if (isHallucination(translation)) translation = '';
+  } else if (t && t.kind !== 'none') {
+    translation = await t.translate(text);
+  }
+  if (!translation) console.warn('two-way translation empty for:', text.slice(0, 80));
+
+  toBG('subtitle', {
+    final: true,
+    source: text,
+    translation: translation || text,
+    rawSource: text,
+    rawTranslation: translation,
+    dir: { src, tgt },
+    t0,
+    t1,
+  });
+}
+
 async function stopCapture() {
   rt.active = false;
   clearTimeout(rt.flushTimer);
@@ -464,6 +545,7 @@ async function stopCapture() {
   rt.partialDraft = { source: '', translation: '' };
   rt.partialBusy = false;
   rt.queue = [];
+  rt.translators = null;
   if (rt.vad) {
     try {
       rt.vad.destroy();
