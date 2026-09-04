@@ -85,6 +85,9 @@ export const LOW_CONFIDENCE = 0.7;
  * @property {number} confidence      0..1
  * @property {Provenance|null} src
  * @property {MetricPayload|null} metric
+ * @property {{from:string,to:string}|null} correction  saran koreksi dari ekstraktor bila
+ *   teks butir dan terjemahan mesin berbeda pada rentang berkeyakinan rendah
+ *   (mis. "Ben and Coding" → "bending and coating"); null bila tidak ada
  * @property {string|null} carriedFrom
  * @property {string|null} openedAt   umur bertahan melewati carry-forward
  * @property {string[]} links         ref item terkait
@@ -213,6 +216,15 @@ export function createMetric(partial) {
   };
 }
 
+/** @returns {{from:string,to:string}|null} */
+export function createCorrection(partial) {
+  if (!partial || typeof partial !== 'object') return null;
+  const from = str(partial.from).trim();
+  const to = str(partial.to).trim();
+  if (!from || !to || from === to) return null;
+  return { from, to };
+}
+
 /** @returns {MinuteItem} */
 export function createMinuteItem(partial = {}, { locale = 'en' } = {}) {
   const type = oneOf(partial.type, ITEM_TYPES, 'info');
@@ -231,6 +243,7 @@ export function createMinuteItem(partial = {}, { locale = 'en' } = {}) {
     confidence: Math.min(1, Math.max(0, num(partial.confidence, 1))),
     src: createProvenance(partial.src),
     metric: type === 'metric' ? createMetric(partial.metric) : null,
+    correction: createCorrection(partial.correction),
     carriedFrom: strOrNull(partial.carriedFrom),
     openedAt: strOrNull(partial.openedAt),
     links: Array.isArray(partial.links) ? partial.links.map(String) : [],

@@ -99,9 +99,45 @@ test('minutes workspace: boots empty, then loads sample data and renders the reg
   const filteredRows = document.querySelectorAll('#pane tbody tr');
   assert.equal(filteredRows.length, 1, 'search narrows to the Ben-and-Coding provenance item');
 
-  // Series tab renders without throwing.
+  // The low-confidence item gets the correction banner from the Provenance
+  // artboard, and the register row is flagged.
+  q.value = 'bending and coating';
+  q.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+  const flagged = document.querySelector('#pane tbody tr');
+  assert.ok(flagged.querySelector('.pill-warn'), 'low-ASR row carries the "Low ASR confidence" pill');
+  assert.ok(flagged.querySelector('.flagword'), 'the mis-heard phrase is underlined in the row');
+  flagged.dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
+  assert.ok(document.querySelector('#d-body .lowconf'), 'drawer shows the correction banner');
+  assert.ok(document.querySelector('#d-apply'), 'banner offers "Apply correction"');
+  assert.ok(document.querySelector('#d-body .wave'), 'drawer shows the cited-span waveform');
+  document.querySelector('#d-apply').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(document.querySelector('#d-body .lowconf'), null, 'banner is gone once the correction is applied');
+  assert.match(document.querySelector('#f-text').value, /bending and coating/);
+
+  // Metric item opens the Progress-artboard detail with the chart.
+  q.value = 'Cumulative';
+  q.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+  document.querySelector('#pane tbody tr').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
+  assert.ok(document.querySelector('#d-body .mcards'), 'metric drawer shows actual / baseline / variance');
+  assert.ok(document.querySelector('#d-body .chart svg polyline'), 'metric drawer draws the series curve');
+  q.value = '';
+  q.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+
+  // Series tab renders the standing register + right rail without throwing.
   document.querySelector('#tabs button[data-view="series"]').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
   assert.match(document.querySelector('#pane').innerHTML, /mini/);
+  assert.ok(document.querySelector('#pane .mstrip .mcard.cur'), 'meeting strip marks the active meeting');
+  assert.ok(document.querySelector('#pane .flow .bars'), 'opened/closed chart renders');
+  assert.ok(document.querySelector('#btn-export-standing'), 'standing register can be exported');
+
+  // Minutes tab renders the issued-document (paper) layout.
+  document.querySelector('#tabs button[data-view="doc"]').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
+  const paper = document.querySelector('#pane .paper');
+  assert.ok(paper, 'Minutes view is the A4 paper document');
+  assert.match(paper.textContent, /MINUTES OF MEETING/);
+  assert.match(paper.textContent, /‡/, 'AI-drafted items are marked ‡ in the issued document');
+  assert.match(paper.textContent, /↩/, 'carried items are marked ↩');
 });
 
 test('notes-panel.js: compact ticker mounts and reflects the register', async (t) => {

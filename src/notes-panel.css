@@ -242,3 +242,63 @@
   border-radius: 999px;
   transition: width 0.2s ease;
 }
+
+/* ---- "Captured so far" card (SidePanel artboard) ---- */
+.notes-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.notes-block-head h3 { margin-bottom: 0; font-size: 14px; letter-spacing: -0.02em; }
+.notes-count {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--accent-soft);
+}
+.notes-title-line { margin-bottom: 10px; }
+.notes-title-line .warn { color: var(--warn-text); }
+.notes-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.notes-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--card3);
+  border-radius: 999px;
+  padding: 3px 9px 3px 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.notes-chip i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.notes-chip b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 500;
+  color: var(--text);
+}
+.notes-latest-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.notes-latest { display: flex; flex-direction: column; gap: 9px; }
+.notes-latest-row { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+.notes-latest-row.dim { opacity: 0.62; }
+.notes-latest-row .rail { width: 3px; align-self: stretch; min-height: 34px; border-radius: 2px; flex-shrink: 0; }
+.notes-latest-row .body { min-width: 0; }
+.notes-latest-row .txt { display: block; font-size: 12.5px; color: var(--text); line-height: 1.45; }
+.notes-latest-row .meta {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.notes-latest-row .meta .low { color: var(--danger); }
+.notes-open-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.notes-open-btn svg { color: rgba(255, 255, 255, 0.85); }
+.notes-hint { text-align: center; font-size: 10.5px; }

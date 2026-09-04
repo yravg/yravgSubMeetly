@@ -59,13 +59,94 @@ export function acceptItem(meeting, ref, { by = 'local' } = {}) {
   const next = clone(meeting);
   const i = findIndex(next, ref);
   const item = next.items[i];
-  if (item.review === 'accepted') return next;
+  if (item.review === 'accepted' && !item.correction) return next;
+  const changes = {};
+  if (item.review !== 'accepted') changes.review = [item.review, 'accepted'];
+  // Menerima apa adanya juga menolak saran koreksi ("keep as heard") —
+  // saran itu tercatat di riwayat, bukan dihapus diam-diam.
+  if (item.correction) changes.correction = [item.correction, null];
   next.items[i] = {
     ...item,
     review: 'accepted',
-    history: withHistory(item, { review: [item.review, 'accepted'] }, by),
+    correction: null,
+    history: withHistory(item, changes, by),
   };
   return next;
+}
+
+/**
+ * Terapkan saran koreksi ekstraktor: ganti `correction.from` dengan
+ * `correction.to` di SEMUA bahasa teks butir, lalu bersihkan sarannya.
+ * Lewat editItem, jadi item menjadi `edited` dan kata yang salah dengar tetap
+ * ada di jejak audit.
+ */
+export function applyCorrection(meeting, ref, { by = 'local' } = {}) {
+  const item = meeting.items[findIndex(meeting, ref)];
+  if (!item.correction) throw new RegisterError('no_correction', `${ref} tidak punya saran koreksi`);
+  const { from, to } = item.correction;
+  const text = {};
+  const pattern = new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  for (const [lang, t] of Object.entries(item.text || {})) {
+    text[lang] = t.replace(pattern, (hit) => (hit[0] === hit[0].toUpperCase() && hit.slice(1) === hit.slice(1).toLowerCase() ? to[0].toUpperCase() + to.slice(1) : to));
+  }
+  return editItem(meeting, ref, { text, correction: null }, { by });
+}
+
+/**
+ * Berapa rapat berturut-turut sebuah butir sudah terbuka: mengikuti rantai
+ * `carriedFrom` + `links[0]` mundur ke rapat asal. 1 = baru diangkat.
+ */
+export function carryChain(meetings, meeting, item) {
+  const byId = new Map(meetings.map((m) => [m.id, m]));
+  let n = 1;
+  let cur = item;
+  let m = meeting;
+  const seen = new Set();
+  while (cur && cur.carriedFrom && cur.links?.[0] && !seen.has(`${m.id}:${cur.ref}`)) {
+    seen.add(`${m.id}:${cur.ref}`);
+    const prev = byId.get(cur.carriedFrom);
+    if (!prev) break;
+    const prevItem = prev.items.find((x) => x.ref === cur.links[0]);
+    if (!prevItem) break;
+    n += 1;
+    cur = prevItem;
+    m = prev;
+  }
+  return n;
+}
+
+/** Butir terkait (`links`) diselesaikan lintas seri — [{item, meeting}]. */
+export function linkedItems(meetings, meeting, item) {
+  const out = [];
+  const candidates = [meeting, ...meetings.filter((m) => m.id !== meeting.id)];
+  for (const ref of item.links || []) {
+    for (const m of candidates) {
+      const hit = m.items.find((x) => x.ref === ref);
+      if (hit) { out.push({ item: hit, meeting: m }); break; }
+    }
+  }
+  // Butir lain di rapat yang sama yang menunjuk balik ke butir ini.
+  for (const other of meeting.items) {
+    if (other.ref !== item.ref && (other.links || []).includes(item.ref) && !out.some((o) => o.item.ref === other.ref)) {
+      out.push({ item: other, meeting });
+    }
+  }
+  return out;
+}
+
+/** Butir dibuka vs ditutup per rapat — bahan grafik alur seri. */
+export function seriesFlow(meetings) {
+  const tracked = (i) => i.type === 'action' || i.type === 'question' || i.type === 'risk';
+  return [...meetings]
+    .sort((a, b) => a.seq - b.seq)
+    .map((m) => ({
+      meetingId: m.id,
+      seq: m.seq,
+      date: m.date,
+      opened: m.items.filter((i) => tracked(i) && !i.carriedFrom).length,
+      closed: m.items.filter((i) => tracked(i) && i.status === 'closed').length,
+      open: m.items.filter((i) => tracked(i) && i.status !== 'closed').length,
+    }));
 }
 
 /**
@@ -242,11 +323,20 @@ export function createAmendment(issued, { by = 'local' } = {}) {
 
 /** Ringkasan seri untuk tampilan register berjalan. */
 export function seriesSummary(meetings, now = new Date()) {
+  // Salinan bawaan menggantikan aslinya: W35-018 yang dibawa jadi W36-001
+  // dihitung SEKALI (yang terbaru), bukan dua kali.
+  const superseded = new Set();
+  for (const m of meetings) {
+    for (const i of m.items) {
+      if (i.carriedFrom && i.links?.[0]) superseded.add(`${i.carriedFrom}:${i.links[0]}`);
+    }
+  }
   const open = [];
   for (const m of meetings) {
     for (const i of m.items) {
       if (i.status === 'closed' || i.type === 'info' || i.type === 'metric') continue;
-      open.push({ item: i, meeting: m, age: itemAgeDays(i, now) });
+      if (superseded.has(`${m.id}:${i.ref}`)) continue;
+      open.push({ item: i, meeting: m, age: itemAgeDays(i, now), chain: carryChain(meetings, m, i) });
     }
   }
   open.sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
@@ -290,6 +380,7 @@ export function metricSeries(meetings, measure) {
 /* ---------- varian yang menuliskan ke penyimpanan ---------- */
 const persist = (fn) => async (meeting, ...args) => saveMeeting(fn(meeting, ...args));
 export const acceptItemAndSave = persist(acceptItem);
+export const applyCorrectionAndSave = persist(applyCorrection);
 export const editItemAndSave = persist(editItem);
 export const addItemAndSave = persist(addItem);
 export const setStatusAndSave = persist(setStatus);

@@ -187,3 +187,59 @@ test('i18n: every English key exists in Indonesian', async () => {
   const missing = Object.keys(NOTES_I18N.en).filter((k) => !(k in NOTES_I18N.id));
   assert.deepEqual(missing, []);
 });
+
+test('actions: the extractor correction is applied everywhere and audited', () => {
+  const base = meetingFixture();
+  base.items[2] = createMinuteItem({
+    ...base.items[2],
+    text: { en: 'Delay risk on Ben and Coding activities for DNS shipment',
+            id: 'Risiko keterlambatan pada aktivitas Ben and Coding untuk pengiriman DNS' },
+    correction: { from: 'Ben and Coding', to: 'bending and coating' },
+  });
+  assert.deepEqual(base.items[2].correction, { from: 'Ben and Coding', to: 'bending and coating' });
+
+  const fixed = A.applyCorrection(base, 'W36-017');
+  const it = fixed.items.find((i) => i.ref === 'W36-017');
+  assert.match(it.text.en, /bending and coating/);
+  assert.match(it.text.id, /bending and coating/, 'every language gets the same correction');
+  assert.equal(it.correction, null, 'the suggestion is consumed');
+  assert.equal(it.review, 'edited', 'a correction is an edit, not an acceptance');
+  assert.match(it.history.find((h) => h.field === 'text.en').from, /Ben and Coding/);
+  assert.equal(it.src.tr, 'delay risk on the bending and coating activities', 'provenance untouched');
+
+  const kept = A.acceptItem(base, 'W36-017');
+  const k = kept.items.find((i) => i.ref === 'W36-017');
+  assert.equal(k.review, 'accepted');
+  assert.equal(k.correction, null, '"keep as heard" dismisses the suggestion');
+  assert.match(k.text.en, /Ben and Coding/, '…but does not rewrite the text');
+  assert.equal(k.history.at(-1).field, 'correction');
+
+  assert.throws(() => A.applyCorrection(base, 'W36-003'), (e) => e.code === 'no_correction');
+});
+
+test('actions: standing register counts a carried item once and knows how long it has bounced', () => {
+  const w36 = meetingFixture();
+  const w37 = A.startNextMeeting(w36, { id: 'MOM-CPOC7-W37', date: '2026-09-09' });
+  const w38 = A.startNextMeeting(w37, { id: 'MOM-CPOC7-W38', date: '2026-09-16' });
+  const series = [w36, w37, w38];
+  const s = A.seriesSummary(series, new Date('2026-09-16T00:00:00Z'));
+  assert.equal(s.open, 2, 'the action and the risk exist once each, not once per meeting');
+  assert.ok(s.rows.every((r) => r.meeting.id === 'MOM-CPOC7-W38'), 'the newest copy is the one that counts');
+  assert.deepEqual(s.rows.map((r) => r.chain), [3, 3], 'both have been raised in three consecutive meetings');
+  assert.equal(s.rows[0].age, 14, 'age still runs from the original meeting');
+
+  const flow = A.seriesFlow(series);
+  assert.deepEqual(flow.map((f) => [f.seq, f.opened, f.closed, f.open]), [[36, 2, 0, 2], [37, 0, 0, 2], [38, 0, 0, 2]]);
+});
+
+test('actions: linked items resolve across the series in both directions', () => {
+  const w36 = meetingFixture();
+  const w37 = A.startNextMeeting(w36, { id: 'MOM-CPOC7-W37', date: '2026-09-09' });
+  const carriedRisk = w37.items.find((i) => i.links[0] === 'W36-017');
+  const links = A.linkedItems([w36, w37], w37, carriedRisk);
+  assert.equal(links.length, 1);
+  assert.equal(links[0].item.ref, 'W36-017');
+  assert.equal(links[0].meeting.id, 'MOM-CPOC7-W36');
+  const back = A.linkedItems([w36, w37], w36, w36.items.find((i) => i.ref === 'W36-016'));
+  assert.equal(back.length, 0, 'nothing points at the metric');
+});

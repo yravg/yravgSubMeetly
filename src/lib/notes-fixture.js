@@ -138,6 +138,7 @@ function buildW36(w35) {
       text: { en: 'Delay risk on Ben and Coding activities for DNS shipment.',
                id: 'Risiko keterlambatan pada aktivitas Ben and Coding untuk pengiriman DNS.' },
       status: 'open', review: 'ai', confidence: 0.61, openedAt: '2026-09-02',
+      correction: { from: 'Ben and Coding', to: 'bending and coating' },
       src: { t0: 3738, t1: 3761, speaker: 'Nasmee Samang', lang: 'zh',
              orig: '弯管和涂敷的活动有明显的延误风险', tr: 'delay risk on the bending and coating activities',
              segmentIds: ['s1284'] } },
