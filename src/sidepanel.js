@@ -62,9 +62,14 @@ function toOffscreen(type, data) {
 // ---------------------------------------------------------------------------
 // i18n rendering
 function applyI18n() {
+  // The notes ticker (notes-panel.js) and the Minutes Register read the UI
+  // language from <html lang>, so keep it in sync with the setting.
+  document.documentElement.lang = state.settings.uiLang || 'en';
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
   });
+  const notesMount = $('notes-mount');
+  if (notesMount && notesMount.dataset.mounted) mountNotesPanel(notesMount);
 }
 
 // ---------------------------------------------------------------------------
@@ -1137,7 +1142,10 @@ async function init() {
   await refreshExportFolderUi();
   await renderHistory();
   const notesMount = $('notes-mount');
-  if (notesMount) await mountNotesPanel(notesMount);
+  if (notesMount) {
+    await mountNotesPanel(notesMount);
+    notesMount.dataset.mounted = '1';
+  }
   const helperMount = $('helper-status-mount');
   if (helperMount) {
     redrawHelperStatus = mountHelperStatusCard(helperMount, () => ({

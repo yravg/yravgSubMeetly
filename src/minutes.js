@@ -50,7 +50,12 @@ const state = {
   sort: { key: 'ref', dir: 1 },
   sel: /** @type {string|null} */ (null),
   adding: false,
-  lang: localStorage.getItem(LS_LANG) || 'en',
+  // ?lang= from the side panel wins once, then the toggle is remembered.
+  lang: (() => {
+    const q = new URLSearchParams(location.search).get('lang');
+    if (q === 'en' || q === 'id') { localStorage.setItem(LS_LANG, q); return q; }
+    return localStorage.getItem(LS_LANG) || 'en';
+  })(),
   me: localStorage.getItem(LS_NAME) || '',
   lastSaved: /** @type {Date|null} */ (null),
 };

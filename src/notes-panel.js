@@ -26,9 +26,11 @@ function escapeHtml(s) {
 }
 
 function registerUrl() {
-  return typeof chrome !== 'undefined' && chrome.runtime?.getURL
+  const lang = (document.documentElement.lang || 'en').startsWith('id') ? 'id' : 'en';
+  const base = typeof chrome !== 'undefined' && chrome.runtime?.getURL
     ? chrome.runtime.getURL('minutes.html')
     : 'minutes.html';
+  return `${base}?lang=${lang}`;
 }
 
 function openRegister() {
