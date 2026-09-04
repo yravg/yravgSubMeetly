@@ -85,6 +85,15 @@
           <button data-task="translate" class="active" data-i18n="plusTranslate">+ Translate</button>
         </div>
 
+        <div class="interp-row" id="interpreter-row">
+          <span class="interp-row-title" data-i18n="interpreterMode">Interpreter mode</span>
+          <span class="interp-row-sep">·</span>
+          <span class="interp-row-summary" id="interpreter-summary"></span>
+          <button type="button" id="btn-interpreter" class="mini-btn" data-i18n="interpreterChange">
+            Change
+          </button>
+        </div>
+
         <div class="lang-row" id="lang-row">
           <div class="lang-col">
             <label class="lbl" for="src-lang" data-i18n="sourceLang">From (speech)</label>
@@ -94,15 +103,6 @@
             <label class="lbl" for="tgt-lang" data-i18n="targetLang">To (translation)</label>
             <select id="tgt-lang" aria-label="Target translation language"></select>
           </div>
-        </div>
-
-        <div class="interp-row" id="interpreter-row">
-          <span class="interp-row-title" data-i18n="interpreterMode">Interpreter mode</span>
-          <span class="interp-row-sep">·</span>
-          <span class="interp-row-summary" id="interpreter-summary"></span>
-          <button type="button" id="btn-interpreter" class="mini-btn" data-i18n="interpreterChange">
-            Change
-          </button>
         </div>
 
         <div id="model-warning" class="warning hidden"></div>
@@ -251,6 +251,8 @@
             <select id="interp-lang-one"></select>
           </div>
         </div>
+
+        <div id="interp-error" class="interp-error hidden" role="alert"></div>
 
         <div class="interp-foot">
           <button id="btn-interp-cancel" class="btn ghost" data-i18n="interpCancel">Cancel</button>

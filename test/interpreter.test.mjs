@@ -93,3 +93,34 @@ test('isConsecutive / interpreterPairs', () => {
 test('the mode list is exactly the two supported modes', () => {
   assert.deepEqual(INTERPRETER_MODES, ['simultaneous', 'consecutive']);
 });
+
+test('normalizeInterpreter never returns a or b as "auto"', () => {
+  const cases = [
+    normalizeInterpreter({ interpreter: { mode: 'simultaneous', a: 'auto', b: 'en' } }, 'auto', 'en'),
+    normalizeInterpreter({ interpreter: { mode: 'consecutive', a: 'auto', b: 'en' } }, 'ja', 'en'),
+    normalizeInterpreter({ interpreter: { mode: 'consecutive', a: 'auto', b: 'auto' } }, 'auto', 'auto'),
+    normalizeInterpreter(null, 'auto', 'auto'),
+    normalizeInterpreter({ interpreter: { mode: 'consecutive' } }, 'auto', 'en'),
+  ];
+  for (const c of cases) {
+    assert.notEqual(c.a, 'auto');
+    assert.notEqual(c.b, 'auto');
+  }
+});
+
+test('a simultaneous record with srcLang "auto" yields a usable or empty a, never "auto"', () => {
+  const r1 = normalizeInterpreter(null, 'auto', 'en');
+  assert.equal(r1.mode, 'simultaneous');
+  assert.ok(r1.a === '' || (typeof r1.a === 'string' && r1.a !== 'auto'));
+  assert.equal(r1.b, 'en');
+
+  const r2 = normalizeInterpreter({ interpreter: { mode: 'simultaneous' } }, 'auto', 'auto');
+  assert.equal(r2.a, '');
+  assert.equal(r2.b, '');
+});
+
+test('consecutive with a === "auto" and no usable fallback degrades to simultaneous', () => {
+  const r = normalizeInterpreter({ interpreter: { mode: 'consecutive', a: 'auto', b: 'en' } }, 'auto', 'en');
+  assert.equal(r.mode, 'simultaneous');
+  assert.notEqual(r.a, 'auto');
+});

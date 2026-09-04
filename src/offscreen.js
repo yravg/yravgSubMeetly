@@ -4,7 +4,7 @@
 import { MicVAD, NonRealTimeVAD } from '@ricky0123/vad-web';
 import { makeTranslator } from './lib/translate.js';
 import { isHallucination } from './lib/registry.js';
-import { sourceText, needsTranslation } from './lib/translation-utils.js';
+import { sourceText, needsTranslation, lineDirection } from './lib/translation-utils.js';
 import { nativeDraft, nativeHealth, nativeTranscribeFile } from './lib/native.js';
 import { detectLanguage } from './lib/lang-detect.js';
 import { isConsecutive, interpreterPairs } from './lib/interpreter.js';
@@ -81,6 +81,42 @@ function transcribe(audio, opts) {
   const payload = ownsBuffer ? audio : audio.slice();
   return rpc('transcribe', { audio: payload, opts }, null, [payload.buffer]);
 }
+// Whisper-family engines report language as either an ISO code or a full
+// English name ("chinese", "german", …) depending on backend/version. Map the
+// common ones to ISO so `reported === a || reported === b` actually matches —
+// naive slice(0,2) turned "chinese" into "ch" (not "zh") and "japanese" into
+// "ja" only by coincidence.
+const ENGINE_LANG_NAMES = {
+  english: 'en',
+  chinese: 'zh',
+  mandarin: 'zh',
+  german: 'de',
+  spanish: 'es',
+  japanese: 'ja',
+  korean: 'ko',
+  french: 'fr',
+  italian: 'it',
+  dutch: 'nl',
+  polish: 'pl',
+  vietnamese: 'vi',
+  portuguese: 'pt',
+  turkish: 'tr',
+  russian: 'ru',
+  ukrainian: 'uk',
+  arabic: 'ar',
+  thai: 'th',
+  hindi: 'hi',
+  indonesian: 'id',
+};
+function normalizeEngineLanguage(lang) {
+  if (typeof lang !== 'string' || !lang) return '';
+  const s = lang.trim().toLowerCase();
+  if (!s) return '';
+  if (ENGINE_LANG_NAMES[s]) return ENGINE_LANG_NAMES[s];
+  // Already a short code (ISO 639-1, or a 639-2/BCP-47 tag like "zh-cn").
+  return s.slice(0, 2);
+}
+
 function mtProgress(config) {
   return mtProgressPair(config.srcLang, config.tgtLang);
 }
@@ -510,7 +546,7 @@ async function processTwoWayUtterance(audio, t0, t1) {
   if (!text || isHallucination(text)) return;
 
   // Trust the engine only when it actually named one of our two languages.
-  const reported = typeof out?.language === 'string' ? out.language.slice(0, 2).toLowerCase() : '';
+  const reported = normalizeEngineLanguage(out?.language);
   const src = reported === a || reported === b ? reported : detectLanguage(text, [a, b]);
   const tgt = src === a ? b : a;
 
@@ -777,18 +813,44 @@ async function runForceTranslate({ lines, config, settings, retranslate = false 
   if (!cfg.srcLang || !cfg.tgtLang) throw new Error('Missing source or target language');
 
   await configureWorker();
-  const t = await makeTranslator(cfg, mtProgress(cfg), { ...engineOpts(), rpc, skipChrome: true });
-  if (!t || t.kind === 'none' || t.kind === 'whisper-direct') {
-    throw new Error(
-      `No text translation model for ${cfg.srcLang} → ${cfg.tgtLang}. Download the pair model in Settings.`,
-    );
+
+  // Two-way lines carry their own direction, so a single cfg translator would
+  // overwrite half the transcript with garbage. Build (and cache) one text
+  // translator per direction actually present in the batch.
+  const built = new Map();
+  async function translatorFor(from, to) {
+    const key = `${from}>${to}`;
+    if (built.has(key)) return built.get(key);
+    let t = null;
+    try {
+      t = await makeTranslator(
+        { ...cfg, srcLang: from, tgtLang: to },
+        mtProgressPair(from, to),
+        { ...engineOpts(), rpc, skipChrome: true },
+      );
+    } catch (e) {
+      console.warn(`force-translate: no translator for ${key}`, e);
+    }
+    // whisper-direct needs the audio, which force-translate does not have.
+    if (!t || t.kind === 'none' || t.kind === 'whisper-direct') t = null;
+    built.set(key, t);
+    return t;
   }
 
   let translated = 0;
+  let candidates = 0; // lines that actually wanted translating
+  let usable = 0; // …of those, the ones a translator exists for
   for (const line of lines || []) {
     const src = sourceText(line);
     if (!src) continue;
+    const { srcLang: from, tgtLang: to } = lineDirection(line, cfg.srcLang, cfg.tgtLang);
+    if (!from || !to || from === to) continue;
     if (!retranslate && !needsTranslation(line, cfg.srcLang, cfg.tgtLang)) continue;
+    candidates++;
+
+    const t = await translatorFor(from, to);
+    if (!t) continue;
+    usable++;
 
     const out = (await t.translate(src)).trim();
     if (!out || out === src) continue;
@@ -799,10 +861,17 @@ async function runForceTranslate({ lines, config, settings, retranslate = false 
       translation: out,
       rawSource: src,
       rawTranslation: out,
+      ...(line.dir ? { dir: line.dir } : {}),
       t0: line.t0 ?? 0,
       t1: line.t1 ?? (line.t0 ?? 0) + 2,
     });
     translated++;
+  }
+  if (candidates && !usable) {
+    const missing = [...built.entries()].filter(([, t]) => !t).map(([k]) => k.replace('>', ' \u2192 '));
+    throw new Error(
+      `No text translation model for ${missing.join(', ') || `${cfg.srcLang} \u2192 ${cfg.tgtLang}`}. Download the pair model in Settings.`,
+    );
   }
   return translated;
 }

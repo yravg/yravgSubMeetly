@@ -259,11 +259,15 @@ import { needsTranslation, sourceText, translationText } from './lib/translation
     const rawTgt = (raw.rawTgt ?? raw.tgt ?? raw.translation ?? prev?.rawTgt ?? '').trim();
     const finalSrc = rawSrc || rawTgt;
     if (!finalSrc && !rawTgt) return;
+    // Two-way lines carry their own direction — isUntranslated() must judge
+    // them by it, not by the session config (which is pinned to one way).
+    const dir = raw.dir?.src && raw.dir?.tgt ? { src: raw.dir.src, tgt: raw.dir.tgt } : prev?.dir;
     cues.set(key, {
       t0,
       t1: raw.t1 ?? prev?.t1 ?? t0 + 2,
       rawSrc: finalSrc,
       rawTgt: rawTgt || finalSrc,
+      ...(dir ? { dir } : {}),
     });
     pendingInterim = false;
     interimCue = null;

@@ -459,6 +459,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             rawSrc: sourceText(l),
             rawTgt: translationText(l),
             tgt: translationText(l),
+            ...(l.dir ? { dir: l.dir } : {}),
           }))
           .filter((l) => l.src);
         if (!lines.length) {
@@ -499,6 +500,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             t1: d.t1 ?? d.t0 + 2,
             src: (d.rawSource ?? d.source ?? '').trim(),
             tgt: (d.rawTranslation ?? '').trim(),
+            // two-way lines remember which way they went; everything that
+            // judges "is this translated?" reads it instead of session.config
+            ...(d.dir?.src && d.dir?.tgt ? { dir: { src: d.dir.src, tgt: d.dir.tgt } } : {}),
           };
           if (!line.src && (d.rawTranslation ?? d.translation ?? '').trim()) {
             line.src = (d.rawTranslation ?? d.translation ?? '').trim();

@@ -508,3 +508,8 @@ input[type="range"] { accent-color: var(--accent); width: 130px; }
   border: 1px solid var(--border); border-radius: 6px;
   padding: 0 5px; margin-right: 6px; white-space: nowrap;
 }
+.interp-error {
+  margin-top: 12px; padding: 8px 12px; border-radius: 10px;
+  background: var(--warn-bg); border: 1px solid var(--warn-border);
+  color: var(--warn-text); font-size: 12.5px; line-height: 1.5;
+}

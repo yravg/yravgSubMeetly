@@ -23,8 +23,10 @@ function usable(code) {
 export function normalizeInterpreter(settings, srcLang = 'ja', tgtLang = 'en') {
   const raw = settings && typeof settings === 'object' ? settings.interpreter : null;
   const mode = raw && raw.mode === 'consecutive' ? 'consecutive' : 'simultaneous';
-  const a = usable(raw?.a) ? raw.a : srcLang;
-  const b = usable(raw?.b) ? raw.b : tgtLang;
+  // 'auto' (and '') never survive into the record — a stale 'auto' would come
+  // back as an empty select in the chooser.
+  const a = usable(raw?.a) ? raw.a : usable(srcLang) ? srcLang : '';
+  const b = usable(raw?.b) ? raw.b : usable(tgtLang) ? tgtLang : '';
   // A two-way session needs two distinct, concrete languages — anything else
   // degrades to the one-way path rather than producing a broken config.
   if (mode === 'consecutive' && (!usable(a) || !usable(b) || a === b)) {

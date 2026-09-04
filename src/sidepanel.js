@@ -142,8 +142,32 @@ function applyInterpreterUi() {
   document.querySelectorAll('#task-toggle button').forEach((b) => {
     b.disabled = two;
   });
-  if (two && state.task !== 'translate') setTask('translate');
+  if (two) {
+    // Remember what the user had so leaving two-way gives it back.
+    if (state.task !== 'translate') {
+      state.taskBeforeTwoWay = state.task;
+      setTask('translate');
+    }
+  } else if (state.taskBeforeTwoWay) {
+    const prev = state.taskBeforeTwoWay;
+    state.taskBeforeTwoWay = null;
+    if (prev !== state.task) setTask(prev);
+  }
   renderInterpreterUi();
+}
+
+/** Set a select to `want`, or to its first option when `want` is not there. */
+function setSelectValue(el, want) {
+  el.value = want || '';
+  if (!el.value) el.value = el.options[0]?.value || '';
+  return el.value;
+}
+
+function showInterpreterError(msg) {
+  const el = $('interp-error');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.classList.toggle('hidden', !msg);
 }
 
 function openInterpreterModal() {
@@ -155,9 +179,12 @@ function openInterpreterModal() {
   $('interp-lang-a').innerHTML = `<optgroup label="${srcGroup}">${optionsHtml(twoWaySrc)}</optgroup>`;
   $('interp-lang-b').innerHTML = `<optgroup label="${tgtGroup}">${optionsHtml(TARGET_LANGS)}</optgroup>`;
   $('interp-lang-one').innerHTML = `<optgroup label="${tgtGroup}">${optionsHtml(TARGET_LANGS)}</optgroup>`;
-  $('interp-lang-a').value = it.a;
-  $('interp-lang-b').value = it.b;
-  $('interp-lang-one').value = state.tgtLang;
+  // it.a may be a language this list does not offer (e.g. a stale 'auto') —
+  // fall back to the first concrete option rather than an empty select.
+  setSelectValue($('interp-lang-a'), it.a);
+  setSelectValue($('interp-lang-b'), it.b);
+  setSelectValue($('interp-lang-one'), state.tgtLang);
+  showInterpreterError('');
   selectInterpreterCard(it.mode);
   $('interpreter-modal').classList.remove('hidden');
 }
@@ -179,16 +206,24 @@ async function applyInterpreterChoice() {
     const a = $('interp-lang-a').value;
     const b = $('interp-lang-b').value;
     const next = normalizeInterpreter({ interpreter: { mode, a, b } }, a, b);
-    state.settings.interpreter = next;
-    if (next.mode === 'consecutive') {
-      // The From/To selects still hold the pair internally.
-      state.srcLang = next.a;
-      state.tgtLang = next.b;
+    if (next.mode !== 'consecutive') {
+      // Two-way needs two different, concrete languages — say so, stay open.
+      showInterpreterError(t('interpCannotApply'));
+      return;
     }
+    state.settings.interpreter = next;
+    // The From/To selects still hold the pair internally.
+    state.srcLang = next.a;
+    state.tgtLang = next.b;
   } else {
     state.tgtLang = $('interp-lang-one').value;
-    state.settings.interpreter = { mode: 'simultaneous', a: state.srcLang, b: state.tgtLang };
+    // Never persist 'auto' as one end of the remembered pair: it is not a
+    // usable two-way language and would come back as an empty select.
+    const prev = interpreter();
+    const a = state.srcLang !== 'auto' ? state.srcLang : prev?.a !== 'auto' ? prev?.a : '';
+    state.settings.interpreter = { mode: 'simultaneous', b: state.tgtLang, ...(a ? { a } : {}) };
   }
+  showInterpreterError('');
   $('src-lang').value = state.srcLang;
   $('tgt-lang').value = state.tgtLang;
   await saveSettings();
