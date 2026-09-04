@@ -320,6 +320,9 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
 .paper .sumedit [contenteditable]:focus { border-color: #0f7a5c; border-style: solid; background: #f2efe9; }
 .paper .sumedit .btn { background: none; border: 1px solid #1c1c1a; color: #1c1c1a; border-radius: 4px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
 .paper .sumedit .btn:hover { background: #f2efe9; }
+.paper .sumedit [contenteditable]:empty::before { content: attr(data-placeholder); color: #8d8981; }
+.paper .genfallback { color: #5c5a55; font-size: 13.5px; }
+.paper .genfallback .lead { font-style: italic; }
 .paper .note { margin-bottom: 13px; }
 .paper .note h3 { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
 .paper .pfoot { border-top: 2px solid #1c1c1a; padding-top: 14px; margin-top: 30px; }

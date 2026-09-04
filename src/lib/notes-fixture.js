@@ -93,7 +93,7 @@ function buildW35() {
 
 function buildW36(w35) {
   let m = startNextMeeting(w35, {
-    id: 'MOM-CPOC7-W36', date: '2026-09-02',
+    id: 'MOM-CPOC7-W36', date: '2026-09-02', end: '12:00',
     summary: {
       en: 'The meeting opened on the dropped-object incident during conductor installation and closed on yard-audit readiness. Crane inspection and securement were agreed as standing requirements covering transport as well as operation. Document review is progressing under MDR/GMDR priority with no issues flagged; one MWS signature remains outstanding. Cumulative actual progress reached 10.89%, 1.11% ahead of baseline, offset by a delay risk on bending and coating for the DNS shipment. Seven items remain open, two of them carried from week 35, and the prefab audit checklist is now the standing template — the series is audit-ready.',
       id: 'Rapat dibuka dengan insiden dropped object saat pemasangan conductor dan ditutup dengan kesiapan audit yard. Inspeksi dan pengamanan crane disepakati sebagai syarat tetap yang mencakup transportasi, bukan hanya operasi. Tinjauan dokumen berjalan sesuai prioritas MDR/GMDR tanpa temuan; satu tanda tangan MWS masih tertunda. Progres aktual kumulatif mencapai 10,89%, 1,11% di depan baseline, tetapi diimbangi risiko keterlambatan bending dan coating untuk pengiriman DNS. Tujuh butir masih terbuka, dua di antaranya bawaan dari minggu 35, dan checklist audit prefab kini menjadi templat tetap — seri ini siap diaudit.',

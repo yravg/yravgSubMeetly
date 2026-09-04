@@ -262,6 +262,15 @@ test('schema: a correction can name the source-language phrase it heard', () => 
   assert.equal(it.correction.origPhrase, 'z', 'it survives the item builder');
 });
 
+test('actions: the next meeting inherits the slot it starts in, not a finish nobody measured', () => {
+  const m = createMeeting({ ...meetingFixture(), start: '10:00', end: '12:00', tz: 'GMT+8' });
+  const next = A.startNextMeeting(m, { id: 'MOM-CPOC7-W37', date: '2026-09-09' });
+  assert.equal(next.start, '10:00', 'a standing series keeps its time of day');
+  assert.equal(next.end, null, 'when it finishes is not known until it happens');
+  assert.equal(next.tz, 'GMT+8');
+  assert.equal(A.startNextMeeting(m, { start: '14:00' }).start, '14:00', 'the caller can still move the slot');
+});
+
 test('actions: the meeting summary is prose a human owns, per language, and freezes on issue', () => {
   const m = meetingFixture();
   assert.deepEqual(m.summary, {}, 'no summary is invented');
@@ -305,4 +314,6 @@ test('fixture: the W36 metric cites real register items, and HSE/man-hours are m
   assert.equal(A.metricSeries([w36], 'hse_incidents')[0].value, 0, 'zero is a value, not a missing one');
   assert.ok(pickText(w36.summary, 'en').length > 0 && pickText(w36.summary, 'id').length > 0,
     'the sample MoM ships an authored summary in both languages');
+  assert.equal(w36.start, '10:00', 'W36 inherits the series slot');
+  assert.equal(w36.end, '12:00', 'and states its own end time explicitly');
 });

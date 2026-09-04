@@ -413,14 +413,22 @@ function viewDoc() {
   const generatedSummary = state.lang === 'id'
     ? `${stats.decisions} keputusan, ${stats.actionsOpen} dari ${stats.actionsTotal} tindak lanjut masih terbuka, ${stats.questionsOpen} pertanyaan terbuka, ${stats.carried} butir bawaan dari rapat sebelumnya. Agenda terbahas ${stats.agendaPct}% (${stats.agendaCovered}/${stats.agendaTotal}).${progressPt?.metric ? ` Progres aktual kumulatif ${fmtNum(progressPt.metric.value)}${progressPt.metric.unit}${progressPt.metric.variance != null ? `, ${sign(progressPt.metric.variance)}${fmtNum(progressPt.metric.variance)}${progressPt.metric.unit} terhadap baseline` : ''}.` : ''}`
     : `${stats.decisions} decision(s), ${stats.actionsOpen} of ${stats.actionsTotal} actions still open, ${stats.questionsOpen} open question(s), ${stats.carried} item(s) carried from the previous meeting. Agenda covered ${stats.agendaPct}% (${stats.agendaCovered}/${stats.agendaTotal}).${progressPt?.metric ? ` Cumulative actual progress ${fmtNum(progressPt.metric.value)}${progressPt.metric.unit}${progressPt.metric.variance != null ? `, ${sign(progressPt.metric.variance)}${fmtNum(progressPt.metric.variance)}${progressPt.metric.unit} against baseline` : ''}.` : ''}`;
-  // A human-written summary replaces the generated statistics sentence; before
-  // issue it is editable in place, after issue the document is frozen.
-  const summaryText = pickText(m.summary, state.lang) || generatedSummary;
+  // A human-written summary replaces the generated statistics sentence.
+  //
+  // The editable box only ever holds what a human typed IN THIS LANGUAGE: it
+  // starts empty (with a placeholder) rather than pre-filled, because a Save on
+  // a pre-filled box would silently sign the machine's sentence as the
+  // minute-taker's prose — or, since pickText falls back across languages,
+  // write English into summary.id. The generated sentence still carries the
+  // document, read-only, underneath.
+  const authored = m.summary?.[state.lang] || '';
   const summaryBlock = m.issuedAt
-    ? `<p>${esc(summaryText)}</p>`
+    ? `<p>${esc(pickText(m.summary, state.lang) || generatedSummary)}</p>`
     : `<div class="sumedit">
-        <p contenteditable="true" id="doc-summary" spellcheck="false">${esc(summaryText)}</p>
+        <p contenteditable="true" id="doc-summary" spellcheck="false"
+           data-placeholder="${esc(T('summaryPlaceholder'))}">${esc(authored)}</p>
         <button type="button" class="btn xs" id="btn-save-summary">${esc(T('saveSummary'))}</button>
+        ${authored ? '' : `<p class="genfallback"><span class="lead">${esc(T('summaryGenerated'))}</span> ${esc(generatedSummary)}</p>`}
       </div>`;
   const rev = /-A(\d+)$/.exec(m.id)?.[1] || '0';
   const chairOrg = m.attendees.find((a) => a.name === m.chair)?.org || '';
@@ -902,6 +910,12 @@ function metricDetail(it, m) {
 /** "Where the figure came from": one card, the cited sentence, and why it is typed. */
 function metricSource(it) {
   const src = it.src;
+  const mt = it.metric;
+  // The editorial line is a claim about THIS figure — three numbers pulled out
+  // of one spoken sentence. It is only true when there is a cited sentence and
+  // the metric really carries a baseline/variance, so a bare count (man-hours,
+  // incidents) or an unsourced figure does not get told a story about itself.
+  const typed = !!src && !!mt && (mt.baseline != null || mt.variance != null);
   return `<div class="pcard">
     <span class="lbl">${esc(T('mWhereFrom'))}</span>
     ${src ? `<div class="qh">
@@ -912,7 +926,7 @@ function metricSource(it) {
     </div>
     <blockquote>${esc(src.tr || src.orig)}</blockquote>`
       : `<p class="empty" style="padding:0;text-align:left">${esc(T('noSource'))}</p>`}
-    <p class="mnote">${esc(T('mTypedNote'))}</p>
+    ${typed ? `<p class="mnote">${esc(T('mTypedNote'))}</p>` : ''}
   </div>`;
 }
 function metricChart(pts, unit) {
@@ -1128,7 +1142,7 @@ async function doSaveSummary() {
   if (!m || !box) return;
   try {
     replaceActive(await setSummaryAndSave(m, state.lang, box.textContent));
-    toast(T('saveSummary'));
+    toast(T('msgSummarySaved'));
     paint();
   } catch (e) {
     toast(e && e.message ? e.message : String(e), true);

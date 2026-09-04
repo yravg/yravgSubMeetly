@@ -131,7 +131,15 @@ test('minutes workspace: boots empty, then loads sample data and renders the reg
   const linkBlock = [...document.querySelectorAll('#d-body .pcard')].find((c) => c.querySelector('.linkrow'));
   assert.ok(linkBlock, 'the Linked items panel renders beside the chart');
   assert.ok(linkBlock.querySelectorAll('.linkrow').length >= 2, 'the figure cites at least two register items');
-  assert.match(document.querySelector('#d-body .mprov').textContent, /typed as a measure/, 'the editorial note explains why it is a measure');
+  assert.ok(document.querySelector('#d-body .mprov .mnote'), 'a sourced metric with a baseline explains why it is a measure');
+
+  // …but a bare count with no cited sentence is told no story about itself.
+  q.value = 'HSE incidents';
+  q.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+  document.querySelector('#pane tbody tr').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
+  assert.ok(document.querySelector('#d-body .mprov'), 'it still gets the Progress surface');
+  assert.equal(document.querySelector('#d-body .mprov .mnote'), null,
+    'the "three numbers from one sentence" note is not printed on an unsourced, baseline-less count');
 
   // A non-metric item goes back to the narrow Provenance drawer.
   q.value = 'bending and coating';
@@ -175,10 +183,26 @@ test('minutes workspace: boots empty, then loads sample data and renders the reg
   assert.equal(summaryBox.id, 'doc-summary');
   assert.match(summaryBox.textContent, /dropped-object incident/, 'it shows the authored summary, not the statistics sentence');
   assert.ok(paper.querySelector('#btn-save-summary'), 'and a way to save it');
+  assert.equal(paper.querySelector('.genfallback'), null, 'no generated fallback once a summary is authored');
+
+  // A meeting with no authored summary must NOT pre-fill the box with the
+  // machine's sentence — one Save would sign it as the minute-taker's prose.
+  const switcher = document.querySelector('#m-switch');
+  switcher.value = [...switcher.options].map((o) => o.value).find((v) => /W35/.test(v));
+  switcher.dispatchEvent(new document.defaultView.Event('change', { bubbles: true }));
+  const blankBox = document.querySelector('#pane .paper [contenteditable]');
+  assert.equal(blankBox.textContent, '', 'the editable summary starts empty when nobody has written one');
+  assert.match(blankBox.getAttribute('data-placeholder') || '', /own words/, 'and says what to type');
+  assert.match(document.querySelector('#pane .paper .genfallback').textContent, /decision\(s\)/,
+    'the generated sentence still carries the document, read-only');
+  switcher.value = [...switcher.options].map((o) => o.value).find((v) => /W36/.test(v));
+  switcher.dispatchEvent(new document.defaultView.Event('change', { bubbles: true }));
+  const paper36 = document.querySelector('#pane .paper');
 
   // Risks read as a matrix, and the KPI band carries the man-hours measure.
-  assert.match(paper.textContent, /High × Possible/, 'risks are severity × likelihood in the issued document');
-  assert.match(paper.querySelector('.kpi').textContent, /35,000/, 'man-hours gets thousands separators');
+  assert.match(paper36.textContent, /High × Possible/, 'risks are severity × likelihood in the issued document');
+  assert.match(paper36.querySelector('.kpi').textContent, /35,000/, 'man-hours gets thousands separators');
+  assert.match(paper36.querySelector('.meta').textContent, /2026-09-02, 10:00–12:00 GMT\+8/, 'the meeting states when it ran');
 });
 
 test('notes-panel.js: compact ticker mounts and reflects the register', async (t) => {

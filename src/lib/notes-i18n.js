@@ -181,8 +181,10 @@ const en = {
   docRaisedRepeatedly: (n) => `Raised in ${n} consecutive meetings; no owner assigned.`,
   docRaisedRepeatedlyOwned: (n) => `Raised in ${n} consecutive meetings.`,
   saveSummary: 'Save summary',
+  msgSummarySaved: 'Summary saved — this is what §1 says from now on',
+  summaryPlaceholder: 'Write the summary in your own words — what opened the meeting, what it turned on, what it closed with.',
+  summaryGenerated: 'Until you write one, the document uses the figures below.',
   printPdf: 'Print / PDF',
-  docManHours: 'Man-hours', docIncidents: 'HSE incidents',
 
   /* side panel (SidePanel artboard) */
   capturedSoFar: 'Captured so far',
@@ -345,8 +347,10 @@ const id = {
   docRaisedRepeatedly: (n) => `Diangkat di ${n} rapat berturut-turut; belum ada penanggung jawab.`,
   docRaisedRepeatedlyOwned: (n) => `Diangkat di ${n} rapat berturut-turut.`,
   saveSummary: 'Simpan ringkasan',
+  msgSummarySaved: 'Ringkasan tersimpan — inilah isi §1 mulai sekarang',
+  summaryPlaceholder: 'Tulis ringkasan dengan kata-kata Anda sendiri — apa yang membuka rapat, apa yang menjadi pokoknya, dan apa penutupnya.',
+  summaryGenerated: 'Selama belum ditulis, dokumen memakai angka-angka di bawah ini.',
   printPdf: 'Cetak / PDF',
-  docManHours: 'Jam kerja', docIncidents: 'Insiden K3',
 
   capturedSoFar: 'Tertangkap sejauh ini',
   latest: 'Terbaru',

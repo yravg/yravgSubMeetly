@@ -292,10 +292,10 @@ export function startNextMeeting(source, partial = {}) {
     seq,
     title: source.title,
     tz: source.tz,
-    // A standing series keeps its slot: the next meeting inherits the time of
-    // day unless the caller says otherwise. Only the date moves.
+    // A standing series keeps its slot, so the START time carries over unless
+    // the caller says otherwise. The END time does NOT: when the next meeting
+    // finishes is a measurement nobody has made yet.
     start: source.start,
-    end: source.end,
     chair: source.chair,
     attendees: source.attendees,
     topics: source.topics,
