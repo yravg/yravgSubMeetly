@@ -6,7 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  createMeeting, createMinuteItem, nextRef, meetingStats, itemAgeDays, pickText, toTimecode,
+  createMeeting, createMinuteItem, createCorrection, nextRef, meetingStats, itemAgeDays,
+  pickText, toTimecode, LIKELIHOODS,
 } from '../src/lib/notes-schema.js';
 import { migrateStore, migrateNoteV1 } from '../src/lib/notes-migrate.js';
 import * as A from '../src/lib/notes-actions.js';
@@ -196,7 +197,7 @@ test('actions: the extractor correction is applied everywhere and audited', () =
             id: 'Risiko keterlambatan pada aktivitas Ben and Coding untuk pengiriman DNS' },
     correction: { from: 'Ben and Coding', to: 'bending and coating' },
   });
-  assert.deepEqual(base.items[2].correction, { from: 'Ben and Coding', to: 'bending and coating' });
+  assert.deepEqual(base.items[2].correction, { from: 'Ben and Coding', to: 'bending and coating', origPhrase: null });
 
   const fixed = A.applyCorrection(base, 'W36-017');
   const it = fixed.items.find((i) => i.ref === 'W36-017');
@@ -242,4 +243,66 @@ test('actions: linked items resolve across the series in both directions', () =>
   assert.equal(links[0].meeting.id, 'MOM-CPOC7-W36');
   const back = A.linkedItems([w36, w37], w36, w36.items.find((i) => i.ref === 'W36-016'));
   assert.equal(back.length, 0, 'nothing points at the metric');
+});
+
+test('schema: severity keeps a second axis — likelihood, defaulted not invented', () => {
+  const d = createMinuteItem({ type: 'risk', text: { en: 'x' } });
+  assert.equal(d.likelihood, 'possible', 'unstated likelihood is "possible", not "certain"');
+  assert.equal(createMinuteItem({ type: 'risk', likelihood: 'certain', text: { en: 'x' } }).likelihood, 'certain');
+  assert.equal(createMinuteItem({ type: 'risk', likelihood: 'ALWAYS', text: { en: 'x' } }).likelihood, 'possible',
+    'an unknown likelihood falls back rather than entering the register');
+  assert.deepEqual(LIKELIHOODS, ['certain', 'likely', 'possible', 'unlikely']);
+});
+
+test('schema: a correction can name the source-language phrase it heard', () => {
+  const c = createCorrection({ from: 'Ben and Coding', to: 'bending and coating', origPhrase: '弯管和涂敷' });
+  assert.equal(c.origPhrase, '弯管和涂敷');
+  assert.equal(createCorrection({ from: 'a', to: 'b' }).origPhrase, null, 'optional — never invented');
+  const it = createMinuteItem({ type: 'risk', text: { en: 'x' }, correction: { from: 'a', to: 'b', origPhrase: 'z' } });
+  assert.equal(it.correction.origPhrase, 'z', 'it survives the item builder');
+});
+
+test('actions: the meeting summary is prose a human owns, per language, and freezes on issue', () => {
+  const m = meetingFixture();
+  assert.deepEqual(m.summary, {}, 'no summary is invented');
+  const withEn = A.setSummary(m, 'en', '  Opened on the dropped-object incident.  ');
+  assert.deepEqual(withEn.summary, { en: 'Opened on the dropped-object incident.' }, 'trimmed, written to the asked-for language');
+  assert.deepEqual(m.summary, {}, 'the action is pure — the input meeting is untouched');
+  const both = A.setSummary(withEn, 'id', 'Dibuka dengan insiden dropped object.');
+  assert.deepEqual(Object.keys(both.summary), ['en', 'id']);
+  assert.equal(pickText(both.summary, 'id'), 'Dibuka dengan insiden dropped object.');
+  const cleared = A.setSummary(both, 'id', '   ');
+  assert.deepEqual(Object.keys(cleared.summary), ['en'], 'emptying a language drops it back to the generated sentence');
+
+  const issued = A.issueMeeting(both, { force: true });
+  assert.throws(() => A.setSummary(issued, 'en', 'rewritten after issue'), (e) => e.code === 'issued');
+});
+
+test('fixture: the W36 metric cites real register items, and HSE/man-hours are measures not prose', async () => {
+  const { buildSampleSeries } = await import('../src/lib/notes-fixture.js');
+  const [, w36] = buildSampleSeries();
+  const progress = w36.items.find((i) => i.metric?.measure === 'cumulative_progress');
+  assert.ok(progress.links.length >= 2, 'the figure points at what it was read out of');
+  for (const ref of progress.links) {
+    assert.ok(w36.items.some((i) => i.ref === ref), `link ${ref} resolves inside the meeting`);
+  }
+  const resolved = A.linkedItems([w36], w36, progress);
+  assert.ok(resolved.length >= 2, 'and they resolve through the action layer the drawer uses');
+  assert.deepEqual(
+    resolved.map((r) => r.item.type).sort(),
+    ['info', 'risk'],
+    'the land-pack note and the delay risk',
+  );
+  const risk = w36.items.find((i) => i.correction?.from === 'Ben and Coding');
+  assert.deepEqual(risk.links, [progress.ref], 'the risk points back at the figure');
+  assert.equal(risk.priority, 'high');
+  assert.equal(risk.likelihood, 'possible');
+  assert.equal(risk.correction.origPhrase, '弯管和涂敷');
+
+  const measures = w36.items.filter((i) => i.type === 'metric').map((i) => i.metric.measure);
+  assert.ok(measures.includes('man_hours'), 'man-hours is a measure, so it lands in the KPI band');
+  assert.ok(measures.includes('hse_incidents'));
+  assert.equal(A.metricSeries([w36], 'hse_incidents')[0].value, 0, 'zero is a value, not a missing one');
+  assert.ok(pickText(w36.summary, 'en').length > 0 && pickText(w36.summary, 'id').length > 0,
+    'the sample MoM ships an authored summary in both languages');
 });

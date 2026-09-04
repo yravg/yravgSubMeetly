@@ -206,6 +206,26 @@ export function addItem(meeting, partial = {}, { by = 'local' } = {}) {
   return next;
 }
 
+/**
+ * Tulis ringkasan notulen (prosa manusia) untuk satu bahasa.
+ *
+ * Ringkasan bukan butir register: tidak punya `review`/provenance dan tidak
+ * masuk `history` butir mana pun — ia adalah teks dokumen. Yang tetap berlaku:
+ * notulen terbit itu beku, jadi ini lewat assertEditable seperti suntingan lain.
+ * Teks kosong MENGHAPUS kunci bahasanya, sehingga dokumen kembali memakai
+ * kalimat statistik yang dihasilkan otomatis.
+ */
+export function setSummary(meeting, lang, text) {
+  assertEditable(meeting);
+  const next = clone(meeting);
+  const key = String(lang || next.locale || 'en');
+  const value = String(text ?? '').trim();
+  next.summary = { ...(next.summary || {}) };
+  if (value) next.summary[key] = value;
+  else delete next.summary[key];
+  return next;
+}
+
 export function setStatus(meeting, ref, status, opts = {}) {
   return editItem(meeting, ref, { status }, opts);
 }
@@ -272,6 +292,10 @@ export function startNextMeeting(source, partial = {}) {
     seq,
     title: source.title,
     tz: source.tz,
+    // A standing series keeps its slot: the next meeting inherits the time of
+    // day unless the caller says otherwise. Only the date moves.
+    start: source.start,
+    end: source.end,
     chair: source.chair,
     attendees: source.attendees,
     topics: source.topics,
@@ -384,6 +408,7 @@ export const applyCorrectionAndSave = persist(applyCorrection);
 export const editItemAndSave = persist(editItem);
 export const addItemAndSave = persist(addItem);
 export const setStatusAndSave = persist(setStatus);
+export const setSummaryAndSave = persist(setSummary);
 export const removeItemAndSave = persist(removeItem);
 export const carryForwardAndSave = persist(carryForward);
 export const issueMeetingAndSave = persist(issueMeeting);

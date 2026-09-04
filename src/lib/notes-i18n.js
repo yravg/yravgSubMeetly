@@ -121,6 +121,8 @@ const en = {
   agendaRef: (a) => `agenda ${a}`,
   translationHint: (other) => `${other} text is kept separately — switch language to edit it`,
   dPriority: 'Priority', prHigh: 'High', prMed: 'Medium', prLow: 'Low',
+  dSevLik: 'Severity × likelihood',
+  lkCertain: 'Certain', lkLikely: 'Likely', lkPossible: 'Possible', lkUnlikely: 'Unlikely',
   segRange: (a, b) => (a === b ? `seg ${a}` : `seg ${a}–${b}`),
   asr: 'ASR',
   correctionApplied: 'Correction applied — item marked as edited',
@@ -138,6 +140,8 @@ const en = {
   mAheadNotSafe: 'Ahead, but not safe',
   mAheadNotSafeBody: (n) => `${n} open risk item(s) share this agenda line — read them together.`,
   mSingle: 'One data point so far — the curve starts next meeting',
+  mTypedNote:
+    'Three numbers were extracted from one sentence and typed as a measure, not prose — so next week\'s figure lands on the same axis instead of in a new paragraph.',
 
   /* series (Series artboard) */
   seriesLabel: 'Meeting series',
@@ -173,6 +177,10 @@ const en = {
   docFootEngine: (asr, seg) => `Transcribed and drafted on the minute-taker's own machine — ${asr}, ${seg} segments. No audio, transcript or minute text was sent to any external service.`,
   docFootTrace: 'Every entry above is traceable to a timestamped segment of the recording kept on this device.',
   minutedBy: 'Minuted by',
+  docSevLik: 'Sev × Lik',
+  docRaisedRepeatedly: (n) => `Raised in ${n} consecutive meetings; no owner assigned.`,
+  docRaisedRepeatedlyOwned: (n) => `Raised in ${n} consecutive meetings.`,
+  saveSummary: 'Save summary',
   printPdf: 'Print / PDF',
   docManHours: 'Man-hours', docIncidents: 'HSE incidents',
 
@@ -280,6 +288,8 @@ const id = {
   agendaRef: (a) => `agenda ${a}`,
   translationHint: (other) => `Teks ${other} disimpan terpisah — ganti bahasa untuk menyuntingnya`,
   dPriority: 'Prioritas', prHigh: 'Tinggi', prMed: 'Sedang', prLow: 'Rendah',
+  dSevLik: 'Keparahan × kemungkinan',
+  lkCertain: 'Pasti', lkLikely: 'Besar', lkPossible: 'Mungkin', lkUnlikely: 'Kecil',
   segRange: (a, b) => (a === b ? `seg ${a}` : `seg ${a}–${b}`),
   asr: 'ASR',
   correctionApplied: 'Koreksi diterapkan — butir ditandai disunting',
@@ -296,6 +306,8 @@ const id = {
   mAheadNotSafe: 'Di depan, tapi belum aman',
   mAheadNotSafeBody: (n) => `${n} risiko terbuka ada di baris agenda yang sama — baca bersama.`,
   mSingle: 'Baru satu titik data — kurvanya mulai di rapat berikutnya',
+  mTypedNote:
+    'Tiga angka diambil dari satu kalimat dan dijadikan tipe ukuran, bukan prosa — sehingga angka minggu depan jatuh di sumbu yang sama, bukan di paragraf baru.',
 
   seriesLabel: 'Seri rapat',
   standingRegister: 'Register tindak lanjut berjalan',
@@ -329,6 +341,10 @@ const id = {
   docFootEngine: (asr, seg) => `Ditranskripsi dan disusun di mesin notulis sendiri — ${asr}, ${seg} segmen. Tidak ada audio, transkrip, atau teks notulen yang dikirim ke layanan eksternal.`,
   docFootTrace: 'Setiap entri di atas dapat ditelusuri ke segmen rekaman bercap waktu yang tersimpan di perangkat ini.',
   minutedBy: 'Dicatat oleh',
+  docSevLik: 'Parah × Kemungkinan',
+  docRaisedRepeatedly: (n) => `Diangkat di ${n} rapat berturut-turut; belum ada penanggung jawab.`,
+  docRaisedRepeatedlyOwned: (n) => `Diangkat di ${n} rapat berturut-turut.`,
+  saveSummary: 'Simpan ringkasan',
   printPdf: 'Cetak / PDF',
   docManHours: 'Jam kerja', docIncidents: 'Insiden K3',
 

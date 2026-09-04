@@ -82,6 +82,7 @@ function buildW35() {
       text: { en: 'OSP approval slipping into the mobilisation window would delay sail-away; no float remains on the marine spread.',
                id: 'Persetujuan OSP yang bergeser ke jendela mobilisasi akan menunda sail-away; tidak ada float tersisa pada marine spread.' },
       status: 'open', review: 'edited', confidence: 0.84, openedAt: '2026-08-19',
+      priority: 'high', likelihood: 'possible',
       src: { t0: 2020, speaker: 'Nasmee Samang', lang: 'zh',
              orig: '如果 OSP 批准拖到动员窗口，起航会被推迟。',
              tr: 'If OSP approval slips into the mobilisation window, sail-away will be delayed.' } },
@@ -93,6 +94,10 @@ function buildW35() {
 function buildW36(w35) {
   let m = startNextMeeting(w35, {
     id: 'MOM-CPOC7-W36', date: '2026-09-02',
+    summary: {
+      en: 'The meeting opened on the dropped-object incident during conductor installation and closed on yard-audit readiness. Crane inspection and securement were agreed as standing requirements covering transport as well as operation. Document review is progressing under MDR/GMDR priority with no issues flagged; one MWS signature remains outstanding. Cumulative actual progress reached 10.89%, 1.11% ahead of baseline, offset by a delay risk on bending and coating for the DNS shipment. Seven items remain open, two of them carried from week 35, and the prefab audit checklist is now the standing template — the series is audit-ready.',
+      id: 'Rapat dibuka dengan insiden dropped object saat pemasangan conductor dan ditutup dengan kesiapan audit yard. Inspeksi dan pengamanan crane disepakati sebagai syarat tetap yang mencakup transportasi, bukan hanya operasi. Tinjauan dokumen berjalan sesuai prioritas MDR/GMDR tanpa temuan; satu tanda tangan MWS masih tertunda. Progres aktual kumulatif mencapai 10,89%, 1,11% di depan baseline, tetapi diimbangi risiko keterlambatan bending dan coating untuk pengiriman DNS. Tujuh butir masih terbuka, dua di antaranya bawaan dari minggu 35, dan checklist audit prefab kini menjadi templat tetap — seri ini siap diaudit.',
+    },
     agenda: [
       { ref: 'A1', title: { en: 'Safety moment & incident review', id: 'Momen keselamatan & tinjauan insiden' }, covered: true },
       { ref: 'A2', title: { en: 'Dropped-object controls', id: 'Kendali dropped object' }, covered: true },
@@ -134,14 +139,6 @@ function buildW36(w35) {
       src: { t0: 2842, speaker: 'Nasmee Samang', lang: 'zh',
              orig: '船的选择要等评估完 C900 的能力和可用性再定。',
              tr: 'Vessel selection to be resolved after evaluating C900 capability and availability.' } },
-    { type: 'risk', topic: 'schedule', agenda: 'A8', owner: 'Nasmee Samang', org: 'GZS', due: '2026-09-09',
-      text: { en: 'Delay risk on Ben and Coding activities for DNS shipment.',
-               id: 'Risiko keterlambatan pada aktivitas Ben and Coding untuk pengiriman DNS.' },
-      status: 'open', review: 'ai', confidence: 0.61, openedAt: '2026-09-02',
-      correction: { from: 'Ben and Coding', to: 'bending and coating' },
-      src: { t0: 3738, t1: 3761, speaker: 'Nasmee Samang', lang: 'zh',
-             orig: '弯管和涂敷的活动有明显的延误风险', tr: 'delay risk on the bending and coating activities',
-             segmentIds: ['s1284'] } },
     { type: 'decision', topic: 'perf', agenda: 'A5', owner: 'QA/QC', org: 'GZS',
       text: { en: 'Adopt the prefab audit checklist as the standing template for future GZS yard audits.',
                id: 'Jadikan checklist audit prefab sebagai templat tetap untuk audit yard GZS berikutnya.' },
@@ -149,10 +146,46 @@ function buildW36(w35) {
       src: { t0: 2410, speaker: 'Nasmee Samang', lang: 'zh',
              orig: '检查清单已经发给 CVL，效果不错，以后就用这份模板。',
              tr: 'The checklist had already been shared with CVL and worked well — use this template going forward.' } },
+    // W36-009 — the figure below cites this line, so it has to exist as its own
+    // register item rather than living inside the metric's sentence.
+    { type: 'info', topic: 'progress', agenda: 'A8',
+      text: { en: 'Land-pack manufacturing complete for all batches, ready for shipment.',
+               id: 'Manufaktur land-pack selesai untuk semua batch, siap dikirim.' },
+      status: 'closed', review: 'accepted', confidence: 0.93,
+      src: { t0: 3372, speaker: 'Nasmee Samang', lang: 'zh',
+             orig: '陆上管段的制造已经全部完成，各批次都可以发运了。',
+             tr: 'Land-pack manufacturing is complete for all batches and ready for shipment.' } },
+    // W36-010 — links back to the metric (W36-011): being ahead of baseline does
+    // not absorb this risk, and the drawer says so.
+    { type: 'risk', topic: 'schedule', agenda: 'A8', owner: 'Nasmee Samang', org: 'GZS', due: '2026-09-09',
+      text: { en: 'Delay risk on Ben and Coding activities for DNS shipment.',
+               id: 'Risiko keterlambatan pada aktivitas Ben and Coding untuk pengiriman DNS.' },
+      status: 'open', review: 'ai', confidence: 0.61, openedAt: '2026-09-02',
+      priority: 'high', likelihood: 'possible',
+      links: ['W36-011'],
+      correction: { from: 'Ben and Coding', to: 'bending and coating', origPhrase: '弯管和涂敷' },
+      src: { t0: 3738, t1: 3761, speaker: 'Nasmee Samang', lang: 'zh',
+             orig: '本周虽然进度领先，但弯管和涂敷的活动有明显的延误风险，特别是要发往 DNS 的部分。',
+             tr: 'Although progress is ahead this week, there is a significant delay risk on the bending and coating activities, particularly the part to be shipped to DNS.',
+             segmentIds: ['s1284', 's1287'] } },
+    // W36-011 — cites the land-pack note (W36-009) and the delay risk (W36-010).
     { type: 'metric', topic: 'progress', agenda: 'A8',
-      text: { en: 'Cumulative actual progress, week 36' },
+      text: { en: 'Cumulative actual progress, week 36', id: 'Progres aktual kumulatif, minggu 36' },
       status: 'closed', review: 'accepted', confidence: 0.94,
-      metric: { measure: 'cumulative_progress', value: 10.89, baseline: 9.78, unit: '%', asOf: '2026-08-28' } },
+      links: ['W36-009', 'W36-010'],
+      metric: { measure: 'cumulative_progress', value: 10.89, baseline: 9.78, unit: '%', asOf: '2026-08-28' },
+      src: { t0: 3390, t1: 3421, speaker: 'Nasmee Samang', lang: 'zh',
+             orig: '8 月 28 日的进度报告作为 WPR 的预基准版本发布，权重按最新信息更新。陆上管段各批次制造完成、可以发运，所以累计实际进度是 10.89%，比基准超前 1.11%。',
+             tr: 'The 28 August progress report was issued as the pre-baseline version for the WPR, with weightage updated according to the latest information. Land-pack manufacturing is complete for all batches and ready for shipment, so cumulative actual progress is 10.89% — 1.11% ahead of baseline.',
+             segmentIds: ['s1198', 's1204'] } },
+    { type: 'metric', topic: 'perf', agenda: 'A5',
+      text: { en: 'Accumulated man-hours', id: 'Jam kerja terakumulasi' },
+      status: 'closed', review: 'accepted', confidence: 0.95,
+      metric: { measure: 'man_hours', value: 35000, unit: '', asOf: '2026-09-02' } },
+    { type: 'metric', topic: 'perf', agenda: 'A5',
+      text: { en: 'HSE incidents this period', id: 'Insiden K3 pada periode ini' },
+      status: 'closed', review: 'accepted', confidence: 0.95,
+      metric: { measure: 'hse_incidents', value: 0, unit: '' } },
   ];
   for (const it of items) m = addItem(m, it, { by: 'seed' });
   return m;

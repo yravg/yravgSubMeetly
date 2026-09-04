@@ -16,12 +16,15 @@ export const NOTE_SCHEMA_VERSION = 2;
 /** @typedef {'open'|'progress'|'closed'|'carried'} ItemStatus */
 /** @typedef {'ai'|'accepted'|'edited'} ReviewState */
 /** @typedef {'high'|'med'|'low'} Priority */
+/** @typedef {'certain'|'likely'|'possible'|'unlikely'} Likelihood */
 
 export const ITEM_TYPES = /** @type {const} */ ([
   'decision', 'action', 'question', 'risk', 'metric', 'info',
 ]);
 export const ITEM_STATUSES = /** @type {const} */ (['open', 'progress', 'closed', 'carried']);
 export const REVIEW_STATES = /** @type {const} */ (['ai', 'accepted', 'edited']);
+/** Sumbu kedua matriks risiko: severity (`priority`) × likelihood. */
+export const LIKELIHOODS = /** @type {const} */ (['certain', 'likely', 'possible', 'unlikely']);
 
 /** Warna per tipe — dipakai UI. Emerald (--accent) TIDAK dipakai sebagai warna tipe. */
 export const TYPE_COLOR = {
@@ -80,12 +83,13 @@ export const LOW_CONFIDENCE = 0.7;
  * @property {string|null} org
  * @property {string|null} due        YYYY-MM-DD
  * @property {ItemStatus} status
- * @property {Priority} priority
+ * @property {Priority} priority   severity — sumbu pertama matriks risiko
+ * @property {Likelihood} likelihood  sumbu kedua; risiko dibaca "High × Possible"
  * @property {ReviewState} review
  * @property {number} confidence      0..1
  * @property {Provenance|null} src
  * @property {MetricPayload|null} metric
- * @property {{from:string,to:string}|null} correction  saran koreksi dari ekstraktor bila
+ * @property {{from:string,to:string,origPhrase:string|null}|null} correction  saran koreksi dari ekstraktor bila
  *   teks butir dan terjemahan mesin berbeda pada rentang berkeyakinan rendah
  *   (mis. "Ben and Coding" → "bending and coating"); null bila tidak ada
  * @property {string|null} carriedFrom
@@ -135,6 +139,8 @@ export const LOW_CONFIDENCE = 0.7;
  * @property {EngineStamp|null} engine
  * @property {string} generatedAt
  * @property {string|null} issuedAt   diisi saat MoM diterbitkan — membekukan dokumen
+ * @property {Record<string,string>} summary  ringkasan notulen yang ditulis manusia,
+ *   per bahasa; kosong berarti dokumen memakai kalimat statistik yang dihasilkan
  * @property {string} locale          bahasa kerja rapat
  * @property {number} schemaVersion
  */
@@ -216,13 +222,19 @@ export function createMetric(partial) {
   };
 }
 
-/** @returns {{from:string,to:string}|null} */
+/**
+ * @returns {{from:string,to:string,origPhrase:string|null}|null}
+ *
+ * `origPhrase` adalah frasa BAHASA SUMBER yang bersangkutan (mis. 弯管和涂敷) —
+ * dipakai untuk menyorotinya di baris "Sesuai ucapan". Opsional: ekstraktor
+ * belum tentu bisa memetakan balik ke rentang aslinya.
+ */
 export function createCorrection(partial) {
   if (!partial || typeof partial !== 'object') return null;
   const from = str(partial.from).trim();
   const to = str(partial.to).trim();
   if (!from || !to || from === to) return null;
-  return { from, to };
+  return { from, to, origPhrase: strOrNull(partial.origPhrase) };
 }
 
 /** @returns {MinuteItem} */
@@ -239,6 +251,7 @@ export function createMinuteItem(partial = {}, { locale = 'en' } = {}) {
     due: strOrNull(partial.due),
     status: oneOf(partial.status, ITEM_STATUSES, type === 'info' ? 'closed' : 'open'),
     priority: oneOf(partial.priority, ['high', 'med', 'low'], 'med'),
+    likelihood: oneOf(partial.likelihood, LIKELIHOODS, 'possible'),
     review: oneOf(partial.review, REVIEW_STATES, 'ai'),
     confidence: Math.min(1, Math.max(0, num(partial.confidence, 1))),
     src: createProvenance(partial.src),
@@ -287,6 +300,7 @@ export function createMeeting(partial = {}) {
       covered: !!a?.covered,
     })).filter((a) => a.ref),
     topics: partial.topics && typeof partial.topics === 'object' ? partial.topics : {},
+    summary: normalizeText(partial.summary, locale),
     items: (Array.isArray(partial.items) ? partial.items : []).map((i) =>
       createMinuteItem(i, { locale }),
     ),
