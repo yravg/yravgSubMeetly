@@ -12,11 +12,13 @@
         min-height: 100%;
       }
       body.app-shell {
-        max-width: 440px;
+        --shell-w: 440px;
+        max-width: var(--shell-w);
         margin: 0 auto;
         border-inline: 1px solid var(--border, #3a3a3a);
         min-height: 100vh;
         position: relative;
+        transition: max-width 0.2s ease;
       }
       .app-banner {
         display: flex;
@@ -34,6 +36,10 @@
         color: var(--accent-soft, #6ce0b8);
         font-weight: 600;
       }
+      .app-banner .banner-text {
+        flex: 1 1 320px;
+        min-width: 0;
+      }
       .app-banner .banner-actions {
         display: flex;
         flex-wrap: wrap;
@@ -44,6 +50,100 @@
       .app-banner a {
         color: var(--accent-soft, #6ce0b8);
       }
+      /* Width toggle: compact = side-panel width, wide = notes width, full = whole window. */
+      .width-seg {
+        display: inline-flex;
+        background: var(--card3, #2c2c2c);
+        border: 1px solid var(--border, #3a3a3a);
+        border-radius: 999px;
+        padding: 2px;
+      }
+      .width-seg button {
+        border: none;
+        background: none;
+        color: var(--muted, #b4b4b4);
+        font: inherit;
+        font-size: 11.5px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .width-seg button[aria-pressed='true'] {
+        background: var(--accent, #14b789);
+        color: #fff;
+        font-weight: 600;
+      }
+      /* Test-pages menu (English; the same list as index.html). */
+      .pages-menu {
+        position: relative;
+      }
+      .pages-menu > summary {
+        list-style: none;
+        cursor: pointer;
+        color: var(--accent-soft, #6ce0b8);
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .pages-menu > summary::-webkit-details-marker {
+        display: none;
+      }
+      .pages-menu[open] > summary::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+      }
+      .pages-menu .pages-list {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 60;
+        width: min(420px, 92vw);
+        max-height: 70vh;
+        overflow: auto;
+        background: var(--card2, #292929);
+        border: 1px solid var(--border, #3a3a3a);
+        border-radius: 12px;
+        padding: 8px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .pages-list a {
+        display: block;
+        padding: 7px 10px;
+        border-radius: 8px;
+        text-decoration: none;
+        color: var(--text, #f5f5f5);
+        font-size: 12.5px;
+        line-height: 1.4;
+      }
+      .pages-list a:hover {
+        background: var(--card3, #2c2c2c);
+      }
+      .pages-list a b {
+        display: block;
+        font-weight: 600;
+        color: var(--text, #f5f5f5);
+      }
+      .pages-list a span {
+        display: block;
+        color: var(--muted, #b4b4b4);
+        font-size: 11.5px;
+      }
+      .pages-list a.primary b {
+        color: var(--accent-soft, #6ce0b8);
+      }
+      .pages-list .sec {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted2, #8a8a8a);
+        font-weight: 600;
+        padding: 8px 10px 3px;
+      }
       #app-mount:empty::before {
         content: 'Loading Local TransSub (Whisper pipeline)…';
         display: block;
@@ -53,28 +153,77 @@
       }
       @media (min-width: 720px) {
         body.app-shell {
-          max-width: 480px;
           margin: 24px auto;
           min-height: calc(100vh - 48px);
           border-radius: 12px;
           border: 1px solid var(--border, #3a3a3a);
-          overflow: hidden;
+          /* Lab must scroll the document; overflow:hidden locked the page. */
+          overflow: visible;
           box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
         }
+        body.app-shell[data-width='full'] {
+          margin: 0;
+          min-height: 100vh;
+          border-radius: 0;
+          border-inline: none;
+          box-shadow: none;
+        }
+      }
+      /* Width presets apply at every viewport size; the shell simply caps at
+         the window when it is narrower than the preset. */
+      body.app-shell[data-width='compact'] { --shell-w: 480px; }
+      body.app-shell[data-width='wide'] { --shell-w: 880px; }
+      body.app-shell[data-width='full'] { --shell-w: 100%; border-inline: none; }
+      /* Auto: compact for Captions, wide for Notes (side panel stays 480px). */
+      body.app-shell[data-width='auto'] { --shell-w: 480px; }
+      body.app-shell[data-width='auto']:has(#view-notes:not(.hidden)) { --shell-w: 880px; }
+      /* Cards stretch to the shell instead of the 420px side-panel cap. */
+      body.app-shell[data-width='wide'] main .card,
+      body.app-shell[data-width='full'] main .card,
+      body.app-shell[data-width='auto']:has(#view-notes:not(.hidden)) main .card {
+        max-width: none;
       }
     </style>
   </head>
-  <body class="app-shell">
+  <body class="app-shell" data-width="auto">
     <div class="app-banner" role="note">
-      <div>
+      <div class="banner-text">
         <strong>Browser tab · on-device Whisper</strong> —
-        Offline file transcription uses the same transformers.js / AI worker path as the
-        extension (<code>offscreen.js</code> → <code>ai-worker.js</code> → <code>lib/asr.js</code>).
-        Models download once via Hugging Face and cache in the browser.
-        Realtime tab capture still needs the Chrome extension.
+        Same pipeline as the extension (<code>offscreen.js</code> → <code>ai-worker.js</code> → ASR/MT).
+        <strong>Realtime:</strong> Start loops a CC0/demo clip via <code>captureStream</code>;
+        Pick uses <code>getDisplayMedia</code> (share a tab + audio).
+        Overlay injection and <code>tabCapture</code> still need the Chrome extension.
+        Offline → CC0 test samples for 10–30s public-domain clips per language.
       </div>
       <div class="banner-actions">
-        <a href="/">All test pages</a>
+        <div class="width-seg" role="group" aria-label="Page width" id="width-seg">
+          <button type="button" data-width="auto" aria-pressed="true" title="Compact for Captions, wide for Notes">Auto</button>
+          <button type="button" data-width="compact" aria-pressed="false" title="Side-panel width (480px)">Compact</button>
+          <button type="button" data-width="wide" aria-pressed="false" title="880px">Wide</button>
+          <button type="button" data-width="full" aria-pressed="false" title="Whole window">Full</button>
+        </div>
+        <details class="pages-menu" id="pages-menu">
+          <summary>All test pages ▾</summary>
+          <div class="pages-list">
+            <a class="primary" href="/src/minutes.html"><b>Minutes Register (full tab)</b><span>Typed register, provenance drawer, series view and the issued-MoM document.</span></a>
+            <a href="/lab.html"><b>Translation Lab</b><span>Media player + automated zh↔en / ja↔en benchmark against the native helper.</span></a>
+            <a href="/studio.html"><b>Offline Studio (transcription / export)</b><span>File transcription, dual-line translation and the SRT/VTT/TXT export panel.</span></a>
+            <a href="/notes-panel.html"><b>Meeting notes ticker (harness)</b><span>Side-panel notes ticker on the v2 register.</span></a>
+            <div class="sec">Release QA</div>
+            <a href="/verify.html"><b>Phase 1 release verification</b><span>Status dashboard for the 26 baseline sub-features before smoke, E2E and the lab are wired up.</span></a>
+            <a href="/qa-report.html"><b>Smoke &amp; E2E test report</b><span>Summary of scripts/smoke.mjs and scripts/e2e.mjs (tabCapture, --pick, --native).</span></a>
+            <a href="/bench.html"><b>Model performance benchmark lab</b><span>Whisper / Voxtral / Opus-MT / native MLX comparison (last-bench.json).</span></a>
+            <a href="/defects.html"><b>Release defect list</b><span>Phase 1 release gate: must-fix defects vs accepted limitations (DRM, MKV, single tab, etc.).</span></a>
+            <div class="sec">Extension harnesses</div>
+            <a href="/audio-page.html"><b>Audio test page</b><span>Looping tab audio for extension e2e / dev-browser.</span></a>
+            <a href="/overlay-test.html"><b>Overlay test</b></a>
+            <a href="/panel-test.html"><b>Panel test</b></a>
+            <a href="/offscreen-test.html"><b>Offscreen test</b></a>
+            <div class="sec">More</div>
+            <a href="/"><b>Test page index</b></a>
+            <a href="/samples/ATTRIBUTION.md"><b>CC0 sample credits</b></a>
+          </div>
+        </details>
       </div>
     </div>
     <div id="app-mount"></div>
@@ -84,6 +233,27 @@
     <script type="module">
       import '/dist/offscreen.js';
       window.__browserOffscreenLoaded = true;
+
+      // Width toggle — remembered per browser.
+      const WIDTH_KEY = 'ltsAppWidth';
+      const seg = document.getElementById('width-seg');
+      function setWidth(w, persist = true) {
+        document.body.dataset.width = w;
+        seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.width === w)));
+        if (persist) {
+          try { localStorage.setItem(WIDTH_KEY, w); } catch { /* private mode */ }
+        }
+      }
+      let saved = 'auto';
+      try { saved = localStorage.getItem(WIDTH_KEY) || 'auto'; } catch { /* ignore */ }
+      setWidth(['auto', 'compact', 'wide', 'full'].includes(saved) ? saved : 'auto', false);
+      seg.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-width]');
+        if (b) setWidth(b.dataset.width);
+      });
+      document.getElementById('pages-menu').addEventListener('click', (e) => {
+        if (e.target.closest('a')) e.currentTarget.removeAttribute('open');
+      });
 
       const mount = document.getElementById('app-mount');
 
@@ -107,17 +277,7 @@
             '<p style="padding:16px;color:#e06c75">Failed to load /dist/sidepanel.js — rebuild with <code>npm run build</code>.</p>',
           );
         };
-        s.addEventListener('load', async () => {
-          // After sidepanel init() defaults to realtime, switch to Offline (no tabCapture here).
-          for (let i = 0; i < 50; i++) {
-            await new Promise((r) => setTimeout(r, 40));
-            const offlineBtn = document.querySelector('#mode-toggle [data-mode="offline"]');
-            if (offlineBtn && document.getElementById('btn-start')) {
-              offlineBtn.click();
-              break;
-            }
-          }
-        });
+        // Stay on Realtime by default so lab users can Start immediately.
         document.body.appendChild(s);
       } catch (err) {
         mount.innerHTML =

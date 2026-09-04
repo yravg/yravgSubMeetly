@@ -1,0 +1,79 @@
+---
+description: Minutes Register v2 — schema, actions/services split, i18n conventions for the notes/minutes feature
+globs: src/lib/notes-*.js,src/minutes.*,src/notes-panel.*,test/notes-*,docs/NOTES-V2-*.md
+alwaysApply: false
+---
+
+# Minutes Register v2
+
+Design doc: `docs/NOTES-V2-SPEC.md` (+ addendum at the bottom). Status / what's
+left: `docs/NOTES-V2-STATUS.md`. Read both before changing this feature —
+they carry the "why", this file only carries the "how".
+
+## Layers — do not blur them
+
+- `src/lib/notes-schema.js` — the `Meeting`/`MinuteItem` shape. Pure data
+  builders (`createMeeting`, `createMinuteItem`, …). No storage, no policy.
+- `src/lib/notes-store.js` — SERVICE. Storage mechanics only (backend
+  auto-detect: `chrome.storage.local` / `localStorage` / memory). No domain
+  rules. This is the seam where the native-helper SQLite backend plugs in
+  later via `setBackend()`.
+- `src/lib/notes-actions.js` — ACTIONS. All domain rules live here and
+  nowhere else: accept/edit/carry-forward/issue/amend. Every function is pure
+  (`(meeting, ...) -> meeting`); the `*AndSave` variants are the only ones
+  that touch storage. If you're asking "when is X allowed", the answer goes
+  here, not in the UI.
+- `src/minutes.js` — the full-tab workspace controller. Renders from the
+  layers above; contains no domain rules of its own (it should only ever
+  call into notes-actions.js, never mutate a Meeting by hand).
+- `src/notes-panel.js` — the SIDE-PANEL ticker. Deliberately thin: status +
+  a short open-items list + "Open minutes register". The table lives in
+  `minutes.html`, not here — don't grow a second table in the panel.
+
+Follow this same actions/services split for new notes code (from
+github.com/michaelshimeles/skills `code-structure`).
+
+## Non-negotiable invariants (tests in `test/notes-v2.test.mjs` enforce these)
+
+- Carry-forward never resets `openedAt` — age must survive across meetings.
+  `carriedFrom` points at the immediately-preceding ref; `src.meetingId`
+  keeps pointing at the meeting where the item was ORIGINALLY raised (so
+  playback still finds the real sentence after several carries).
+- Editing an item sets `review: 'edited'`, never `'accepted'` — approving
+  as-drafted and rewriting it are different signals and the MoM footer
+  reports them differently.
+- An issued meeting (`issuedAt` set) is frozen. Corrections go through
+  `createAmendment()`, which produces a new `-A1`/`-A2` meeting — the
+  original is never mutated after issue.
+- v1 → v2 migration (`notes-migrate.js`) never invents `src`/`confidence` for
+  imported items — they get `src: null, confidence: 0`. Don't backfill fake
+  provenance to make old data look richer than it is.
+
+## i18n
+
+Every UI string goes through `T()` from `makeT(lang)` (`src/lib/notes-i18n.js`).
+No hardcoded English or Indonesian in markup. Adding a string means adding it
+to BOTH the `en` and `id` dictionaries in the same edit — the i18n test in
+`test/notes-v2.test.mjs` fails the build otherwise. `pickText(item.text, lang)`
+is how item text (a `{en, id, ...}` map) gets read, never `item.text.en`
+directly.
+
+## Before you change `src/minutes.js` or `notes-panel.js`
+
+1. Check `id="..."` you reference with `$('#...')` actually exists — either
+   in the static HTML shell or in a template string the JS itself injects.
+   `test/notes-minutes-smoke.mjs` test 1 checks this automatically; run it.
+2. Run `node --test test/notes-v2.test.mjs test/notes-minutes-smoke.mjs`
+   before committing. The smoke test needs `jsdom` (`npm install --no-save
+   jsdom` — intentionally not a committed dependency; the test skips itself
+   cleanly if jsdom isn't installed).
+3. This repo's `esbuild.config.mjs` bundles `src/minutes.js` →
+   `dist/minutes.js` and copies `minutes.html`/`minutes.css` as statics —
+   update all three together if you rename files.
+
+## What's still stubbed (see roadmap in the spec, §7)
+
+Native extraction (mlx_lm), SQLite storage, provenance audio playback (the
+"▶ Play from here" action currently just toasts), diarization, and
+XLSX/ICS/DOCX export are Phase 2.1+ and not implemented yet — don't assume
+they exist when reading `native/server.py`.

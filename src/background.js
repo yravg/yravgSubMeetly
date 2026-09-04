@@ -7,6 +7,7 @@ import {
   mergeLine,
 } from './lib/transcript-cache.js';
 import { needsTranslation, pickUntranslatedLines, mergeLinesByTime, sourceText, translationText } from './lib/translation-utils.js';
+import { normalizeInterpreter, isConsecutive } from './lib/interpreter.js';
 import { nativeHostAction, nativeHostSupported, NATIVE_HOST_NAME } from './lib/native-host.js';
 import { nativeHealth } from './lib/native.js';
 import { NATIVE_MESSAGING_HOST, LOCAL_HELPER_ORIGIN } from './lib/native-protocol.js';
@@ -114,7 +115,7 @@ function toContent(type, data) {
 async function buildConfig(tabId, partial = {}) {
   const settings = await getSettings();
   const { lastConfig = {} } = await chrome.storage.local.get('lastConfig');
-  return {
+  const cfg = {
     tabId,
     srcLang: partial.srcLang ?? lastConfig.srcLang ?? 'ja',
     tgtLang: partial.tgtLang ?? lastConfig.tgtLang ?? 'en',
@@ -125,6 +126,18 @@ async function buildConfig(tabId, partial = {}) {
     streamId: partial.streamId,
     captureType: partial.captureType || 'tab',
   };
+  // Interpreter mode is a setting, so a context-menu start honours it too.
+  // Two-way is translation between a and b by definition, and has no fixed
+  // source language for the draft-then-refine pass.
+  const interpreter = normalizeInterpreter(settings, cfg.srcLang, cfg.tgtLang);
+  if (isConsecutive(interpreter)) {
+    cfg.srcLang = interpreter.a;
+    cfg.tgtLang = interpreter.b;
+    cfg.taskMode = 'translate';
+    cfg.refineTranslation = false;
+  }
+  cfg.interpreter = interpreter;
+  return cfg;
 }
 
 async function startRealtime(partialCfg) {
@@ -446,6 +459,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             rawSrc: sourceText(l),
             rawTgt: translationText(l),
             tgt: translationText(l),
+            ...(l.dir ? { dir: l.dir } : {}),
           }))
           .filter((l) => l.src);
         if (!lines.length) {
@@ -486,6 +500,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             t1: d.t1 ?? d.t0 + 2,
             src: (d.rawSource ?? d.source ?? '').trim(),
             tgt: (d.rawTranslation ?? '').trim(),
+            // two-way lines remember which way they went; everything that
+            // judges "is this translated?" reads it instead of session.config
+            ...(d.dir?.src && d.dir?.tgt ? { dir: { src: d.dir.src, tgt: d.dir.tgt } } : {}),
           };
           if (!line.src && (d.rawTranslation ?? d.translation ?? '').trim()) {
             line.src = (d.rawTranslation ?? d.translation ?? '').trim();

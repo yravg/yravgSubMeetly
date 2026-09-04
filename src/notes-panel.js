@@ -1,11 +1,25 @@
 /**
- * Renderer panel Notulen Rapat (frontend stub).
- * Dipakai harness test/notes-panel.html; nanti diintegrasikan ke Side Panel.
+ * Panel Notulen (rel samping) — tiket ringkas hidup, BUKAN tempat tabel.
+ * Register lengkap ada di src/minutes.html (tab penuh); panel ini hanya
+ * menunjukkan apa yang sudah tertangkap dari rapat aktif (hitungan per jenis
+ * + tiga butir terakhir dengan timecode / pembicara / keyakinan ASR), lalu
+ * satu tombol ke register. Bentuknya mengikuti artboard "Side panel — live
+ * capture" di kanvas desain Minutes Register.
+ *
+ * Side-panel notes ticker — NOT the table surface. The full register lives
+ * at src/minutes.html (a full tab); this panel only shows what has been
+ * captured so far from the active meeting (per-type counts + the three
+ * latest items with timecode / speaker / ASR confidence) and one button to
+ * the register. Layout follows the "Side panel — live capture" artboard.
  */
-import { loadNotesState, statusLabel, STUB_NOTE, STUB_TRANSCRIPT } from './lib/notes-stub.js';
-import { serializeNote } from './lib/notes-export.js';
-import { generateNotesFromTranscript } from './lib/notes-generate.js';
-import { saveNote, listNotes } from './lib/notes-store.js';
+import {
+  pickText, meetingStats, createMeeting, toTimecode,
+  TYPE_COLOR, ITEM_TYPES, LOW_CONFIDENCE,
+} from './lib/notes-schema.js';
+import { listMeetings, saveMeeting, backendName } from './lib/notes-store.js';
+import { makeT } from './lib/notes-i18n.js';
+import { flagMomentAndSave } from './lib/notes-actions.js';
+import { seedSampleData } from './lib/notes-fixture.js';
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -15,229 +29,311 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-function decisionsHtml(note, state) {
-  const decisions = note.decisions || [];
-  if (!decisions.length) {
-    return `<p class="notes-empty" id="notes-decisions-empty">${escapeHtml(state.emptyDecisionsMessage)}</p>`;
-  }
-  return `<ul id="notes-decisions-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>`;
+function registerUrl() {
+  const lang = (document.documentElement.lang || 'en').startsWith('id') ? 'id' : 'en';
+  const base = typeof chrome !== 'undefined' && chrome.runtime?.getURL
+    ? chrome.runtime.getURL('minutes.html')
+    : 'minutes.html';
+  return `${base}?lang=${lang}`;
 }
 
-function actionsHtml(note, state) {
-  const actions = note.actions || [];
-  if (!actions.length) {
-    return `<p class="notes-empty" id="notes-actions-empty">${escapeHtml(state.emptyActionsMessage)}</p>`;
-  }
-  return `<ul class="notes-actions-list" id="notes-actions-list">${actions
-    .map(
-      (a) => `
-        <li data-act-id="${escapeHtml(a.id)}">
-          <div class="act-text">${escapeHtml(a.text)}</div>
-          <span class="act-meta">${escapeHtml(a.owner || '—')}</span>
-          <span class="act-meta">${escapeHtml(a.due || 'tanpa tenggat')} · ${a.status}</span>
-        </li>`,
-    )
-    .join('')}</ul>`;
+function openRegister() {
+  const url = registerUrl();
+  if (typeof chrome !== 'undefined' && chrome.tabs?.create) chrome.tabs.create({ url });
+  else window.open(url, '_blank');
+}
+
+/** Tiga butir terakhir menurut posisi dalam rekaman (t0), lalu urutan register. */
+function latestItems(meeting, lang, n = 3) {
+  if (!meeting) return [];
+  return meeting.items
+    .map((i, idx) => ({ i, idx }))
+    .sort((a, b) => (b.i.src?.t0 ?? -1) - (a.i.src?.t0 ?? -1) || b.idx - a.idx)
+    .slice(0, n)
+    .map(({ i }) => ({
+      ref: i.ref,
+      type: i.type,
+      text: pickText(i.text, lang),
+      tc: i.src?.tc || null,
+      speaker: i.src?.speaker ? i.src.speaker.split(/\s+/)[0] : null,
+      conf: i.src ? Math.round(i.confidence * 100) : null,
+      low: i.confidence < LOW_CONFIDENCE,
+    }));
+}
+
+/** Detik sejak `startedAt` sebagai HH:MM:SS — jam rekaman di kartu. */
+function elapsedSeconds(capture, now = Date.now()) {
+  if (!capture?.running || !capture.startedAt) return 0;
+  return Math.max(0, Math.floor((now - capture.startedAt) / 1000));
+}
+
+const macLike = () => /^Mac/i.test(globalThis.navigator?.platform || '');
+/** Petunjuk pintasan "flag" — ⌘⇧F di Mac, Ctrl+Shift+F di tempat lain. */
+function flagShortcutHint() {
+  return macLike() ? '\u2318\u21e7F' : 'Ctrl+Shift+F';
+}
+
+// Strip gelombang di artboard adalah DEKORASI, bukan meter amplitudo: tinggi
+// batang tetap (deterministik) supaya panel tidak berpura-pura menampilkan
+// level audio yang memang belum tersedia dari pipeline.
+/** Berapa lama alasan penolakan bertahan di baris status. */
+const NOTICE_MS = 6000;
+
+const WAVE_BARS = [22, 38, 55, 31, 64, 44, 73, 36, 58, 81, 47, 29, 66, 52, 88, 61, 94, 70, 45, 78];
+
+function waveHtml(running) {
+  const live = WAVE_BARS.length - 5;
+  return `<div class="notes-wave" aria-hidden="true">${WAVE_BARS
+    .map((h, i) => `<span class="${running && i >= live ? 'on' : ''}" style="height:${h}%"></span>`)
+    .join('')}</div>`;
 }
 
 /**
- * @param {HTMLElement} root
- * @param {Awaited<ReturnType<typeof loadNotesState>>} state
- * @param {object} [handlers]
+ * Rel tangkap langsung (artboard SidePanel): titik status + jam + lencana
+ * mesin, strip gelombang, "End & draft", lalu tombol "Flag this moment".
+ * Tidak ada tombol Pause — pipeline-nya memang tidak punya jeda, dan kontrol
+ * mati lebih buruk daripada kontrol yang tidak ada.
  */
-export function renderNotesPanel(root, state, handlers = {}) {
-  const note = state.note;
-  const local = state.localStatus || note.status;
-
-  root.innerHTML = `
-    <div class="notes-panel" data-notes-root>
-      <div class="notes-status-row">
-        <span class="notes-pill ${escapeHtml(local)}" id="notes-local-status" data-status="${escapeHtml(local)}">
-          <span aria-hidden="true">●</span>
-          ${escapeHtml(statusLabel(local))}
-        </span>
-        <span class="notes-meta" id="notes-source-line">
-          ${note.savedLocally ? '📦 Tersimpan di perangkat' : 'Draft lokal'} · ${escapeHtml(note.source)}
-        </span>
-      </div>
-
-      <div class="notes-block">
-        <h3 id="notes-title">${escapeHtml(note.title)}</h3>
-        <p class="notes-meta">Dibuat ${escapeHtml(note.generatedAt || '—')}</p>
-      </div>
-
-      <div class="notes-toolbar">
-        <button type="button" class="btn primary" id="btn-notes-generate">
-          Buat Notulen dari contoh
-        </button>
-        <button type="button" class="btn ghost" id="btn-notes-clear-decisions" title="Demo pesan kosong">
-          Kosongkan keputusan
-        </button>
-        <button type="button" class="btn" id="btn-notes-export">
-          Ekspor…
-        </button>
-      </div>
-
-      <div class="notes-block" id="notes-summary-block">
-        <h3>Ringkasan</h3>
-        <p id="notes-summary">${escapeHtml(note.summary)}</p>
-        <details class="notes-transcript" id="notes-transcript-details">
-          <summary>Transkrip contoh</summary>
-          <pre id="notes-transcript-preview">${escapeHtml(note.transcriptPreview || '')}</pre>
-        </details>
-      </div>
-
-      <div class="notes-block" id="notes-decisions-block">
-        <h3>Poin Keputusan</h3>
-        <div id="notes-decisions">${decisionsHtml(note, state)}</div>
-      </div>
-
-      <div class="notes-block" id="notes-actions-block">
-        <h3>Tindak Lanjut</h3>
-        <div id="notes-actions">${actionsHtml(note, state)}</div>
-      </div>
-
-      <div class="notes-block" id="notes-saved-block">
-        <h3>Notulen tersimpan (lokal)</h3>
-        <div class="notes-saved-list" id="notes-saved-list">
-          ${(state.saved || [])
-            .map(
-              (n) => `
-            <button type="button" class="notes-saved-item${n.id === note.id ? ' active' : ''}" data-note-id="${escapeHtml(n.id)}">
-              <div>
-                <div class="ns-title">${escapeHtml(n.title)}</div>
-                <div class="ns-meta">${escapeHtml(n.source)} · ${escapeHtml(statusLabel(n.status))}</div>
-              </div>
-              <span class="notes-pill ${escapeHtml(n.status)}">${n.savedLocally ? 'lokal' : 'draft'}</span>
-            </button>`,
-            )
-            .join('')}
+function captureRailHtml(capture, T, { issued = false } = {}) {
+  const running = !!capture.running;
+  // Dua alasan berbeda untuk tombol mati: belum merekam, atau notulen aktif
+  // sudah terbit (beku). Judul tooltip mengatakan yang mana.
+  const blocked = !running || issued;
+  const why = issued ? T('flagRefusedIssued') : T('flagNeedsRecording');
+  return `
+      <div class="notes-rec" id="notes-recording-card">
+        <div class="notes-rec-head">
+          <span class="notes-rec-dot${running ? ' live' : ''}" aria-hidden="true"></span>
+          <span class="notes-rec-label">${escapeHtml(T(running ? 'recording' : 'idle'))}</span>
+          <span class="notes-rec-clock mono" id="notes-elapsed">${toTimecode(elapsedSeconds(capture))}</span>
+          <span class="notes-rec-spacer"></span>
+          <span class="notes-engine mono">${escapeHtml(capture.engine || '')}</span>
+        </div>
+        ${waveHtml(running)}
+        <div class="notes-rec-actions">
+          <button type="button" class="btn primary notes-end-btn" id="btn-end-draft"${running ? '' : ' disabled'}>
+            ${escapeHtml(T('endAndDraft'))}
+          </button>
         </div>
       </div>
 
-      <dialog id="notes-export-dialog" class="notes-dialog">
-        <form method="dialog" class="notes-dialog-body">
-          <h3>Ekspor notulen</h3>
-          <p class="notes-meta">Unduh sebagai teks polos atau Markdown (100% lokal).</p>
-          <div class="notes-toolbar">
-            <button type="submit" class="btn primary" value="txt" id="btn-export-txt">TXT</button>
-            <button type="submit" class="btn primary" value="md" id="btn-export-md">Markdown</button>
-            <button type="submit" class="btn ghost" value="cancel">Batal</button>
-          </div>
-        </form>
-      </dialog>
+      <button type="button" class="notes-flag" id="btn-flag-moment"${blocked ? ` disabled title="${escapeHtml(why)}"` : ''}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0b05c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h12l-2.2 3.6L17 12H5"/></svg>
+        ${escapeHtml(T('flagMoment'))}
+        <span class="notes-flag-key mono">${escapeHtml(flagShortcutHint())}</span>
+      </button>`;
+}
+
+export function renderNotesPanel(root, state, handlers = {}) {
+  const { meetings, active, lang, T, capture, notice } = state;
+  const stats = active ? meetingStats(active) : null;
+  const latest = latestItems(active, lang);
+  const counts = active
+    ? ITEM_TYPES.map((t) => [t, active.items.filter((i) => i.type === t).length]).filter(([, n]) => n > 0)
+    : [];
+
+  root.innerHTML = `
+    <div class="notes-panel" data-notes-root>
+      ${capture ? captureRailHtml(capture, T, { issued: !!active?.issuedAt }) : ''}
+
+      <div class="notes-status-row">
+        <span class="notes-pill ${notice ? 'error' : active ? 'ready' : 'idle'}" id="notes-status-pill">
+          <span aria-hidden="true">●</span>
+          ${notice ? escapeHtml(notice) : active ? escapeHtml(T('onDevice')) : escapeHtml(T('msgNoMeeting'))}
+        </span>
+        <span class="notes-meta">${escapeHtml(backendName())}</span>
+      </div>
+
+      <div class="notes-block" id="notes-active-block">
+        <div class="notes-block-head">
+          <h3>${active ? escapeHtml(T('capturedSoFar')) : escapeHtml(T('minutes'))}</h3>
+          ${active ? `<span class="notes-count">${stats.total}</span>` : ''}
+        </div>
+        ${active
+          ? `<p class="notes-meta notes-title-line">${escapeHtml(active.title)} · ${escapeHtml(active.date)}${stats.unreviewed ? ` · <span class="warn">${stats.unreviewed} ${escapeHtml(T('needReview'))}</span>` : ''}</p>
+             ${counts.length ? `<div class="notes-chips">${counts.map(([t, n]) => `<span class="notes-chip"><i style="background:${TYPE_COLOR[t]}"></i>${escapeHtml(T(t))}<b>${n}</b></span>`).join('')}</div>` : ''}
+             ${latest.length ? `<div class="notes-latest-label">${escapeHtml(T('latest'))}</div>
+             <div class="notes-latest" id="notes-open-list">${latest.map((i, idx) => `
+               <div class="notes-latest-row${idx === latest.length - 1 && latest.length > 2 ? ' dim' : ''}" data-ref="${escapeHtml(i.ref)}">
+                 <span class="rail" style="background:${TYPE_COLOR[i.type]}"></span>
+                 <span class="body">
+                   <span class="txt">${escapeHtml(i.text)}</span>
+                   <span class="meta">${i.tc ? `${escapeHtml(i.tc)} · ` : ''}${i.speaker ? `${escapeHtml(i.speaker)} · ` : ''}${i.conf != null ? `<span class="${i.low ? 'low' : ''}">${i.conf}%</span>` : escapeHtml(i.ref)}</span>
+                 </span>
+               </div>`).join('')}</div>` : `<p class="notes-empty">${escapeHtml(T('noneYet'))}</p>`}`
+          : `<p class="notes-empty">${escapeHtml(T('nothingLeft'))}</p>`}
+      </div>
+
+      <div class="notes-toolbar">
+        <button type="button" class="btn primary notes-open-btn" id="btn-open-register">
+          ${escapeHtml(T('openRegister'))}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 16 16 8"/><path d="M9.5 8H16v6.5"/></svg>
+        </button>
+        ${!meetings.length ? `<button type="button" class="btn ghost" id="btn-notes-sample">${escapeHtml(T('startNext'))} (${escapeHtml(T('minutes'))} demo)</button>` : ''}
+      </div>
+      <p class="notes-meta notes-hint">${escapeHtml(T('panelHint'))}</p>
+
+      ${meetings.length > 1
+        ? `<div class="notes-block" id="notes-recent-block">
+            <h3>${escapeHtml(T('meetings'))}</h3>
+            <div class="notes-saved-list" id="notes-saved-list">
+              ${meetings
+                .slice(0, 6)
+                .map(
+                  (m) => `
+                <button type="button" class="notes-saved-item${m.id === active?.id ? ' active' : ''}" data-meeting-id="${escapeHtml(m.id)}">
+                  <div>
+                    <div class="ns-title">${escapeHtml(m.title)}</div>
+                    <div class="ns-meta">${escapeHtml(m.date)}${m.issuedAt ? ` · ${escapeHtml(T('issued'))}` : ''}</div>
+                  </div>
+                </button>`,
+                )
+                .join('')}
+            </div>
+          </div>`
+        : ''}
     </div>
   `;
 
-  root.querySelector('#btn-notes-generate')?.addEventListener('click', () => handlers.onGenerate?.());
-  root.querySelector('#btn-notes-export')?.addEventListener('click', () => {
-    handlers.onExport?.();
-    root.querySelector('#notes-export-dialog')?.showModal();
+  root.querySelector('#btn-open-register')?.addEventListener('click', () => handlers.onOpenRegister?.());
+  root.querySelector('#btn-end-draft')?.addEventListener('click', () => handlers.onEndAndDraft?.());
+  root.querySelector('#btn-flag-moment')?.addEventListener('click', () => handlers.onFlagMoment?.());
+  root.querySelector('#btn-notes-sample')?.addEventListener('click', () => handlers.onLoadSample?.());
+  root.querySelectorAll('.notes-latest-row[data-ref]').forEach((row) => {
+    row.addEventListener('click', () => handlers.onOpenRegister?.());
   });
-  root.querySelector('#btn-notes-clear-decisions')?.addEventListener('click', () => {
-    handlers.onClearDecisions?.();
-  });
-  root.querySelectorAll('[data-note-id]').forEach((btn) => {
-    btn.addEventListener('click', () => handlers.onSelectSaved?.(btn.getAttribute('data-note-id')));
-  });
-  root.querySelector('#notes-export-dialog')?.addEventListener('close', (ev) => {
-    const val = /** @type {HTMLDialogElement} */ (ev.target).returnValue;
-    if (val === 'txt' || val === 'md') handlers.onExportFormat?.(val);
+  root.querySelectorAll('[data-meeting-id]').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onSelectMeeting?.(btn.getAttribute('data-meeting-id')));
   });
 }
 
-export function formatNoteExport(note, format) {
-  return serializeNote(note, format === 'md' ? 'md' : 'txt');
-}
+/**
+ * Pasang tiket panel. `getCapture()` (dipasok sidepanel.js) melaporkan
+ * `{ running, startedAt, engine }`; tanpa itu rel tangkap-langsung tidak
+ * dirender sama sekali — panel tetap berguna di konteks lain (uji, lab).
+ *
+ * Jam berdetak sekali per detik; interval lama SELALU dibersihkan lebih dulu
+ * karena applyI18n() memanggil ulang mountNotesPanel pada root yang sama saat
+ * bahasa berubah.
+ */
+export async function mountNotesPanel(root, { getCapture, onEndCapture } = {}) {
+  const lang = (document.documentElement.lang || 'en').startsWith('id') ? 'id' : 'en';
+  const T = makeT(lang);
+  let meetings = await listMeetings();
+  let activeId = meetings[0]?.id || null;
 
-export function downloadText(filename, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+  if (root.__notesTick) {
+    clearInterval(root.__notesTick);
+    root.__notesTick = null;
+  }
+  if (root.__notesNoticeTimer) {
+    clearTimeout(root.__notesNoticeTimer);
+    root.__notesNoticeTimer = null;
+  }
 
-export async function mountNotesPanel(root) {
-  let state = await loadNotesState();
+  // Panel ini tidak punya toast. Alasan sebuah tanda ditolak muncul beberapa
+  // detik di baris status yang sudah ada — gagal diam-diam itu bug, bukan gaya.
+  let notice = null;
+  const say = (msg) => {
+    notice = msg;
+    redraw();
+    clearTimeout(root.__notesNoticeTimer);
+    root.__notesNoticeTimer = setTimeout(() => {
+      notice = null;
+      root.__notesNoticeTimer = null;
+      redraw();
+    }, NOTICE_MS);
+  };
+
+  const readCapture = () => {
+    if (!getCapture) return null;
+    const c = getCapture() || {};
+    return { running: !!c.running, startedAt: c.startedAt ?? null, engine: c.engine || '' };
+  };
+
+  const flagNow = async () => {
+    const cap = readCapture();
+    if (!cap?.running) return;
+    const t0 = elapsedSeconds(cap);
+    const tc = toTimecode(t0);
+    let meeting = meetings.find((m) => m.id === activeId) || null;
+    if (meeting?.issuedAt) {
+      // Notulen terbit itu beku (assertEditable). Katakan kenapa, jangan diam.
+      say(T('flagRefusedIssued'));
+      return;
+    }
+    if (!meeting) {
+      meeting = await saveMeeting(
+        createMeeting({
+          title: T('untitledMeeting'),
+          date: new Date().toISOString().slice(0, 10),
+          locale: lang,
+        }),
+      );
+    }
+    try {
+      await flagMomentAndSave(meeting, { tc, t0, text: T('flaggedAt', tc) });
+    } catch (e) {
+      console.warn('[notes] flagMoment:', e?.message || e);
+      say(e?.code === 'issued' ? T('flagRefusedIssued') : String(e?.message || e));
+      return;
+    }
+    meetings = await listMeetings();
+    activeId = meeting.id;
+    redraw();
+  };
 
   const redraw = () => {
-    renderNotesPanel(root, state, {
-      onGenerate: () => {
-        state = {
-          ...state,
-          localStatus: 'generating',
-          note: {
-            ...state.note,
-            status: 'generating',
-            summary: 'Menyusun notulen dari transkrip contoh…',
-            decisions: [],
-            actions: [],
-          },
-        };
-        redraw();
-        setTimeout(async () => {
-          const built = generateNotesFromTranscript(
-            STUB_TRANSCRIPT.map((l) => ({ text: l.text, speaker: l.speaker, t0: l.t0, t1: l.t1 })),
-            {
-              title: 'Standup rilis Fase 1 — contoh',
-              source: 'transkrip contoh (dibuat sekarang)',
-            },
-          );
-          built.decisions = STUB_NOTE.decisions;
-          built.actions = STUB_NOTE.actions;
-          built.summary = STUB_NOTE.summary;
-          built.status = 'saved';
-          built.savedLocally = true;
-          try {
-            await saveNote(built);
-            const saved = await listNotes();
-            state = {
-              ...state,
-              localStatus: 'saved',
-              note: built,
-              activeNoteId: built.id,
-              saved: saved.length ? saved : [built, ...state.saved],
-            };
-          } catch {
-            state = {
-              ...state,
-              localStatus: 'saved',
-              note: built,
-              activeNoteId: built.id,
-              saved: [built, ...state.saved.filter((n) => n.id !== built.id)],
-            };
-          }
+    renderNotesPanel(
+      root,
+      {
+        meetings,
+        active: meetings.find((m) => m.id === activeId) || null,
+        lang,
+        T,
+        capture: readCapture(),
+        notice,
+      },
+      {
+        onOpenRegister: openRegister,
+        onFlagMoment: flagNow,
+        onEndAndDraft: async () => {
+          await onEndCapture?.();
+          openRegister();
+        },
+        onSelectMeeting: (id) => {
+          activeId = id;
           redraw();
-        }, 600);
+        },
+        onLoadSample: async () => {
+          await seedSampleData();
+          meetings = await listMeetings();
+          activeId = meetings[0]?.id || null;
+          redraw();
+          openRegister();
+        },
       },
-      onClearDecisions: () => {
-        state = {
-          ...state,
-          note: { ...state.note, decisions: [] },
-        };
-        redraw();
-      },
-      onSelectSaved: (id) => {
-        const found = state.saved.find((n) => n.id === id);
-        if (!found) return;
-        state = {
-          ...state,
-          note: { ...found },
-          activeNoteId: id,
-          localStatus: found.status === 'saved' ? 'saved' : found.status,
-        };
-        redraw();
-      },
-      onExportFormat: (fmt) => {
-        const safe = (state.note.title || 'notulen').replace(/[^\w\s.-]+/g, '_').slice(0, 60);
-        const ext = fmt === 'md' ? 'md' : 'txt';
-        downloadText(`${safe}.${ext}`, formatNoteExport(state.note, fmt));
-      },
-    });
+    );
   };
 
   redraw();
-  return () => state;
+
+  if (getCapture) {
+    // Satu detak per detik: selagi merekam ia hanya menulis ulang jam (murah),
+    // dan menggambar ulang kartu hanya ketika status rekam benar-benar berubah.
+    let wasRunning = readCapture().running;
+    root.__notesTick = setInterval(() => {
+      const cap = readCapture();
+      if (cap.running !== wasRunning) {
+        wasRunning = cap.running;
+        redraw();
+        return;
+      }
+      if (!cap.running) return;
+      const clock = root.querySelector('#notes-elapsed');
+      if (clock) clock.textContent = toTimecode(elapsedSeconds(cap));
+    }, 1000);
+  }
+
+  return () => ({ meetings, activeId });
 }

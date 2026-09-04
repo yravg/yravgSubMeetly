@@ -1,4 +1,4 @@
-# Chrome Web Store assets (1.1.0)
+# Chrome Web Store assets (1.1.1)
 
 | Doc | Path |
 |---|---|
@@ -36,7 +36,7 @@ npm run build
 npm run pack:store
 ```
 
-Canonical upload path: **`store/releases/local-transsub-1.1.0.zip`**.
+Canonical upload path: **`store/releases/local-transsub-1.1.1.zip`**.
 
 ## Short blurb
 Local TransSub — on-device realtime subtitles & translation. No Local TransSub cloud inference; models download once when you choose them.

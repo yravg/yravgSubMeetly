@@ -35,26 +35,30 @@
     <p>
       Full side-panel UI at <code>http://127.0.0.1:8799/app.html</code> with
       on-device Whisper (transformers.js / AI worker), same as the extension browser engine.
-      Use <strong>Offline</strong> + a media file. Realtime tab capture still needs the extension.
+      <strong>Realtime</strong> works here too: Start loops a CC0/demo clip;
+      Pick shares a tab with audio via getDisplayMedia. Extension tabCapture/overlay still need the unpacked extension.
     </p>
 
-    <a href="verify.html">Verifikasi Rilis Fase 1</a>
-    <p>Dashboard status 26 sub-fitur baseline (stub) sebelum smoke, E2E, dan lab terhubung.</p>
+    <a href="verify.html">Phase 1 release verification</a>
+    <p>Status dashboard for the 26 baseline sub-features (stub) before smoke, E2E and the lab are wired up.</p>
 
-    <a href="qa-report.html">Laporan uji asap &amp; E2E</a>
-    <p>Ringkasan stub <code>scripts/smoke.mjs</code> dan <code>scripts/e2e.mjs</code> (tabCapture, --pick, --native).</p>
+    <a href="qa-report.html">Smoke &amp; E2E test report</a>
+    <p>Stub summary of <code>scripts/smoke.mjs</code> and <code>scripts/e2e.mjs</code> (tabCapture, --pick, --native).</p>
 
-    <a href="bench.html">Lab benchmark kinerja model</a>
-    <p>Perbandingan Whisper / Voxtral / Opus-MT / native MLX (stub + <code>last-bench.json</code>).</p>
+    <a href="bench.html">Model performance benchmark lab</a>
+    <p>Whisper / Voxtral / Opus-MT / native MLX comparison (stub + <code>last-bench.json</code>).</p>
 
-    <a href="defects.html">Daftar cacat rilis</a>
-    <p>Gerbang rilis Fase 1: cacat wajib vs kendala yang diterima (DRM, MKV, satu tab, dll.).</p>
+    <a href="defects.html">Release defect list</a>
+    <p>Phase 1 release gate: must-fix defects vs accepted limitations (DRM, MKV, single tab, etc.).</p>
 
-    <a href="studio.html">Offline Studio (transkripsi / ekspor)</a>
-    <p>Halaman tiruan transkripsi berkas, terjemahan dual-line, dan panel ekspor SRT/VTT/TXT.</p>
+    <a href="studio.html">Offline Studio (transcription / export)</a>
+    <p>Mock page for file transcription, dual-line translation and the SRT/VTT/TXT export panel.</p>
 
-    <a href="notes-panel.html">Notulen Rapat (stub)</a>
-    <p>Harness frontend notulen lokal (ringkasan, keputusan, tindak lanjut).</p>
+    <a href="notes-panel.html">Meeting notes ticker (harness)</a>
+    <p>Side-panel notes ticker on the v2 register; the full Minutes Register opens from it.</p>
+
+    <a href="/src/minutes.html">Minutes Register (full tab)</a>
+    <p>Typed register, provenance drawer, series view and the issued-MoM document (design canvas implementation).</p>
 
     <a href="lab.html">Translation Lab</a>
     <p>Media player + automated zh↔en / ja↔en benchmark against the native helper.</p>

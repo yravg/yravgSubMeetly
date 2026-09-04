@@ -58,44 +58,85 @@ export const ENGINES = {
 export const DEFAULT_NATIVE_URL = 'http://127.0.0.1:17865';
 
 // ---------------------------------------------------------------------------
+// Canonical display names (one label per ISO code — never "Indonesia" vs
+// "Indonesian" drift between UI / ASR / MT pickers).
+export const LANG_LABELS = {
+  auto: 'Auto detect',
+  en: 'English',
+  ja: 'Japanese',
+  zh: 'Chinese',
+  ko: 'Korean',
+  de: 'German',
+  fr: 'French',
+  es: 'Spanish',
+  ru: 'Russian',
+  it: 'Italian',
+  pt: 'Portuguese',
+  nl: 'Dutch',
+  pl: 'Polish',
+  tr: 'Turkish',
+  ar: 'Arabic',
+  hi: 'Hindi',
+  th: 'Thai',
+  vi: 'Vietnamese',
+  id: 'Bahasa Indonesia',
+  uk: 'Ukrainian',
+};
+
+/** Deduplicate [code, label] pairs — first occurrence wins. */
+export function uniqueLangEntries(entries) {
+  const seen = new Set();
+  const out = [];
+  for (const [code, label] of entries) {
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    out.push([code, label || LANG_LABELS[code] || code]);
+  }
+  return out;
+}
+
+function langEntry(code) {
+  return [code, LANG_LABELS[code] || code];
+}
+
 // Source languages Whisper handles well (subset of its 99). 'auto' lets the
 // model detect per-utterance.
-export const SOURCE_LANGS = [
-  ['auto', 'Auto detect'],
-  ['en', 'English'],
-  ['ja', 'Japanese'],
-  ['zh', 'Chinese'],
-  ['ko', 'Korean'],
-  ['de', 'German'],
-  ['fr', 'French'],
-  ['es', 'Spanish'],
-  ['ru', 'Russian'],
-  ['it', 'Italian'],
-  ['pt', 'Portuguese'],
-  ['nl', 'Dutch'],
-  ['pl', 'Polish'],
-  ['tr', 'Turkish'],
-  ['ar', 'Arabic'],
-  ['hi', 'Hindi'],
-  ['th', 'Thai'],
-  ['vi', 'Vietnamese'],
-  ['id', 'Indonesian'],
-  ['uk', 'Ukrainian'],
-];
+export const SOURCE_LANGS = uniqueLangEntries([
+  'auto',
+  'en',
+  'ja',
+  'zh',
+  'ko',
+  'de',
+  'fr',
+  'es',
+  'ru',
+  'it',
+  'pt',
+  'nl',
+  'pl',
+  'tr',
+  'ar',
+  'hi',
+  'th',
+  'vi',
+  'id',
+  'uk',
+].map(langEntry));
 
-export const TARGET_LANGS = [
-  ['en', 'English'],
-  ['zh', 'Chinese'],
-  ['de', 'German'],
-  ['fr', 'French'],
-  ['es', 'Spanish'],
-  ['ru', 'Russian'],
-  ['it', 'Italian'],
-  ['id', 'Indonesian'],
-  ['vi', 'Vietnamese'],
-  ['ja', 'Japanese'],
-  ['ko', 'Korean'],
-];
+export const TARGET_LANGS = uniqueLangEntries([
+  'en',
+  'zh',
+  'de',
+  'fr',
+  'es',
+  'ru',
+  'it',
+  'id',
+  'vi',
+  'ja',
+  'ko',
+].map(langEntry));
 
 // ---------------------------------------------------------------------------
 // Opus-MT translation pairs available as Xenova ONNX exports (q8 ≈ 110–125 MB
@@ -125,7 +166,44 @@ export const MT_PAIRS = {
   'en-vi': { id: 'Xenova/opus-mt-en-vi', size: '~115 MB' },
 };
 
-export const LANG_NAMES = Object.fromEntries([...SOURCE_LANGS, ...TARGET_LANGS]);
+export const LANG_NAMES = { ...LANG_LABELS };
+
+/** UI language options = unique Opus-MT source langs (matches #mt-models). */
+export const UI_LANGS = (() => {
+  // Only the left side of each pair key — never both ends (that would list
+  // English once per en-* pair and look like duplicates).
+  const codes = new Set();
+  for (const key of Object.keys(MT_PAIRS)) {
+    const [src] = key.split('-');
+    if (src) codes.add(src);
+  }
+  const nativeLabels = {
+    en: 'English',
+    zh: '中文',
+    ja: '日本語',
+    ko: '한국어',
+    de: 'Deutsch',
+    fr: 'Français',
+    es: 'Español',
+    ru: 'Русский',
+    it: 'Italiano',
+    nl: 'Nederlands',
+    pl: 'Polski',
+    ar: 'العربية',
+    vi: 'Tiếng Việt',
+    id: 'Bahasa Indonesia',
+    uk: 'Українська',
+  };
+  // Stable order: English first, then Chinese, then remaining alpha by code.
+  const preferred = ['en', 'zh'];
+  const rest = [...codes].filter((c) => !preferred.includes(c)).sort();
+  return uniqueLangEntries(
+    [...preferred.filter((c) => codes.has(c)), ...rest].map((code) => [
+      code,
+      nativeLabels[code] || LANG_NAMES[code] || code,
+    ]),
+  );
+})();
 
 // "ja-en" -> "Japanese → English"
 export function pairLabel(key) {

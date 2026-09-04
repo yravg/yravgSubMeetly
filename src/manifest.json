@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Local TransSub",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "On-device realtime subtitles: local AI transcription + translation for any tab. Audio is not uploaded to our servers.",
   "minimum_chrome_version": "120",
   "permissions": [
@@ -17,7 +17,9 @@
     "tabs",
     "nativeMessaging"
   ],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

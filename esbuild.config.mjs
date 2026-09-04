@@ -47,6 +47,8 @@ const statics = [
   ['src/sidepanel.html', 'sidepanel.html'],
   ['src/sidepanel.css', 'sidepanel.css'],
   ['src/notes-panel.css', 'notes-panel.css'],
+  ['src/minutes.html', 'minutes.html'],
+  ['src/minutes.css', 'minutes.css'],
 ];
 for (const [from, to] of statics) {
   await copyFile(path.join(root, from), path.join(dist, to));
@@ -94,6 +96,7 @@ const builds = [
   { entryPoints: ['src/offscreen.js'], outfile: 'dist/offscreen.js', format: 'esm' },
   { entryPoints: ['src/ai-worker.js'], outfile: 'dist/ai-worker.js', format: 'esm' },
   { entryPoints: ['src/sidepanel.js'], outfile: 'dist/sidepanel.js', format: 'esm' },
+  { entryPoints: ['src/minutes.js'], outfile: 'dist/minutes.js', format: 'esm' },
   { entryPoints: ['src/content.js'], outfile: 'dist/content.js', format: 'iife' },
 ];
 

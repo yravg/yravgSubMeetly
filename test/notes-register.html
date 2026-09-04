@@ -1,0 +1,1185 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Minutes Register</title>
+<style>
+/* ==========================================================================
+   Local TransSub — Minutes Register (Facilitator-class notes surface)
+   Design tokens extend src/sidepanel.css (charcoal + emerald). Committed
+   single-theme dark: the product is a dark Chrome surface, so every colour
+   is painted explicitly rather than inherited from the host.
+   ========================================================================== */
+:root{
+  /* --- carried over verbatim from src/sidepanel.css --- */
+  --bg:#181818;
+  --card:#1f1f1f;
+  --card2:#292929;
+  --card3:#2c2c2c;
+  --border:#3a3a3a;
+  --text:#f5f5f5;
+  --text2:#e8e8e8;
+  --muted:#b4b4b4;
+  --accent:#14b789;
+  --accent-hover:#16cc99;
+  --accent-soft:#6ce0b8;
+  --accent-dim:rgba(20,183,137,.14);
+  --warn-text:#e0b05c;
+  --danger:#e06c75;
+
+  /* --- new: register-specific --- */
+  --bg-deep:#131313;          /* the surface behind the table */
+  --row-hover:#232323;
+  --row-sel:rgba(20,183,137,.10);
+  --grid:#2f2f2f;             /* hairlines inside the table only */
+  --muted2:#8a8a8a;
+
+  /* item-type hues — deliberately NOT the emerald accent, which stays
+     reserved for interface affordances (active tab, primary action) */
+  --t-decision:#7fb3d5;       /* harbour blue  */
+  --t-action:#e0b05c;         /* buoy amber    */
+  --t-question:#b79ce0;       /* violet        */
+  --t-risk:#e06c75;           /* signal red    */
+  --t-info:#9a9a9a;           /* slate         */
+
+  /* review state */
+  --ai:#7a6fa8;
+  --ok:#14b789;
+
+  --mono:ui-monospace,SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;
+  --ui:"Hellix","Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,
+       "Hiragino Sans","Microsoft YaHei",sans-serif;
+
+  --r:8px;
+  --r-pill:999px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg-deep);
+  color:var(--text);
+  font-family:var(--ui);
+  font-size:13px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent-soft);outline-offset:1px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- app shell ---------- */
+.app{display:flex;flex-direction:column;height:100vh;min-height:100vh}
+
+/* ---------- meeting header ---------- */
+.mhead{
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  padding:12px 16px 0;
+  flex-shrink:0;
+}
+.mhead-top{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.brandmark{
+  display:flex;align-items:center;gap:8px;
+  font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;
+  flex-shrink:0;padding-top:3px;
+}
+.brandmark b{color:var(--text);font-weight:600;letter-spacing:-.01em;text-transform:none;font-size:13px}
+.mtitle-wrap{flex:1;min-width:240px}
+h1{
+  font-size:17px;font-weight:600;letter-spacing:-.015em;line-height:1.3;
+  text-wrap:balance;
+}
+.mfacts{
+  display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px;
+  font-size:11.5px;color:var(--muted);
+}
+.mfacts span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.mfacts .k{color:var(--muted2)}
+.mfacts .v{color:var(--text2)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.head-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+
+/* provenance banner — replaces Loop's flat "AI-generated content" line */
+.prov{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  margin:10px 0 0;padding:7px 10px;
+  background:rgba(122,111,168,.10);
+  border:1px solid rgba(122,111,168,.35);
+  border-radius:var(--r);
+  font-size:11.5px;color:#cdc6e4;
+}
+.prov b{color:#e2dcf2;font-weight:600}
+.prov .sep{color:#6b6383}
+
+/* ---------- coverage strip ---------- */
+.strip{
+  display:flex;gap:0;margin-top:10px;
+  border:1px solid var(--border);border-bottom:none;
+  border-radius:var(--r) var(--r) 0 0;
+  background:var(--card);
+  overflow-x:auto;
+}
+.stat{
+  flex:1 0 auto;min-width:104px;padding:9px 12px;
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;gap:1px;
+}
+.stat:last-child{border-right:none}
+.stat .n{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.15;font-variant-numeric:tabular-nums}
+.stat .l{font-size:10.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em}
+.stat.is-alert .n{color:var(--danger)}
+.stat.is-warn .n{color:var(--warn-text)}
+.stat.is-ok .n{color:var(--accent)}
+.stat .bar{display:block;height:4px;border-radius:2px;background:#333;margin-top:6px;overflow:hidden;max-width:160px}
+.stat .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+
+/* ---------- view tabs + toolbar ---------- */
+.bar{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 16px;background:var(--bg);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.tabs{display:inline-flex;background:var(--card3);border:1px solid var(--border);border-radius:var(--r-pill);padding:2px}
+.tabs button{
+  border:none;background:none;color:var(--muted);
+  padding:4px 11px;border-radius:var(--r-pill);cursor:pointer;
+  font-size:12px;white-space:nowrap;
+}
+.tabs button[aria-selected="true"]{background:var(--accent);color:#fff;font-weight:600}
+.tabs button:hover:not([aria-selected="true"]){color:var(--text2)}
+
+.spacer{flex:1}
+
+.srch{
+  position:relative;display:flex;align-items:center;
+  background:var(--card2);border:1px solid var(--border);border-radius:var(--r-pill);
+  padding:0 10px;height:28px;min-width:150px;
+}
+.srch input{background:none;border:none;outline:none;width:100%;font-size:12px}
+.srch input::placeholder{color:var(--muted2)}
+.srch span{color:var(--muted2);font-size:11px;margin-right:6px}
+
+.btn{
+  background:var(--card2);border:1px solid var(--border);color:var(--text2);
+  height:28px;padding:0 11px;border-radius:var(--r-pill);cursor:pointer;font-size:12px;
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  transition:background .12s ease,border-color .12s ease;
+}
+.btn:hover{background:var(--card3);border-color:#4a4a4a}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.on{background:var(--accent-dim);border-color:rgba(20,183,137,.5);color:var(--accent-soft)}
+
+.langsw{display:inline-flex;border:1px solid var(--border);border-radius:var(--r-pill);overflow:hidden;height:28px}
+.langsw button{
+  border:none;background:var(--card2);color:var(--muted);
+  padding:0 10px;cursor:pointer;font-size:11.5px;font-weight:600;letter-spacing:.03em;
+}
+.langsw button[aria-pressed="true"]{background:var(--accent);color:#fff}
+
+/* filter chips row */
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:7px 16px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  border:1px solid var(--border);background:var(--card2);color:var(--muted);
+  border-radius:var(--r-pill);padding:3px 9px 3px 7px;font-size:11.5px;cursor:pointer;
+}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+.chip .ct{font-family:var(--mono);font-size:10.5px;color:var(--muted2)}
+.chip[aria-pressed="true"]{background:var(--card3);color:var(--text);border-color:#4d4d4d}
+.chip[data-type="decision"]{--c:var(--t-decision)}
+.chip[data-type="action"]{--c:var(--t-action)}
+.chip[data-type="question"]{--c:var(--t-question)}
+.chip[data-type="risk"]{--c:var(--t-risk)}
+.chip[data-type="info"]{--c:var(--t-info)}
+.chip .dot{background:var(--c,var(--muted))}
+.chip[aria-pressed="true"] .ct{color:var(--text2)}
+
+/* ---------- main region ---------- */
+.main{flex:1;display:flex;min-height:0;overflow:hidden}
+.pane{flex:1;min-width:0;overflow:auto;background:var(--bg-deep)}
+
+/* ---------- the register table ---------- */
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:940px}
+thead th{
+  position:sticky;top:0;z-index:3;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  text-align:left;padding:7px 10px;
+  font-size:10.5px;font-weight:600;color:var(--muted2);
+  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;
+  cursor:pointer;user-select:none;
+}
+thead th:hover{color:var(--text2)}
+thead th .sort{color:var(--accent);font-size:9px}
+tbody td{
+  border-bottom:1px solid var(--grid);
+  padding:8px 10px;vertical-align:top;
+}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--row-hover)}
+tbody tr[aria-selected="true"] td{background:var(--row-sel)}
+tbody tr[aria-selected="true"] td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
+
+.c-id{width:78px}
+.c-type{width:104px}
+.c-topic{width:120px}
+.c-owner{width:132px}
+.c-due{width:92px}
+.c-status{width:104px}
+.c-src{width:78px}
+
+.id{font-family:var(--mono);font-size:11px;color:var(--muted2);white-space:nowrap}
+.id.carried::after{
+  content:"↩";color:var(--warn-text);margin-left:4px;font-family:var(--ui);
+}
+
+/* type is a left severity rail + label, not a rounded pill on everything */
+.type{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.type i{width:3px;height:14px;border-radius:2px;background:var(--c);flex-shrink:0}
+.type[data-type="decision"]{--c:var(--t-decision);color:var(--t-decision)}
+.type[data-type="action"]{--c:var(--t-action);color:var(--t-action)}
+.type[data-type="question"]{--c:var(--t-question);color:var(--t-question)}
+.type[data-type="risk"]{--c:var(--t-risk);color:var(--t-risk)}
+.type[data-type="info"]{--c:var(--t-info);color:var(--t-info)}
+
+.topic{
+  display:inline-block;font-size:10.5px;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border);
+  border-radius:4px;padding:1px 6px;white-space:nowrap;
+}
+.itemtext{color:var(--text2);max-width:640px}
+.itemtext .agenda{
+  font-family:var(--mono);font-size:10px;color:var(--muted2);
+  margin-right:6px;
+}
+.itemtext .alt{display:block;color:var(--muted2);font-size:11.5px;margin-top:2px;font-style:italic}
+.owner{display:flex;align-items:center;gap:6px;min-width:0}
+.av{
+  width:20px;height:20px;border-radius:50%;flex-shrink:0;
+  display:grid;place-items:center;font-size:9.5px;font-weight:700;color:#12160f;
+  font-family:var(--mono);
+}
+.owner .nm{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.owner .org{font-size:10px;color:var(--muted2)}
+.due{font-family:var(--mono);font-size:11.5px;color:var(--text2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.due.over{color:var(--danger);font-weight:600}
+.due.soon{color:var(--warn-text)}
+.due .rel{display:block;font-size:10px;color:var(--muted2);font-family:var(--ui)}
+
+.status{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;white-space:nowrap}
+.status .sd{width:8px;height:8px;border-radius:50%;flex-shrink:0;border:1.5px solid var(--c)}
+.status[data-s="open"]{--c:var(--muted)}
+.status[data-s="progress"]{--c:var(--warn-text);color:var(--warn-text)}
+.status[data-s="progress"] .sd{background:linear-gradient(90deg,var(--warn-text) 50%,transparent 50%)}
+.status[data-s="closed"]{--c:var(--accent);color:var(--accent)}
+.status[data-s="closed"] .sd{background:var(--accent)}
+.status[data-s="carried"]{--c:var(--t-question);color:var(--t-question)}
+.status[data-s="carried"] .sd{background:var(--t-question)}
+
+.src{
+  font-family:var(--mono);font-size:11px;color:var(--muted2);
+  display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+}
+.src:hover{color:var(--accent-soft)}
+.src .play{font-size:8px}
+.conf{
+  display:block;width:34px;height:3px;border-radius:2px;background:var(--card3);
+  margin-top:4px;overflow:hidden;
+}
+.conf i{display:block;height:100%;border-radius:2px}
+.rev{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;margin-top:3px;display:block}
+.rev[data-r="ai"]{color:var(--ai)}
+.rev[data-r="accepted"]{color:var(--ok)}
+.rev[data-r="edited"]{color:var(--muted2)}
+
+/* ---------- grouped (by topic) view ---------- */
+.grp{padding:0 0 24px}
+.grp h2{
+  position:sticky;top:0;z-index:2;
+  display:flex;align-items:baseline;gap:10px;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  padding:8px 16px;font-size:12px;font-weight:600;letter-spacing:.01em;
+}
+.grp h2 .cnt{font-family:var(--mono);font-size:11px;color:var(--muted2);font-weight:400}
+.grp h2 .cov{margin-left:auto;font-size:10.5px;font-weight:400}
+.gcard{
+  display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;
+  padding:10px 16px;border-bottom:1px solid var(--grid);cursor:pointer;
+}
+.gcard:hover{background:var(--row-hover)}
+.gcard .gmeta{display:flex;flex-direction:column;gap:4px;align-items:flex-end;text-align:right}
+
+/* ---------- document (minutes) view ---------- */
+.doc{max-width:72ch;margin:0 auto;padding:28px 24px 64px}
+.doc h2{
+  font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2);
+  border-bottom:1px solid var(--border);padding-bottom:5px;margin:26px 0 12px;font-weight:600;
+}
+.doc h2:first-child{margin-top:0}
+.doc p{color:var(--text2);margin-bottom:10px}
+.doc ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+.doc li{display:flex;gap:9px;align-items:baseline}
+.doc li i{width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;background:var(--c,var(--muted))}
+.doc li[data-type="decision"]{--c:var(--t-decision)}
+.doc li[data-type="action"]{--c:var(--t-action)}
+.doc li[data-type="question"]{--c:var(--t-question)}
+.doc li[data-type="risk"]{--c:var(--t-risk)}
+.doc li[data-type="info"]{--c:var(--t-info)}
+.doc li .tail{font-family:var(--mono);font-size:10.5px;color:var(--muted2);white-space:nowrap}
+.doc .sig{
+  margin-top:32px;padding-top:14px;border-top:1px solid var(--border);
+  font-size:11px;color:var(--muted2);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+}
+
+/* ---------- carry-forward view ---------- */
+.cf{padding:16px}
+.cf-intro{color:var(--muted);font-size:12px;margin-bottom:14px;max-width:64ch}
+.cf-list{display:flex;flex-direction:column;gap:8px}
+.cfrow{
+  display:grid;grid-template-columns:4px 1fr auto;gap:12px;align-items:center;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:10px 12px 10px 0;overflow:hidden;
+}
+.cfrow>.age-rail{height:100%;min-height:42px;background:var(--warn-text);border-radius:0}
+.cfrow.hot>.age-rail{background:var(--danger)}
+.cfrow .cfmain{min-width:0;padding-left:12px}
+.cfrow .cfmain .t{color:var(--text2);margin-bottom:3px}
+.cfrow .cfmain .m{font-size:11px;color:var(--muted2);font-family:var(--mono)}
+.cfrow .cfact{display:flex;gap:6px;flex-shrink:0}
+
+/* ---------- detail drawer ---------- */
+.drawer{
+  width:min(400px,42vw);flex-shrink:0;
+  border-left:1px solid var(--border);background:var(--card);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.drawer[hidden]{display:none!important}
+.dhead{
+  padding:12px 14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;gap:10px;flex-shrink:0;
+}
+.dhead .x{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px}
+.dhead .x:hover{color:var(--text)}
+.dbody{overflow:auto;padding:14px;display:flex;flex-direction:column;gap:16px}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld>label{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);font-weight:600}
+.fld input,.fld select,.fld textarea{
+  background:var(--card2);border:1px solid var(--border);border-radius:6px;
+  padding:6px 8px;font-size:12.5px;width:100%;outline:none;resize:vertical;
+}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--accent);background:var(--card3)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* provenance block — the thing Loop cannot do */
+.quote{
+  background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--r);
+  padding:10px 12px;position:relative;
+}
+.quote .qh{
+  display:flex;align-items:center;gap:8px;margin-bottom:7px;
+  font-size:11px;color:var(--muted2);flex-wrap:wrap;
+}
+.quote .qh .tc{font-family:var(--mono);color:var(--accent-soft);cursor:pointer}
+.quote .qt{color:var(--text2);font-size:12.5px;line-height:1.55}
+.quote .qt.orig{padding-bottom:8px;margin-bottom:8px;border-bottom:1px dashed var(--border)}
+.quote .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);display:block;margin-bottom:3px}
+.wave{
+  display:flex;align-items:flex-end;gap:1.5px;height:22px;margin-top:9px;
+}
+.wave i{flex:1;background:var(--card3);border-radius:1px;min-height:2px}
+.wave i.in{background:var(--accent);opacity:.55}
+
+.dfoot{
+  border-top:1px solid var(--border);padding:10px 14px;display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;
+}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(8px);
+  background:var(--card3);border:1px solid var(--border);border-radius:var(--r-pill);
+  padding:8px 16px;font-size:12px;color:var(--text2);
+  opacity:0;pointer-events:none;transition:opacity .16s ease,transform .16s ease;z-index:50;
+  box-shadow:0 6px 22px rgba(0,0,0,.45);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.empty{padding:40px 16px;text-align:center;color:var(--muted2);font-size:12.5px}
+
+/* ---------- narrow / side-panel mode ---------- */
+@media (max-width:860px){
+  .drawer{
+    position:fixed;inset:0;width:100%;z-index:40;border-left:none;
+  }
+  .c-topic,.c-src,.c-owner{display:none}
+  table{min-width:0}
+  .itemtext{max-width:none}
+  .mfacts .opt{display:none}
+}
+@media (max-width:620px){
+  thead{display:none}
+  table,tbody,tr,td{display:block;width:auto}
+  tbody tr{
+    border-bottom:1px solid var(--grid);padding:10px 14px;
+    display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:baseline;
+  }
+  tbody tr:hover td{background:none}
+  tbody td{border:none;padding:0}
+  td.c-id{grid-row:1;grid-column:1}
+  td.c-type{grid-row:1;grid-column:2}
+  td.c-item{grid-row:2;grid-column:1/-1}
+  td.c-due,td.c-status{grid-row:3;display:inline-block}
+  td.c-due{grid-column:1}
+  td.c-status{grid-column:2}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ meeting header ============ -->
+  <header class="mhead">
+    <div class="mhead-top">
+      <div class="brandmark"><b>Local TransSub</b><span>·</span><span data-t="minutes">Minutes</span></div>
+      <div class="mtitle-wrap">
+        <h1 id="m-title">CPOC Phase 7 — GZS Weekly Progress Meeting</h1>
+        <div class="mfacts">
+          <span><span class="k" data-t="date">Date</span> <span class="v mono">2026-09-02</span></span>
+          <span><span class="k" data-t="time">Time</span> <span class="v mono">10:00–12:00 GMT+8</span></span>
+          <span><span class="k" data-t="chair">Chair</span> <span class="v">Nasmee Samang</span></span>
+          <span class="opt"><span class="k" data-t="present">Present</span> <span class="v mono">9</span></span>
+          <span class="opt"><span class="k" data-t="mom">MoM</span> <span class="v mono">MOM-CPOC7-W36</span></span>
+        </div>
+      </div>
+      <div class="head-actions">
+        <button class="btn" id="btn-export">⤓ <span data-t="export">Export</span></button>
+        <button class="btn primary" id="btn-issue">✓ <span data-t="issue">Issue MoM</span></button>
+      </div>
+    </div>
+
+    <div class="prov">
+      <b data-t="provTitle">Drafted on-device</b>
+      <span class="sep">·</span>
+      <span id="prov-line">Whisper large-v3-turbo (MLX) → 214 segments → 18 register items. Nothing left this Mac.</span>
+      <span class="sep">·</span>
+      <span><b id="prov-unreviewed">6</b> <span data-t="needReview">need review</span></span>
+    </div>
+
+    <div class="strip" id="strip"></div>
+  </header>
+
+  <!-- ============ view tabs + toolbar ============ -->
+  <div class="bar">
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" aria-selected="true" data-view="table" data-t="vRegister">Register</button>
+      <button role="tab" aria-selected="false" data-view="topic" data-t="vTopic">By topic</button>
+      <button role="tab" aria-selected="false" data-view="doc" data-t="vDoc">Minutes</button>
+      <button role="tab" aria-selected="false" data-view="carry" data-t="vCarry">Carry-forward</button>
+    </div>
+    <div class="spacer"></div>
+    <label class="srch"><span>⌕</span><input id="q" type="search" placeholder="Search items, owners, quotes…" /></label>
+    <button class="btn" id="btn-mine" aria-pressed="false">◑ <span data-t="mine">Mine</span></button>
+    <button class="btn" id="btn-dual" aria-pressed="false">⇅ <span data-t="dual">Dual text</span></button>
+    <div class="langsw" role="group" aria-label="Interface language">
+      <button data-lang="en" aria-pressed="true">EN</button>
+      <button data-lang="id" aria-pressed="false">ID</button>
+    </div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <!-- ============ main ============ -->
+  <div class="main">
+    <div class="pane" id="pane"></div>
+
+    <!-- detail drawer -->
+    <aside class="drawer" id="drawer" hidden aria-label="Item detail">
+      <div class="dhead">
+        <div style="flex:1;min-width:0">
+          <div class="id" id="d-id">—</div>
+          <div id="d-type" style="margin-top:3px"></div>
+        </div>
+        <button class="x" id="d-close" aria-label="Close">✕</button>
+      </div>
+      <div class="dbody" id="d-body"></div>
+      <div class="dfoot" id="d-foot"></div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   1. i18n — every label goes through T(). Nothing is hardcoded in the markup
+      except the fallback text, which T() overwrites on first paint.
+   ========================================================================== */
+const STR = {
+  en:{
+    minutes:"Minutes", date:"Date", time:"Time", chair:"Chair", present:"Present", mom:"MoM",
+    export:"Export", issue:"Issue MoM", provTitle:"Drafted on-device", needReview:"need review",
+    vRegister:"Register", vTopic:"By topic", vDoc:"Minutes", vCarry:"Carry-forward",
+    mine:"Mine", dual:"Dual text",
+    cId:"Ref", cType:"Type", cTopic:"Topic", cItem:"Item", cOwner:"Owner", cDue:"Due",
+    cStatus:"Status", cSrc:"Source",
+    decision:"Decision", action:"Action", question:"Open question", risk:"Risk", info:"Note",
+    open:"Open", progress:"In progress", closed:"Closed", carried:"Carried",
+    ai:"AI draft", accepted:"Accepted", edited:"Edited",
+    noOwner:"Unassigned", noDue:"No date", overdue:"overdue", dueIn:"in",
+    days:"d", today:"today",
+    total:"Items", actions:"Actions", overdueL:"Overdue", decisions:"Decisions",
+    questions:"Open Qs", coverage:"Agenda covered", review:"Unreviewed",
+    sHeard:"Heard at", sSpeaker:"Speaker", sOriginal:"Original (zh)", sTranslated:"Translated (en)",
+    dText:"Item text", dOwner:"Owner", dDue:"Due date", dStatus:"Status", dType:"Type",
+    dTopic:"Topic", dAgenda:"Agenda ref", dConf:"ASR confidence", dProv:"Where this came from",
+    accept:"Accept", editS:"Save edit", reject:"Discard", jump:"Play from here",
+    carryIntro:"Open items inherited from the previous meeting. Anything still open is re-numbered into this week's register and keeps its original age.",
+    carryIn:"Carry in", closeIt:"Close", age:"open for",
+    emptyF:"No items match the current filters.",
+    toastAccept:"Item accepted — locked into the MoM",
+    toastCarry:"Carried into this week's register",
+    toastExport:"Register exported: 18 rows → MoM-CPOC7-W36.xlsx + .md",
+    toastIssue:"MoM issued. 6 unreviewed items still flagged as AI draft.",
+    toastPlay:"Seeking transcript to",
+    attendees:"Attendees", nextMtg:"Next meeting", prepared:"Prepared by",
+    docSum:"Summary", docDec:"Decisions", docAct:"Action register", docQ:"Open questions",
+    docRisk:"Risks", docNote:"Discussion notes",
+  },
+  id:{
+    minutes:"Notulen", date:"Tanggal", time:"Waktu", chair:"Pimpinan", present:"Hadir", mom:"Notulen",
+    export:"Ekspor", issue:"Terbitkan Notulen", provTitle:"Disusun di perangkat", needReview:"perlu ditinjau",
+    vRegister:"Register", vTopic:"Per topik", vDoc:"Notulen", vCarry:"Bawaan",
+    mine:"Milik saya", dual:"Dua bahasa",
+    cId:"Ref", cType:"Jenis", cTopic:"Topik", cItem:"Butir", cOwner:"Penanggung jawab", cDue:"Tenggat",
+    cStatus:"Status", cSrc:"Sumber",
+    decision:"Keputusan", action:"Tindak lanjut", question:"Pertanyaan terbuka", risk:"Risiko", info:"Catatan",
+    open:"Terbuka", progress:"Berjalan", closed:"Selesai", carried:"Dibawa",
+    ai:"Draf AI", accepted:"Disetujui", edited:"Disunting",
+    noOwner:"Belum ditugaskan", noDue:"Tanpa tenggat", overdue:"lewat", dueIn:"dalam",
+    days:"h", today:"hari ini",
+    total:"Butir", actions:"Tindak lanjut", overdueL:"Lewat tenggat", decisions:"Keputusan",
+    questions:"Pertanyaan", coverage:"Agenda terbahas", review:"Belum ditinjau",
+    sHeard:"Terdengar pada", sSpeaker:"Pembicara", sOriginal:"Asli (zh)", sTranslated:"Terjemahan (en)",
+    dText:"Teks butir", dOwner:"Penanggung jawab", dDue:"Tenggat", dStatus:"Status", dType:"Jenis",
+    dTopic:"Topik", dAgenda:"Ref agenda", dConf:"Keyakinan ASR", dProv:"Asal butir ini",
+    accept:"Setujui", editS:"Simpan suntingan", reject:"Buang", jump:"Putar dari sini",
+    carryIntro:"Butir terbuka warisan rapat sebelumnya. Yang masih terbuka dinomori ulang ke register minggu ini dan mempertahankan umurnya.",
+    carryIn:"Bawa masuk", closeIt:"Tutup", age:"terbuka",
+    emptyF:"Tidak ada butir yang cocok dengan filter.",
+    toastAccept:"Butir disetujui — terkunci di notulen",
+    toastCarry:"Dibawa ke register minggu ini",
+    toastExport:"Register diekspor: 18 baris → MoM-CPOC7-W36.xlsx + .md",
+    toastIssue:"Notulen diterbitkan. 6 butir belum ditinjau masih ditandai draf AI.",
+    toastPlay:"Menggeser transkrip ke",
+    attendees:"Peserta", nextMtg:"Rapat berikutnya", prepared:"Disusun oleh",
+    docSum:"Ringkasan", docDec:"Poin keputusan", docAct:"Register tindak lanjut", docQ:"Pertanyaan terbuka",
+    docRisk:"Risiko", docNote:"Catatan pembahasan",
+  }
+};
+let LANG = "en";
+const T = k => (STR[LANG][k] ?? STR.en[k] ?? k);
+
+/* ==========================================================================
+   2. Data model — one flat register of typed items. This replaces
+      { summary:string, decisions:string[], actions:ActionItem[] }.
+   ========================================================================== */
+const TOPICS = {
+  hse:      {en:"HSE / Incident",   id:"K3 / Insiden"},
+  controls: {en:"Safety controls",  id:"Kendali keselamatan"},
+  docs:     {en:"Document review",  id:"Tinjauan dokumen"},
+  marine:   {en:"Vessel & marine",  id:"Kapal & marine"},
+  mob:      {en:"Mobilisation",     id:"Mobilisasi"},
+  perf:     {en:"HSE performance",  id:"Kinerja K3"},
+  proc:     {en:"Procurement",      id:"Pengadaan"},
+};
+
+const AGENDA = [
+  {ref:"A1", en:"Safety moment & incident review", id:"Momen keselamatan & tinjauan insiden", covered:true},
+  {ref:"A2", en:"Dropped-object controls",         id:"Kendali dropped object",              covered:true},
+  {ref:"A3", en:"Document review status (MDR/GMDR)",id:"Status tinjauan dokumen (MDR/GMDR)", covered:true},
+  {ref:"A4", en:"Offshore mobilisation readiness", id:"Kesiapan mobilisasi offshore",        covered:true},
+  {ref:"A5", en:"HSE performance & yard audits",   id:"Kinerja K3 & audit yard",             covered:true},
+  {ref:"A6", en:"Vessel selection (C900)",         id:"Pemilihan kapal (C900)",              covered:true},
+  {ref:"A7", en:"Marine budget & pipeline cargo",  id:"Anggaran marine & kargo pipa",        covered:false},
+  {ref:"A8", en:"Look-ahead: 3-week plan",         id:"Look-ahead: rencana 3 minggu",        covered:false},
+];
+
+const PEOPLE = {
+  "Nasmee Samang":{org:"GZS", c:"#14b789"},
+  "Lai Kong Teng":{org:"COMPANY", c:"#7fb3d5"},
+  "Riza":{org:"GZS", c:"#e0b05c"},
+  "Jagdeep":{org:"MWS", c:"#b79ce0"},
+  "Huimin":{org:"GZS", c:"#6ce0b8"},
+  "QA/QC":{org:"GZS", c:"#e06c75"},
+  "CVL":{org:"SUBCON", c:"#9a9a9a"},
+};
+const TODAY = new Date("2026-09-03T00:00:00Z");
+
+/* Each item carries both languages, a review state, and a pointer back into
+   the transcript. That pointer is the whole reason this beats Loop. */
+const ITEMS = [
+  { ref:"W36-001", type:"info", topic:"hse", agenda:"A1", conf:.94, review:"accepted",
+    en:"Grating fell from the HLV main-boom walkway onto the jacket sea deck and struck a portable fire extinguisher; a second object later fell from the main crane into the sea. Personnel on the sea deck were evacuated to the barge — no injuries.",
+    id:"Grating jatuh dari walkway main-boom HLV ke sea deck jacket dan menghantam APAR portabel; benda kedua kemudian jatuh dari main crane ke laut. Personel di sea deck dievakuasi ke barge — tidak ada cedera.",
+    owner:null, due:null, status:"closed",
+    src:{t:"00:04:12", speaker:"Nasmee Samang",
+      orig:"吊臂走道上的格栅掉落到导管架甲板上，砸到一个手提灭火器。人员已撤到驳船，之后又有物件掉入海中，无人受伤。",
+      tr:"A grating from the boom walkway fell onto the jacket deck and hit a portable extinguisher. Personnel were moved to the barge; another object then fell into the sea. No injuries."}},
+
+  { ref:"W36-002", type:"decision", topic:"controls", agenda:"A2", conf:.91, review:"accepted",
+    en:"Cranes are to be inspected and secured before operation and before transport — not operation alone.",
+    id:"Crane wajib diperiksa dan diamankan sebelum operasi dan sebelum transportasi — bukan hanya saat operasi.",
+    owner:"Lai Kong Teng", due:null, status:"closed",
+    src:{t:"00:11:38", speaker:"Lai Kong Teng",
+      orig:"起重机的护栏和潜在坠物不仅要在作业时检查，港口动员和运输到现场时也要检查。",
+      tr:"Crane handrails and potential dropped objects need inspection not only during operation but also during port-side mobilisation and transport to field."}},
+
+  { ref:"W36-003", type:"action", topic:"controls", agenda:"A2", conf:.88, review:"ai",
+    en:"Issue a crane inspection checklist covering greasing, fast-line block inspection and a boom-walkway sweep for loose items.",
+    id:"Terbitkan checklist inspeksi crane mencakup greasing, inspeksi fast-line block, dan penyisiran walkway boom untuk barang lepas.",
+    owner:"Lai Kong Teng", due:"2026-09-08", status:"open",
+    src:{t:"00:09:05", speaker:"Nasmee Samang",
+      orig:"事故复盘建议建立起重机检查清单，包括润滑、快绳滑车检查，以及检查吊臂走道有无松散物件。",
+      tr:"The incident review recommended establishing a crane inspection checklist, including greasing, fast-line block inspection, and checking the crane-boom walkway for loose items."}},
+
+  { ref:"W36-004", type:"action", topic:"controls", agenda:"A2", conf:.86, review:"ai",
+    en:"Update HRLFE crane master work orders to include service-platform inspection.",
+    id:"Perbarui master work order crane HRLFE agar mencakup inspeksi service platform.",
+    owner:"Lai Kong Teng", due:"2026-09-12", status:"open",
+    src:{t:"00:10:22", speaker:"Lai Kong Teng",
+      orig:"更新 HRLFE 起重机主工单，纳入服务平台检查。",
+      tr:"Update HRLFE crane master work orders to include service-platform inspections."}},
+
+  { ref:"W36-005", type:"action", topic:"controls", agenda:"A2", conf:.93, review:"accepted",
+    en:"Secondary securement installed — additional wire ropes fitted to floodlights and the walkway after multiple loose items were found.",
+    id:"Pengamanan sekunder terpasang — tambahan wire rope pada floodlight dan walkway setelah ditemukan beberapa barang lepas.",
+    owner:"Riza", due:"2026-09-01", status:"closed",
+    src:{t:"00:12:47", speaker:"Riza",
+      orig:"检查发现多处松散物件，之后加装了钢丝绳固定探照灯和走道设备。",
+      tr:"The inspection identified multiple loose items, after which additional wire ropes were installed to secure floodlights and walkway equipment."}},
+
+  { ref:"W36-006", type:"risk", topic:"controls", agenda:"A2", conf:.79, review:"ai",
+    en:"ZPMC crane operations outside the stated weather-limit criteria remain a live dropped-object exposure until the checklist is in force.",
+    id:"Operasi crane ZPMC di luar kriteria batas cuaca tetap menjadi paparan dropped object hingga checklist berlaku.",
+    owner:"Lai Kong Teng", due:"2026-09-08", status:"progress",
+    src:{t:"00:13:30", speaker:"Nasmee Samang",
+      orig:"必须遵守 ZPMC 起重机作业的天气限制标准。",
+      tr:"Comply with weather-limit criteria for ZPMC crane operations."}},
+
+  { ref:"W36-007", type:"info", topic:"docs", agenda:"A3", conf:.90, review:"accepted",
+    en:"Xuemei documents sit at mixed review stages — some under COMPANY review, others submitted to divisions per MDR/GMDR priority. No issues flagged at the time of the meeting.",
+    id:"Dokumen Xuemei berada pada tahap tinjauan berbeda — sebagian dalam tinjauan COMPANY, sebagian sudah diserahkan ke divisi sesuai prioritas MDR/GMDR. Tidak ada isu saat rapat.",
+    owner:null, due:null, status:"closed",
+    src:{t:"00:22:04", speaker:"Nasmee Samang",
+      orig:"雪梅的文件处于不同审查阶段，部分在公司审查中，其余已按 MDR 和 GMDR 优先级提交给相关部门，目前没有问题。",
+      tr:"The Xuemei documents were at different review stages: some under company review, others submitted to the relevant divisions according to MDR and GMDR priorities. No issues flagged."}},
+
+  { ref:"W36-008", type:"action", topic:"docs", agenda:"A3", conf:.85, review:"ai",
+    en:"Obtain Mr. Huimin's signature on the SCI MWS draft before submission to COMPANY.",
+    id:"Peroleh tanda tangan Bapak Huimin pada draf SCI MWS sebelum penyerahan ke COMPANY.",
+    owner:"Riza", due:"2026-09-05", status:"progress",
+    src:{t:"00:25:41", speaker:"Riza",
+      orig:"SCI 的 MWS 草稿已经发给公司，正在等惠民先生签字后再正式提交。",
+      tr:"The SCI MWS draft had been shared with the company and was awaiting Mr. Huimin's signature before submission."}},
+
+  { ref:"W36-009", type:"action", topic:"docs", agenda:"A3", conf:.82, review:"ai",
+    en:"Chase management signature in parallel on the advance MWS draft already sent to Jagdeep.",
+    id:"Kejar tanda tangan manajemen secara paralel untuk draf MWS awal yang sudah dikirim ke Jagdeep.",
+    owner:"Riza", due:"2026-09-05", status:"open",
+    src:{t:"00:26:20", speaker:"Riza",
+      orig:"我也把预先草稿发给了 Jagdeep，同时在向管理层申请签字。",
+      tr:"Riza had also sent an advance draft to Jagdeep and was requesting management's signature in parallel."}},
+
+  { ref:"W36-010", type:"action", topic:"mob", agenda:"A4", conf:.87, review:"ai",
+    en:"Close the OSP before offshore mobilisation — still under discussion at the time of the meeting.",
+    id:"Tutup OSP sebelum mobilisasi offshore — masih dalam pembahasan saat rapat.",
+    owner:"Nasmee Samang", due:"2026-09-15", status:"progress",
+    src:{t:"00:31:15", speaker:"Nasmee Samang",
+      orig:"OSP 还在讨论中，预计在海上动员之前关闭。",
+      tr:"The OSP remained under discussion and was expected to be closed before offshore mobilisation."}},
+
+  { ref:"W36-011", type:"decision", topic:"perf", agenda:"A5", conf:.92, review:"accepted",
+    en:"CUL onshore fabrication yard prefabrication audits confirmed for 21–22 September, run jointly with QA/QC.",
+    id:"Audit prefabrikasi di yard fabrikasi onshore CUL dikonfirmasi 21–22 September, dijalankan bersama QA/QC.",
+    owner:"QA/QC", due:"2026-09-22", status:"open",
+    src:{t:"00:38:52", speaker:"Nasmee Samang",
+      orig:"CUL 陆上预制场的预制审核安排在 9 月 21 到 22 日，与 QAQC 一起进行。",
+      tr:"Prefabrication audits at the CUL onshore fabrication yard were planned for September 21–22 in conjunction with QAQC."}},
+
+  { ref:"W36-012", type:"action", topic:"perf", agenda:"A5", conf:.89, review:"accepted",
+    en:"Prefab audit checklist shared with CVL; CVL confirmed it is preparing for the audit.",
+    id:"Checklist audit prefab dibagikan ke CVL; CVL mengonfirmasi sedang bersiap untuk audit.",
+    owner:"CVL", due:"2026-09-19", status:"closed",
+    src:{t:"00:40:10", speaker:"Nasmee Samang",
+      orig:"检查清单已经发给 CVL，他们正在为审核做准备。",
+      tr:"The checklist had been shared with CVL, which was preparing for the audits."}},
+
+  { ref:"W36-013", type:"info", topic:"perf", agenda:"A5", conf:.95, review:"accepted",
+    en:"35,000+ accumulated man-hours; lagging KPI indicators positive; zero HSE incidents recorded this period.",
+    id:"Lebih dari 35.000 jam kerja terakumulasi; indikator KPI lagging positif; nol insiden K3 pada periode ini.",
+    owner:null, due:null, status:"closed",
+    src:{t:"00:36:30", speaker:"Nasmee Samang",
+      orig:"累计工时已超过三万五千小时，滞后 KPI 指标保持良好，零 HSE 事故。",
+      tr:"More than 35,000 accumulated work hours, with lagging KPI indicators remaining positive and zero HSE incidents recorded."}},
+
+  { ref:"W36-014", type:"question", topic:"marine", agenda:"A6", conf:.81, review:"ai",
+    en:"Which vessel is selected? Pending evaluation of C900 capability and availability window.",
+    id:"Kapal mana yang dipilih? Menunggu evaluasi kapabilitas dan jendela ketersediaan C900.",
+    owner:"Nasmee Samang", due:"2026-09-09", status:"open",
+    src:{t:"00:47:22", speaker:"Nasmee Samang",
+      orig:"船的选择要等评估完 C900 的能力和可用性再定。",
+      tr:"Vessel selection to be resolved after evaluating C900 capability and availability."}},
+
+  { ref:"W36-015", type:"question", topic:"proc", agenda:"A7", conf:.76, review:"ai",
+    en:"Pipeline cargo scope and marine budget to be confirmed during procurement — figures not tabled this week.",
+    id:"Lingkup kargo pipa dan anggaran marine dikonfirmasi saat pengadaan — angka belum dibahas minggu ini.",
+    owner:null, due:"2026-09-16", status:"open",
+    src:{t:"00:51:09", speaker:"Nasmee Samang",
+      orig:"管线货量和海事预算要在采购阶段确认。",
+      tr:"Confirm pipeline cargo and marine budget during procurement."}},
+
+  /* --- carried from the previous meeting: same register, kept age --- */
+  { ref:"W35-018", type:"action", topic:"marine", agenda:"A6", conf:.90, review:"accepted",
+    en:"Obtain written C900 availability window from the vessel owner.",
+    id:"Peroleh jendela ketersediaan C900 tertulis dari pemilik kapal.",
+    owner:"Nasmee Samang", due:"2026-08-29", status:"carried", carriedFrom:"MOM-CPOC7-W35", opened:"2026-08-19",
+    src:{t:"00:44:02", speaker:"Nasmee Samang", meeting:"W35",
+      orig:"需要船东书面确认 C900 的可用窗口。",
+      tr:"Written confirmation of the C900 availability window is needed from the vessel owner."}},
+
+  { ref:"W35-022", type:"action", topic:"docs", agenda:"A3", conf:.88, review:"accepted",
+    en:"Issue GMDR rev.3 to COMPANY with the revised submission priority list.",
+    id:"Terbitkan GMDR rev.3 ke COMPANY dengan daftar prioritas penyerahan yang direvisi.",
+    owner:"Riza", due:"2026-08-26", status:"carried", carriedFrom:"MOM-CPOC7-W35", opened:"2026-08-12",
+    src:{t:"00:29:55", speaker:"Riza", meeting:"W35",
+      orig:"GMDR 第三版要连同修订后的提交优先级清单一起发给公司。",
+      tr:"GMDR rev.3 to be issued to COMPANY together with the revised submission priority list."}},
+
+  { ref:"W35-031", type:"risk", topic:"mob", agenda:"A4", conf:.84, review:"edited",
+    en:"OSP approval slipping into the mobilisation window would delay sail-away; no float remains on the marine spread.",
+    id:"Persetujuan OSP yang bergeser ke jendela mobilisasi akan menunda sail-away; tidak ada float tersisa pada marine spread.",
+    owner:"Nasmee Samang", due:"2026-09-15", status:"carried", carriedFrom:"MOM-CPOC7-W35", opened:"2026-08-19",
+    src:{t:"00:33:40", speaker:"Nasmee Samang", meeting:"W35",
+      orig:"如果 OSP 批准拖到动员窗口，起航会被推迟。",
+      tr:"If OSP approval slips into the mobilisation window, sail-away will be delayed."}},
+];
+
+/* ==========================================================================
+   3. View state
+   ========================================================================== */
+const state = {
+  view:"table", q:"", types:new Set(), mine:false, dual:false,
+  sort:{key:"id", dir:1}, sel:null, me:"Riza",
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const txt = it => it[LANG] ?? it.en;
+const topicName = k => (TOPICS[k] ? TOPICS[k][LANG] ?? TOPICS[k].en : k);
+
+function daysTo(iso){
+  if(!iso) return null;
+  return Math.round((new Date(iso+"T00:00:00Z") - TODAY)/86400000);
+}
+function dueClass(it){
+  if(!it.due || it.status==="closed") return "";
+  const d = daysTo(it.due);
+  if(d < 0) return "over";
+  if(d <= 3) return "soon";
+  return "";
+}
+function relLabel(it){
+  if(!it.due) return "";
+  if(it.status==="closed") return "";
+  const d = daysTo(it.due);
+  if(d === 0) return T("today");
+  if(d < 0) return `${Math.abs(d)}${T("days")} ${T("overdue")}`;
+  return `${T("dueIn")} ${d}${T("days")}`;
+}
+function initials(n){
+  return n.split(/[\s\/]+/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+}
+
+function filtered(){
+  const q = state.q.trim().toLowerCase();
+  return ITEMS.filter(it=>{
+    if(state.types.size && !state.types.has(it.type)) return false;
+    if(state.mine && it.owner !== state.me) return false;
+    if(q){
+      const hay = [it.ref, it.en, it.id, it.owner, it.src.speaker, it.src.tr].join(" ").toLowerCase();
+      if(!hay.includes(q) && !String(it[LANG]||"").toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+function sorted(rows){
+  const {key,dir} = state.sort;
+  const val = it => {
+    if(key==="due") return it.due || "9999";
+    if(key==="type") return it.type;
+    if(key==="owner") return it.owner || "zzz";
+    if(key==="status") return it.status;
+    if(key==="topic") return it.topic;
+    return it.ref;
+  };
+  return [...rows].sort((a,b)=> (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : 0) * dir);
+}
+
+/* ==========================================================================
+   4. Header strip — the numbers a project engineer actually opens this for
+   ========================================================================== */
+function paintStrip(){
+  const acts = ITEMS.filter(i=>i.type==="action");
+  const openActs = acts.filter(i=>i.status!=="closed");
+  const overdue = ITEMS.filter(i=>i.due && i.status!=="closed" && daysTo(i.due) < 0);
+  const unrev = ITEMS.filter(i=>i.review==="ai");
+  const covered = AGENDA.filter(a=>a.covered).length;
+  const pct = Math.round(covered/AGENDA.length*100);
+
+  $("#prov-unreviewed").textContent = unrev.length;
+
+  const cells = [
+    {n:ITEMS.length, l:T("total")},
+    {n:`${openActs.length}/${acts.length}`, l:T("actions")},
+    {n:overdue.length, l:T("overdueL"), cls: overdue.length ? "is-alert" : "is-ok"},
+    {n:ITEMS.filter(i=>i.type==="decision").length, l:T("decisions")},
+    {n:ITEMS.filter(i=>i.type==="question"&&i.status!=="closed").length, l:T("questions")},
+    {n:unrev.length, l:T("review"), cls: unrev.length ? "is-warn" : "is-ok"},
+    {n:`${pct}%`, l:T("coverage"), bar:pct},
+  ];
+  $("#strip").innerHTML = cells.map(c=>`
+    <div class="stat ${c.cls||""}">
+      <span class="n">${esc(c.n)}</span>
+      <span class="l">${esc(c.l)}</span>
+      ${c.bar!=null ? `<span class="bar"><i style="width:${c.bar}%"></i></span>` : ""}
+    </div>`).join("");
+}
+
+function paintChips(){
+  const types = ["decision","action","question","risk","info"];
+  $("#chips").innerHTML = types.map(t=>{
+    const n = ITEMS.filter(i=>i.type===t).length;
+    const on = state.types.has(t);
+    return `<button class="chip" data-type="${t}" aria-pressed="${on}">
+      <span class="dot"></span>${esc(T(t))}<span class="ct">${n}</span></button>`;
+  }).join("");
+}
+
+/* ==========================================================================
+   5. Views
+   ========================================================================== */
+function cellType(it){
+  return `<span class="type" data-type="${it.type}"><i></i>${esc(T(it.type))}</span>`;
+}
+function cellOwner(it){
+  if(!it.owner) return `<span class="owner"><span class="nm" style="color:var(--muted2)">${esc(T("noOwner"))}</span></span>`;
+  const p = PEOPLE[it.owner] || {org:"", c:"#9a9a9a"};
+  return `<span class="owner">
+    <span class="av" style="background:${p.c}">${esc(initials(it.owner))}</span>
+    <span style="min-width:0"><span class="nm">${esc(it.owner)}</span>
+    <span class="org">${esc(p.org)}</span></span></span>`;
+}
+function cellDue(it){
+  if(!it.due) return `<span class="due" style="color:var(--muted2)">${esc(T("noDue"))}</span>`;
+  return `<span class="due ${dueClass(it)}">${esc(it.due.slice(5))}<span class="rel">${esc(relLabel(it))}</span></span>`;
+}
+function cellStatus(it){
+  return `<span class="status" data-s="${it.status}"><span class="sd"></span>${esc(T(it.status))}</span>`;
+}
+function confColor(c){ return c >= .9 ? "var(--accent)" : c >= .82 ? "var(--warn-text)" : "var(--danger)"; }
+function cellSrc(it){
+  return `<span class="src" data-play="${esc(it.src.t)}"><span class="play">▶</span>${esc(it.src.t)}
+    <span class="conf" title="ASR ${Math.round(it.conf*100)}%"><i style="width:${it.conf*100}%;background:${confColor(it.conf)}"></i></span>
+    </span><span class="rev" data-r="${it.review}">${esc(T(it.review))}</span>`;
+}
+function cellItem(it){
+  const alt = state.dual ? `<span class="alt">${esc(LANG==="en" ? it.id : it.en)}</span>` : "";
+  return `<span class="itemtext"><span class="agenda">${esc(it.agenda)}</span>${esc(txt(it))}${alt}</span>`;
+}
+
+function viewTable(rows){
+  if(!rows.length) return `<p class="empty">${esc(T("emptyF"))}</p>`;
+  const th = (k,cls,label)=>{
+    const active = state.sort.key===k;
+    return `<th class="${cls}" data-sort="${k}">${esc(label)}${active?`<span class="sort">${state.sort.dir>0?"▲":"▼"}</span>`:""}</th>`;
+  };
+  return `<table>
+    <thead><tr>
+      ${th("id","c-id",T("cId"))}
+      ${th("type","c-type",T("cType"))}
+      ${th("topic","c-topic",T("cTopic"))}
+      <th class="c-item">${esc(T("cItem"))}</th>
+      ${th("owner","c-owner",T("cOwner"))}
+      ${th("due","c-due",T("cDue"))}
+      ${th("status","c-status",T("cStatus"))}
+      <th class="c-src">${esc(T("cSrc"))}</th>
+    </tr></thead>
+    <tbody>${rows.map(it=>`
+      <tr data-ref="${esc(it.ref)}" aria-selected="${state.sel===it.ref}">
+        <td class="c-id"><span class="id ${it.carriedFrom?"carried":""}">${esc(it.ref)}</span></td>
+        <td class="c-type">${cellType(it)}</td>
+        <td class="c-topic"><span class="topic">${esc(topicName(it.topic))}</span></td>
+        <td class="c-item">${cellItem(it)}</td>
+        <td class="c-owner">${cellOwner(it)}</td>
+        <td class="c-due">${cellDue(it)}</td>
+        <td class="c-status">${cellStatus(it)}</td>
+        <td class="c-src">${cellSrc(it)}</td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+function viewTopic(rows){
+  const keys = Object.keys(TOPICS).filter(k=>rows.some(r=>r.topic===k));
+  if(!keys.length) return `<p class="empty">${esc(T("emptyF"))}</p>`;
+  return `<div class="grp">${keys.map(k=>{
+    const rs = rows.filter(r=>r.topic===k);
+    const openN = rs.filter(r=>r.status!=="closed").length;
+    return `<h2>${esc(topicName(k))}<span class="cnt">${rs.length}</span>
+      <span class="cov" style="color:${openN?"var(--warn-text)":"var(--accent)"}">${openN} ${esc(T("open")).toLowerCase()}</span></h2>
+      ${rs.map(it=>`
+        <div class="gcard" data-ref="${esc(it.ref)}">
+          <div>${cellType(it)}<div class="id ${it.carriedFrom?"carried":""}" style="margin-top:4px">${esc(it.ref)}</div></div>
+          <div>${cellItem(it)}<div style="margin-top:6px">${cellOwner(it)}</div></div>
+          <div class="gmeta">${cellStatus(it)}${cellDue(it)}</div>
+        </div>`).join("")}`;
+  }).join("")}</div>`;
+}
+
+function viewDoc(rows){
+  const sec = (title, type) => {
+    const rs = rows.filter(r=>r.type===type);
+    if(!rs.length) return "";
+    return `<h2>${esc(title)}</h2><ul>${rs.map(it=>`
+      <li data-type="${it.type}" data-ref="${esc(it.ref)}">
+        <i></i>
+        <span>${esc(txt(it))}
+          ${it.owner||it.due ? `<span class="tail"> — ${esc(it.owner||T("noOwner"))}${it.due?` · ${esc(it.due)}`:""}</span>`:""}
+        </span>
+      </li>`).join("")}</ul>`;
+  };
+  const openActs = rows.filter(r=>r.type==="action"&&r.status!=="closed").length;
+  return `<div class="doc">
+    <h2>${esc(T("docSum"))}</h2>
+    <p>${LANG==="en"
+      ? `The meeting opened on the dropped-object incident during conductor installation and closed on yard-audit readiness. Crane inspection and securement controls were agreed as standing requirements covering transport as well as operation. Document review is progressing under MDR/GMDR priority with no issues flagged; two MWS signatures remain outstanding. Vessel selection and the marine budget stay open pending the C900 evaluation. ${openActs} action items are open, three of them carried from week 35.`
+      : `Rapat dibuka dengan insiden dropped object saat instalasi conductor dan ditutup dengan kesiapan audit yard. Kendali inspeksi dan pengamanan crane disepakati sebagai persyaratan tetap yang mencakup transportasi, bukan hanya operasi. Tinjauan dokumen berjalan sesuai prioritas MDR/GMDR tanpa isu; dua tanda tangan MWS masih tertunda. Pemilihan kapal dan anggaran marine tetap terbuka menunggu evaluasi C900. ${openActs} tindak lanjut masih terbuka, tiga di antaranya bawaan dari minggu 35.`}</p>
+    ${sec(T("docDec"),"decision")}
+    ${sec(T("docAct"),"action")}
+    ${sec(T("docQ"),"question")}
+    ${sec(T("docRisk"),"risk")}
+    ${sec(T("docNote"),"info")}
+    <div class="sig">
+      <span>${esc(T("prepared"))}: Local TransSub · on-device · 2026-09-02 12:14</span>
+      <span>${esc(T("nextMtg"))}: 2026-09-09 10:00 GMT+8</span>
+    </div>
+  </div>`;
+}
+
+function viewCarry(){
+  const rs = ITEMS.filter(i=>i.carriedFrom);
+  return `<div class="cf">
+    <p class="cf-intro">${esc(T("carryIntro"))}</p>
+    <div class="cf-list">${rs.map(it=>{
+      const age = Math.round((TODAY - new Date(it.opened+"T00:00:00Z"))/86400000);
+      return `<div class="cfrow ${age>14?"hot":""}" data-ref="${esc(it.ref)}">
+        <span class="age-rail"></span>
+        <div class="cfmain">
+          <div class="t">${cellType(it)} ${esc(txt(it))}</div>
+          <div class="m">${esc(it.ref)} · ${esc(it.carriedFrom)} · ${esc(T("age"))} ${age}${esc(T("days"))} · ${esc(it.owner||T("noOwner"))}</div>
+        </div>
+        <div class="cfact">
+          <button class="btn primary" data-carry="${esc(it.ref)}">↳ ${esc(T("carryIn"))}</button>
+          <button class="btn" data-close="${esc(it.ref)}">✓ ${esc(T("closeIt"))}</button>
+        </div>
+      </div>`;
+    }).join("")}</div>
+  </div>`;
+}
+
+function paint(){
+  document.querySelectorAll("[data-t]").forEach(el=>{ el.textContent = T(el.dataset.t); });
+  document.documentElement.lang = LANG;
+  paintStrip(); paintChips();
+
+  const rows = sorted(filtered());
+  const pane = $("#pane");
+  pane.innerHTML =
+    state.view==="table" ? viewTable(rows) :
+    state.view==="topic" ? viewTopic(rows) :
+    state.view==="doc"   ? viewDoc(rows)   :
+                           viewCarry();
+  if(state.sel) paintDrawer();
+}
+
+/* ==========================================================================
+   6. Detail drawer — provenance is the point
+   ========================================================================== */
+function paintDrawer(){
+  const it = ITEMS.find(i=>i.ref===state.sel);
+  const dr = $("#drawer");
+  if(!it){ dr.hidden = true; return; }
+  dr.hidden = false;
+  $("#d-id").innerHTML = `${esc(it.ref)}${it.carriedFrom?` <span style="color:var(--warn-text)">↩ ${esc(it.carriedFrom)}</span>`:""}`;
+  $("#d-type").innerHTML = cellType(it);
+
+  const bars = Array.from({length:44},(_,i)=>{
+    const h = 20 + 80*Math.abs(Math.sin(i*1.7)*Math.cos(i*.6));
+    return `<i class="${i>12&&i<32?"in":""}" style="height:${h}%"></i>`;
+  }).join("");
+
+  $("#d-body").innerHTML = `
+    <div class="fld">
+      <label>${esc(T("dText"))}</label>
+      <textarea rows="4" id="f-text">${esc(txt(it))}</textarea>
+    </div>
+    <div class="two">
+      <div class="fld"><label>${esc(T("dOwner"))}</label>
+        <select id="f-owner">
+          <option value="">${esc(T("noOwner"))}</option>
+          ${Object.keys(PEOPLE).map(p=>`<option ${p===it.owner?"selected":""}>${esc(p)}</option>`).join("")}
+        </select></div>
+      <div class="fld"><label>${esc(T("dDue"))}</label>
+        <input type="date" id="f-due" value="${esc(it.due||"")}" /></div>
+    </div>
+    <div class="two">
+      <div class="fld"><label>${esc(T("dStatus"))}</label>
+        <select id="f-status">
+          ${["open","progress","closed","carried"].map(s=>`<option value="${s}" ${s===it.status?"selected":""}>${esc(T(s))}</option>`).join("")}
+        </select></div>
+      <div class="fld"><label>${esc(T("dTopic"))}</label>
+        <select id="f-topic">
+          ${Object.keys(TOPICS).map(k=>`<option value="${k}" ${k===it.topic?"selected":""}>${esc(topicName(k))}</option>`).join("")}
+        </select></div>
+    </div>
+
+    <div class="fld">
+      <label>${esc(T("dProv"))}</label>
+      <div class="quote">
+        <div class="qh">
+          <span class="tc" data-play="${esc(it.src.t)}">▶ ${esc(it.src.t)}</span>
+          <span>·</span><span>${esc(it.src.speaker)}</span>
+          ${it.src.meeting?`<span>·</span><span class="mono">${esc(it.src.meeting)}</span>`:""}
+          <span style="margin-left:auto" class="mono">ASR ${Math.round(it.conf*100)}%</span>
+        </div>
+        <div class="qt orig"><span class="lbl">${esc(T("sOriginal"))}</span>${esc(it.src.orig)}</div>
+        <div class="qt"><span class="lbl">${esc(T("sTranslated"))}</span>${esc(it.src.tr)}</div>
+        <div class="wave">${bars}</div>
+      </div>
+    </div>`;
+
+  $("#d-foot").innerHTML = `
+    <button class="btn primary" id="d-accept">✓ ${esc(T(it.review==="ai"?"accept":"editS"))}</button>
+    <button class="btn" id="d-play">▶ ${esc(T("jump"))}</button>
+    <span class="spacer"></span>
+    <button class="btn" id="d-reject" style="color:var(--danger)">${esc(T("reject"))}</button>`;
+}
+
+/* ==========================================================================
+   7. Events
+   ========================================================================== */
+let toastTimer;
+function toast(msg){
+  const el = $("#toast");
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>el.classList.remove("show"), 2200);
+}
+
+$("#tabs").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-view]"); if(!b) return;
+  state.view = b.dataset.view;
+  [...$("#tabs").children].forEach(x=>x.setAttribute("aria-selected", x===b));
+  paint();
+});
+
+$("#chips").addEventListener("click", e=>{
+  const c = e.target.closest(".chip"); if(!c) return;
+  const t = c.dataset.type;
+  state.types.has(t) ? state.types.delete(t) : state.types.add(t);
+  paint();
+});
+
+$("#q").addEventListener("input", e=>{ state.q = e.target.value; paint(); });
+
+$("#btn-mine").addEventListener("click", e=>{
+  state.mine = !state.mine;
+  e.currentTarget.setAttribute("aria-pressed", state.mine);
+  e.currentTarget.classList.toggle("on", state.mine);
+  paint();
+});
+$("#btn-dual").addEventListener("click", e=>{
+  state.dual = !state.dual;
+  e.currentTarget.setAttribute("aria-pressed", state.dual);
+  e.currentTarget.classList.toggle("on", state.dual);
+  paint();
+});
+
+document.querySelector(".langsw").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-lang]"); if(!b) return;
+  LANG = b.dataset.lang;
+  [...b.parentNode.children].forEach(x=>x.setAttribute("aria-pressed", x===b));
+  paint();
+});
+
+$("#pane").addEventListener("click", e=>{
+  const play = e.target.closest("[data-play]");
+  if(play){ e.stopPropagation(); toast(`${T("toastPlay")} ${play.dataset.play}`); return; }
+
+  const carry = e.target.closest("[data-carry]");
+  if(carry){
+    const it = ITEMS.find(i=>i.ref===carry.dataset.carry);
+    if(it){ it.status="open"; it.ref = "W36-0" + (20 + ITEMS.filter(x=>x.ref.startsWith("W36")).length); it.carriedInFrom = it.carriedFrom; delete it.carriedFrom; }
+    toast(T("toastCarry")); paint(); return;
+  }
+  const close = e.target.closest("[data-close]");
+  if(close){
+    const it = ITEMS.find(i=>i.ref===close.dataset.close);
+    if(it) it.status = "closed";
+    paint(); return;
+  }
+  const th = e.target.closest("th[data-sort]");
+  if(th){
+    const k = th.dataset.sort;
+    state.sort = {key:k, dir: state.sort.key===k ? -state.sort.dir : 1};
+    paint(); return;
+  }
+  const row = e.target.closest("[data-ref]");
+  if(row){ state.sel = row.dataset.ref; paint(); }
+});
+
+$("#d-close").addEventListener("click", ()=>{ state.sel=null; $("#drawer").hidden=true; paint(); });
+
+$("#drawer").addEventListener("click", e=>{
+  const it = ITEMS.find(i=>i.ref===state.sel); if(!it) return;
+  if(e.target.closest("[data-play]")) { toast(`${T("toastPlay")} ${it.src.t}`); return; }
+  if(e.target.closest("#d-accept")){
+    it.review = it.review==="ai" ? "accepted" : "edited";
+    it[LANG] = $("#f-text").value;
+    it.owner = $("#f-owner").value || null;
+    it.due   = $("#f-due").value || null;
+    it.status= $("#f-status").value;
+    it.topic = $("#f-topic").value;
+    toast(T("toastAccept")); paint(); return;
+  }
+  if(e.target.closest("#d-reject")){
+    const i = ITEMS.indexOf(it); if(i>-1) ITEMS.splice(i,1);
+    state.sel = null; $("#drawer").hidden = true; paint(); return;
+  }
+});
+
+$("#btn-export").addEventListener("click", ()=>toast(T("toastExport")));
+$("#btn-issue").addEventListener("click", ()=>toast(T("toastIssue")));
+
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape" && state.sel){ state.sel=null; $("#drawer").hidden=true; paint(); }
+  if(e.key==="/" && document.activeElement!==$("#q")){ e.preventDefault(); $("#q").focus(); }
+});
+
+paint();
+</script>
+</body>
+</html>

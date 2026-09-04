@@ -9,6 +9,8 @@ import {
   LANG_NAMES,
   pairLabel,
   DEFAULT_NATIVE_URL,
+  UI_LANGS,
+  uniqueLangEntries,
 } from './lib/registry.js';
 import { nativeHealth, nativeShutdown } from './lib/native.js';
 import { nativeHostAction, nativeHostSupported } from './lib/native-host.js';
@@ -16,15 +18,22 @@ import { formatSrt, formatVtt, formatTxt } from './lib/transcript-cache.js';
 import { loadExportDir, pickExportDir, clearExportDir, saveExportFile, exportDirLabel } from './lib/export.js';
 import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
+import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel } from './notes-panel.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { exportBasename } from './lib/helper-status.js';
+import {
+  loadSampleCatalog,
+  firstSampleForPair,
+  fetchSampleFile,
+} from './lib/qa-samples.js';
 
 const $ = (id) => document.getElementById(id);
 
 const state = {
   mode: 'realtime', // 'realtime' | 'offline'
   task: 'translate', // 'transcribe' | 'translate'
+  view: 'captions', // 'captions' | 'notes'
   srcLang: 'ja',
   tgtLang: 'en',
   settings: {
@@ -37,14 +46,19 @@ const state = {
     asrModel: DEFAULT_ASR,
     engine: 'browser',
     nativeUrl: DEFAULT_NATIVE_URL,
+    // Two-way (consecutive) interpreting is opt-in; 'simultaneous' is the
+    // historical one-way srcLang → tgtLang path.
+    interpreter: { mode: 'simultaneous', a: 'ja', b: 'en' },
   },
   downloaded: {},
   running: false,
   offlineRunning: false,
+  startedAt: null, // stempel mulai tugas tangkap — jam rekaman di rel Notulen
   offlineFile: null, // { name, size } once staged to OPFS
   offlineStaging: false,
   offlineLines: [],
   currentTab: null,
+  qaCatalog: null,
 };
 
 function t(key, ...args) {
@@ -62,22 +76,226 @@ function toOffscreen(type, data) {
 // ---------------------------------------------------------------------------
 // i18n rendering
 function applyI18n() {
+  // The notes ticker (notes-panel.js) and the Minutes Register read the UI
+  // language from <html lang>, so keep it in sync with the setting.
+  document.documentElement.lang = state.settings.uiLang || 'en';
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
   });
+  const notesMount = $('notes-mount');
+  if (notesMount && notesMount.dataset.mounted) mountNotesPanel(notesMount, notesMountOptions());
+  renderInterpreterUi();
 }
 
 // ---------------------------------------------------------------------------
-// selects
+// selects — one option per language code; optgroup names the role so Source
+// vs Target never read as a single duplicated list.
+function optionsHtml(entries) {
+  return uniqueLangEntries(entries)
+    .map(([c, label]) => `<option value="${c}">${label}</option>`)
+    .join('');
+}
+
 function fillSelects() {
-  $('src-lang').innerHTML = SOURCE_LANGS.map(
-    ([c, label]) => `<option value="${c}">${label}</option>`,
-  ).join('');
-  $('tgt-lang').innerHTML = TARGET_LANGS.map(
-    ([c, label]) => `<option value="${c}">${label}</option>`,
-  ).join('');
+  const srcGroup = t('sourceLangGroup');
+  const tgtGroup = t('targetLangGroup');
+  $('src-lang').innerHTML =
+    `<optgroup label="${srcGroup}">${optionsHtml(SOURCE_LANGS)}</optgroup>`;
+  $('tgt-lang').innerHTML =
+    `<optgroup label="${tgtGroup}">${optionsHtml(TARGET_LANGS)}</optgroup>`;
   $('src-lang').value = state.srcLang;
   $('tgt-lang').value = state.tgtLang;
+  $('src-lang').setAttribute('aria-label', t('sourceLang'));
+  $('tgt-lang').setAttribute('aria-label', t('targetLang'));
+}
+
+// ---------------------------------------------------------------------------
+// Interpreter mode — one-way (simultaneous) vs two-way (consecutive).
+function interpreter() {
+  return state.settings.interpreter;
+}
+function twoWay() {
+  return interpreter()?.mode === 'consecutive';
+}
+
+/** Badges + summary text; called on every language / i18n / mode change. */
+function renderInterpreterUi() {
+  const it = interpreter();
+  if (!it || !$('interpreter-summary')) return;
+  $('interpreter-summary').textContent =
+    it.mode === 'consecutive'
+      ? t('interpSummaryTwoWay', it.a.toUpperCase(), it.b.toUpperCase())
+      : t('interpSummaryOneWay', state.srcLang.toUpperCase(), state.tgtLang.toUpperCase());
+  const two = $('interp-badge-consecutive');
+  if (two) two.textContent = `${t('interpTwoWay')} \u00b7 ${t('interpPreview')}`;
+  const one = $('interp-badge-simultaneous');
+  if (one) one.textContent = t('interpOneWay');
+  syncInterpreterLock();
+}
+
+/**
+ * Two-way replaces the From/To selects with the summary row and forces
+ * `+ Translate` (a two-way session is translation by definition).
+ */
+function applyInterpreterUi() {
+  const two = twoWay();
+  $('lang-row').classList.toggle('hidden', two);
+  document.querySelectorAll('#task-toggle button').forEach((b) => {
+    b.disabled = two;
+  });
+  if (two) {
+    // Remember what the user had so leaving two-way gives it back.
+    if (state.task !== 'translate') {
+      state.taskBeforeTwoWay = state.task;
+      setTask('translate');
+    }
+  } else if (state.taskBeforeTwoWay) {
+    const prev = state.taskBeforeTwoWay;
+    state.taskBeforeTwoWay = null;
+    if (prev !== state.task) setTask(prev);
+  }
+  renderInterpreterUi();
+}
+
+/** Set a select to `want`, or to its first option when `want` is not there. */
+function setSelectValue(el, want) {
+  el.value = want || '';
+  if (!el.value) el.value = el.options[0]?.value || '';
+  return el.value;
+}
+
+function showInterpreterError(msg) {
+  const el = $('interp-error');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.classList.toggle('hidden', !msg);
+}
+
+function openInterpreterModal() {
+  const it = interpreter();
+  const srcGroup = t('sourceLangGroup');
+  const tgtGroup = t('targetLangGroup');
+  // 'auto' is not a usable end of a two-way conversation — both sides are named.
+  const twoWaySrc = SOURCE_LANGS.filter(([c]) => c !== 'auto');
+  $('interp-lang-a').innerHTML = `<optgroup label="${srcGroup}">${optionsHtml(twoWaySrc)}</optgroup>`;
+  $('interp-lang-b').innerHTML = `<optgroup label="${tgtGroup}">${optionsHtml(TARGET_LANGS)}</optgroup>`;
+  $('interp-lang-one').innerHTML = `<optgroup label="${tgtGroup}">${optionsHtml(TARGET_LANGS)}</optgroup>`;
+  // it.a may be a language this list does not offer (e.g. a stale 'auto') —
+  // fall back to the first concrete option rather than an empty select.
+  setSelectValue($('interp-lang-a'), it.a);
+  setSelectValue($('interp-lang-b'), it.b);
+  setSelectValue($('interp-lang-one'), state.tgtLang);
+  showInterpreterError('');
+  selectInterpreterCard(it.mode);
+  syncInterpreterLock();
+  $('interpreter-modal').classList.remove('hidden');
+}
+
+function selectInterpreterCard(mode) {
+  document.querySelectorAll('.interp-card').forEach((card) => {
+    card.setAttribute('aria-checked', String(card.dataset.mode === mode));
+  });
+}
+
+function chosenInterpreterMode() {
+  const on = document.querySelector('.interp-card[aria-checked="true"]');
+  return on?.dataset.mode === 'consecutive' ? 'consecutive' : 'simultaneous';
+}
+
+async function applyInterpreterChoice() {
+  const mode = chosenInterpreterMode();
+  if (mode === 'consecutive') {
+    const a = $('interp-lang-a').value;
+    const b = $('interp-lang-b').value;
+    const next = normalizeInterpreter({ interpreter: { mode, a, b } }, a, b);
+    if (next.mode !== 'consecutive') {
+      // Two-way needs two different, concrete languages — say so, stay open.
+      showInterpreterError(t('interpCannotApply'));
+      return;
+    }
+    state.settings.interpreter = next;
+    // The From/To selects still hold the pair internally.
+    state.srcLang = next.a;
+    state.tgtLang = next.b;
+  } else {
+    state.tgtLang = $('interp-lang-one').value;
+    // Never persist 'auto' as one end of the remembered pair: it is not a
+    // usable two-way language and would come back as an empty select.
+    const prev = interpreter();
+    const a = state.srcLang !== 'auto' ? state.srcLang : prev?.a !== 'auto' ? prev?.a : '';
+    state.settings.interpreter = { mode: 'simultaneous', b: state.tgtLang, ...(a ? { a } : {}) };
+  }
+  showInterpreterError('');
+  $('src-lang').value = state.srcLang;
+  $('tgt-lang').value = state.tgtLang;
+  await saveSettings();
+  persistLastConfig();
+  applyInterpreterUi();
+  updateWarning();
+  $('interpreter-modal').classList.add('hidden');
+}
+
+/**
+ * Satu stempel waktu untuk kedua jalur tangkap (realtime + berkas offline):
+ * dipasang saat tugas mulai berjalan, dibersihkan begitu berhenti. Panggil ini
+ * SETELAH setiap perubahan `state.running` / `state.offlineRunning`.
+ */
+function syncCaptureStamp() {
+  const on = state.running || state.offlineRunning;
+  if (on && !state.startedAt) state.startedAt = Date.now();
+  else if (!on) state.startedAt = null;
+  syncInterpreterLock();
+}
+
+/**
+ * The pipeline builds its translators once, at start: switching Interpreter
+ * mode mid-capture would change the UI and nothing else. So while a task runs
+ * the Change button is locked, and the modal says the truth out loud.
+ */
+function captureRunning() {
+  return !!(state.running || state.offlineRunning);
+}
+
+function syncInterpreterLock() {
+  const btn = $('btn-interpreter');
+  if (!btn) return;
+  const busy = captureRunning();
+  btn.disabled = busy;
+  btn.title = busy ? t('interpAppliesNextTask') : '';
+  const note = $('interp-running-note');
+  if (note) note.classList.toggle('hidden', !busy);
+}
+
+/** Lencana mesin di kartu rekam — apa yang benar-benar mentranskripsi. */
+function captureEngineLabel() {
+  if (state.settings.engine === 'native' && nativeInfo) {
+    const e = String(nativeInfo.engine || '');
+    return /mlx/i.test(e) ? 'MLX \u00b7 GPU' : `${e || 'Helper'} \u00b7 native`;
+  }
+  return 'Whisper \u00b7 browser';
+}
+
+/** Keadaan tangkap yang dibaca tiket Notulen (notes-panel.js). */
+function getCapture() {
+  return {
+    running: state.running || state.offlineRunning,
+    startedAt: state.startedAt,
+    engine: captureEngineLabel(),
+  };
+}
+
+/** Apa yang dipasok panel Notulen: keadaan tangkap + jalan berhenti yang sudah ada. */
+function notesMountOptions() {
+  return { getCapture, onEndCapture: () => onStop() };
+}
+
+function setView(view) {
+  state.view = view === 'notes' ? 'notes' : 'captions';
+  document.querySelectorAll('#view-tabs button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.view === state.view);
+  });
+  $('view-captions')?.classList.toggle('hidden', state.view !== 'captions');
+  $('view-notes')?.classList.toggle('hidden', state.view !== 'notes');
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +310,10 @@ function setMode(mode) {
   $('pick-hint').classList.add('hidden');
   $('off-drop').classList.toggle('hidden', mode !== 'offline');
   $('off-results').classList.toggle('hidden', mode !== 'offline' || state.offlineLines.length === 0);
+  const qaBar = $('qa-sample-bar');
+  if (qaBar) {
+    qaBar.classList.toggle('hidden', mode !== 'offline' || !state.qaCatalog?.samples?.length);
+  }
   $('live-preview').classList.add('hidden');
   updateButtons();
   updateWarning();
@@ -157,6 +379,51 @@ function setTask(task) {
 }
 
 // ---------------------------------------------------------------------------
+// Which translation models one direction needs, and whether a note applies.
+function mtPairIssues(srcLang, tgtLang, cfg) {
+  const issues = [];
+  let directNote = '';
+  const plan = translationPlan(srcLang, tgtLang, {
+    dualLine: cfg.dualLine,
+    refineTranslation: cfg.refineTranslation,
+  });
+  if (plan.mode === 'whisper-direct') {
+    directNote = `<span style="opacity:.85">${t('directNote')}</span>`;
+  } else if (cfg.refineTranslation) {
+    directNote = `<span style="opacity:.85">${t('refineNote')}</span>`;
+  } else if (plan.mode === 'mt') {
+    const label = pairLabel(`${srcLang}-${tgtLang}`);
+    if (plan.pivot) {
+      if (!state.downloaded[plan.pivot.leg1Key]) {
+        issues.push({
+          msg: t('needMtModel', `${pairLabel(plan.pivot.leg1Key)} (${plan.pivot.leg1.size})`),
+          key: plan.pivot.leg1Key,
+          btn: pairLabel(plan.pivot.leg1Key),
+        });
+      }
+      if (!state.downloaded[plan.pivot.leg2Key]) {
+        issues.push({
+          msg: t('needMtModel', `${pairLabel(plan.pivot.leg2Key)} (${plan.pivot.leg2.size})`),
+          key: plan.pivot.leg2Key,
+          btn: pairLabel(plan.pivot.leg2Key),
+        });
+      }
+    } else if (!plan.pair) {
+      issues.push({
+        msg: `No local translation model exists for ${label}. The browser's built-in translator or native helper LLM will be tried; otherwise pick another pair.`,
+      });
+    } else if (!state.downloaded[plan.pairKey]) {
+      issues.push({
+        msg: t('needMtModel', `${label} (${plan.pair.size})`),
+        key: plan.pairKey,
+        btn: label,
+      });
+    }
+  }
+  return { issues, directNote };
+}
+
+// ---------------------------------------------------------------------------
 // warning banner: does the current config need a model that isn't downloaded?
 function updateWarning() {
   const el = $('model-warning');
@@ -177,42 +444,19 @@ function updateWarning() {
 
   let directNote = '';
   if (cfg.taskMode === 'translate') {
-    const plan = translationPlan(cfg.srcLang, cfg.tgtLang, {
-      dualLine: cfg.dualLine,
-      refineTranslation: cfg.refineTranslation,
-    });
-    if (plan.mode === 'whisper-direct') {
-      directNote = `<span style="opacity:.85">${t('directNote')}</span>`;
-    } else if (cfg.refineTranslation) {
-      directNote = `<span style="opacity:.85">${t('refineNote')}</span>`;
-    } else if (plan.mode === 'mt') {
-      const label = pairLabel(`${cfg.srcLang}-${cfg.tgtLang}`);
-      if (plan.pivot) {
-        if (!state.downloaded[plan.pivot.leg1Key]) {
-          issues.push({
-            msg: t('needMtModel', `${pairLabel(plan.pivot.leg1Key)} (${plan.pivot.leg1.size})`),
-            key: plan.pivot.leg1Key,
-            btn: pairLabel(plan.pivot.leg1Key),
-          });
-        }
-        if (!state.downloaded[plan.pivot.leg2Key]) {
-          issues.push({
-            msg: t('needMtModel', `${pairLabel(plan.pivot.leg2Key)} (${plan.pivot.leg2.size})`),
-            key: plan.pivot.leg2Key,
-            btn: pairLabel(plan.pivot.leg2Key),
-          });
-        }
-      } else if (!plan.pair) {
-        issues.push({
-          msg: `No local translation model exists for ${label}. The browser's built-in translator or native helper LLM will be tried; otherwise pick another pair.`,
-        });
-      } else if (!state.downloaded[plan.pairKey]) {
-        issues.push({
-          msg: t('needMtModel', `${label} (${plan.pair.size})`),
-          key: plan.pairKey,
-          btn: label,
-        });
-      }
+    if (twoWay()) {
+      // Two-way needs BOTH directions — list each missing pair separately.
+      const { a, b } = interpreter();
+      const fwd = mtPairIssues(a, b, cfg);
+      const rev = mtPairIssues(b, a, cfg);
+      const both = [...fwd.issues, ...rev.issues];
+      if (both.length) issues.push({ msg: t('interpNeedsBoth') });
+      issues.push(...both);
+      directNote = fwd.directNote || rev.directNote;
+    } else {
+      const r = mtPairIssues(cfg.srcLang, cfg.tgtLang, cfg);
+      issues.push(...r.issues);
+      directNote = r.directNote;
     }
   }
 
@@ -221,8 +465,9 @@ function updateWarning() {
     el.innerHTML = '';
     return;
   }
+  const seenKeys = new Set();
   const buttons = issues
-    .filter((i) => i.key)
+    .filter((i) => i.key && !seenKeys.has(i.key) && seenKeys.add(i.key))
     .map(
       (i) =>
         `<button class="mini-btn dl-now" data-key="${i.key}">⬇ ${t('download')} — ${i.btn}</button>`,
@@ -254,14 +499,20 @@ function persistLastConfig() {
 }
 
 function currentConfig() {
+  const it = interpreter();
+  const two = it?.mode === 'consecutive';
   return {
     tabId: state.currentTab?.id,
-    srcLang: state.srcLang,
-    tgtLang: state.tgtLang,
-    taskMode: state.task,
+    // Two-way: the a → b direction is the nominal pair; offscreen flips it per
+    // utterance. Refine (draft-then-correct) has no meaning without a fixed
+    // source language, so it is off.
+    srcLang: two ? it.a : state.srcLang,
+    tgtLang: two ? it.b : state.tgtLang,
+    taskMode: two ? 'translate' : state.task,
     dualLine: state.settings.dualLine,
-    refineTranslation: state.settings.refineTranslation,
+    refineTranslation: two ? false : state.settings.refineTranslation,
     asrModel: state.settings.asrModel,
+    interpreter: it,
   };
 }
 
@@ -339,6 +590,116 @@ async function refreshDownloaded() {
 
 // ---------------------------------------------------------------------------
 // model manager (settings modal)
+function renderUiLangToggle() {
+  const host = $('ui-lang-toggle');
+  if (!host) return;
+  const cur = state.settings.uiLang || 'en';
+  if (!host.dataset.ready) {
+    host.innerHTML = '';
+    for (const [code, label] of UI_LANGS) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = label;
+      host.appendChild(opt);
+    }
+    host.addEventListener('change', async () => {
+      state.settings.uiLang = host.value;
+      await saveSettings();
+      await loadSettings();
+      applyI18n();
+      fillSelects();
+      updateWarning();
+      renderHistory();
+      renderQaSampleBar();
+      renderModelLists();
+    });
+    host.dataset.ready = '1';
+  }
+  host.value = cur;
+}
+
+const ENGINE_OPTIONS = [
+  ['browser', 'engineBrowser'],
+  ['native', 'engineNative'],
+];
+
+function renderEngineToggle() {
+  const host = $('engine-toggle');
+  if (!host) return;
+  const cur = state.settings.engine || 'browser';
+  if (!host.dataset.ready) {
+    host.innerHTML = '';
+    for (const [value, i18nKey] of ENGINE_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.dataset.i18nKey = i18nKey;
+      host.appendChild(opt);
+    }
+    host.addEventListener('change', async () => {
+      state.settings.engine = host.value;
+      await saveSettings();
+      await loadSettings();
+      updateWarning();
+      if (state.settings.engine === 'native') {
+        lastNativeAutoStartMs = 0;
+        labEnsureAttempted = false;
+        checkNative({ allowAutoStart: true });
+        if (!$('settings-modal').classList.contains('hidden')) startNativePoll();
+      } else {
+        stopNativePoll();
+      }
+    });
+    host.dataset.ready = '1';
+  }
+  for (const opt of host.options) {
+    if (opt.dataset.i18nKey) opt.textContent = t(opt.dataset.i18nKey);
+  }
+  host.value = ENGINE_OPTIONS.some(([v]) => v === cur) ? cur : 'browser';
+}
+
+function renderQaSampleBar() {
+  const bar = $('qa-sample-bar');
+  const sel = $('qa-sample-select');
+  if (!bar || !sel) return;
+  const samples = state.qaCatalog?.samples || [];
+  const show = state.mode === 'offline' && samples.length > 0;
+  bar.classList.toggle('hidden', !show);
+  if (!samples.length) return;
+  const prev = sel.value;
+  sel.innerHTML = samples
+    .map(
+      (s) =>
+        `<option value="${s.id}">${s.label || s.id} (${Math.round(s.durationHint || 0)}s)</option>`,
+    )
+    .join('');
+  if (prev && samples.some((s) => s.id === prev)) sel.value = prev;
+}
+
+async function runQaSample(sample, { autoStart = true } = {}) {
+  if (!sample || !state.qaCatalog) {
+    setStatus(t('qaNoSample'), 'error');
+    return;
+  }
+  setMode('offline');
+  setTask('translate');
+  state.srcLang = sample.src;
+  state.tgtLang = sample.tgt || 'en';
+  $('src-lang').value = state.srcLang;
+  $('tgt-lang').value = state.tgtLang;
+  updateWarning();
+  persistLastConfig();
+  setStatus(t('qaLoadingSample'));
+  try {
+    const file = await fetchSampleFile(state.qaCatalog, sample);
+    await pickFile(file);
+    if (autoStart && state.offlineFile && !state.offlineStaging) {
+      await onStart();
+    }
+  } catch (e) {
+    setStatus(String(e?.message || e), 'error');
+  }
+}
+
 function renderModelLists() {
   const asrHost = $('asr-models');
   asrHost.innerHTML = '';
@@ -349,17 +710,18 @@ function renderModelLists() {
   const mtHost = $('mt-models');
   mtHost.innerHTML = '';
   for (const [key, p] of Object.entries(MT_PAIRS)) {
-    mtHost.appendChild(modelRow(key, pairLabel(key), `${key} · Opus-MT · ${p.size}`));
+    mtHost.appendChild(modelRow(key, pairLabel(key), `${key} · Opus-MT · ${p.size}`, { mtPair: key }));
   }
 }
 
-function modelRow(key, name, sub) {
+function modelRow(key, name, sub, { mtPair = null } = {}) {
   const div = document.createElement('div');
   div.className = 'm-item';
   const isDl = !!state.downloaded[key];
   const isActive = key === state.settings.asrModel && ASR_MODELS[key];
   const dl = dlState.get(key);
   const downloading = dl && !dl.done;
+  const canTest = mtPair && state.qaCatalog && firstSampleForPair(state.qaCatalog, mtPair);
   div.innerHTML = `
     <div class="m-meta">
       <div class="m-name">${name}${isActive ? ' ✓' : ''}</div>
@@ -368,6 +730,11 @@ function modelRow(key, name, sub) {
     <span class="m-state ${isDl ? 'done' : ''}" data-key="${key}">${
       downloading ? Math.round(dl.pct || 0) + '%' : isDl ? '✅' : ''
     }</span>
+    ${
+      canTest
+        ? `<button class="mini-btn test-btn" data-pair="${mtPair}" title="${t('qaSamplesHint')}">${t('qaTest')}</button>`
+        : ''
+    }
     ${
       ASR_MODELS[key] && !isActive
         ? `<button class="mini-btn use-btn" data-key="${key}">Use</button>`
@@ -390,6 +757,13 @@ function modelRow(key, name, sub) {
     renderModelLists();
     updateWarning();
   });
+  div.querySelector('.test-btn')?.addEventListener('click', async () => {
+    const pair = div.querySelector('.test-btn').dataset.pair;
+    const sample = firstSampleForPair(state.qaCatalog, pair);
+    $('settings-modal').classList.add('hidden');
+    stopNativePoll();
+    await runQaSample(sample, { autoStart: true });
+  });
   return div;
 }
 
@@ -398,23 +772,30 @@ function modelRow(key, name, sub) {
 async function loadSettings() {
   const { settings } = await chrome.storage.local.get('settings');
   if (settings) Object.assign(state.settings, settings);
-  document.querySelectorAll('#ui-lang-toggle button').forEach((b) =>
-    b.classList.toggle('active', b.dataset.lang === state.settings.uiLang),
-  );
+  if (!UI_LANGS.some(([c]) => c === state.settings.uiLang)) {
+    state.settings.uiLang = 'en';
+  }
+  // Installs from before the interpreter chooser have no `interpreter` key —
+  // they normalise to the one-way behaviour they already had.
+  state.settings.interpreter = normalizeInterpreter(state.settings, state.srcLang, state.tgtLang);
+  if (state.settings.interpreter.mode === 'consecutive') {
+    state.srcLang = state.settings.interpreter.a;
+    state.tgtLang = state.settings.interpreter.b;
+  }
+  renderUiLangToggle();
+  renderEngineToggle();
   document.querySelectorAll('#mirror-toggle button').forEach((b) =>
     b.classList.toggle('active', b.dataset.mirror === state.settings.mirror),
   );
   document.querySelectorAll('#device-toggle button').forEach((b) =>
     b.classList.toggle('active', b.dataset.device === state.settings.device),
   );
-  document.querySelectorAll('#engine-toggle button').forEach((b) =>
-    b.classList.toggle('active', b.dataset.engine === (state.settings.engine || 'browser')),
-  );
   $('native-block').classList.toggle('hidden', state.settings.engine !== 'native');
   $('native-url').value = state.settings.nativeUrl || DEFAULT_NATIVE_URL;
   syncDualLineCheckboxes();
   syncRefineCheckboxes();
   $('font-size').value = state.settings.overlayFontSize;
+  applyInterpreterUi();
 }
 
 let nativeInfo = null; // last /health result (null = offline/unknown)
@@ -474,9 +855,6 @@ async function checkNative({ allowAutoStart = false } = {}) {
       nativeInfo.translate &&
       nativeInfo.features &&
       nativeInfo.features.translate_refine === false;
-    // #region agent log
-    fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'pre-fix',hypothesisId:'A',location:'sidepanel.js:checkNative',message:'native check result',data:{online:true,engine:nativeInfo.engine,stale,features:nativeInfo.features},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setNativeUi({
       running: true,
       busy: false,
@@ -489,9 +867,6 @@ async function checkNative({ allowAutoStart = false } = {}) {
     });
     tryEnsureLab();
   } else {
-    // #region agent log
-    fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'pre-fix',hypothesisId:'C',location:'sidepanel.js:checkNative',message:'native check offline',data:{url:state.settings.nativeUrl||DEFAULT_NATIVE_URL},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setNativeUi({ running: false, busy: false, detail: t('nativeOffline') });
   }
   updateWarning();
@@ -533,9 +908,6 @@ async function nativeControl(action) {
   });
   try {
     if (nativeHostSupported()) {
-      // #region agent log
-      fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'post-fix',hypothesisId:'F',location:'sidepanel.js:nativeControl',message:'native host action',data:{action},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const res = await nativeHostAction(action, { timeoutMs: 130_000 });
       if (!res?.ok) throw new Error(res?.error || 'Native host failed');
     } else if (action === 'stop') {
@@ -559,18 +931,155 @@ async function saveSettings() {
 
 // ---------------------------------------------------------------------------
 // realtime session
+/** True when sidepanel runs under test/app.html (chrome-mock), not the extension. */
+function isLabHarness() {
+  return typeof window !== 'undefined' && !!window.__chromeMockStore;
+}
+
+let labMediaEl = null;
+
+function releaseLabCapture() {
+  try {
+    const s = window.__ltsCaptureStream;
+    if (s?.getTracks) {
+      for (const track of s.getTracks()) {
+        try {
+          track.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  window.__ltsCaptureStream = null;
+  window.__ltsLabClock = null;
+  if (labMediaEl) {
+    try {
+      labMediaEl.pause();
+      labMediaEl.removeAttribute('src');
+      labMediaEl.load();
+      labMediaEl.remove();
+    } catch {
+      /* ignore */
+    }
+    labMediaEl = null;
+  }
+}
+
+/** Looping CC0 / speech.wav via captureStream — no extension APIs. */
+async function acquireLabDemoStream() {
+  releaseLabCapture();
+  let url = '/speech.wav';
+  let title = 'Lab demo — looping speech.wav';
+  try {
+    const cat = await loadSampleCatalog();
+    const sample =
+      firstSampleForPair(cat, `${state.srcLang}-${state.tgtLang}`) ||
+      firstSampleForPair(cat, `${state.srcLang}-en`) ||
+      cat?.samples?.[0];
+    if (cat && sample?.file) {
+      url = `${cat.base}${sample.file}`;
+      title = sample.label || sample.file;
+    }
+  } catch {
+    /* keep speech.wav fallback */
+  }
+
+  const el = document.createElement('audio');
+  el.src = url;
+  el.loop = true;
+  el.controls = true;
+  el.crossOrigin = 'anonymous';
+  el.setAttribute('playsinline', '');
+  el.style.cssText =
+    'position:fixed;right:12px;bottom:12px;width:240px;z-index:40;border-radius:8px;background:#111';
+  document.body.appendChild(el);
+  labMediaEl = el;
+
+  try {
+    await el.play();
+  } catch (e) {
+    releaseLabCapture();
+    throw new Error(`Lab demo audio blocked: ${e.message || e}. Click the page, then Start again.`);
+  }
+
+  const raw =
+    typeof el.captureStream === 'function'
+      ? el.captureStream()
+      : typeof el.mozCaptureStream === 'function'
+        ? el.mozCaptureStream()
+        : null;
+  const audioTracks = raw?.getAudioTracks?.() || [];
+  if (!audioTracks.length) {
+    releaseLabCapture();
+    throw new Error('Could not capture audio from the lab demo clip (captureStream).');
+  }
+
+  const stream = new MediaStream(audioTracks);
+  window.__ltsCaptureStream = stream;
+  window.__ltsLabClock = () => (labMediaEl && Number.isFinite(labMediaEl.currentTime) ? labMediaEl.currentTime : 0);
+
+  state.currentTab = { id: 1, title, url, favIconUrl: '' };
+  $('tab-title').textContent = title;
+  $('tab-url').textContent = url;
+  $('tab-favicon').src = chrome.runtime.getURL('icons/icon16.png');
+  updateButtons();
+  return stream;
+}
+
+/** Share a Chrome tab/window with audio (best extension-equivalent in a normal tab). */
+async function acquireLabDisplayStream() {
+  releaseLabCapture();
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    throw new Error('getDisplayMedia is unavailable in this browser.');
+  }
+  const display = await navigator.mediaDevices.getDisplayMedia({
+    video: true,
+    audio: true,
+  });
+  const audioTracks = display.getAudioTracks();
+  if (!audioTracks.length) {
+    for (const track of display.getTracks()) track.stop();
+    throw new Error(t('noAudioShared'));
+  }
+  for (const track of display.getVideoTracks()) track.stop();
+
+  const stream = new MediaStream(audioTracks);
+  const t0 = performance.now();
+  window.__ltsCaptureStream = stream;
+  window.__ltsLabClock = () => (performance.now() - t0) / 1000;
+  audioTracks[0].addEventListener('ended', () => {
+    if (state.running) onStop();
+  });
+
+  state.currentTab = {
+    id: 1,
+    title: 'Shared tab / window (getDisplayMedia)',
+    url: location.href,
+    favIconUrl: '',
+  };
+  $('tab-title').textContent = state.currentTab.title;
+  $('tab-url').textContent = 'Pick → share a tab and enable audio';
+  $('tab-favicon').src = chrome.runtime.getURL('icons/icon16.png');
+  updateButtons();
+  return stream;
+}
+
 async function refreshTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const fallbackIcon = chrome.runtime.getURL('icons/icon16.png');
   if (tab && /^https?:/.test(tab.url || '')) {
     state.currentTab = tab;
     $('tab-title').textContent = tab.title || tab.url;
     $('tab-url').textContent = tab.url;
-    $('tab-favicon').src = tab.favIconUrl || 'icons/icon16.png';
+    $('tab-favicon').src = tab.favIconUrl || fallbackIcon;
   } else {
     state.currentTab = null;
     $('tab-title').textContent = t('noTab');
     $('tab-url').textContent = '';
-    $('tab-favicon').src = 'icons/icon16.png';
+    $('tab-favicon').src = fallbackIcon;
   }
   updateButtons();
 }
@@ -599,12 +1108,16 @@ async function startWithStream(streamId, captureType) {
     ...currentConfig(),
     streamId,
     captureType,
+    tabTitle: state.currentTab?.title,
+    tabUrl: state.currentTab?.url,
   });
   if (res?.ok) {
     state.running = true;
+    syncCaptureStamp();
     $('pick-hint').classList.add('hidden');
     updateButtons();
   } else if (res?.error) {
+    if (isLabHarness()) releaseLabCapture();
     showCaptureError(res.error);
   }
 }
@@ -622,6 +1135,24 @@ function showCaptureError(message) {
 // to share its audio. The picker itself is the consent, so this path never
 // hits the "extension has not been invoked" restriction.
 function onPickManually() {
+  if (isLabHarness()) {
+    void (async () => {
+      $('pick-hint').textContent = t('pickHintLab');
+      $('pick-hint').classList.remove('hidden');
+      try {
+        setStatus(t('pickHintLab'));
+        await acquireLabDisplayStream();
+        await startWithStream(null, 'media');
+      } catch (e) {
+        if (e?.name === 'NotAllowedError' || /Permission denied|dismissed/i.test(String(e?.message || e))) {
+          setStatus(t('cancelled'));
+        } else {
+          setStatus(String(e?.message || e), 'error');
+        }
+      }
+    })();
+    return;
+  }
   if (!chrome.desktopCapture?.chooseDesktopMedia) {
     setStatus('desktopCapture API unavailable in this browser.', 'error');
     return;
@@ -643,8 +1174,21 @@ function onPickManually() {
 
 async function onStart() {
   if (state.mode === 'realtime') {
-    if (!state.currentTab) return;
     persistLastConfig();
+    if (isLabHarness()) {
+      try {
+        setStatus(t('loadingModels'));
+        clearLivePreview();
+        $('live-preview').classList.remove('hidden');
+        await acquireLabDemoStream();
+        await startWithStream(null, 'media');
+      } catch (e) {
+        releaseLabCapture();
+        setStatus(String(e?.message || e), 'error');
+      }
+      return;
+    }
+    if (!state.currentTab) return;
     let streamId = null;
     try {
       streamId = await chrome.tabCapture.getMediaStreamId({
@@ -681,6 +1225,7 @@ async function onStart() {
         config: currentConfig(),
       });
       state.offlineRunning = true;
+      syncCaptureStamp();
       updateButtons();
     } catch (e) {
       setStatus(String(e?.message || e), 'error');
@@ -692,6 +1237,8 @@ async function onStop() {
   if (state.mode === 'realtime') {
     await toBG('panel-stop', {});
     state.running = false;
+    syncCaptureStamp();
+    if (isLabHarness()) releaseLabCapture();
     setStatus('');
     updateButtons();
   } else {
@@ -756,11 +1303,17 @@ async function pickFile(file) {
 
 // ---------------------------------------------------------------------------
 // subtitle stream + offline results
-function appendLiveLine(host, text) {
+function appendLiveLine(host, text, tag = '') {
   if (!text) return;
   const div = document.createElement('div');
   div.className = 'line';
-  div.textContent = text;
+  if (tag) {
+    const badge = document.createElement('span');
+    badge.className = 'dir-tag';
+    badge.textContent = tag;
+    div.appendChild(badge);
+  }
+  div.appendChild(document.createTextNode(text));
   host.appendChild(div);
   while (host.children.length > 30) host.firstChild.remove();
   host.scrollTop = host.scrollHeight;
@@ -784,7 +1337,7 @@ function setLiveInterim(host, text) {
   host.scrollTop = host.scrollHeight;
 }
 
-function pushLive({ source, translation, interim, partial }) {
+function pushLive({ source, translation, interim, partial, dir }) {
   if (interim && partial) {
     if (source) setLiveInterim($('live-src-lines'), source);
     if (translation) setLiveInterim($('live-tgt-lines'), translation);
@@ -793,8 +1346,11 @@ function pushLive({ source, translation, interim, partial }) {
   if (interim) return;
   setLiveInterim($('live-src-lines'), '');
   setLiveInterim($('live-tgt-lines'), '');
-  if (source) appendLiveLine($('live-src-lines'), source);
-  if (translation) appendLiveLine($('live-tgt-lines'), translation);
+  // Two-way lines say which way this utterance went; one-way stays untagged.
+  const srcTag = dir?.src ? dir.src.toUpperCase() : '';
+  const dirTag = dir?.src && dir?.tgt ? `${dir.src.toUpperCase()} \u2192 ${dir.tgt.toUpperCase()}` : '';
+  if (source) appendLiveLine($('live-src-lines'), source, srcTag);
+  if (translation) appendLiveLine($('live-tgt-lines'), translation, dirTag);
 }
 
 function fmtTs(sec, srtStyle = false) {
@@ -932,6 +1488,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   switch (msg.type) {
     case 'state':
       state.running = !!msg.data.active;
+      syncCaptureStamp();
       updateButtons();
       if (!state.running && state.mode === 'realtime') setStatus('');
       break;
@@ -948,6 +1505,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     case 'error':
       setStatus(msg.data?.message || 'Error', 'error');
       state.running = false;
+      syncCaptureStamp();
       updateButtons();
       break;
     case 'model-progress':
@@ -976,12 +1534,14 @@ chrome.runtime.onMessage.addListener((msg) => {
     }
     case 'offline-done':
       state.offlineRunning = false;
+      syncCaptureStamp();
       setStatus(t('done'), 'ok');
       updateButtons();
       renderHistory();
       break;
     case 'offline-error':
       state.offlineRunning = false;
+      syncCaptureStamp();
       setStatus(msg.data?.cancelled ? t('cancelled') : msg.data?.message || 'Error', msg.data?.cancelled ? '' : 'error');
       updateButtons();
       break;
@@ -997,6 +1557,23 @@ chrome.runtime.onMessage.addListener((msg) => {
 // ---------------------------------------------------------------------------
 // wiring
 function wire() {
+  document.querySelectorAll('#view-tabs button').forEach((b) =>
+    b.addEventListener('click', () => setView(b.dataset.view)),
+  );
+  // ⌘⇧F / Ctrl+Shift+F — tandai momen. Hanya saat tampilan Notulen terlihat
+  // dan ada tugas tangkap yang berjalan; tombolnya sendiri yang menyimpan,
+  // jadi pintasan ini cukup menekannya (satu jalur, satu aturan).
+  document.addEventListener('keydown', (e) => {
+    // Tahan tombol ≠ banjir tanda: satu tekan, satu tanda.
+    if (e.repeat || e.isComposing) return;
+    const mod = /^Mac/i.test(navigator.platform || '') ? e.metaKey : e.ctrlKey;
+    if (!mod || !e.shiftKey || e.altKey || (e.key || '').toLowerCase() !== 'f') return;
+    if (state.view !== 'notes' || !getCapture().running) return;
+    const btn = $('btn-flag-moment');
+    if (!btn || btn.disabled) return;
+    e.preventDefault();
+    btn.click();
+  });
   document.querySelectorAll('#mode-toggle button').forEach((b) =>
     b.addEventListener('click', () => setMode(b.dataset.mode)),
   );
@@ -1005,13 +1582,32 @@ function wire() {
   );
   $('src-lang').addEventListener('change', (e) => {
     state.srcLang = e.target.value;
+    renderInterpreterUi();
     updateWarning();
     persistLastConfig();
   });
   $('tgt-lang').addEventListener('change', (e) => {
     state.tgtLang = e.target.value;
+    renderInterpreterUi();
     updateWarning();
     persistLastConfig();
+  });
+
+  $('btn-interpreter').addEventListener('click', openInterpreterModal);
+  $('btn-close-interpreter').addEventListener('click', () =>
+    $('interpreter-modal').classList.add('hidden'),
+  );
+  $('btn-interp-cancel').addEventListener('click', () =>
+    $('interpreter-modal').classList.add('hidden'),
+  );
+  $('btn-interp-apply').addEventListener('click', applyInterpreterChoice);
+  document.querySelectorAll('.interp-card').forEach((card) => {
+    card.addEventListener('click', () => selectInterpreterCard(card.dataset.mode));
+    card.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      selectInterpreterCard(card.dataset.mode);
+    });
   });
   $('btn-start').addEventListener('click', onStart);
   $('btn-stop').addEventListener('click', onStop);
@@ -1051,16 +1647,6 @@ function wire() {
     $('about-block').scrollIntoView({ behavior: 'smooth' });
   });
 
-  document.querySelectorAll('#ui-lang-toggle button').forEach((b) =>
-    b.addEventListener('click', async () => {
-      state.settings.uiLang = b.dataset.lang;
-      await saveSettings();
-      await loadSettings();
-      applyI18n();
-      updateWarning();
-      renderHistory();
-    }),
-  );
   document.querySelectorAll('#mirror-toggle button').forEach((b) =>
     b.addEventListener('click', async () => {
       state.settings.mirror = b.dataset.mirror;
@@ -1074,22 +1660,6 @@ function wire() {
       await saveSettings();
       await loadSettings();
       updateWarning();
-    }),
-  );
-  document.querySelectorAll('#engine-toggle button').forEach((b) =>
-    b.addEventListener('click', async () => {
-      state.settings.engine = b.dataset.engine;
-      await saveSettings();
-      await loadSettings();
-      updateWarning();
-      if (state.settings.engine === 'native') {
-        lastNativeAutoStartMs = 0;
-        labEnsureAttempted = false;
-        checkNative({ allowAutoStart: true });
-        if (!$('settings-modal').classList.contains('hidden')) startNativePoll();
-      } else {
-        stopNativePoll();
-      }
     }),
   );
   $('native-url').addEventListener('change', async (e) => {
@@ -1112,6 +1682,12 @@ function wire() {
 
   wireDropzone();
 
+  $('btn-qa-run')?.addEventListener('click', async () => {
+    const id = $('qa-sample-select')?.value;
+    const sample = state.qaCatalog?.samples?.find((s) => s.id === id);
+    await runQaSample(sample, { autoStart: true });
+  });
+
   chrome.tabs.onActivated.addListener(refreshTab);
   chrome.tabs.onUpdated.addListener((id, info) => {
     if (info.status === 'complete' || info.title) refreshTab();
@@ -1122,8 +1698,11 @@ function wire() {
 async function init() {
   await loadSettings();
   wire();
-  fillSelects();
   applyI18n();
+  fillSelects();
+  setView('captions');
+  state.qaCatalog = await loadSampleCatalog();
+  renderQaSampleBar();
   setMode('realtime');
   setTask('translate');
   await refreshDownloaded();
@@ -1137,7 +1716,10 @@ async function init() {
   await refreshExportFolderUi();
   await renderHistory();
   const notesMount = $('notes-mount');
-  if (notesMount) await mountNotesPanel(notesMount);
+  if (notesMount) {
+    await mountNotesPanel(notesMount, notesMountOptions());
+    notesMount.dataset.mounted = '1';
+  }
   const helperMount = $('helper-status-mount');
   if (helperMount) {
     redrawHelperStatus = mountHelperStatusCard(helperMount, () => ({
@@ -1152,6 +1734,7 @@ async function init() {
   const s = await toBG('get-state', {});
   if (s?.active) {
     state.running = true;
+    syncCaptureStamp();
     if (s.config) {
       state.srcLang = s.config.srcLang;
       state.tgtLang = s.config.tgtLang;

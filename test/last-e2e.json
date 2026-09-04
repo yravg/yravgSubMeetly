@@ -1,6 +1,6 @@
 {
   "source": "e2e",
-  "generatedAt": "2026-09-03T06:52:30.348Z",
+  "generatedAt": "2026-09-03T08:05:11.697Z",
   "mode": "e2e-file",
   "suites": [
     {
@@ -11,7 +11,7 @@
       "script": "scripts/e2e.mjs",
       "status": "pass",
       "durationMs": 16,
-      "lastRun": "2026-09-03T06:52:30.306Z",
+      "lastRun": "2026-09-03T08:05:11.645Z",
       "covers": "Puppeteer + tabCapture allowlisted → subtitel + overlay",
       "checks": [
         {
@@ -58,7 +58,7 @@
       "script": "scripts/e2e-file.mjs",
       "status": "pass",
       "durationMs": 4,
-      "lastRun": "2026-09-03T06:52:30.348Z",
+      "lastRun": "2026-09-03T08:05:11.696Z",
       "covers": "formatSrt/formatVtt/formatTxt + wiring Offline dropzone; opsional Puppeteer --browser",
       "checks": [
         {
@@ -95,7 +95,7 @@
           "id": "e2e-sample-wav",
           "name": "Berkas audio sampel untuk uji berkas",
           "status": "pass",
-          "detail": "test/samples/en-zh-1.wav"
+          "detail": "test/samples/cc0/en-1.mp3"
         },
         {
           "id": "e2e-split",

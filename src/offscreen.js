@@ -4,8 +4,10 @@
 import { MicVAD, NonRealTimeVAD } from '@ricky0123/vad-web';
 import { makeTranslator } from './lib/translate.js';
 import { isHallucination } from './lib/registry.js';
-import { sourceText, needsTranslation } from './lib/translation-utils.js';
+import { sourceText, needsTranslation, lineDirection } from './lib/translation-utils.js';
 import { nativeDraft, nativeHealth, nativeTranscribeFile } from './lib/native.js';
+import { detectLanguage } from './lib/lang-detect.js';
+import { isConsecutive, interpreterPairs } from './lib/interpreter.js';
 import {
   getOfflineInputFile,
   needsNativeFilePath,
@@ -66,6 +68,11 @@ async function loadEngine(config) {
     (p) => toBG('model-progress', { key: config.asrModel, ...p }),
   );
 }
+function transcribeDetailed(audio, opts) {
+  const ownsBuffer = audio.byteOffset === 0 && audio.byteLength === audio.buffer.byteLength;
+  const payload = ownsBuffer ? audio : audio.slice();
+  return rpc('transcribeDetailed', { audio: payload, opts }, null, [payload.buffer]);
+}
 function transcribe(audio, opts) {
   // Only transfer when `audio` owns its whole buffer (realtime utterances are
   // fresh arrays). Offline segments are subarray views into one big buffer —
@@ -74,8 +81,47 @@ function transcribe(audio, opts) {
   const payload = ownsBuffer ? audio : audio.slice();
   return rpc('transcribe', { audio: payload, opts }, null, [payload.buffer]);
 }
+// Whisper-family engines report language as either an ISO code or a full
+// English name ("chinese", "german", …) depending on backend/version. Map the
+// common ones to ISO so `reported === a || reported === b` actually matches —
+// naive slice(0,2) turned "chinese" into "ch" (not "zh") and "japanese" into
+// "ja" only by coincidence.
+const ENGINE_LANG_NAMES = {
+  english: 'en',
+  chinese: 'zh',
+  mandarin: 'zh',
+  german: 'de',
+  spanish: 'es',
+  japanese: 'ja',
+  korean: 'ko',
+  french: 'fr',
+  italian: 'it',
+  dutch: 'nl',
+  polish: 'pl',
+  vietnamese: 'vi',
+  portuguese: 'pt',
+  turkish: 'tr',
+  russian: 'ru',
+  ukrainian: 'uk',
+  arabic: 'ar',
+  thai: 'th',
+  hindi: 'hi',
+  indonesian: 'id',
+};
+function normalizeEngineLanguage(lang) {
+  if (typeof lang !== 'string' || !lang) return '';
+  const s = lang.trim().toLowerCase();
+  if (!s) return '';
+  if (ENGINE_LANG_NAMES[s]) return ENGINE_LANG_NAMES[s];
+  // Already a short code (ISO 639-1, or a 639-2/BCP-47 tag like "zh-cn").
+  return s.slice(0, 2);
+}
+
 function mtProgress(config) {
-  return (p) => toBG('model-progress', { key: `${config.srcLang}-${config.tgtLang}`, ...p });
+  return mtProgressPair(config.srcLang, config.tgtLang);
+}
+function mtProgressPair(srcLang, tgtLang) {
+  return (p) => toBG('model-progress', { key: `${srcLang}-${tgtLang}`, ...p });
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +133,7 @@ const rt = {
   ctx: null,
   vad: null,
   translator: null,
+  translators: null, // two-way: { 'a>b': translator, 'b>a': translator }
   config: null,
   queue: [],
   processing: false,
@@ -98,8 +145,14 @@ const rt = {
   partialBusy: false,
 };
 
+/** Two-way (consecutive) interpreting: direction is decided per utterance. */
+function twoWay() {
+  return isConsecutive(rt.config?.interpreter);
+}
+
 function refineEnabled() {
-  return !!(rt.config?.refineTranslation && rt.config?.taskMode === 'translate');
+  // Drafting mid-utterance needs a fixed source language; two-way has none.
+  return !!(rt.config?.refineTranslation && rt.config?.taskMode === 'translate' && !twoWay());
 }
 
 function concatSpeechBuffer() {
@@ -229,7 +282,15 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
 
   try {
     // Grab the stream FIRST — the streamId expires within seconds.
-    if (captureType === 'desktop') {
+    if (captureType === 'media') {
+      // Lab / browser-tab harness: MediaStream already acquired via
+      // getDisplayMedia or <audio|video>.captureStream() (same page as offscreen).
+      const stream = globalThis.__ltsCaptureStream;
+      if (!stream || typeof stream.getAudioTracks !== 'function') {
+        throw new Error('No lab capture stream — Start demo audio or Pick (share tab audio).');
+      }
+      rt.media = stream;
+    } else if (captureType === 'desktop') {
       // desktopCapture picker stream: Chrome requires requesting video along
       // with audio; we only need the audio and stop the video track at once.
       rt.media = await navigator.mediaDevices.getUserMedia({
@@ -269,9 +330,10 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
 
   rt.ctx = new AudioContext();
   const src = rt.ctx.createMediaStreamSource(rt.audioStream);
-  if (captureType !== 'desktop') {
+  if (captureType === 'tab') {
     // chrome.tabCapture silences the tab — route audio back to the speakers.
-    // Picker-based capture keeps playing locally, so passthrough would echo.
+    // Desktop / lab media already play locally (or via a demo <audio>), so
+    // passthrough would echo.
     src.connect(rt.ctx.destination);
   }
 
@@ -286,10 +348,21 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
     info = await loadEngine(config);
 
     toBG('pipeline-status', { state: 'loading', detail: 'translator' });
-    rt.translator = await makeTranslator(config, mtProgress(config), { ...engineOpts(), rpc });
-    // #region agent log
-    fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'pre-fix',hypothesisId:'D',location:'offscreen.js:startCapture',message:'pipeline ready',data:{engine:engineOpts().engine,asrBackend:info?.backend||backend,translatorKind:rt.translator?.kind,refine:!!config.refineTranslation},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+    rt.translator = null;
+    rt.translators = null;
+    if (twoWay()) {
+      // Both directions must be ready before the first utterance arrives.
+      rt.translators = {};
+      for (const [from, to] of interpreterPairs(config.interpreter)) {
+        rt.translators[`${from}>${to}`] = await makeTranslator(
+          { ...config, srcLang: from, tgtLang: to, taskMode: 'translate', refineTranslation: false },
+          mtProgressPair(from, to),
+          { ...engineOpts(), rpc },
+        );
+      }
+    } else {
+      rt.translator = await makeTranslator(config, mtProgress(config), { ...engineOpts(), rpc });
+    }
 
     toBG('pipeline-status', { state: 'warmup', device: info.device });
     await rpc('warmup');
@@ -407,6 +480,11 @@ async function processUtterance({ audio, draft = null }) {
     // Skip only when this exact segment is already in the transcript cache.
     if (await isCachedRange(t0, t1)) return;
 
+    if (twoWay()) {
+      await processTwoWayUtterance(audio, t0, t1);
+      return;
+    }
+
     if (t && t.kind === 'whisper-direct') {
       const en = await transcribe(audio, { language: srcLang, task: 'translate' });
       if (isHallucination(en)) return;
@@ -450,6 +528,51 @@ async function processUtterance({ audio, draft = null }) {
   }
 }
 
+/**
+ * One utterance in two-way mode: transcribe with language:'auto', work out
+ * which of the two conversation languages was spoken, and translate it into
+ * the other one.
+ */
+async function processTwoWayUtterance(audio, t0, t1) {
+  const { a, b } = rt.config.interpreter;
+  // transcribeDetailed transfers the buffer it is handed; when one direction is
+  // Whisper-direct we may need the samples again, so send it a copy.
+  const reuseAudio = Object.values(rt.translators || {}).some((x) => x?.kind === 'whisper-direct');
+  const out = await transcribeDetailed(reuseAudio ? audio.slice() : audio, {
+    language: 'auto',
+    task: 'transcribe',
+  });
+  const text = (out?.text || '').trim();
+  if (!text || isHallucination(text)) return;
+
+  // Trust the engine only when it actually named one of our two languages.
+  const reported = normalizeEngineLanguage(out?.language);
+  const src = reported === a || reported === b ? reported : detectLanguage(text, [a, b]);
+  const tgt = src === a ? b : a;
+
+  const t = rt.translators?.[`${src}>${tgt}`];
+  let translation = '';
+  if (t && t.kind === 'whisper-direct') {
+    // tgt is English — Whisper's own translate task does it without an MT model.
+    translation = await transcribe(audio, { language: src, task: 'translate' });
+    if (isHallucination(translation)) translation = '';
+  } else if (t && t.kind !== 'none') {
+    translation = await t.translate(text);
+  }
+  if (!translation) console.warn('two-way translation empty for:', text.slice(0, 80));
+
+  toBG('subtitle', {
+    final: true,
+    source: text,
+    translation: translation || text,
+    rawSource: text,
+    rawTranslation: translation,
+    dir: { src, tgt },
+    t0,
+    t1,
+  });
+}
+
 async function stopCapture() {
   rt.active = false;
   clearTimeout(rt.flushTimer);
@@ -458,6 +581,7 @@ async function stopCapture() {
   rt.partialDraft = { source: '', translation: '' };
   rt.partialBusy = false;
   rt.queue = [];
+  rt.translators = null;
   if (rt.vad) {
     try {
       rt.vad.destroy();
@@ -689,18 +813,51 @@ async function runForceTranslate({ lines, config, settings, retranslate = false 
   if (!cfg.srcLang || !cfg.tgtLang) throw new Error('Missing source or target language');
 
   await configureWorker();
-  const t = await makeTranslator(cfg, mtProgress(cfg), { ...engineOpts(), rpc, skipChrome: true });
-  if (!t || t.kind === 'none' || t.kind === 'whisper-direct') {
-    throw new Error(
-      `No text translation model for ${cfg.srcLang} → ${cfg.tgtLang}. Download the pair model in Settings.`,
-    );
+
+  // Two-way lines carry their own direction, so a single cfg translator would
+  // overwrite half the transcript with garbage. Build (and cache) one text
+  // translator per direction actually present in the batch.
+  const built = new Map();
+  async function translatorFor(from, to) {
+    const key = `${from}>${to}`;
+    if (built.has(key)) return built.get(key);
+    let t = null;
+    try {
+      t = await makeTranslator(
+        { ...cfg, srcLang: from, tgtLang: to },
+        mtProgressPair(from, to),
+        { ...engineOpts(), rpc, skipChrome: true },
+      );
+    } catch (e) {
+      console.warn(`force-translate: no translator for ${key}`, e);
+    }
+    // whisper-direct needs the audio, which force-translate does not have.
+    if (!t || t.kind === 'none' || t.kind === 'whisper-direct') t = null;
+    built.set(key, t);
+    return t;
   }
 
   let translated = 0;
+  let candidates = 0; // lines that actually wanted translating
+  let usable = 0; // …of those, the ones a translator exists for
+  // Directions we had to give up on, and how many lines each one cost —
+  // silently translating "some" of a two-way transcript is a lie.
+  const skippedByDir = new Map();
   for (const line of lines || []) {
     const src = sourceText(line);
     if (!src) continue;
+    const { srcLang: from, tgtLang: to } = lineDirection(line, cfg.srcLang, cfg.tgtLang);
+    if (!from || !to || from === to) continue;
     if (!retranslate && !needsTranslation(line, cfg.srcLang, cfg.tgtLang)) continue;
+    candidates++;
+
+    const t = await translatorFor(from, to);
+    if (!t) {
+      const key = `${from} \u2192 ${to}`;
+      skippedByDir.set(key, (skippedByDir.get(key) || 0) + 1);
+      continue;
+    }
+    usable++;
 
     const out = (await t.translate(src)).trim();
     if (!out || out === src) continue;
@@ -711,12 +868,25 @@ async function runForceTranslate({ lines, config, settings, retranslate = false 
       translation: out,
       rawSource: src,
       rawTranslation: out,
+      ...(line.dir ? { dir: line.dir } : {}),
       t0: line.t0 ?? 0,
       t1: line.t1 ?? (line.t0 ?? 0) + 2,
     });
     translated++;
   }
-  return translated;
+  if (candidates && !usable) {
+    const missing = [...built.entries()].filter(([, t]) => !t).map(([k]) => k.replace('>', ' \u2192 '));
+    throw new Error(
+      `No text translation model for ${missing.join(', ') || `${cfg.srcLang} \u2192 ${cfg.tgtLang}`}. Download the pair model in Settings.`,
+    );
+  }
+  let skipped = 0;
+  for (const n of skippedByDir.values()) skipped += n;
+  return {
+    translated,
+    skipped,
+    skippedDirections: [...skippedByDir.keys()],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -740,8 +910,8 @@ chrome.runtime.onMessage.addListener((msg) => {
     case 'force-translate':
       (async () => {
         try {
-          const translated = await runForceTranslate(msg.data || {});
-          toBG('force-translate-done', { translated });
+          const res = await runForceTranslate(msg.data || {});
+          toBG('force-translate-done', res);
         } catch (e) {
           toBG('force-translate-done', { translated: 0, error: String(e.message || e) });
         }

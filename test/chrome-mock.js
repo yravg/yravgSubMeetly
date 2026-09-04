@@ -1,7 +1,8 @@
 // Chrome API mock for browser-tab harnesses (app.html / panel-test.html).
-// Offline + model download reuse the real extension pipeline:
+// Offline + realtime reuse the real extension pipeline:
 //   sidepanel → (this mock as background) → /dist/offscreen.js → /dist/ai-worker.js → Whisper.
-// Realtime tabCapture stays extension-only.
+// Lab realtime uses captureType "media" + globalThis.__ltsCaptureStream
+// (getDisplayMedia or <audio>.captureStream) — not chrome.tabCapture.
 (() => {
   const listeners = [];
   const store = {
@@ -27,6 +28,15 @@
   };
 
   let offscreenBoot = null;
+  let labSession = {
+    active: false,
+    tabTitle: '',
+    tabUrl: '',
+    config: null,
+    lines: [],
+    startedAt: 0,
+    videoTime: 0,
+  };
 
   window.__mockEmit = (msg) => listeners.forEach((f) => f(msg));
   window.__chromeMockStore = store;
@@ -41,6 +51,29 @@
 
   async function getSettings() {
     return store.settings || {};
+  }
+
+  function labVideoTime() {
+    try {
+      if (typeof window.__ltsLabClock === 'function') {
+        const t = Number(window.__ltsLabClock());
+        if (Number.isFinite(t) && t >= 0) return t;
+      }
+    } catch {
+      /* ignore */
+    }
+    return labSession.videoTime || 0;
+  }
+
+  function publicState() {
+    return {
+      active: labSession.active,
+      tabId: 1,
+      tabTitle: labSession.tabTitle,
+      config: labSession.config,
+      lineCount: labSession.lines.length,
+      cacheMaxTime: 0,
+    };
   }
 
   /** Boot the real offscreen module once (registers listeners + AI worker). */
@@ -63,22 +96,102 @@
     emitPanel('history-updated', {});
   }
 
+  async function stopLabSession() {
+    if (!labSession.active) {
+      emitOffscreen('stop-capture', {});
+      emitPanel('state', publicState());
+      return;
+    }
+    emitOffscreen('stop-capture', {});
+    if (labSession.lines.length > 0) {
+      await saveHistory({
+        id: `lab-rt-${labSession.startedAt}`,
+        ts: labSession.startedAt,
+        mode: 'realtime',
+        title: labSession.tabTitle || 'Lab realtime',
+        url: labSession.tabUrl || '',
+        srcLang: labSession.config?.srcLang,
+        tgtLang: labSession.config?.tgtLang,
+        lines: labSession.lines,
+      });
+    }
+    labSession = {
+      active: false,
+      tabTitle: '',
+      tabUrl: '',
+      config: null,
+      lines: [],
+      startedAt: 0,
+      videoTime: 0,
+    };
+    emitPanel('state', publicState());
+  }
+
+  async function startLabRealtime(data) {
+    await ensureOffscreen();
+    const stream = window.__ltsCaptureStream;
+    if (!stream || typeof stream.getAudioTracks !== 'function' || !stream.getAudioTracks().length) {
+      return {
+        ok: false,
+        error:
+          'No capture stream. Start uses a looping CC0/demo clip; Pick shares a tab/window with audio (getDisplayMedia).',
+      };
+    }
+    if (labSession.active) await stopLabSession();
+
+    const settings = await getSettings();
+    const config = {
+      tabId: 1,
+      srcLang: data?.srcLang || 'ja',
+      tgtLang: data?.tgtLang || 'en',
+      taskMode: data?.taskMode || 'translate',
+      dualLine: data?.dualLine ?? false,
+      refineTranslation: data?.refineTranslation ?? false,
+      asrModel: data?.asrModel || 'whisper-base',
+      streamId: null,
+      captureType: 'media',
+      cacheMaxTime: 0,
+    };
+
+    labSession = {
+      active: true,
+      tabTitle: data?.tabTitle || 'Lab realtime audio',
+      tabUrl: data?.tabUrl || location.href,
+      config,
+      lines: [],
+      startedAt: Date.now(),
+      videoTime: 0,
+    };
+
+    emitOffscreen('start-capture', {
+      streamId: null,
+      captureType: 'media',
+      config,
+      settings,
+    });
+    emitPanel('state', publicState());
+    return { ok: true };
+  }
+
   async function handleBgMessage(msg) {
     const type = msg?.type;
     const data = msg?.data;
 
     switch (type) {
       case 'get-state':
-        return { active: false };
+        return publicState();
 
       case 'panel-start-realtime':
-        return {
-          ok: false,
-          error:
-            'Realtime tab capture only works in the Chrome extension. Switch to Offline for on-device Whisper, or load the unpacked extension.',
-        };
+        try {
+          return await startLabRealtime(data);
+        } catch (e) {
+          const message = String(e?.message || e);
+          emitPanel('error', { message });
+          return { ok: false, error: message };
+        }
 
       case 'panel-stop':
+        await stopLabSession();
         return { ok: true };
 
       case 'ensure-offscreen':
@@ -122,10 +235,53 @@
         return { ok: true };
 
       case 'update-config':
+        if (labSession.active && data) {
+          labSession.config = { ...labSession.config, ...data };
+          emitOffscreen('update-config', { config: labSession.config });
+        }
         return { ok: true };
 
       case 'save-history':
         await saveHistory(data);
+        return { ok: true };
+
+      case 'get-video-time':
+        labSession.videoTime = labVideoTime();
+        return { ok: true, time: labSession.videoTime };
+
+      case 'speech-start':
+        labSession.videoTime = labVideoTime();
+        return { ok: true, time: labSession.videoTime };
+
+      case 'check-cache-range':
+        return { ok: true, cached: false, cacheMaxTime: 0 };
+
+      case 'subtitle': {
+        const d = data || {};
+        emitPanel('subtitle', d);
+        if (labSession.active && d.final && d.t0 != null) {
+          const line = {
+            t0: d.t0,
+            t1: d.t1 ?? d.t0 + 2,
+            src: (d.rawSource ?? d.source ?? '').trim(),
+            tgt: (d.rawTranslation ?? d.translation ?? '').trim(),
+          };
+          if (line.src || line.tgt) labSession.lines.push(line);
+        }
+        return { ok: true };
+      }
+
+      case 'pipeline-status':
+        emitPanel('pipeline-status', data);
+        return { ok: true };
+
+      case 'pipeline-error':
+        emitPanel('error', data);
+        await stopLabSession();
+        return { ok: true };
+
+      case 'capture-ended':
+        await stopLabSession();
         return { ok: true };
 
       case 'model-progress':
@@ -135,12 +291,7 @@
       case 'offline-progress':
       case 'offline-done':
       case 'offline-error':
-      case 'pipeline-status':
         emitPanel(type, data);
-        return { ok: true };
-
-      case 'pipeline-error':
-        emitPanel('error', data);
         return { ok: true };
 
       case 'native-helper-status':
@@ -207,9 +358,9 @@
       query: async () => [
         {
           id: 1,
-          title: 'サンプル動画 — Example Japanese Video',
-          url: 'https://www.youtube.com/watch?v=example',
-          favIconUrl: 'https://www.youtube.com/favicon.ico',
+          title: 'Lab demo — looping speech.wav',
+          url: 'http://127.0.0.1:8799/speech.wav',
+          favIconUrl: 'http://127.0.0.1:8799/dist/icons/icon16.png',
         },
       ],
       onActivated: { addListener: () => {} },
@@ -221,6 +372,6 @@
         throw new Error('tabCapture is unavailable outside the Chrome extension');
       },
     },
-    // desktopCapture omitted — sidepanel shows a clear unavailable message on Pick.
+    // desktopCapture omitted — sidepanel lab path uses getDisplayMedia instead.
   };
 })();
