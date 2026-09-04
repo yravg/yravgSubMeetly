@@ -52,7 +52,7 @@ const state = {
   adding: false,
   // ?lang= from the side panel wins once, then the toggle is remembered.
   lang: (() => {
-    const q = new URLSearchParams(location.search).get('lang');
+    const q = new URLSearchParams(globalThis.location?.search || '').get('lang');
     if (q === 'en' || q === 'id') { localStorage.setItem(LS_LANG, q); return q; }
     return localStorage.getItem(LS_LANG) || 'en';
   })(),
