@@ -5,6 +5,31 @@
 // (getDisplayMedia or <audio>.captureStream) — not chrome.tabCapture.
 (() => {
   const listeners = [];
+
+  // localStorage tier for the storage mock below. Reads return undefined (not
+  // null) when a key was never persisted, so a seeded default can win instead.
+  function readPersisted(key) {
+    let raw;
+    try {
+      raw = localStorage.getItem(key);
+    } catch {
+      return undefined; // private mode / blocked site data
+    }
+    if (raw === null) return undefined;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return undefined; // corrupt entry — fall back to the seed
+    }
+  }
+  function writePersisted(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      /* quota or private mode — the in-memory tier still has it this session */
+    }
+  }
+
   const store = {
     settings: null,
     history: [
@@ -335,18 +360,40 @@
       getURL: (p) => '/dist/' + String(p || '').replace(/^\//, ''),
       // Intentionally omitted: connectNative — nativeHostSupported() stays false in a tab.
     },
+    // Backed by localStorage, one entry per key, JSON-encoded — NOT a plain
+    // object. The lab has two surfaces that must share one store: app.html
+    // (which sees this mock, so notes-store picks its chrome.storage.local
+    // backend) and /dist/minutes.html (no mock, so notes-store falls back to
+    // localStorage). Keeping the mock in memory gave them separate stores:
+    // "Open minutes register" always landed on an empty register, and a
+    // captured meeting vanished on reload. Same key names as the localStorage
+    // backend, so both read and write the same bytes.
     storage: {
       local: {
         get: async (keys) => {
           const out = {};
           const arr = Array.isArray(keys) ? keys : typeof keys === 'string' ? [keys] : Object.keys(keys || {});
-          for (const k of arr) if (store[k] != null) out[k] = store[k];
+          for (const k of arr) {
+            const persisted = readPersisted(k);
+            const v = persisted === undefined ? store[k] : persisted;
+            if (v != null) out[k] = v;
+          }
           return out;
         },
-        set: async (obj) => Object.assign(store, obj),
+        set: async (obj) => {
+          Object.assign(store, obj);
+          for (const [k, v] of Object.entries(obj)) writePersisted(k, v);
+        },
         remove: async (keys) => {
           const arr = Array.isArray(keys) ? keys : [keys];
-          for (const k of arr) delete store[k];
+          for (const k of arr) {
+            delete store[k];
+            try {
+              localStorage.removeItem(k);
+            } catch {
+              /* private mode — the in-memory tier still dropped it */
+            }
+          }
         },
       },
       onChanged: {

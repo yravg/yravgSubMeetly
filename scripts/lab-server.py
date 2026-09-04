@@ -300,6 +300,11 @@ class LabHandler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # Never cache: this server exists to show the CURRENT build. Without
+        # this the handler sends only Last-Modified, so browsers heuristically
+        # cache /dist/*.js and /chrome-mock.js and keep serving a stale copy
+        # after a rebuild — the page looks unchanged and the edit appears lost.
+        self.send_header("Cache-Control", "no-store, max-age=0")
         super().end_headers()
 
     def do_OPTIONS(self):
