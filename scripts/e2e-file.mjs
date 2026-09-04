@@ -22,7 +22,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DIST = path.join(root, 'dist');
 const OUT_PATH = path.join(root, 'test', 'last-e2e.json');
 const SAMPLE =
-  process.env.E2E_FILE_SAMPLE || path.join(root, 'test', 'samples', 'en-zh-1.wav');
+  process.env.E2E_FILE_SAMPLE || path.join(root, 'test', 'samples', 'cc0', 'en-1.mp3');
 const FALLBACK_SPEECH = path.join(root, 'test', 'speech.wav');
 
 const BROWSER = process.argv.includes('--browser');

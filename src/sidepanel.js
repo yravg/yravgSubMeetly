@@ -9,6 +9,8 @@ import {
   LANG_NAMES,
   pairLabel,
   DEFAULT_NATIVE_URL,
+  UI_LANGS,
+  uniqueLangEntries,
 } from './lib/registry.js';
 import { nativeHealth, nativeShutdown } from './lib/native.js';
 import { nativeHostAction, nativeHostSupported } from './lib/native-host.js';
@@ -19,12 +21,18 @@ import { I18N } from './lib/i18n.js';
 import { mountNotesPanel } from './notes-panel.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { exportBasename } from './lib/helper-status.js';
+import {
+  loadSampleCatalog,
+  firstSampleForPair,
+  fetchSampleFile,
+} from './lib/qa-samples.js';
 
 const $ = (id) => document.getElementById(id);
 
 const state = {
   mode: 'realtime', // 'realtime' | 'offline'
   task: 'translate', // 'transcribe' | 'translate'
+  view: 'captions', // 'captions' | 'notes'
   srcLang: 'ja',
   tgtLang: 'en',
   settings: {
@@ -45,6 +53,7 @@ const state = {
   offlineStaging: false,
   offlineLines: [],
   currentTab: null,
+  qaCatalog: null,
 };
 
 function t(key, ...args) {
@@ -73,16 +82,34 @@ function applyI18n() {
 }
 
 // ---------------------------------------------------------------------------
-// selects
+// selects — one option per language code; optgroup names the role so Source
+// vs Target never read as a single duplicated list.
+function optionsHtml(entries) {
+  return uniqueLangEntries(entries)
+    .map(([c, label]) => `<option value="${c}">${label}</option>`)
+    .join('');
+}
+
 function fillSelects() {
-  $('src-lang').innerHTML = SOURCE_LANGS.map(
-    ([c, label]) => `<option value="${c}">${label}</option>`,
-  ).join('');
-  $('tgt-lang').innerHTML = TARGET_LANGS.map(
-    ([c, label]) => `<option value="${c}">${label}</option>`,
-  ).join('');
+  const srcGroup = t('sourceLangGroup');
+  const tgtGroup = t('targetLangGroup');
+  $('src-lang').innerHTML =
+    `<optgroup label="${srcGroup}">${optionsHtml(SOURCE_LANGS)}</optgroup>`;
+  $('tgt-lang').innerHTML =
+    `<optgroup label="${tgtGroup}">${optionsHtml(TARGET_LANGS)}</optgroup>`;
   $('src-lang').value = state.srcLang;
   $('tgt-lang').value = state.tgtLang;
+  $('src-lang').setAttribute('aria-label', t('sourceLang'));
+  $('tgt-lang').setAttribute('aria-label', t('targetLang'));
+}
+
+function setView(view) {
+  state.view = view === 'notes' ? 'notes' : 'captions';
+  document.querySelectorAll('#view-tabs button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.view === state.view);
+  });
+  $('view-captions')?.classList.toggle('hidden', state.view !== 'captions');
+  $('view-notes')?.classList.toggle('hidden', state.view !== 'notes');
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +124,10 @@ function setMode(mode) {
   $('pick-hint').classList.add('hidden');
   $('off-drop').classList.toggle('hidden', mode !== 'offline');
   $('off-results').classList.toggle('hidden', mode !== 'offline' || state.offlineLines.length === 0);
+  const qaBar = $('qa-sample-bar');
+  if (qaBar) {
+    qaBar.classList.toggle('hidden', mode !== 'offline' || !state.qaCatalog?.samples?.length);
+  }
   $('live-preview').classList.add('hidden');
   updateButtons();
   updateWarning();
@@ -344,6 +375,116 @@ async function refreshDownloaded() {
 
 // ---------------------------------------------------------------------------
 // model manager (settings modal)
+function renderUiLangToggle() {
+  const host = $('ui-lang-toggle');
+  if (!host) return;
+  const cur = state.settings.uiLang || 'en';
+  if (!host.dataset.ready) {
+    host.innerHTML = '';
+    for (const [code, label] of UI_LANGS) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = label;
+      host.appendChild(opt);
+    }
+    host.addEventListener('change', async () => {
+      state.settings.uiLang = host.value;
+      await saveSettings();
+      await loadSettings();
+      applyI18n();
+      fillSelects();
+      updateWarning();
+      renderHistory();
+      renderQaSampleBar();
+      renderModelLists();
+    });
+    host.dataset.ready = '1';
+  }
+  host.value = cur;
+}
+
+const ENGINE_OPTIONS = [
+  ['browser', 'engineBrowser'],
+  ['native', 'engineNative'],
+];
+
+function renderEngineToggle() {
+  const host = $('engine-toggle');
+  if (!host) return;
+  const cur = state.settings.engine || 'browser';
+  if (!host.dataset.ready) {
+    host.innerHTML = '';
+    for (const [value, i18nKey] of ENGINE_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.dataset.i18nKey = i18nKey;
+      host.appendChild(opt);
+    }
+    host.addEventListener('change', async () => {
+      state.settings.engine = host.value;
+      await saveSettings();
+      await loadSettings();
+      updateWarning();
+      if (state.settings.engine === 'native') {
+        lastNativeAutoStartMs = 0;
+        labEnsureAttempted = false;
+        checkNative({ allowAutoStart: true });
+        if (!$('settings-modal').classList.contains('hidden')) startNativePoll();
+      } else {
+        stopNativePoll();
+      }
+    });
+    host.dataset.ready = '1';
+  }
+  for (const opt of host.options) {
+    if (opt.dataset.i18nKey) opt.textContent = t(opt.dataset.i18nKey);
+  }
+  host.value = ENGINE_OPTIONS.some(([v]) => v === cur) ? cur : 'browser';
+}
+
+function renderQaSampleBar() {
+  const bar = $('qa-sample-bar');
+  const sel = $('qa-sample-select');
+  if (!bar || !sel) return;
+  const samples = state.qaCatalog?.samples || [];
+  const show = state.mode === 'offline' && samples.length > 0;
+  bar.classList.toggle('hidden', !show);
+  if (!samples.length) return;
+  const prev = sel.value;
+  sel.innerHTML = samples
+    .map(
+      (s) =>
+        `<option value="${s.id}">${s.label || s.id} (${Math.round(s.durationHint || 0)}s)</option>`,
+    )
+    .join('');
+  if (prev && samples.some((s) => s.id === prev)) sel.value = prev;
+}
+
+async function runQaSample(sample, { autoStart = true } = {}) {
+  if (!sample || !state.qaCatalog) {
+    setStatus(t('qaNoSample'), 'error');
+    return;
+  }
+  setMode('offline');
+  setTask('translate');
+  state.srcLang = sample.src;
+  state.tgtLang = sample.tgt || 'en';
+  $('src-lang').value = state.srcLang;
+  $('tgt-lang').value = state.tgtLang;
+  updateWarning();
+  persistLastConfig();
+  setStatus(t('qaLoadingSample'));
+  try {
+    const file = await fetchSampleFile(state.qaCatalog, sample);
+    await pickFile(file);
+    if (autoStart && state.offlineFile && !state.offlineStaging) {
+      await onStart();
+    }
+  } catch (e) {
+    setStatus(String(e?.message || e), 'error');
+  }
+}
+
 function renderModelLists() {
   const asrHost = $('asr-models');
   asrHost.innerHTML = '';
@@ -354,17 +495,18 @@ function renderModelLists() {
   const mtHost = $('mt-models');
   mtHost.innerHTML = '';
   for (const [key, p] of Object.entries(MT_PAIRS)) {
-    mtHost.appendChild(modelRow(key, pairLabel(key), `${key} · Opus-MT · ${p.size}`));
+    mtHost.appendChild(modelRow(key, pairLabel(key), `${key} · Opus-MT · ${p.size}`, { mtPair: key }));
   }
 }
 
-function modelRow(key, name, sub) {
+function modelRow(key, name, sub, { mtPair = null } = {}) {
   const div = document.createElement('div');
   div.className = 'm-item';
   const isDl = !!state.downloaded[key];
   const isActive = key === state.settings.asrModel && ASR_MODELS[key];
   const dl = dlState.get(key);
   const downloading = dl && !dl.done;
+  const canTest = mtPair && state.qaCatalog && firstSampleForPair(state.qaCatalog, mtPair);
   div.innerHTML = `
     <div class="m-meta">
       <div class="m-name">${name}${isActive ? ' ✓' : ''}</div>
@@ -373,6 +515,11 @@ function modelRow(key, name, sub) {
     <span class="m-state ${isDl ? 'done' : ''}" data-key="${key}">${
       downloading ? Math.round(dl.pct || 0) + '%' : isDl ? '✅' : ''
     }</span>
+    ${
+      canTest
+        ? `<button class="mini-btn test-btn" data-pair="${mtPair}" title="${t('qaSamplesHint')}">${t('qaTest')}</button>`
+        : ''
+    }
     ${
       ASR_MODELS[key] && !isActive
         ? `<button class="mini-btn use-btn" data-key="${key}">Use</button>`
@@ -395,6 +542,13 @@ function modelRow(key, name, sub) {
     renderModelLists();
     updateWarning();
   });
+  div.querySelector('.test-btn')?.addEventListener('click', async () => {
+    const pair = div.querySelector('.test-btn').dataset.pair;
+    const sample = firstSampleForPair(state.qaCatalog, pair);
+    $('settings-modal').classList.add('hidden');
+    stopNativePoll();
+    await runQaSample(sample, { autoStart: true });
+  });
   return div;
 }
 
@@ -403,17 +557,16 @@ function modelRow(key, name, sub) {
 async function loadSettings() {
   const { settings } = await chrome.storage.local.get('settings');
   if (settings) Object.assign(state.settings, settings);
-  document.querySelectorAll('#ui-lang-toggle button').forEach((b) =>
-    b.classList.toggle('active', b.dataset.lang === state.settings.uiLang),
-  );
+  if (!UI_LANGS.some(([c]) => c === state.settings.uiLang)) {
+    state.settings.uiLang = 'en';
+  }
+  renderUiLangToggle();
+  renderEngineToggle();
   document.querySelectorAll('#mirror-toggle button').forEach((b) =>
     b.classList.toggle('active', b.dataset.mirror === state.settings.mirror),
   );
   document.querySelectorAll('#device-toggle button').forEach((b) =>
     b.classList.toggle('active', b.dataset.device === state.settings.device),
-  );
-  document.querySelectorAll('#engine-toggle button').forEach((b) =>
-    b.classList.toggle('active', b.dataset.engine === (state.settings.engine || 'browser')),
   );
   $('native-block').classList.toggle('hidden', state.settings.engine !== 'native');
   $('native-url').value = state.settings.nativeUrl || DEFAULT_NATIVE_URL;
@@ -479,9 +632,6 @@ async function checkNative({ allowAutoStart = false } = {}) {
       nativeInfo.translate &&
       nativeInfo.features &&
       nativeInfo.features.translate_refine === false;
-    // #region agent log
-    fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'pre-fix',hypothesisId:'A',location:'sidepanel.js:checkNative',message:'native check result',data:{online:true,engine:nativeInfo.engine,stale,features:nativeInfo.features},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setNativeUi({
       running: true,
       busy: false,
@@ -494,9 +644,6 @@ async function checkNative({ allowAutoStart = false } = {}) {
     });
     tryEnsureLab();
   } else {
-    // #region agent log
-    fetch('http://127.0.0.1:7615/ingest/6dcc605f-4b08-497b-ae3f-ba4a5887e064',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89e0f7'},body:JSON.stringify({sessionId:'89e0f7',runId:'pre-fix',hypothesisId:'C',location:'sidepanel.js:checkNative',message:'native check offline',data:{url:state.settings.nativeUrl||DEFAULT_NATIVE_URL},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setNativeUi({ running: false, busy: false, detail: t('nativeOffline') });
   }
   updateWarning();
@@ -564,18 +711,155 @@ async function saveSettings() {
 
 // ---------------------------------------------------------------------------
 // realtime session
+/** True when sidepanel runs under test/app.html (chrome-mock), not the extension. */
+function isLabHarness() {
+  return typeof window !== 'undefined' && !!window.__chromeMockStore;
+}
+
+let labMediaEl = null;
+
+function releaseLabCapture() {
+  try {
+    const s = window.__ltsCaptureStream;
+    if (s?.getTracks) {
+      for (const track of s.getTracks()) {
+        try {
+          track.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  window.__ltsCaptureStream = null;
+  window.__ltsLabClock = null;
+  if (labMediaEl) {
+    try {
+      labMediaEl.pause();
+      labMediaEl.removeAttribute('src');
+      labMediaEl.load();
+      labMediaEl.remove();
+    } catch {
+      /* ignore */
+    }
+    labMediaEl = null;
+  }
+}
+
+/** Looping CC0 / speech.wav via captureStream — no extension APIs. */
+async function acquireLabDemoStream() {
+  releaseLabCapture();
+  let url = '/speech.wav';
+  let title = 'Lab demo — looping speech.wav';
+  try {
+    const cat = await loadSampleCatalog();
+    const sample =
+      firstSampleForPair(cat, `${state.srcLang}-${state.tgtLang}`) ||
+      firstSampleForPair(cat, `${state.srcLang}-en`) ||
+      cat?.samples?.[0];
+    if (cat && sample?.file) {
+      url = `${cat.base}${sample.file}`;
+      title = sample.label || sample.file;
+    }
+  } catch {
+    /* keep speech.wav fallback */
+  }
+
+  const el = document.createElement('audio');
+  el.src = url;
+  el.loop = true;
+  el.controls = true;
+  el.crossOrigin = 'anonymous';
+  el.setAttribute('playsinline', '');
+  el.style.cssText =
+    'position:fixed;right:12px;bottom:12px;width:240px;z-index:40;border-radius:8px;background:#111';
+  document.body.appendChild(el);
+  labMediaEl = el;
+
+  try {
+    await el.play();
+  } catch (e) {
+    releaseLabCapture();
+    throw new Error(`Lab demo audio blocked: ${e.message || e}. Click the page, then Start again.`);
+  }
+
+  const raw =
+    typeof el.captureStream === 'function'
+      ? el.captureStream()
+      : typeof el.mozCaptureStream === 'function'
+        ? el.mozCaptureStream()
+        : null;
+  const audioTracks = raw?.getAudioTracks?.() || [];
+  if (!audioTracks.length) {
+    releaseLabCapture();
+    throw new Error('Could not capture audio from the lab demo clip (captureStream).');
+  }
+
+  const stream = new MediaStream(audioTracks);
+  window.__ltsCaptureStream = stream;
+  window.__ltsLabClock = () => (labMediaEl && Number.isFinite(labMediaEl.currentTime) ? labMediaEl.currentTime : 0);
+
+  state.currentTab = { id: 1, title, url, favIconUrl: '' };
+  $('tab-title').textContent = title;
+  $('tab-url').textContent = url;
+  $('tab-favicon').src = chrome.runtime.getURL('icons/icon16.png');
+  updateButtons();
+  return stream;
+}
+
+/** Share a Chrome tab/window with audio (best extension-equivalent in a normal tab). */
+async function acquireLabDisplayStream() {
+  releaseLabCapture();
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    throw new Error('getDisplayMedia is unavailable in this browser.');
+  }
+  const display = await navigator.mediaDevices.getDisplayMedia({
+    video: true,
+    audio: true,
+  });
+  const audioTracks = display.getAudioTracks();
+  if (!audioTracks.length) {
+    for (const track of display.getTracks()) track.stop();
+    throw new Error(t('noAudioShared'));
+  }
+  for (const track of display.getVideoTracks()) track.stop();
+
+  const stream = new MediaStream(audioTracks);
+  const t0 = performance.now();
+  window.__ltsCaptureStream = stream;
+  window.__ltsLabClock = () => (performance.now() - t0) / 1000;
+  audioTracks[0].addEventListener('ended', () => {
+    if (state.running) onStop();
+  });
+
+  state.currentTab = {
+    id: 1,
+    title: 'Shared tab / window (getDisplayMedia)',
+    url: location.href,
+    favIconUrl: '',
+  };
+  $('tab-title').textContent = state.currentTab.title;
+  $('tab-url').textContent = 'Pick → share a tab and enable audio';
+  $('tab-favicon').src = chrome.runtime.getURL('icons/icon16.png');
+  updateButtons();
+  return stream;
+}
+
 async function refreshTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const fallbackIcon = chrome.runtime.getURL('icons/icon16.png');
   if (tab && /^https?:/.test(tab.url || '')) {
     state.currentTab = tab;
     $('tab-title').textContent = tab.title || tab.url;
     $('tab-url').textContent = tab.url;
-    $('tab-favicon').src = tab.favIconUrl || 'icons/icon16.png';
+    $('tab-favicon').src = tab.favIconUrl || fallbackIcon;
   } else {
     state.currentTab = null;
     $('tab-title').textContent = t('noTab');
     $('tab-url').textContent = '';
-    $('tab-favicon').src = 'icons/icon16.png';
+    $('tab-favicon').src = fallbackIcon;
   }
   updateButtons();
 }
@@ -604,12 +888,15 @@ async function startWithStream(streamId, captureType) {
     ...currentConfig(),
     streamId,
     captureType,
+    tabTitle: state.currentTab?.title,
+    tabUrl: state.currentTab?.url,
   });
   if (res?.ok) {
     state.running = true;
     $('pick-hint').classList.add('hidden');
     updateButtons();
   } else if (res?.error) {
+    if (isLabHarness()) releaseLabCapture();
     showCaptureError(res.error);
   }
 }
@@ -627,6 +914,24 @@ function showCaptureError(message) {
 // to share its audio. The picker itself is the consent, so this path never
 // hits the "extension has not been invoked" restriction.
 function onPickManually() {
+  if (isLabHarness()) {
+    void (async () => {
+      $('pick-hint').textContent = t('pickHintLab');
+      $('pick-hint').classList.remove('hidden');
+      try {
+        setStatus(t('pickHintLab'));
+        await acquireLabDisplayStream();
+        await startWithStream(null, 'media');
+      } catch (e) {
+        if (e?.name === 'NotAllowedError' || /Permission denied|dismissed/i.test(String(e?.message || e))) {
+          setStatus(t('cancelled'));
+        } else {
+          setStatus(String(e?.message || e), 'error');
+        }
+      }
+    })();
+    return;
+  }
   if (!chrome.desktopCapture?.chooseDesktopMedia) {
     setStatus('desktopCapture API unavailable in this browser.', 'error');
     return;
@@ -648,8 +953,21 @@ function onPickManually() {
 
 async function onStart() {
   if (state.mode === 'realtime') {
-    if (!state.currentTab) return;
     persistLastConfig();
+    if (isLabHarness()) {
+      try {
+        setStatus(t('loadingModels'));
+        clearLivePreview();
+        $('live-preview').classList.remove('hidden');
+        await acquireLabDemoStream();
+        await startWithStream(null, 'media');
+      } catch (e) {
+        releaseLabCapture();
+        setStatus(String(e?.message || e), 'error');
+      }
+      return;
+    }
+    if (!state.currentTab) return;
     let streamId = null;
     try {
       streamId = await chrome.tabCapture.getMediaStreamId({
@@ -697,6 +1015,7 @@ async function onStop() {
   if (state.mode === 'realtime') {
     await toBG('panel-stop', {});
     state.running = false;
+    if (isLabHarness()) releaseLabCapture();
     setStatus('');
     updateButtons();
   } else {
@@ -1002,6 +1321,9 @@ chrome.runtime.onMessage.addListener((msg) => {
 // ---------------------------------------------------------------------------
 // wiring
 function wire() {
+  document.querySelectorAll('#view-tabs button').forEach((b) =>
+    b.addEventListener('click', () => setView(b.dataset.view)),
+  );
   document.querySelectorAll('#mode-toggle button').forEach((b) =>
     b.addEventListener('click', () => setMode(b.dataset.mode)),
   );
@@ -1056,16 +1378,6 @@ function wire() {
     $('about-block').scrollIntoView({ behavior: 'smooth' });
   });
 
-  document.querySelectorAll('#ui-lang-toggle button').forEach((b) =>
-    b.addEventListener('click', async () => {
-      state.settings.uiLang = b.dataset.lang;
-      await saveSettings();
-      await loadSettings();
-      applyI18n();
-      updateWarning();
-      renderHistory();
-    }),
-  );
   document.querySelectorAll('#mirror-toggle button').forEach((b) =>
     b.addEventListener('click', async () => {
       state.settings.mirror = b.dataset.mirror;
@@ -1079,22 +1391,6 @@ function wire() {
       await saveSettings();
       await loadSettings();
       updateWarning();
-    }),
-  );
-  document.querySelectorAll('#engine-toggle button').forEach((b) =>
-    b.addEventListener('click', async () => {
-      state.settings.engine = b.dataset.engine;
-      await saveSettings();
-      await loadSettings();
-      updateWarning();
-      if (state.settings.engine === 'native') {
-        lastNativeAutoStartMs = 0;
-        labEnsureAttempted = false;
-        checkNative({ allowAutoStart: true });
-        if (!$('settings-modal').classList.contains('hidden')) startNativePoll();
-      } else {
-        stopNativePoll();
-      }
     }),
   );
   $('native-url').addEventListener('change', async (e) => {
@@ -1117,6 +1413,12 @@ function wire() {
 
   wireDropzone();
 
+  $('btn-qa-run')?.addEventListener('click', async () => {
+    const id = $('qa-sample-select')?.value;
+    const sample = state.qaCatalog?.samples?.find((s) => s.id === id);
+    await runQaSample(sample, { autoStart: true });
+  });
+
   chrome.tabs.onActivated.addListener(refreshTab);
   chrome.tabs.onUpdated.addListener((id, info) => {
     if (info.status === 'complete' || info.title) refreshTab();
@@ -1127,8 +1429,11 @@ function wire() {
 async function init() {
   await loadSettings();
   wire();
-  fillSelects();
   applyI18n();
+  fillSelects();
+  setView('captions');
+  state.qaCatalog = await loadSampleCatalog();
+  renderQaSampleBar();
   setMode('realtime');
   setTask('translate');
   await refreshDownloaded();

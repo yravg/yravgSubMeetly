@@ -20,7 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(__dirname);
 const OUT = path.join(ROOT, 'test', 'last-models-bench.json');
 const LAST_NATIVE = path.join(ROOT, 'test', 'last-bench.json');
-const SAMPLE = path.join(ROOT, 'test', 'samples', 'en-zh-1.wav');
+const SAMPLE = path.join(ROOT, 'test', 'samples', 'cc0', 'en-1.mp3');
 const SPEECH = path.join(ROOT, 'test', 'speech.wav');
 
 const WANT_BROWSER = process.argv.includes('--browser');

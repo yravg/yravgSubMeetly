@@ -229,7 +229,15 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
 
   try {
     // Grab the stream FIRST — the streamId expires within seconds.
-    if (captureType === 'desktop') {
+    if (captureType === 'media') {
+      // Lab / browser-tab harness: MediaStream already acquired via
+      // getDisplayMedia or <audio|video>.captureStream() (same page as offscreen).
+      const stream = globalThis.__ltsCaptureStream;
+      if (!stream || typeof stream.getAudioTracks !== 'function') {
+        throw new Error('No lab capture stream — Start demo audio or Pick (share tab audio).');
+      }
+      rt.media = stream;
+    } else if (captureType === 'desktop') {
       // desktopCapture picker stream: Chrome requires requesting video along
       // with audio; we only need the audio and stop the video track at once.
       rt.media = await navigator.mediaDevices.getUserMedia({
@@ -269,9 +277,10 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
 
   rt.ctx = new AudioContext();
   const src = rt.ctx.createMediaStreamSource(rt.audioStream);
-  if (captureType !== 'desktop') {
+  if (captureType === 'tab') {
     // chrome.tabCapture silences the tab — route audio back to the speakers.
-    // Picker-based capture keeps playing locally, so passthrough would echo.
+    // Desktop / lab media already play locally (or via a demo <audio>), so
+    // passthrough would echo.
     src.connect(rt.ctx.destination);
   }
 

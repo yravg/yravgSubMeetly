@@ -8,13 +8,22 @@
   </head>
   <body>
     <header class="topbar">
-      <span class="brand">Local TransSub</span>
+      <div class="topbar-brand">
+        <span class="brand">Local TransSub</span>
+        <nav class="view-tabs" id="view-tabs" aria-label="Main views">
+          <button type="button" data-view="captions" class="active" data-i18n="tabCaptions">
+            Captions
+          </button>
+          <button type="button" data-view="notes" data-i18n="tabNotes">Notes</button>
+        </nav>
+      </div>
       <div class="topbar-actions">
         <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
       </div>
     </header>
 
     <main>
+      <div id="view-captions" class="view-panel">
       <!-- ============ Subtitle Generation ============ -->
       <section class="card">
         <div class="card-head">
@@ -44,6 +53,20 @@
           <div id="off-filename" class="drop-file"></div>
         </div>
 
+        <!-- CC0 QA samples (visible when catalog is reachable, e.g. lab :8799) -->
+        <div id="qa-sample-bar" class="qa-sample-bar hidden">
+          <div class="qa-sample-head">
+            <span class="lbl" data-i18n="qaSamples">CC0 test samples</span>
+            <span class="qa-sample-hint" data-i18n="qaSamplesHint"
+              >Pick a language-pair sample (10–30s, CC0/Public Domain) and run Offline.</span
+            >
+          </div>
+          <div class="qa-sample-row">
+            <select id="qa-sample-select" aria-label="CC0 sample"></select>
+            <button type="button" id="btn-qa-run" class="mini-btn" data-i18n="qaRunSample">Run sample</button>
+          </div>
+        </div>
+
         <div class="task-row">
           <label class="lbl" data-i18n="taskMode">Task Mode</label>
           <div class="task-toggles">
@@ -64,12 +87,12 @@
 
         <div class="lang-row">
           <div class="lang-col">
-            <label class="lbl" data-i18n="sourceLang">Source Language</label>
-            <select id="src-lang"></select>
+            <label class="lbl" for="src-lang" data-i18n="sourceLang">From (speech)</label>
+            <select id="src-lang" aria-label="Source speech language"></select>
           </div>
           <div class="lang-col" id="tgt-col">
-            <label class="lbl" data-i18n="targetLang">Translate To</label>
-            <select id="tgt-lang"></select>
+            <label class="lbl" for="tgt-lang" data-i18n="targetLang">To (translation)</label>
+            <select id="tgt-lang" aria-label="Target translation language"></select>
           </div>
         </div>
 
@@ -128,19 +151,22 @@
         </div>
         <div id="helper-status-mount"></div>
       </section>
+      </div>
 
-      <!-- ============ Meeting notes (Fase 2 stub) ============ -->
+      <!-- ============ Meeting notes (top-level Notes tab) ============ -->
+      <div id="view-notes" class="view-panel hidden">
       <section class="card" id="notes-card">
         <div class="card-head">
-          <h2 data-i18n="notesTitle">📝 Notulen Rapat</h2>
+          <h2 data-i18n="notesTitle">📝 Meeting notes</h2>
         </div>
         <div id="notes-mount"></div>
       </section>
+      </div>
     </main>
 
     <footer class="footer">
       <span>© 2026 Local TransSub</span>
-      <span class="ver">v1.1.0 <button id="btn-about" class="link-btn">ⓘ</button></span>
+      <span class="ver">v1.1.1 <button id="btn-about" class="link-btn">ⓘ</button></span>
     </footer>
 
     <!-- ============ Settings modal ============ -->
@@ -152,19 +178,13 @@
         </div>
 
         <div class="setting-row">
-          <label data-i18n="uiLang">Language / 语言</label>
-          <div class="seg" id="ui-lang-toggle">
-            <button data-lang="zh">中文</button>
-            <button data-lang="en" class="active">English</button>
-          </div>
+          <label for="ui-lang-toggle" data-i18n="uiLang">UI language</label>
+          <select id="ui-lang-toggle"></select>
         </div>
 
         <div class="setting-row">
-          <label data-i18n="engine">Engine</label>
-          <div class="seg" id="engine-toggle">
-            <button data-engine="browser" class="active" data-i18n="engineBrowser">Browser</button>
-            <button data-engine="native" data-i18n="engineNative">Native helper</button>
-          </div>
+          <label for="engine-toggle" data-i18n="engine">Engine</label>
+          <select id="engine-toggle"></select>
         </div>
         <div id="native-block" class="native-block hidden">
           <div class="native-row">
