@@ -12,9 +12,13 @@
  * latest items with timecode / speaker / ASR confidence) and one button to
  * the register. Layout follows the "Side panel — live capture" artboard.
  */
-import { pickText, meetingStats, TYPE_COLOR, ITEM_TYPES, LOW_CONFIDENCE } from './lib/notes-schema.js';
-import { listMeetings, backendName } from './lib/notes-store.js';
+import {
+  pickText, meetingStats, createMeeting, toTimecode,
+  TYPE_COLOR, ITEM_TYPES, LOW_CONFIDENCE,
+} from './lib/notes-schema.js';
+import { listMeetings, saveMeeting, backendName } from './lib/notes-store.js';
 import { makeT } from './lib/notes-i18n.js';
+import { flagMomentAndSave } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
 
 function escapeHtml(s) {
@@ -57,8 +61,64 @@ function latestItems(meeting, lang, n = 3) {
     }));
 }
 
+/** Detik sejak `startedAt` sebagai HH:MM:SS — jam rekaman di kartu. */
+function elapsedSeconds(capture, now = Date.now()) {
+  if (!capture?.running || !capture.startedAt) return 0;
+  return Math.max(0, Math.floor((now - capture.startedAt) / 1000));
+}
+
+const macLike = () => /^Mac/i.test(globalThis.navigator?.platform || '');
+/** Petunjuk pintasan "flag" — ⌘⇧F di Mac, Ctrl+Shift+F di tempat lain. */
+function flagShortcutHint() {
+  return macLike() ? '\u2318\u21e7F' : 'Ctrl+Shift+F';
+}
+
+// Strip gelombang di artboard adalah DEKORASI, bukan meter amplitudo: tinggi
+// batang tetap (deterministik) supaya panel tidak berpura-pura menampilkan
+// level audio yang memang belum tersedia dari pipeline.
+const WAVE_BARS = [22, 38, 55, 31, 64, 44, 73, 36, 58, 81, 47, 29, 66, 52, 88, 61, 94, 70, 45, 78];
+
+function waveHtml(running) {
+  const live = WAVE_BARS.length - 5;
+  return `<div class="notes-wave" aria-hidden="true">${WAVE_BARS
+    .map((h, i) => `<span class="${running && i >= live ? 'on' : ''}" style="height:${h}%"></span>`)
+    .join('')}</div>`;
+}
+
+/**
+ * Rel tangkap langsung (artboard SidePanel): titik status + jam + lencana
+ * mesin, strip gelombang, "End & draft", lalu tombol "Flag this moment".
+ * Tidak ada tombol Pause — pipeline-nya memang tidak punya jeda, dan kontrol
+ * mati lebih buruk daripada kontrol yang tidak ada.
+ */
+function captureRailHtml(capture, T) {
+  const running = !!capture.running;
+  return `
+      <div class="notes-rec" id="notes-recording-card">
+        <div class="notes-rec-head">
+          <span class="notes-rec-dot${running ? ' live' : ''}" aria-hidden="true"></span>
+          <span class="notes-rec-label">${escapeHtml(T(running ? 'recording' : 'idle'))}</span>
+          <span class="notes-rec-clock mono" id="notes-elapsed">${toTimecode(elapsedSeconds(capture))}</span>
+          <span class="notes-rec-spacer"></span>
+          <span class="notes-engine mono">${escapeHtml(capture.engine || '')}</span>
+        </div>
+        ${waveHtml(running)}
+        <div class="notes-rec-actions">
+          <button type="button" class="btn primary notes-end-btn" id="btn-end-draft"${running ? '' : ' disabled'}>
+            ${escapeHtml(T('endAndDraft'))}
+          </button>
+        </div>
+      </div>
+
+      <button type="button" class="notes-flag" id="btn-flag-moment"${running ? '' : ` disabled title="${escapeHtml(T('flagNeedsRecording'))}"`}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0b05c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h12l-2.2 3.6L17 12H5"/></svg>
+        ${escapeHtml(T('flagMoment'))}
+        <span class="notes-flag-key mono">${escapeHtml(flagShortcutHint())}</span>
+      </button>`;
+}
+
 export function renderNotesPanel(root, state, handlers = {}) {
-  const { meetings, active, lang, T } = state;
+  const { meetings, active, lang, T, capture } = state;
   const stats = active ? meetingStats(active) : null;
   const latest = latestItems(active, lang);
   const counts = active
@@ -67,6 +127,8 @@ export function renderNotesPanel(root, state, handlers = {}) {
 
   root.innerHTML = `
     <div class="notes-panel" data-notes-root>
+      ${capture ? captureRailHtml(capture, T) : ''}
+
       <div class="notes-status-row">
         <span class="notes-pill ${active ? 'ready' : 'idle'}">
           <span aria-hidden="true">●</span>
@@ -127,6 +189,8 @@ export function renderNotesPanel(root, state, handlers = {}) {
   `;
 
   root.querySelector('#btn-open-register')?.addEventListener('click', () => handlers.onOpenRegister?.());
+  root.querySelector('#btn-end-draft')?.addEventListener('click', () => handlers.onEndAndDraft?.());
+  root.querySelector('#btn-flag-moment')?.addEventListener('click', () => handlers.onFlagMoment?.());
   root.querySelector('#btn-notes-sample')?.addEventListener('click', () => handlers.onLoadSample?.());
   root.querySelectorAll('.notes-latest-row[data-ref]').forEach((row) => {
     row.addEventListener('click', () => handlers.onOpenRegister?.());
@@ -136,18 +200,76 @@ export function renderNotesPanel(root, state, handlers = {}) {
   });
 }
 
-export async function mountNotesPanel(root) {
+/**
+ * Pasang tiket panel. `getCapture()` (dipasok sidepanel.js) melaporkan
+ * `{ running, startedAt, engine }`; tanpa itu rel tangkap-langsung tidak
+ * dirender sama sekali — panel tetap berguna di konteks lain (uji, lab).
+ *
+ * Jam berdetak sekali per detik; interval lama SELALU dibersihkan lebih dulu
+ * karena applyI18n() memanggil ulang mountNotesPanel pada root yang sama saat
+ * bahasa berubah.
+ */
+export async function mountNotesPanel(root, { getCapture, onEndCapture } = {}) {
   const lang = (document.documentElement.lang || 'en').startsWith('id') ? 'id' : 'en';
   const T = makeT(lang);
   let meetings = await listMeetings();
   let activeId = meetings[0]?.id || null;
 
+  if (root.__notesTick) {
+    clearInterval(root.__notesTick);
+    root.__notesTick = null;
+  }
+
+  const readCapture = () => {
+    if (!getCapture) return null;
+    const c = getCapture() || {};
+    return { running: !!c.running, startedAt: c.startedAt ?? null, engine: c.engine || '' };
+  };
+
+  const flagNow = async () => {
+    const cap = readCapture();
+    if (!cap?.running) return;
+    const t0 = elapsedSeconds(cap);
+    const tc = toTimecode(t0);
+    let meeting = meetings.find((m) => m.id === activeId) || null;
+    if (!meeting) {
+      meeting = await saveMeeting(
+        createMeeting({
+          title: T('untitledMeeting'),
+          date: new Date().toISOString().slice(0, 10),
+          locale: lang,
+        }),
+      );
+    }
+    try {
+      await flagMomentAndSave(meeting, { tc, t0, text: T('flaggedAt', tc) });
+    } catch (e) {
+      // Notulen terbit itu beku (assertEditable) — tanda tidak boleh menyelinap masuk.
+      console.warn('[notes] flagMoment:', e?.message || e);
+      return;
+    }
+    meetings = await listMeetings();
+    activeId = meeting.id;
+    redraw();
+  };
+
   const redraw = () => {
     renderNotesPanel(
       root,
-      { meetings, active: meetings.find((m) => m.id === activeId) || null, lang, T },
+      {
+        meetings,
+        active: meetings.find((m) => m.id === activeId) || null,
+        lang,
+        T,
+        capture: readCapture(),
+      },
       {
         onOpenRegister: openRegister,
+        onFlagMoment: flagNow,
+        onEndAndDraft: async () => {
+          await onEndCapture?.();
+          openRegister();
+        },
         onSelectMeeting: (id) => {
           activeId = id;
           redraw();
@@ -164,5 +286,23 @@ export async function mountNotesPanel(root) {
   };
 
   redraw();
+
+  if (getCapture) {
+    // Satu detak per detik: selagi merekam ia hanya menulis ulang jam (murah),
+    // dan menggambar ulang kartu hanya ketika status rekam benar-benar berubah.
+    let wasRunning = readCapture().running;
+    root.__notesTick = setInterval(() => {
+      const cap = readCapture();
+      if (cap.running !== wasRunning) {
+        wasRunning = cap.running;
+        redraw();
+        return;
+      }
+      if (!cap.running) return;
+      const clock = root.querySelector('#notes-elapsed');
+      if (clock) clock.textContent = toTimecode(elapsedSeconds(cap));
+    }, 1000);
+  }
+
   return () => ({ meetings, activeId });
 }

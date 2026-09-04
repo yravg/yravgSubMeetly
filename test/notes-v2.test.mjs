@@ -153,6 +153,39 @@ test('actions: an issued MoM is frozen; amendments are the way back in', () => {
   assert.doesNotThrow(() => A.editItem(a1, 'W36-003', { owner: 'X' }));
 });
 
+test('actions: flagging a moment stamps a timecode and invents no words', () => {
+  const T = makeT('en');
+  const m = meetingFixture();
+  const before = m.items.length;
+  const flagged = A.flagMoment(m, { tc: '00:12:34', t0: 754, text: T('flaggedAt', '00:12:34') });
+  assert.equal(flagged.items.length, before + 1, 'the flag is appended, nothing replaced');
+  const item = flagged.items.at(-1);
+  assert.equal(item.type, 'info');
+  assert.equal(item.topic, 'flag');
+  assert.equal(item.review, 'edited', 'a human put it there');
+  assert.equal(pickText(item.text, 'en'), 'Flagged at 00:12:34 — review this moment');
+  assert.equal(item.src.tc, '00:12:34');
+  assert.equal(item.src.t0, 754);
+  assert.equal(item.src.lang, 'auto');
+  assert.equal(item.src.orig, '', 'no transcript words are invented');
+  assert.equal(item.src.tr, '');
+  assert.ok(item.ref, 'it gets a register ref like any other item');
+  assert.equal(m.items.length, before, 'the source meeting is untouched (pure action)');
+
+  // Indonesian panel writes the Indonesian sentence into the meeting locale.
+  const idMeeting = createMeeting({ locale: 'id', title: 'Rapat' });
+  const idT = makeT('id');
+  const idFlag = A.flagMoment(idMeeting, { t0: 65, text: idT('flaggedAt', toTimecode(65)) });
+  assert.equal(idFlag.items[0].src.tc, '00:01:05', 'tc falls back to toTimecode(t0)');
+  assert.equal(pickText(idFlag.items[0].text, 'id'), 'Ditandai pada 00:01:05 — tinjau momen ini');
+});
+
+test('actions: an issued MoM cannot be flagged, and a flag needs its rendered text', () => {
+  const issued = A.issueMeeting(meetingFixture(), { force: true });
+  assert.throws(() => A.flagMoment(issued, { tc: '00:00:10', t0: 10, text: 'x' }), (e) => e.code === 'issued');
+  assert.throws(() => A.flagMoment(meetingFixture(), { tc: '00:00:10', t0: 10 }), (e) => e.code === 'no_text');
+});
+
 test('actions: metric series is a curve, not a sentence', () => {
   const w36 = meetingFixture();
   const w35 = createMeeting({

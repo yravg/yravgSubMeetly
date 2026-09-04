@@ -205,6 +205,96 @@ test('minutes workspace: boots empty, then loads sample data and renders the reg
   assert.match(paper36.querySelector('.meta').textContent, /2026-09-02, 10:00–12:00 GMT\+8/, 'the meeting states when it ran');
 });
 
+test('notes-panel.js: the live-capture rail clocks a running task and flags the moment', async (t) => {
+  let JSDOM;
+  try {
+    ({ JSDOM } = await import('jsdom'));
+  } catch (e) {
+    if (e?.code === 'ERR_MODULE_NOT_FOUND') return t.skip('jsdom not installed — npm install --no-save jsdom to run this check');
+    throw e;
+  }
+  const dom = new JSDOM('<div id="notes-mount"></div>', { url: 'http://localhost/sidepanel.html' });
+  global.window = dom.window;
+  global.document = dom.window.document;
+  global.localStorage = dom.window.localStorage;
+  global.HTMLElement = dom.window.HTMLElement;
+  localStorage.clear();
+
+  const { seedSampleData } = await import(path.join(srcDir, 'lib', 'notes-fixture.js') + '?rail-test');
+  await seedSampleData();
+
+  const { mountNotesPanel } = await import(path.join(srcDir, 'notes-panel.js') + '?rail-test');
+  const root = document.getElementById('notes-mount');
+  // The rail owns a 1 s interval; a failing assertion must not leave it
+  // running or `node --test` never exits.
+  t.after(() => {
+    if (root.__notesTick) clearInterval(root.__notesTick);
+    root.__notesTick = null;
+  });
+  const capture = { running: true, startedAt: Date.now() - 65000, engine: 'MLX · GPU' };
+  await mountNotesPanel(root, { getCapture: () => capture, onEndCapture: () => {} });
+
+  const card = root.querySelector('#notes-recording-card');
+  assert.ok(card, 'a running capture shows the recording card');
+  assert.ok(card.querySelector('.notes-rec-dot.live'), 'the status dot is live while recording');
+  assert.equal(card.querySelector('#notes-elapsed').textContent.trim(), '00:01:05', 'elapsed clock counts from startedAt');
+  assert.match(card.querySelector('.notes-engine').textContent, /MLX/, 'the engine badge names what is transcribing');
+  assert.equal(root.querySelectorAll('.notes-wave span').length, 20, 'the waveform strip is 20 bars');
+  assert.equal(root.querySelectorAll('.notes-wave span.on').length, 5, 'the last five bars read as live');
+  assert.equal(root.querySelector('#btn-end-draft').disabled, false, '"End & draft" is live while a task runs');
+  assert.equal(root.querySelector('button[id="btn-pause"]'), null, 'no dead Pause control — the pipeline has none');
+
+  const flag = root.querySelector('#btn-flag-moment');
+  assert.ok(flag, 'the flag button is in the rail');
+  assert.equal(flag.disabled, false, 'a running capture enables flagging');
+
+  const { listMeetings } = await import(path.join(srcDir, 'lib', 'notes-store.js') + '?rail-test');
+  const before = (await listMeetings())[0].items.length;
+  flag.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  const deadline = Date.now() + 2000;
+  let after = before;
+  while (after === before && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 20));
+    after = (await listMeetings())[0].items.length;
+  }
+  assert.equal(after, before + 1, 'clicking the flag adds one register item');
+  const item = (await listMeetings())[0].items.at(-1);
+  assert.equal(item.topic, 'flag');
+  assert.equal(item.review, 'edited');
+  assert.match(item.src.tc, /^00:01:0\d$/, 'the flag carries the recording timecode');
+  assert.equal(item.src.orig, '', 'and no invented transcript words');
+  // "Latest" is ordered by position in the recording (src.t0), so a flag at
+  // 00:01:05 of an hour-long meeting correctly stays below the later items…
+  assert.doesNotMatch(root.querySelector('#notes-open-list')?.textContent || '', /Flagged at/,
+    'a flag early in the recording does not jump the queue');
+
+  // …and a flag dropped after everything else leads the list.
+  capture.startedAt = Date.now() - 4200000; // 01:10:00 into the capture
+  await mountNotesPanel(root, { getCapture: () => capture, onEndCapture: () => {} });
+  root.querySelector('#btn-flag-moment').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  const listDeadline = Date.now() + 2000;
+  while (!/Flagged at/.test(root.querySelector('#notes-open-list')?.textContent || '') && Date.now() < listDeadline) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.match(root.querySelector('#notes-open-list')?.textContent || '', /Flagged at 01:1\d:\d\d/,
+    'the freshly flagged item leads "Latest" once it is the newest timecode');
+
+  // Idle: the card stays (grey), and the flag button is disabled with a reason.
+  capture.running = false;
+  await mountNotesPanel(root, { getCapture: () => capture });
+  assert.equal(root.querySelector('.notes-rec-dot.live'), null, 'the dot goes grey when idle');
+  assert.equal(root.querySelectorAll('.notes-wave span.on').length, 0);
+  assert.equal(root.querySelector('#btn-flag-moment').disabled, true);
+  assert.match(root.querySelector('#btn-flag-moment').getAttribute('title') || '', /capture task/);
+  assert.equal(root.querySelector('#btn-end-draft').disabled, true);
+
+  // Re-mounting (applyI18n does this on a language change) must not leak the
+  // 1 s tick — one root, one interval.
+  const first = root.__notesTick;
+  await mountNotesPanel(root, { getCapture: () => capture });
+  assert.notEqual(root.__notesTick, first, 'the old interval is replaced, not stacked');
+});
+
 test('notes-panel.js: compact ticker mounts and reflects the register', async (t) => {
   let JSDOM;
   try {

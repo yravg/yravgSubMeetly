@@ -302,3 +302,105 @@
 .notes-open-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
 .notes-open-btn svg { color: rgba(255, 255, 255, 0.85); }
 .notes-hint { text-align: center; font-size: 10.5px; }
+
+/* ---------------------------------------------------------------------------
+   Rel tangkap langsung (artboard SidePanel): kartu rekam + tombol tandai.
+   Live-capture rail: recording card + "flag this moment". */
+.notes-panel .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.notes-rec {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.notes-rec-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.notes-rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.notes-rec-dot.live {
+  background: var(--danger);
+  animation: notes-rec-pulse 1.6s ease-in-out infinite;
+}
+@keyframes notes-rec-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(224, 108, 117, 0.45); }
+  50% { opacity: 0.55; box-shadow: 0 0 0 4px rgba(224, 108, 117, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notes-rec-dot.live { animation: none; }
+}
+.notes-rec-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.notes-rec-clock {
+  font-size: 13px;
+  color: var(--text2);
+}
+.notes-rec-spacer { flex-grow: 1; }
+.notes-engine {
+  font-size: 10.5px;
+  color: var(--accent-soft);
+  background: var(--accent-dim);
+  border: 1px solid rgba(20, 183, 137, 0.35);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.notes-wave {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 34px;
+  margin-top: 12px;
+}
+.notes-wave span {
+  flex-grow: 1;
+  background: var(--card2);
+  border-radius: 1px;
+}
+.notes-wave span.on { background: var(--accent); }
+
+.notes-rec-actions {
+  display: flex;
+  gap: 9px;
+  margin-top: 12px;
+}
+.notes-end-btn { flex-grow: 1; }
+
+.notes-flag {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.notes-flag:hover:not(:disabled) { border-color: var(--accent); }
+.notes-flag:disabled { opacity: 0.5; cursor: not-allowed; }
+.notes-flag-key {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}

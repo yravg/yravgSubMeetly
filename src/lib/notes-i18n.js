@@ -190,6 +190,13 @@ const en = {
   capturedSoFar: 'Captured so far',
   latest: 'Latest',
   panelHint: 'The register opens in a full tab — a table does not belong in a 400px rail.',
+  recording: 'Recording',
+  idle: 'Idle',
+  endAndDraft: 'End & draft',
+  flagMoment: 'Flag this moment',
+  flagNeedsRecording: 'Start a capture task first — a flag is a timecode, and there is no clock yet.',
+  flaggedAt: (tc) => `Flagged at ${tc} — review this moment`,
+  untitledMeeting: 'Untitled meeting',
 };
 
 const id = {
@@ -355,6 +362,13 @@ const id = {
   capturedSoFar: 'Tertangkap sejauh ini',
   latest: 'Terbaru',
   panelHint: 'Register terbuka di tab penuh — tabel tidak muat di rel 400px.',
+  recording: 'Merekam',
+  idle: 'Siaga',
+  endAndDraft: 'Akhiri & buat draf',
+  flagMoment: 'Tandai momen ini',
+  flagNeedsRecording: 'Mulai tugas perekaman dulu — tanda itu sebuah timecode, dan jamnya belum berjalan.',
+  flaggedAt: (tc) => `Ditandai pada ${tc} — tinjau momen ini`,
+  untitledMeeting: 'Rapat tanpa judul',
 };
 
 export const NOTES_I18N = { en, id: { ...en, ...id } };

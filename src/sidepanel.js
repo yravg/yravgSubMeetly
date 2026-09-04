@@ -49,6 +49,7 @@ const state = {
   downloaded: {},
   running: false,
   offlineRunning: false,
+  startedAt: null, // stempel mulai tugas tangkap — jam rekaman di rel Notulen
   offlineFile: null, // { name, size } once staged to OPFS
   offlineStaging: false,
   offlineLines: [],
@@ -78,7 +79,7 @@ function applyI18n() {
     el.textContent = t(el.dataset.i18n);
   });
   const notesMount = $('notes-mount');
-  if (notesMount && notesMount.dataset.mounted) mountNotesPanel(notesMount);
+  if (notesMount && notesMount.dataset.mounted) mountNotesPanel(notesMount, notesMountOptions());
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +102,40 @@ function fillSelects() {
   $('tgt-lang').value = state.tgtLang;
   $('src-lang').setAttribute('aria-label', t('sourceLang'));
   $('tgt-lang').setAttribute('aria-label', t('targetLang'));
+}
+
+/**
+ * Satu stempel waktu untuk kedua jalur tangkap (realtime + berkas offline):
+ * dipasang saat tugas mulai berjalan, dibersihkan begitu berhenti. Panggil ini
+ * SETELAH setiap perubahan `state.running` / `state.offlineRunning`.
+ */
+function syncCaptureStamp() {
+  const on = state.running || state.offlineRunning;
+  if (on && !state.startedAt) state.startedAt = Date.now();
+  else if (!on) state.startedAt = null;
+}
+
+/** Lencana mesin di kartu rekam — apa yang benar-benar mentranskripsi. */
+function captureEngineLabel() {
+  if (state.settings.engine === 'native' && nativeInfo) {
+    const e = String(nativeInfo.engine || '');
+    return /mlx/i.test(e) ? 'MLX \u00b7 GPU' : `${e || 'Helper'} \u00b7 native`;
+  }
+  return 'Whisper \u00b7 browser';
+}
+
+/** Keadaan tangkap yang dibaca tiket Notulen (notes-panel.js). */
+function getCapture() {
+  return {
+    running: state.running || state.offlineRunning,
+    startedAt: state.startedAt,
+    engine: captureEngineLabel(),
+  };
+}
+
+/** Apa yang dipasok panel Notulen: keadaan tangkap + jalan berhenti yang sudah ada. */
+function notesMountOptions() {
+  return { getCapture, onEndCapture: () => onStop() };
 }
 
 function setView(view) {
@@ -890,6 +925,7 @@ async function startWithStream(streamId, captureType) {
   });
   if (res?.ok) {
     state.running = true;
+    syncCaptureStamp();
     $('pick-hint').classList.add('hidden');
     updateButtons();
   } else if (res?.error) {
@@ -1001,6 +1037,7 @@ async function onStart() {
         config: currentConfig(),
       });
       state.offlineRunning = true;
+      syncCaptureStamp();
       updateButtons();
     } catch (e) {
       setStatus(String(e?.message || e), 'error');
@@ -1012,6 +1049,7 @@ async function onStop() {
   if (state.mode === 'realtime') {
     await toBG('panel-stop', {});
     state.running = false;
+    syncCaptureStamp();
     if (isLabHarness()) releaseLabCapture();
     setStatus('');
     updateButtons();
@@ -1253,6 +1291,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   switch (msg.type) {
     case 'state':
       state.running = !!msg.data.active;
+      syncCaptureStamp();
       updateButtons();
       if (!state.running && state.mode === 'realtime') setStatus('');
       break;
@@ -1269,6 +1308,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     case 'error':
       setStatus(msg.data?.message || 'Error', 'error');
       state.running = false;
+      syncCaptureStamp();
       updateButtons();
       break;
     case 'model-progress':
@@ -1297,12 +1337,14 @@ chrome.runtime.onMessage.addListener((msg) => {
     }
     case 'offline-done':
       state.offlineRunning = false;
+      syncCaptureStamp();
       setStatus(t('done'), 'ok');
       updateButtons();
       renderHistory();
       break;
     case 'offline-error':
       state.offlineRunning = false;
+      syncCaptureStamp();
       setStatus(msg.data?.cancelled ? t('cancelled') : msg.data?.message || 'Error', msg.data?.cancelled ? '' : 'error');
       updateButtons();
       break;
@@ -1321,6 +1363,18 @@ function wire() {
   document.querySelectorAll('#view-tabs button').forEach((b) =>
     b.addEventListener('click', () => setView(b.dataset.view)),
   );
+  // ⌘⇧F / Ctrl+Shift+F — tandai momen. Hanya saat tampilan Notulen terlihat
+  // dan ada tugas tangkap yang berjalan; tombolnya sendiri yang menyimpan,
+  // jadi pintasan ini cukup menekannya (satu jalur, satu aturan).
+  document.addEventListener('keydown', (e) => {
+    const mod = /^Mac/i.test(navigator.platform || '') ? e.metaKey : e.ctrlKey;
+    if (!mod || !e.shiftKey || e.altKey || (e.key || '').toLowerCase() !== 'f') return;
+    if (state.view !== 'notes' || !getCapture().running) return;
+    const btn = $('btn-flag-moment');
+    if (!btn || btn.disabled) return;
+    e.preventDefault();
+    btn.click();
+  });
   document.querySelectorAll('#mode-toggle button').forEach((b) =>
     b.addEventListener('click', () => setMode(b.dataset.mode)),
   );
@@ -1445,7 +1499,7 @@ async function init() {
   await renderHistory();
   const notesMount = $('notes-mount');
   if (notesMount) {
-    await mountNotesPanel(notesMount);
+    await mountNotesPanel(notesMount, notesMountOptions());
     notesMount.dataset.mounted = '1';
   }
   const helperMount = $('helper-status-mount');
@@ -1462,6 +1516,7 @@ async function init() {
   const s = await toBG('get-state', {});
   if (s?.active) {
     state.running = true;
+    syncCaptureStamp();
     if (s.config) {
       state.srcLang = s.config.srcLang;
       state.tgtLang = s.config.tgtLang;

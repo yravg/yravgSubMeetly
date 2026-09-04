@@ -12,6 +12,7 @@ import {
   createMeeting,
   nextRef,
   itemAgeDays,
+  toTimecode,
   LOW_CONFIDENCE,
 } from './notes-schema.js';
 import { saveMeeting } from './notes-store.js';
@@ -204,6 +205,39 @@ export function addItem(meeting, partial = {}, { by = 'local' } = {}) {
   item.history = [createRevision({ by, field: 'created', to: item.ref })];
   next.items.push(item);
   return next;
+}
+
+/**
+ * Tandai momen yang sedang berlangsung: satu butir `info` yang provenance-nya
+ * HANYA timecode. Panel tidak boleh mengarang kata-kata transkrip, jadi
+ * `orig`/`tr` sengaja kosong — yang dicatat adalah "pada menit ini ada sesuatu
+ * yang perlu ditinjau", bukan kalimat siapa pun.
+ *
+ * Lapisan aksi tidak mengenal i18n, jadi teks yang sudah diterjemahkan
+ * (`T('flaggedAt', tc)`) dikirim dari pemanggil.
+ *
+ * Flag the moment being captured: one `info` item whose provenance is the
+ * timecode and nothing else (`orig`/`tr` stay empty — never invent transcript
+ * words). The rendered, translated text comes from the caller; this layer
+ * knows no i18n.
+ */
+export function flagMoment(meeting, { tc, t0 = 0, text, by = 'local' } = {}) {
+  assertEditable(meeting);
+  if (!text) {
+    throw new RegisterError('no_text', 'flagMoment butuh teks jadi dari pemanggil: T("flaggedAt", tc)');
+  }
+  const stamp = tc || toTimecode(t0);
+  return addItem(
+    meeting,
+    {
+      type: 'info',
+      topic: 'flag',
+      text: { [meeting.locale || 'en']: String(text) },
+      review: 'edited',
+      src: { t0, t1: t0, tc: stamp, lang: 'auto', orig: '', tr: '' },
+    },
+    { by },
+  );
 }
 
 /**
@@ -407,6 +441,7 @@ export const acceptItemAndSave = persist(acceptItem);
 export const applyCorrectionAndSave = persist(applyCorrection);
 export const editItemAndSave = persist(editItem);
 export const addItemAndSave = persist(addItem);
+export const flagMomentAndSave = persist(flagMoment);
 export const setStatusAndSave = persist(setStatus);
 export const setSummaryAndSave = persist(setSummary);
 export const removeItemAndSave = persist(removeItem);

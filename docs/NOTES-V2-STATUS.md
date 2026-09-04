@@ -128,12 +128,37 @@ tell in 30 seconds where things stand without reading the whole spec.
     (`startNextMeeting` now inherits the series' time of day, so the slot
     survives), and the series flow chart labels both the tallest opened and
     the tallest closed bar on the y axis.
-  - 24 tests (`node --test test/notes-v2.test.mjs
+  - 28 tests (`node --test test/notes-v2.test.mjs
     test/notes-minutes-smoke.mjs`).
 - **Design reference** — `test/notes-register.html`, the original
   static/fake-data prototype, and the Claude Design canvas this was built
   from (published separately as an Artifact; not in this repo). When the two
   disagree, the canvas wins.
+- **Side-panel live-capture rail** (`src/notes-panel.js` + `.css`,
+  `src/sidepanel.js`) — the SidePanel artboard's top block. A recording card
+  (pulsing red dot / grey when idle, `T('recording')`/`T('idle')`, mono
+  `HH:MM:SS` elapsed clock, engine badge — `MLX · GPU` when the native helper
+  is the active engine, else `Whisper · browser`), a 20-bar decorative
+  waveform whose last five bars go emerald while running, and "End & draft".
+  `sidepanel.js` stamps `state.startedAt` wherever a capture starts or stops
+  (`syncCaptureStamp()`, both the realtime and offline paths) and passes
+  `{ getCapture, onEndCapture }` into `mountNotesPanel()` from both call
+  sites; the ticker owns one 1 s interval per root and clears it on re-mount,
+  so a language change (which re-mounts via `applyI18n()`) cannot stack
+  timers. The waveform is DECORATION — the pipeline exposes no amplitudes and
+  the bars are fixed rather than faked-live.
+- **"Flag this moment"** (`flagMoment` / `flagMomentAndSave` in
+  `src/lib/notes-actions.js`) — a dashed full-width button under the recording
+  card with a `⌘⇧F` / `Ctrl+Shift+F` hint, wired as a real shortcut in
+  `sidepanel.js` (fires only while the Notes view is visible and a capture is
+  running). It appends an `info` item, `topic: 'flag'`, `review: 'edited'`
+  (a human put it there), whose provenance is the timecode and nothing else:
+  `src.orig`/`src.tr` stay empty because the panel must never invent
+  transcript words. The rendered text comes from the caller
+  (`T('flaggedAt', tc)`) — the actions layer knows no i18n. With no meeting
+  in the store yet, the ticker creates one (`T('untitledMeeting')`, today's
+  date, the UI locale) and flags that. Disabled with `T('flagNeedsRecording')`
+  when nothing is running.
 
 ## Not done yet — later phases (see spec §7 roadmap)
 
@@ -183,9 +208,14 @@ Nothing below is wired up. Don't assume it exists when reading other files.
     `Participant` has `name`/`org`/`speakerLabel`, no role.
   - Retention wording in the MoM footer — there is no retention setting, so
     the footer says "kept on this device" and claims no period.
-- **Side panel "Flag this moment" + recording card** (SidePanel artboard) —
-  not built; they need live recording state from `sidepanel.js`, which the
-  notes ticker doesn't have access to yet.
+- **Side panel: Pause** — the SidePanel artboard draws a Pause button beside
+  "End & draft"; the capture pipeline has no pause (start/stop only), so the
+  rail ships without it rather than with a dead control. Phase 2.1.
+- **Side panel: "End & draft" only ends** — it stops the running task through
+  the existing `onStop()` path and opens the register. Actually *drafting* a
+  register from the live transcript (running the extractor over what was just
+  captured) is Phase 2.1; today the register it opens holds whatever was
+  already stored, plus any flags.
 - **`src/manifest.json`** — not modified. `minutes.html` doesn't need a
   manifest entry to open via `chrome.tabs.create` from inside the
   extension (MV3 doesn't require declaring internal pages), so this was
