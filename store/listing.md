@@ -1,4 +1,4 @@
-# Chrome Web Store listing copy — Local TransSub 1.1.0
+# Chrome Web Store listing copy — Local TransSub 1.1.1
 
 Paste into the Developer Dashboard. Keep English as the primary locale; Indonesian is optional.
 

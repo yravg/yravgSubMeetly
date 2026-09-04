@@ -1,4 +1,4 @@
-# Manifest V3 permission audit — Local TransSub 1.1.0
+# Manifest V3 permission audit — Local TransSub 1.1.1
 
 Use these justifications in the Chrome Web Store “single purpose” / permission justification fields.
 
