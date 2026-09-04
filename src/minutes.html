@@ -101,6 +101,14 @@
       </div>
       <div class="grow"></div>
       <label class="srch"><span aria-hidden="true">⌕</span><input id="q" type="search" /></label>
+      <label class="grpsel"><span data-t="groupBy">Group</span>
+        <select id="group-by">
+          <option value="none" data-t="groupNone">none</option>
+          <option value="topic" data-t="cTopic">Topic</option>
+          <option value="owner" data-t="cOwner">Owner</option>
+          <option value="status" data-t="cStatus">Status</option>
+        </select>
+      </label>
       <button class="btn sm" id="btn-mine" aria-pressed="false">◑ <span data-t="mine">Mine</span></button>
       <button class="btn sm" id="btn-dual" aria-pressed="false">⇄ <span data-t="dual">Dual text</span></button>
       <div class="langsw" role="group" aria-label="Interface language">

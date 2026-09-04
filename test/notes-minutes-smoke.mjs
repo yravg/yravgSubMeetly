@@ -110,19 +110,49 @@ test('minutes workspace: boots empty, then loads sample data and renders the reg
   assert.ok(document.querySelector('#d-body .lowconf'), 'drawer shows the correction banner');
   assert.ok(document.querySelector('#d-apply'), 'banner offers "Apply correction"');
   assert.ok(document.querySelector('#d-body .wave'), 'drawer shows the cited-span waveform');
+  const spoken = document.querySelector('#d-body .qt.orig');
+  assert.equal(spoken.querySelector('mark')?.textContent, '弯管和涂敷',
+    'the mis-heard phrase is marked in the source-language quote too, not only the translation');
   document.querySelector('#d-apply').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 60));
   assert.equal(document.querySelector('#d-body .lowconf'), null, 'banner is gone once the correction is applied');
   assert.match(document.querySelector('#f-text').value, /bending and coating/);
 
-  // Metric item opens the Progress-artboard detail with the chart.
+  // Metric item opens the Progress-artboard detail: a WIDE drawer with the
+  // three numbers, the curve, the linked items and a real title.
   q.value = 'Cumulative';
   q.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
   document.querySelector('#pane tbody tr').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
-  assert.ok(document.querySelector('#d-body .mcards'), 'metric drawer shows actual / baseline / variance');
+  const drawer = document.querySelector('#drawer');
+  assert.ok(drawer.classList.contains('wide'), 'the metric drawer widens to the Progress surface');
+  assert.equal(document.querySelectorAll('#d-body .mcards .mc').length, 3, 'actual / baseline / variance');
   assert.ok(document.querySelector('#d-body .chart svg polyline'), 'metric drawer draws the series curve');
+  assert.match(drawer.querySelector('h1')?.textContent || '', /Cumulative actual progress/, 'the metric has a title, not a textarea');
+  const linkBlock = [...document.querySelectorAll('#d-body .pcard')].find((c) => c.querySelector('.linkrow'));
+  assert.ok(linkBlock, 'the Linked items panel renders beside the chart');
+  assert.ok(linkBlock.querySelectorAll('.linkrow').length >= 2, 'the figure cites at least two register items');
+  assert.match(document.querySelector('#d-body .mprov').textContent, /typed as a measure/, 'the editorial note explains why it is a measure');
+
+  // A non-metric item goes back to the narrow Provenance drawer.
+  q.value = 'bending and coating';
+  q.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+  document.querySelector('#pane tbody tr').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
+  assert.equal(drawer.classList.contains('wide'), false, 'only metrics get the wide surface');
+  assert.ok(document.querySelector('#f-likelihood'), 'a risk is edited as severity × likelihood');
   q.value = '';
   q.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+
+  // Grouping inserts full-width group headers and keeps the rows.
+  const group = document.querySelector('#group-by');
+  group.value = 'topic';
+  group.dispatchEvent(new document.defaultView.Event('change', { bubbles: true }));
+  const gheads = document.querySelectorAll('#pane tbody tr.ghead');
+  assert.ok(gheads.length >= 2, `grouping by topic emits group headers (got ${gheads.length})`);
+  assert.equal(gheads[0].querySelector('td').getAttribute('colspan'), '8', 'the header spans the table');
+  assert.ok(document.querySelectorAll('#pane tbody tr[data-ref]').length >= 8, 'no row is lost to grouping');
+  group.value = 'none';
+  group.dispatchEvent(new document.defaultView.Event('change', { bubbles: true }));
+  assert.equal(document.querySelectorAll('#pane tbody tr.ghead').length, 0);
 
   // Series tab renders the standing register + right rail without throwing.
   document.querySelector('#tabs button[data-view="series"]').dispatchEvent(new document.defaultView.Event('click', { bubbles: true }));
@@ -138,6 +168,17 @@ test('minutes workspace: boots empty, then loads sample data and renders the reg
   assert.match(paper.textContent, /MINUTES OF MEETING/);
   assert.match(paper.textContent, /‡/, 'AI-drafted items are marked ‡ in the issued document');
   assert.match(paper.textContent, /↩/, 'carried items are marked ↩');
+
+  // The summary is prose the minute-taker owns while the MoM is still a draft.
+  const summaryBox = paper.querySelector('[contenteditable]');
+  assert.ok(summaryBox, 'an unissued MoM offers an editable summary');
+  assert.equal(summaryBox.id, 'doc-summary');
+  assert.match(summaryBox.textContent, /dropped-object incident/, 'it shows the authored summary, not the statistics sentence');
+  assert.ok(paper.querySelector('#btn-save-summary'), 'and a way to save it');
+
+  // Risks read as a matrix, and the KPI band carries the man-hours measure.
+  assert.match(paper.textContent, /High × Possible/, 'risks are severity × likelihood in the issued document');
+  assert.match(paper.querySelector('.kpi').textContent, /35,000/, 'man-hours gets thousands separators');
 });
 
 test('notes-panel.js: compact ticker mounts and reflects the register', async (t) => {

@@ -14,15 +14,15 @@
  * (standing register), MoM (issued document) and SidePanel artboards.
  */
 import {
-  ITEM_TYPES, pickText, meetingStats, itemAgeDays, TYPE_COLOR, LOW_CONFIDENCE,
+  ITEM_TYPES, LIKELIHOODS, pickText, meetingStats, itemAgeDays, TYPE_COLOR, LOW_CONFIDENCE,
 } from './lib/notes-schema.js';
 import { makeT } from './lib/notes-i18n.js';
 import { listMeetings, saveMeeting, backendName } from './lib/notes-store.js';
 import {
   acceptItemAndSave, editItemAndSave, addItemAndSave, removeItemAndSave,
-  applyCorrectionAndSave, issueMeetingAndSave, createAmendment,
+  applyCorrectionAndSave, issueMeetingAndSave, createAmendment, setSummaryAndSave,
   startNextMeeting, carryCandidates, blockingItems, seriesSummary, metricSeries,
-  seriesFlow, linkedItems, RegisterError,
+  seriesFlow, linkedItems, carryChain, RegisterError,
 } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
@@ -48,6 +48,7 @@ const state = {
   reviewOnly: false,
   seriesAll: false,
   sort: { key: 'ref', dir: 1 },
+  group: 'none',
   sel: /** @type {string|null} */ (null),
   adding: false,
   // ?lang= from the side panel wins once, then the toggle is remembered.
@@ -171,6 +172,12 @@ function sign(n) {
 }
 function fmtNum(n) {
   return Number.isFinite(n) ? String(Number(n.toFixed(2))) : '—';
+}
+/** Big counts (man-hours) need thousands separators; percentages must not get them. */
+function fmtMeasure(n) {
+  if (!Number.isFinite(n)) return '—';
+  if (Math.abs(n) < 1000) return fmtNum(n);
+  return new Intl.NumberFormat(state.lang === 'id' ? 'id-ID' : 'en-US').format(Number(n.toFixed(2)));
 }
 /** Highlight the extractor's mis-hearing inside the item text (Main artboard). */
 function textWithFlag(it) {
@@ -309,7 +316,9 @@ function viewTable(rows) {
       ${th('status', 'c-status', T('cStatus'))}
       <th class="c-src">${esc(T('cSource'))}</th>
     </tr></thead>
-    <tbody>${rows.map((it) => `
+    <tbody>${groupRows(rows).map(({ label, count, items }) => `
+      ${label == null ? '' : `<tr class="ghead"><td colspan="8">${esc(label)}<span class="cnt">${count}</span></td></tr>`}
+      ${items.map((it) => `
       <tr data-ref="${esc(it.ref)}" aria-selected="${state.sel === it.ref}">
         <td class="c-ref">${cellRef(it)}</td>
         <td class="c-type">${cellType(it)}</td>
@@ -319,8 +328,36 @@ function viewTable(rows) {
         <td class="c-due">${cellDue(it)}</td>
         <td class="c-status">${cellStatus(it)}</td>
         <td class="c-src">${cellSrc(it)}</td>
-      </tr>`).join('')}</tbody>
+      </tr>`).join('')}`).join('')}</tbody>
   </table>`;
+}
+/**
+ * Group the already-sorted rows into runs. Grouping never re-orders inside a
+ * group — the column sort still decides that — it only inserts a header row
+ * before each run, in the order the groups first appear.
+ * @returns {Array<{label: string|null, count: number, items: object[]}>}
+ */
+function groupRows(rows) {
+  if (state.group === 'none') return [{ label: null, count: rows.length, items: rows }];
+  const key = (it) => {
+    if (state.group === 'owner') return it.owner || T('noOwner');
+    if (state.group === 'status') return T(it.status);
+    return topicLabel(it.topic);
+  };
+  const out = [];
+  const byLabel = new Map();
+  for (const it of rows) {
+    const label = key(it);
+    if (!byLabel.has(label)) {
+      const g = { label, count: 0, items: [] };
+      byLabel.set(label, g);
+      out.push(g);
+    }
+    const g = byLabel.get(label);
+    g.items.push(it);
+    g.count += 1;
+  }
+  return out;
 }
 function topicLabel(key) {
   const m = activeMeeting();
@@ -373,9 +410,18 @@ function viewDoc() {
   const dateLine = `${m.date}${m.start ? `, ${m.start}${m.end ? `–${m.end}` : ''}` : ''}${m.tz && m.tz !== 'local' ? ` ${m.tz}` : ''}`;
   const noteGroups = [...new Set(byType('info').map((i) => i.topic))];
   const infoByTopic = noteGroups.map((k, idx) => `<div class="note"><h3>7.${idx + 1} ${esc(topicLabel(k))}</h3>${byType('info').filter((i) => i.topic === k).map((i) => `<p>${esc(itemText(i))}</p>`).join('')}</div>`).join('');
-  const summary = state.lang === 'id'
+  const generatedSummary = state.lang === 'id'
     ? `${stats.decisions} keputusan, ${stats.actionsOpen} dari ${stats.actionsTotal} tindak lanjut masih terbuka, ${stats.questionsOpen} pertanyaan terbuka, ${stats.carried} butir bawaan dari rapat sebelumnya. Agenda terbahas ${stats.agendaPct}% (${stats.agendaCovered}/${stats.agendaTotal}).${progressPt?.metric ? ` Progres aktual kumulatif ${fmtNum(progressPt.metric.value)}${progressPt.metric.unit}${progressPt.metric.variance != null ? `, ${sign(progressPt.metric.variance)}${fmtNum(progressPt.metric.variance)}${progressPt.metric.unit} terhadap baseline` : ''}.` : ''}`
     : `${stats.decisions} decision(s), ${stats.actionsOpen} of ${stats.actionsTotal} actions still open, ${stats.questionsOpen} open question(s), ${stats.carried} item(s) carried from the previous meeting. Agenda covered ${stats.agendaPct}% (${stats.agendaCovered}/${stats.agendaTotal}).${progressPt?.metric ? ` Cumulative actual progress ${fmtNum(progressPt.metric.value)}${progressPt.metric.unit}${progressPt.metric.variance != null ? `, ${sign(progressPt.metric.variance)}${fmtNum(progressPt.metric.variance)}${progressPt.metric.unit} against baseline` : ''}.` : ''}`;
+  // A human-written summary replaces the generated statistics sentence; before
+  // issue it is editable in place, after issue the document is frozen.
+  const summaryText = pickText(m.summary, state.lang) || generatedSummary;
+  const summaryBlock = m.issuedAt
+    ? `<p>${esc(summaryText)}</p>`
+    : `<div class="sumedit">
+        <p contenteditable="true" id="doc-summary" spellcheck="false">${esc(summaryText)}</p>
+        <button type="button" class="btn xs" id="btn-save-summary">${esc(T('saveSummary'))}</button>
+      </div>`;
   const rev = /-A(\d+)$/.exec(m.id)?.[1] || '0';
   const chairOrg = m.attendees.find((a) => a.name === m.chair)?.org || '';
   const distribution = [...new Set(m.attendees.map((a) => a.org).filter(Boolean))].join(' · ');
@@ -387,17 +433,24 @@ function viewDoc() {
     byType('decision').map((it) => `<tr data-ref="${esc(it.ref)}"><td class="mref">${mark(it)}</td><td>${esc(itemText(it))}</td>${ownerCell(it)}</tr>`).join(''));
   const actions = table([[T('cRef'), '76px'], [T('docAction')], [T('cOwner'), '118px'], [T('cDue'), '76px'], [T('cStatus'), '84px']],
     byType('action').map((it) => `<tr data-ref="${esc(it.ref)}"><td class="mref">${mark(it)}</td><td>${esc(itemText(it))}${carriedNote(it)}</td>${ownerCell(it)}${dueCell(it)}${statusCell(it)}</tr>`).join(''));
+  // A question that keeps coming back is the finding, not the question — the
+  // Series view already says so; the issued document has to say it too.
+  const repeatNote = (it) => {
+    const chain = carryChain(series, m, it);
+    if (chain < 2) return '';
+    return ` <b>${esc(it.owner ? T('docRaisedRepeatedlyOwned', chain) : T('docRaisedRepeatedly', chain))}</b>`;
+  };
   const questions = table([[T('cRef'), '76px'], [T('docQuestion')], [T('docReferredTo'), '118px'], [T('docBy'), '76px']],
-    byType('question').map((it) => `<tr data-ref="${esc(it.ref)}"><td class="mref">${mark(it)}</td><td>${esc(itemText(it))}${carriedNote(it)}</td>${ownerCell(it)}${dueCell(it)}</tr>`).join(''));
-  const risks = table([[T('cRef'), '76px'], [T('docRisk')], [T('cOwner'), '118px'], [T('dPriority'), '90px']],
-    byType('risk').map((it) => `<tr data-ref="${esc(it.ref)}"><td class="mref">${mark(it)}</td><td>${esc(itemText(it))}${carriedNote(it)}</td>${ownerCell(it)}<td>${esc(T(`pr${cap(it.priority)}`))}</td></tr>`).join(''));
+    byType('question').map((it) => `<tr data-ref="${esc(it.ref)}"><td class="mref">${mark(it)}</td><td>${esc(itemText(it))}${repeatNote(it)}${carriedNote(it)}</td>${ownerCell(it)}${dueCell(it)}</tr>`).join(''));
+  const risks = table([[T('cRef'), '76px'], [T('docRisk')], [T('cOwner'), '118px'], [T('docSevLik'), '100px']],
+    byType('risk').map((it) => `<tr data-ref="${esc(it.ref)}"><td class="mref">${mark(it)}</td><td>${esc(itemText(it))}${carriedNote(it)}</td>${ownerCell(it)}<td>${esc(sevLikLabel(it))}</td></tr>`).join(''));
   const metrics = byType('metric');
   const progress = metrics.length ? `<div class="kpi">${metrics.map((it) => {
     const mt = it.metric;
     if (!mt) return '';
-    return `<div><small>${esc(itemText(it))}</small><b>${esc(fmtNum(mt.value))}${esc(mt.unit)}</b></div>
-      ${mt.baseline != null ? `<div><small>${esc(T('mBaseline'))}</small><b class="base">${esc(fmtNum(mt.baseline))}${esc(mt.unit)}</b></div>` : ''}
-      ${mt.variance != null ? `<div><small>${esc(T('mVariance'))}</small><b class="${mt.variance >= 0 ? 'up' : 'down'}">${sign(mt.variance)}${esc(fmtNum(mt.variance))}${esc(mt.unit)}</b></div>` : ''}`;
+    return `<div><small>${esc(itemText(it))}</small><b>${esc(fmtMeasure(mt.value))}${esc(mt.unit)}</b></div>
+      ${mt.baseline != null ? `<div><small>${esc(T('mBaseline'))}</small><b class="base">${esc(fmtMeasure(mt.baseline))}${esc(mt.unit)}</b></div>` : ''}
+      ${mt.variance != null ? `<div><small>${esc(T('mVariance'))}</small><b class="${mt.variance >= 0 ? 'up' : 'down'}">${sign(mt.variance)}${esc(fmtMeasure(mt.variance))}${esc(mt.unit)}</b></div>` : ''}`;
   }).join('')}</div>${metrics.map((it) => (it.src?.tr ? `<p>${esc(it.src.tr)}</p>` : '')).join('')}` : '';
 
   return `<div class="docwrap"><div class="paper">
@@ -418,9 +471,9 @@ function viewDoc() {
       <div><span>${esc(T('date'))}</span><span class="mono">${esc(dateLine)}</span></div>
       <div><span>${esc(T('chair'))}</span><span>${esc(m.chair || '—')}</span></div>
       <div><span>${esc(T('present'))}</span><span>${m.attendees.length ? esc(m.attendees.map((a) => a.name).join(', ')) : '—'}</span></div>
-      <div><span>${esc(T('next'))}</span><span class="mono">${next ? esc(next.date) : '—'}</span></div>
+      <div><span>${esc(T('next'))}</span><span class="mono">${next ? esc(meetingWhen(next)) : '—'}</span></div>
     </div>
-    ${sec(T('docSummary'), `<p>${esc(summary)}</p>`)}
+    ${sec(T('docSummary'), summaryBlock)}
     ${sec(T('docDecisions'), decisions)}
     ${sec(T('docActions'), actions)}
     ${sec(T('docQuestions'), questions)}
@@ -455,6 +508,14 @@ function cssEscape(v) {
 }
 function cap(s) {
   return s ? s[0].toUpperCase() + s.slice(1) : '';
+}
+/** Risk matrix read out loud: "High × Possible". */
+function sevLikLabel(it) {
+  return `${T(`pr${cap(it.priority)}`)} × ${T(`lk${cap(it.likelihood)}`)}`;
+}
+/** "2026-09-09, 10:00 GMT+8" — a date alone does not tell anyone when to dial in. */
+function meetingWhen(m) {
+  return `${m.date}${m.start ? `, ${m.start}` : ''}${m.tz && m.tz !== 'local' ? ` ${m.tz}` : ''}`;
 }
 function splitTitle(title) {
   const parts = String(title || '').split(/\s+[—–-]\s+/);
@@ -519,6 +580,10 @@ function viewSeries() {
   const maxAge = Math.max(...rows.map((r) => r.age ?? 0), 1);
   const maxOpen = Math.max(...flow.map((f) => f.open), 1);
   const maxFlow = Math.max(...flow.map((f) => Math.max(f.opened, f.closed)), 1);
+  // Two labels, not one: the artboard names the tallest opened bar AND the
+  // tallest closed bar, because the gap between them is the story.
+  const maxOpened = Math.max(...flow.map((f) => f.opened), 0);
+  const maxClosed = Math.max(...flow.map((f) => f.closed), 0);
   const upN = flow.filter((f) => f.opened > f.closed).length;
   const net = flow.reduce((a, f) => a + f.opened - f.closed, 0);
   const orgRows = Object.entries(summary.byOrg).sort((a, b) => b[1] - a[1]);
@@ -600,7 +665,7 @@ function viewSeries() {
           <div class="flow">
             <div class="gl" style="top:0"></div><div class="gl" style="top:37px"></div><div class="gl" style="top:73px"></div>
             <div class="bars">${flow.map((f) => `<span><i class="o" style="height:${Math.round((f.opened / maxFlow) * 110)}px" title="${f.opened}"></i><i class="c" style="height:${Math.round((f.closed / maxFlow) * 110)}px" title="${f.closed}"></i></span>`).join('')}</div>
-            <span class="ymax">${maxFlow}</span>
+            ${[['o', maxOpened], ['c', maxClosed]].filter(([, val]) => val > 0).map(([cls, val]) => `<span class="ymax ${cls}" style="bottom:${Math.round((val / maxFlow) * 110)}px">${val}</span>`).join('')}
           </div>
           <div class="flowx">${flow.map((f) => `<span class="${f.meetingId === m.id ? 'cur' : ''}">W${f.seq}</span>`).join('')}</div>
         </div>
@@ -734,6 +799,10 @@ function provenanceBlock(it, m) {
   if (!it.src) return `<p class="empty" style="padding:0;text-align:left">${esc(T('noSource'))}</p>`;
   const src = it.src;
   const to = it.correction?.to || null;
+  // The mis-hearing is marked in BOTH quotes when the extractor could map it
+  // back to the source-language phrase — seeing 弯管和涂敷 lit up is what makes
+  // "the audio says bending and coating" checkable by someone who reads zh.
+  const origMark = it.correction?.origPhrase || null;
   return `<div class="fld">
     <label>${esc(T('dProvenance'))}</label>
     <div class="quote">
@@ -744,18 +813,18 @@ function provenanceBlock(it, m) {
         ${src.meetingId && src.meetingId !== m.id ? `<span class="sep">·</span><span class="mono">${esc(src.meetingId)}</span>` : ''}
         <span class="asr" style="color:${confColor(it.confidence)}">${esc(T('asr'))} ${pct(it.confidence)}%</span>
       </div>
-      ${src.orig ? `<div class="qt orig"><span class="lbl">${esc(T('asSpoken'))}${src.lang && src.lang !== 'auto' ? ` · ${esc(src.lang)}` : ''}</span>${esc(src.orig)}</div>` : ''}
+      ${src.orig ? `<div class="qt orig"><span class="lbl">${esc(T('asSpoken'))}${src.lang && src.lang !== 'auto' ? ` · ${esc(src.lang)}` : ''}</span>${textWithMark(src.orig, origMark)}</div>` : ''}
       ${src.tr ? `<div class="qt"><span class="lbl">${esc(T('machineTranslation'))} · en</span>${textWithMark(src.tr, to)}</div>` : ''}
       ${waveform(it)}
     </div>
   </div>`;
 }
 
-function linkedBlock(it, m) {
+function linkedBlock(it, m, variant = 'fld') {
   const links = linkedItems(state.meetings, m, it);
   if (!links.length) return '';
-  return `<div class="fld">
-    <label>${esc(T('dLinked'))}</label>
+  return `<div class="${variant === 'card' ? 'pcard' : 'fld'}">
+    <label class="lbl">${esc(T('dLinked'))}</label>
     <div class="linkrows">${links.map(({ item, meeting }) => `
       <div class="linkrow" data-link="${esc(item.ref)}" data-meeting="${esc(meeting.id)}">
         <span class="bar" style="background:${TYPE_COLOR[item.type]}"></span>
@@ -796,7 +865,11 @@ function correctionBanner(it) {
   </div>`;
 }
 
-/** Progress artboard: three numbers + the curve across the series. */
+/**
+ * Progress artboard: three numbers, the curve across the series, then the
+ * evidence beside the links — the whole point of the wide drawer is that the
+ * figure and what it came from are read together, not scrolled past.
+ */
 function metricDetail(it, m) {
   const mt = it.metric;
   if (!mt) return '';
@@ -804,11 +877,15 @@ function metricDetail(it, m) {
   const v = mt.variance;
   const dir = v == null ? 'mOnBaseline' : v > 0 ? 'mAhead' : v < 0 ? 'mBehind' : 'mOnBaseline';
   const risks = m.items.filter((i) => i.type === 'risk' && i.status !== 'closed' && (i.agenda && i.agenda === it.agenda || (it.links || []).includes(i.ref)));
+  const callout = risks.length && v != null && v > 0
+    ? `<div class="callout"><div class="h">${alertIcon(14)}${esc(T('mAheadNotSafe'))}</div><p>${esc(T('mAheadNotSafeBody', risks.length))}</p></div>`
+    : '';
+  const side = `${linkedBlock(it, m, 'card')}${callout}`;
   return `
     <div class="mcards">
-      <div class="mc"><span class="lbl">${esc(T('mActual'))}</span><span class="n">${esc(fmtNum(mt.value))}<span class="unit">${esc(mt.unit)}</span></span></div>
-      <div class="mc base"><span class="lbl">${esc(T('mBaseline'))}</span><span class="n">${mt.baseline != null ? `${esc(fmtNum(mt.baseline))}<span class="unit">${esc(mt.unit)}</span>` : '—'}</span></div>
-      <div class="mc var ${v != null && v < 0 ? 'down' : ''}"><span class="lbl">${esc(T('mVariance'))}</span><span class="n">${v != null ? `${sign(v)}${esc(fmtNum(v))}<span class="unit">${esc(mt.unit)}</span>` : '—'}</span><small>${esc(T(dir))}</small></div>
+      <div class="mc"><span class="lbl">${esc(T('mActual'))}</span><span class="n">${esc(fmtMeasure(mt.value))}<span class="unit">${esc(mt.unit)}</span></span></div>
+      <div class="mc base"><span class="lbl">${esc(T('mBaseline'))}</span><span class="n">${mt.baseline != null ? `${esc(fmtMeasure(mt.baseline))}<span class="unit">${esc(mt.unit)}</span>` : '—'}</span></div>
+      <div class="mc var ${v != null && v < 0 ? 'down' : ''}"><span class="lbl">${esc(T('mVariance'))}</span><span class="n">${v != null ? `${sign(v)}${esc(fmtMeasure(v))}<span class="unit">${esc(mt.unit)}</span>` : '—'}</span><small>${esc(T(dir))}</small></div>
     </div>
     <div class="chart">
       <div class="ch"><b>${esc(T('mChart'))}</b>
@@ -816,7 +893,27 @@ function metricDetail(it, m) {
       <div class="sub">${esc(pts.length > 1 ? T('mChartNote') : T('mSingle'))}</div>
       ${metricChart(pts, mt.unit)}
     </div>
-    ${risks.length && v != null && v > 0 ? `<div class="callout"><div class="h">${alertIcon(14)}${esc(T('mAheadNotSafe'))}</div><p>${esc(T('mAheadNotSafeBody', risks.length))}</p></div>` : ''}`;
+    <div class="mgrid">
+      <div class="mprov">${metricSource(it)}</div>
+      ${side ? `<div class="mside">${side}</div>` : ''}
+    </div>`;
+}
+
+/** "Where the figure came from": one card, the cited sentence, and why it is typed. */
+function metricSource(it) {
+  const src = it.src;
+  return `<div class="pcard">
+    <span class="lbl">${esc(T('mWhereFrom'))}</span>
+    ${src ? `<div class="qh">
+      <span class="tc" data-play="${esc(src.tc)}">${playIcon()}${esc(tcRange(src))}</span>
+      ${src.speaker ? `<span class="sep">·</span><span class="spk">${esc(src.speaker)}</span>` : ''}
+      ${segLabel(src) ? `<span class="sep">·</span><span class="mono">${esc(segLabel(src))}</span>` : ''}
+      <span class="asr" style="color:${confColor(it.confidence)}">${esc(T('asr'))} ${pct(it.confidence)}%</span>
+    </div>
+    <blockquote>${esc(src.tr || src.orig)}</blockquote>`
+      : `<p class="empty" style="padding:0;text-align:left">${esc(T('noSource'))}</p>`}
+    <p class="mnote">${esc(T('mTypedNote'))}</p>
+  </div>`;
 }
 function metricChart(pts, unit) {
   const W = 620; const H = 196; const L = 40; const R = 12; const TOP = 20; const BOT = 170;
@@ -855,8 +952,16 @@ function paintDrawer() {
   dr.hidden = false;
   const locked = !!m.issuedAt;
   const other = state.lang === 'en' ? 'ID' : 'EN';
-  $('#d-id').innerHTML = `<span class="mono">${esc(it.ref)}</span>${it.carriedFrom ? ` <span style="color:var(--warn-text)">↩ ${esc(it.carriedFrom)}</span>` : ''}`;
-  $('#d-type').innerHTML = `${cellType(it)}<span class="topic">${esc(topicLabel(it.topic))}</span>${it.agenda ? `<span class="mono muted2" style="font-size:10.5px">${esc(T('agendaRef', it.agenda))}</span>` : ''}${it.review !== 'ai' ? `<span class="rev" data-r="${it.review}" style="margin:0">${esc(T(it.review))}</span>` : ''}`;
+  // A metric is a page, not a row: the Progress artboard gives it a wide
+  // surface so the chart sits beside the sentence it was read out of.
+  const isMetric = it.type === 'metric';
+  dr.classList.toggle('wide', isMetric);
+  const refChip = `<span class="mono">${esc(it.ref)}</span>${it.carriedFrom ? ` <span style="color:var(--warn-text)">↩ ${esc(it.carriedFrom)}</span>` : ''}`;
+  const metaChips = `${cellType(it)}<span class="topic">${esc(topicLabel(it.topic))}</span>${it.agenda ? `<span class="mono muted2" style="font-size:10.5px">${esc(T('agendaRef', it.agenda))}</span>` : ''}${it.review !== 'ai' ? `<span class="rev" data-r="${it.review}" style="margin:0">${esc(T(it.review))}</span>` : ''}`;
+  $('#d-id').innerHTML = isMetric ? '' : refChip;
+  $('#d-type').innerHTML = isMetric
+    ? `<span class="dref">${refChip}</span>${metaChips}<h1 class="dtitle">${esc(itemText(it))}</h1>`
+    : metaChips;
 
   $('#d-body').innerHTML = `
     ${locked ? '' : correctionBanner(it)}
@@ -875,7 +980,17 @@ function paintDrawer() {
         <select id="f-status" ${locked ? 'disabled' : ''}>
           ${['open', 'progress', 'closed', 'carried'].map((s) => `<option value="${s}" ${s === it.status ? 'selected' : ''}>${esc(T(s))}</option>`).join('')}
         </select></div>
-      ${it.type === 'risk' || it.type === 'action'
+      ${it.type === 'risk'
+        ? `<div class="fld"><label>${esc(T('dSevLik'))}</label>
+        <div class="sevlik">
+          <select id="f-priority" ${locked ? 'disabled' : ''} aria-label="${esc(T('dPriority'))}">
+            ${['high', 'med', 'low'].map((p) => `<option value="${p}" ${p === it.priority ? 'selected' : ''}>${esc(T(`pr${cap(p)}`))}</option>`).join('')}
+          </select>
+          <select id="f-likelihood" ${locked ? 'disabled' : ''} aria-label="${esc(T('dSevLik'))}">
+            ${LIKELIHOODS.map((l) => `<option value="${l}" ${l === it.likelihood ? 'selected' : ''}>${esc(T(`lk${cap(l)}`))}</option>`).join('')}
+          </select>
+        </div></div>`
+        : it.type === 'action'
         ? `<div class="fld"><label>${esc(T('dPriority'))}</label>
         <select id="f-priority" ${locked ? 'disabled' : ''}>
           ${['high', 'med', 'low'].map((p) => `<option value="${p}" ${p === it.priority ? 'selected' : ''}>${esc(T(`pr${cap(p)}`))}</option>`).join('')}
@@ -884,8 +999,8 @@ function paintDrawer() {
         <input id="f-topic" list="dl-topics" value="${esc(it.topic)}" ${locked ? 'disabled' : ''} /></div>`}
     </div>
     ${it.type === 'risk' || it.type === 'action' ? `<div class="fld"><label>${esc(T('dTopic'))}</label><input id="f-topic" list="dl-topics" value="${esc(it.topic)}" ${locked ? 'disabled' : ''} /></div>` : ''}
-    ${provenanceBlock(it, m)}
-    ${linkedBlock(it, m)}
+    ${isMetric ? '' : provenanceBlock(it, m)}
+    ${isMetric ? '' : linkedBlock(it, m)}
     ${historyBlock(it)}
     <datalist id="dl-owners">${(m.attendees || []).map((a) => `<option value="${esc(a.name)}">`).join('')}</datalist>
     <datalist id="dl-topics">${[...new Set(m.items.map((i) => i.topic))].map((t) => `<option value="${esc(t)}">`).join('')}</datalist>
@@ -902,6 +1017,7 @@ function paintDrawer() {
 function paintDrawerAdd() {
   const dr = $('#drawer');
   dr.hidden = false;
+  dr.classList.remove('wide');
   $('#d-id').textContent = T('addItem');
   $('#d-type').innerHTML = '';
   $('#d-body').innerHTML = `
@@ -990,6 +1106,7 @@ async function saveDrawer() {
     topic: $('#f-topic')?.value.trim() || it.topic,
   };
   if ($('#f-priority')) patch.priority = $('#f-priority').value;
+  if ($('#f-likelihood')) patch.likelihood = $('#f-likelihood').value;
   const changed = Object.keys(patch).some((k) => JSON.stringify(patch[k]) !== JSON.stringify(it[k]));
   let meeting;
   if (!changed && it.review === 'ai') {
@@ -1002,6 +1119,20 @@ async function saveDrawer() {
   replaceActive(meeting);
   toast(T('msgAccepted'));
   paint();
+}
+
+/** The MoM summary is prose a human owns — read it back off the page as typed. */
+async function doSaveSummary() {
+  const m = activeMeeting();
+  const box = $('#doc-summary');
+  if (!m || !box) return;
+  try {
+    replaceActive(await setSummaryAndSave(m, state.lang, box.textContent));
+    toast(T('saveSummary'));
+    paint();
+  } catch (e) {
+    toast(e && e.message ? e.message : String(e), true);
+  }
 }
 
 async function acceptSelected() {
@@ -1178,6 +1309,7 @@ function wireEvents() {
   $('#btn-review-only').addEventListener('click', () => { state.reviewOnly = !state.reviewOnly; paint(); });
 
   $('#q').addEventListener('input', (e) => { state.q = e.target.value; paint(); });
+  $('#group-by').addEventListener('change', (e) => { state.group = e.target.value; paint(); });
 
   $('#btn-mine').addEventListener('click', (e) => {
     if (!state.me) {
@@ -1215,6 +1347,7 @@ function wireEvents() {
   });
 
   $('#pane').addEventListener('click', (e) => {
+    if (e.target.closest('#btn-save-summary')) { doSaveSummary(); return; }
     const play = e.target.closest('[data-play]');
     if (play) { e.stopPropagation(); toast(`${T('msgSeeking')} ${play.dataset.play}`); return; }
 

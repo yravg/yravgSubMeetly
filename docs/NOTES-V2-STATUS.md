@@ -38,7 +38,7 @@ tell in 30 seconds where things stand without reading the whole spec.
   (a real regression, not hypothetical — it would have thrown as soon as
   anyone opened the Notes tab). Now shows active-meeting status + open
   follow-ups + one "Open minutes register" button that opens the full tab.
-- **Tests** — `test/notes-v2.test.mjs` (data layer, 14 cases) +
+- **Tests** — `test/notes-v2.test.mjs` (data layer, 21 cases) +
   `test/notes-minutes-smoke.mjs` (3 cases: every `#id` the JS queries exists
   in the markup it runs against; the empty-state → load-sample → populated
   register path renders for real against jsdom; the side-panel ticker
@@ -85,6 +85,51 @@ tell in 30 seconds where things stand without reading the whole spec.
     `seriesSummary` now counts a carried item once (newest copy) and reports
     `chain`. `acceptItem` clears a pending correction ("keep as heard") and
     records that in history. 20 data-layer tests + 3 DOM smoke tests.
+- **Artboard fidelity pass (Phase 2.0c)** — the gaps the artboard→code audit
+  found on the Progress / Provenance / MoM / Main boards are closed:
+  - *Progress* — selecting a metric now widens the drawer to
+    `min(900px, 72vw)` (`.drawer.wide`) and lays it out like the artboard:
+    ref · Metric · topic · agenda on one line, the item text as an `<h1>`,
+    the three number cards, the full-width chart, then a `1.35fr 1fr` grid —
+    "Where the figure came from" (timecode, speaker, segment range, ASR %,
+    the cited sentence as a left-ruled quote, plus the editorial line
+    `mTypedNote`) beside "Linked items" and the "Ahead, but not safe"
+    callout. Non-metric items keep the 520px Provenance drawer; under 900px
+    both are full-screen as before.
+  - *Severity × likelihood* — `MinuteItem.likelihood`
+    (`certain|likely|possible|unlikely`, default `possible`) is in the
+    schema; the drawer shows risks as two side-by-side selects saved through
+    `editItemAndSave`, and the MoM risks column is `Sev × Lik` →
+    `High × Possible`. Non-risk items keep the single Priority field.
+  - *Editable MoM summary* — `Meeting.summary` is a multilingual text map
+    written by `setSummary` / `setSummaryAndSave` (refused on an issued
+    meeting, like every other edit). §1 of the document renders the authored
+    paragraph when there is one and the generated statistics sentence
+    otherwise; before issue it is a `contenteditable` block with a
+    **Save summary** button, after issue it is read-only. The W36 fixture
+    ships an EN + ID summary.
+  - *Recurring questions reach the document* — `viewDoc()` computes
+    `carryChain()` per question and appends the bolded "Raised in N
+    consecutive meetings; no owner assigned." (owner-less variant only when
+    the item really has no owner).
+  - *Correction highlight in "As spoken"* — `correction.origPhrase` carries
+    the source-language phrase (fixture: `弯管和涂敷`) so the zh original is
+    marked as well as the MT line.
+  - *Fixture links + KPI measures* — W36 now has a land-pack `info` item and
+    a `cumulative_progress` metric that links to it and to the delay risk
+    (which links back), so "Linked in this register" renders on sample data;
+    `man_hours` (35,000) and `hse_incidents` (0) are metric items, so they
+    land in the §6 KPI band instead of §7 prose, with thousands separators
+    via `Intl.NumberFormat`.
+  - *Group control* — a `Group: none / Topic / Owner / Status` select in the
+    toolbar; grouping inserts a full-width `tr.ghead` header per group and
+    keeps the column sort inside each group.
+  - *Small fidelity* — the MoM "Next" line shows date + start time + tz
+    (`startNextMeeting` now inherits the series' time of day, so the slot
+    survives), and the series flow chart labels both the tallest opened and
+    the tallest closed bar on the y axis.
+  - 24 tests (`node --test test/notes-v2.test.mjs
+    test/notes-minutes-smoke.mjs`).
 - **Design reference** — `test/notes-register.html`, the original
   static/fake-data prototype, and the Claude Design canvas this was built
   from (published separately as an Artifact; not in this repo). When the two
@@ -122,6 +167,22 @@ Nothing below is wired up. Don't assume it exists when reading other files.
 - **Phase 2.4 — retention / export formats.** No XLSX, ICS, or DOCX export.
   No retention-policy UI. Issue/freeze/amend the *data model* is done and
   tested; there's no storage panel or bulk cleanup UI.
+- **Still data-dependent, not oversights** (the artboards show these; the
+  model has nothing to render them from, and inventing values would be
+  worse than the gap):
+  - `Present 9 of 11 invited` — `Meeting.attendees` is who spoke/attended;
+    there is no invited roster, so the header and the MoM meta line count
+    attendees only.
+  - `… · 02:04 GPU` in the pipeline line — `EngineStamp.durationSec` is the
+    media length, not processing time; nothing measures wall-clock/GPU time.
+  - Audio seek — every `data-play` timecode and "Play from here" still just
+    toasts; there is no retained audio (Phase 2.2).
+  - Waveform amplitudes — deterministic pseudo-peaks keyed on `src.t0`; the
+    cited span and low-confidence colouring are the real information.
+  - Job titles in the signature block (`Project Manager, GZS`) —
+    `Participant` has `name`/`org`/`speakerLabel`, no role.
+  - Retention wording in the MoM footer — there is no retention setting, so
+    the footer says "kept on this device" and claims no period.
 - **Side panel "Flag this moment" + recording card** (SidePanel artboard) —
   not built; they need live recording state from `sidepanel.js`, which the
   notes ticker doesn't have access to yet.
