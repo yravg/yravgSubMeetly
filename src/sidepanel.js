@@ -150,7 +150,9 @@ function openInterpreterModal() {
   const it = interpreter();
   const srcGroup = t('sourceLangGroup');
   const tgtGroup = t('targetLangGroup');
-  $('interp-lang-a').innerHTML = `<optgroup label="${srcGroup}">${optionsHtml(SOURCE_LANGS)}</optgroup>`;
+  // 'auto' is not a usable end of a two-way conversation — both sides are named.
+  const twoWaySrc = SOURCE_LANGS.filter(([c]) => c !== 'auto');
+  $('interp-lang-a').innerHTML = `<optgroup label="${srcGroup}">${optionsHtml(twoWaySrc)}</optgroup>`;
   $('interp-lang-b').innerHTML = `<optgroup label="${tgtGroup}">${optionsHtml(TARGET_LANGS)}</optgroup>`;
   $('interp-lang-one').innerHTML = `<optgroup label="${tgtGroup}">${optionsHtml(TARGET_LANGS)}</optgroup>`;
   $('interp-lang-a').value = it.a;
