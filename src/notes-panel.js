@@ -76,6 +76,9 @@ function flagShortcutHint() {
 // Strip gelombang di artboard adalah DEKORASI, bukan meter amplitudo: tinggi
 // batang tetap (deterministik) supaya panel tidak berpura-pura menampilkan
 // level audio yang memang belum tersedia dari pipeline.
+/** Berapa lama alasan penolakan bertahan di baris status. */
+const NOTICE_MS = 6000;
+
 const WAVE_BARS = [22, 38, 55, 31, 64, 44, 73, 36, 58, 81, 47, 29, 66, 52, 88, 61, 94, 70, 45, 78];
 
 function waveHtml(running) {
@@ -91,8 +94,12 @@ function waveHtml(running) {
  * Tidak ada tombol Pause — pipeline-nya memang tidak punya jeda, dan kontrol
  * mati lebih buruk daripada kontrol yang tidak ada.
  */
-function captureRailHtml(capture, T) {
+function captureRailHtml(capture, T, { issued = false } = {}) {
   const running = !!capture.running;
+  // Dua alasan berbeda untuk tombol mati: belum merekam, atau notulen aktif
+  // sudah terbit (beku). Judul tooltip mengatakan yang mana.
+  const blocked = !running || issued;
+  const why = issued ? T('flagRefusedIssued') : T('flagNeedsRecording');
   return `
       <div class="notes-rec" id="notes-recording-card">
         <div class="notes-rec-head">
@@ -110,7 +117,7 @@ function captureRailHtml(capture, T) {
         </div>
       </div>
 
-      <button type="button" class="notes-flag" id="btn-flag-moment"${running ? '' : ` disabled title="${escapeHtml(T('flagNeedsRecording'))}"`}>
+      <button type="button" class="notes-flag" id="btn-flag-moment"${blocked ? ` disabled title="${escapeHtml(why)}"` : ''}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0b05c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h12l-2.2 3.6L17 12H5"/></svg>
         ${escapeHtml(T('flagMoment'))}
         <span class="notes-flag-key mono">${escapeHtml(flagShortcutHint())}</span>
@@ -118,7 +125,7 @@ function captureRailHtml(capture, T) {
 }
 
 export function renderNotesPanel(root, state, handlers = {}) {
-  const { meetings, active, lang, T, capture } = state;
+  const { meetings, active, lang, T, capture, notice } = state;
   const stats = active ? meetingStats(active) : null;
   const latest = latestItems(active, lang);
   const counts = active
@@ -127,12 +134,12 @@ export function renderNotesPanel(root, state, handlers = {}) {
 
   root.innerHTML = `
     <div class="notes-panel" data-notes-root>
-      ${capture ? captureRailHtml(capture, T) : ''}
+      ${capture ? captureRailHtml(capture, T, { issued: !!active?.issuedAt }) : ''}
 
       <div class="notes-status-row">
-        <span class="notes-pill ${active ? 'ready' : 'idle'}">
+        <span class="notes-pill ${notice ? 'error' : active ? 'ready' : 'idle'}" id="notes-status-pill">
           <span aria-hidden="true">●</span>
-          ${active ? escapeHtml(T('onDevice')) : escapeHtml(T('msgNoMeeting'))}
+          ${notice ? escapeHtml(notice) : active ? escapeHtml(T('onDevice')) : escapeHtml(T('msgNoMeeting'))}
         </span>
         <span class="notes-meta">${escapeHtml(backendName())}</span>
       </div>
@@ -219,6 +226,24 @@ export async function mountNotesPanel(root, { getCapture, onEndCapture } = {}) {
     clearInterval(root.__notesTick);
     root.__notesTick = null;
   }
+  if (root.__notesNoticeTimer) {
+    clearTimeout(root.__notesNoticeTimer);
+    root.__notesNoticeTimer = null;
+  }
+
+  // Panel ini tidak punya toast. Alasan sebuah tanda ditolak muncul beberapa
+  // detik di baris status yang sudah ada — gagal diam-diam itu bug, bukan gaya.
+  let notice = null;
+  const say = (msg) => {
+    notice = msg;
+    redraw();
+    clearTimeout(root.__notesNoticeTimer);
+    root.__notesNoticeTimer = setTimeout(() => {
+      notice = null;
+      root.__notesNoticeTimer = null;
+      redraw();
+    }, NOTICE_MS);
+  };
 
   const readCapture = () => {
     if (!getCapture) return null;
@@ -232,6 +257,11 @@ export async function mountNotesPanel(root, { getCapture, onEndCapture } = {}) {
     const t0 = elapsedSeconds(cap);
     const tc = toTimecode(t0);
     let meeting = meetings.find((m) => m.id === activeId) || null;
+    if (meeting?.issuedAt) {
+      // Notulen terbit itu beku (assertEditable). Katakan kenapa, jangan diam.
+      say(T('flagRefusedIssued'));
+      return;
+    }
     if (!meeting) {
       meeting = await saveMeeting(
         createMeeting({
@@ -244,8 +274,8 @@ export async function mountNotesPanel(root, { getCapture, onEndCapture } = {}) {
     try {
       await flagMomentAndSave(meeting, { tc, t0, text: T('flaggedAt', tc) });
     } catch (e) {
-      // Notulen terbit itu beku (assertEditable) — tanda tidak boleh menyelinap masuk.
       console.warn('[notes] flagMoment:', e?.message || e);
+      say(e?.code === 'issued' ? T('flagRefusedIssued') : String(e?.message || e));
       return;
     }
     meetings = await listMeetings();
@@ -262,6 +292,7 @@ export async function mountNotesPanel(root, { getCapture, onEndCapture } = {}) {
         lang,
         T,
         capture: readCapture(),
+        notice,
       },
       {
         onOpenRegister: openRegister,

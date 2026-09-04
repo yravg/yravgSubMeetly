@@ -158,7 +158,10 @@ tell in 30 seconds where things stand without reading the whole spec.
   (`T('flaggedAt', tc)`) — the actions layer knows no i18n. With no meeting
   in the store yet, the ticker creates one (`T('untitledMeeting')`, today's
   date, the UI locale) and flags that. Disabled with `T('flagNeedsRecording')`
-  when nothing is running.
+  when nothing is running, and disabled with `T('flagRefusedIssued')` when the
+  selected meeting is already issued — a refusal also surfaces for a few
+  seconds in the panel's existing status pill, because the panel has no toast
+  and a silent no-op is a bug.
 
 ## Not done yet — later phases (see spec §7 roadmap)
 
@@ -211,6 +214,15 @@ Nothing below is wired up. Don't assume it exists when reading other files.
 - **Side panel: Pause** — the SidePanel artboard draws a Pause button beside
   "End & draft"; the capture pipeline has no pause (start/stop only), so the
   rail ships without it rather than with a dead control. Phase 2.1.
+- **Side panel: a flag is not bound to a capture session** — nothing ties a
+  running capture to a meeting. A flag therefore lands on whichever meeting is
+  currently selected in the panel, carrying a timecode measured from the live
+  capture's own clock (`state.startedAt`), which may have nothing to do with
+  that meeting's recording. This is deliberate for Phase 2.0 — the panel
+  refuses to flag an issued MoM and says why, but it cannot know whether the
+  selected meeting is the one being recorded. Binding a capture session to a
+  meeting (and with it a single shared timecode clock, so `src.t0` means the
+  same thing for flags and extracted items) is Phase 2.1.
 - **Side panel: "End & draft" only ends** — it stops the running task through
   the existing `onStop()` path and opens the register. Actually *drafting* a
   register from the live transcript (running the extractor over what was just

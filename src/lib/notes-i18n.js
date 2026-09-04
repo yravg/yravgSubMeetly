@@ -195,6 +195,7 @@ const en = {
   endAndDraft: 'End & draft',
   flagMoment: 'Flag this moment',
   flagNeedsRecording: 'Start a capture task first — a flag is a timecode, and there is no clock yet.',
+  flagRefusedIssued: 'This MoM is issued — flags go to an amendment or the next meeting',
   flaggedAt: (tc) => `Flagged at ${tc} — review this moment`,
   untitledMeeting: 'Untitled meeting',
 };
@@ -367,6 +368,7 @@ const id = {
   endAndDraft: 'Akhiri & buat draf',
   flagMoment: 'Tandai momen ini',
   flagNeedsRecording: 'Mulai tugas perekaman dulu — tanda itu sebuah timecode, dan jamnya belum berjalan.',
+  flagRefusedIssued: 'Notulen ini sudah terbit — tanda masuk lewat amandemen atau rapat berikutnya',
   flaggedAt: (tc) => `Ditandai pada ${tc} — tinjau momen ini`,
   untitledMeeting: 'Rapat tanpa judul',
 };

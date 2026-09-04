@@ -1367,6 +1367,8 @@ function wire() {
   // dan ada tugas tangkap yang berjalan; tombolnya sendiri yang menyimpan,
   // jadi pintasan ini cukup menekannya (satu jalur, satu aturan).
   document.addEventListener('keydown', (e) => {
+    // Tahan tombol ≠ banjir tanda: satu tekan, satu tanda.
+    if (e.repeat || e.isComposing) return;
     const mod = /^Mac/i.test(navigator.platform || '') ? e.metaKey : e.ctrlKey;
     if (!mod || !e.shiftKey || e.altKey || (e.key || '').toLowerCase() !== 'f') return;
     if (state.view !== 'notes' || !getCapture().running) return;

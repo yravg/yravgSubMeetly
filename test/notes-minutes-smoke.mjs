@@ -229,7 +229,9 @@ test('notes-panel.js: the live-capture rail clocks a running task and flags the 
   // running or `node --test` never exits.
   t.after(() => {
     if (root.__notesTick) clearInterval(root.__notesTick);
+    if (root.__notesNoticeTimer) clearTimeout(root.__notesNoticeTimer);
     root.__notesTick = null;
+    root.__notesNoticeTimer = null;
   });
   const capture = { running: true, startedAt: Date.now() - 65000, engine: 'MLX · GPU' };
   await mountNotesPanel(root, { getCapture: () => capture, onEndCapture: () => {} });
@@ -293,6 +295,34 @@ test('notes-panel.js: the live-capture rail clocks a running task and flags the 
   const first = root.__notesTick;
   await mountNotesPanel(root, { getCapture: () => capture });
   assert.notEqual(root.__notesTick, first, 'the old interval is replaced, not stacked');
+
+  // An ISSUED MoM is frozen: the flag button says so instead of failing
+  // silently when the shortcut lands on it.
+  const { saveMeeting: save, listMeetings: list } = await import(path.join(srcDir, 'lib', 'notes-store.js') + '?rail-test');
+  const A = await import(path.join(srcDir, 'lib', 'notes-actions.js') + '?rail-test');
+  const live = (await list())[0];
+  await save(A.issueMeeting(live, { force: true }));
+  capture.running = true;
+  await mountNotesPanel(root, { getCapture: () => capture, onEndCapture: () => {} });
+  const frozen = root.querySelector('#btn-flag-moment');
+  assert.equal(frozen.disabled, true, 'a running capture cannot flag an issued MoM');
+  assert.match(frozen.getAttribute('title') || '', /issued/, 'and the tooltip says why');
+  assert.equal(root.querySelector('#btn-end-draft').disabled, false, 'ending the capture is still allowed');
+
+  // The refusal is spoken, not swallowed: the shortcut path calls the handler
+  // directly (the button is disabled, so a click never fires).
+  const itemsBefore = (await list())[0].items.length;
+  const btn = root.querySelector('#btn-flag-moment');
+  btn.disabled = false; // the shortcut path, as if the button had been reachable
+  btn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  const noticeDeadline = Date.now() + 2000;
+  while (!/issued/.test(root.querySelector('#notes-status-pill')?.textContent || '') && Date.now() < noticeDeadline) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.match(root.querySelector('#notes-status-pill')?.textContent || '', /issued/,
+    'the refusal shows up in the status row instead of only the console');
+  assert.ok(root.querySelector('#notes-status-pill').classList.contains('error'));
+  assert.equal((await list())[0].items.length, itemsBefore, 'and nothing was written to the frozen MoM');
 });
 
 test('notes-panel.js: compact ticker mounts and reflects the register', async (t) => {
