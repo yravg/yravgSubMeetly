@@ -42,3 +42,6 @@ __pycache__/
 *.pyc
 .e2e-file-profile/
 .superpowers/
+
+# Potongan ringkasan per-slice dari subagen (digabung ke summaries.json)
+.ngodingpakeai/summaries.part-*.json

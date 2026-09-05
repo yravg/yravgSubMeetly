@@ -10,31 +10,20 @@
 
 ## Posisi sekarang
 
-**Semua task plan `done` (`task next` → done: true).** Final `sync` BELUM dijalankan — 602 berkas butuh
-ringkasan dan langkah itu menutup siklus + membangun ulang wiki; jalankan hanya atas persetujuan pengguna.
+**Plan selesai: semua task `done` (`task next` → done: true), gate rilis CLEAR.**
+Keputusan pengguna 2026-09-05 (a): E2E `--native` dan `e2e-file --browser` yang gagal konsisten
+(`Runtime.callFunctionOn timed out`, renderer panel tak merespons CDP) **diterima sebagai residual CWS**
+di `scripts/mark-release-priorities.mjs` (`E2E-e2e-native*`, `E2E-e2e-file*`) dengan alasan yang sama
+seperti REL-03/REL-04: helper bukan artefak store, jalur `--browser` opsional. Penyebab renderer tetap
+dilacak — langkah diagnosis di bagian Verifikasi. Jangan menghapus `test/last-e2e.json` untuk
+"membersihkan" gate.
 
-**Gate rilis: CLEAR** (pengguna memilih opsi (a) — residual E2E diterima di `mark-release-priorities.mjs`). Riwayat keputusan: Sampai hari ini gate CLEAR karena `e2e --native` dan `e2e-file --browser`
-tidak pernah dijalankan (REL-03/REL-04 = residual `accepted`). Hari ini keduanya dijalankan dan **gagal
-konsisten** dengan `Runtime.callFunctionOn timed out` (renderer halaman panel tak merespons CDP; realtime
-browser lulus di jalur yang sama). `gen-defects` menandai suite E2E yang gagal sebagai must-fix otomatis
-(`E2E-e2e-native*`, `E2E-e2e-file*`). Keputusan yang menunggu pengguna:
-(a) menerima keduanya sebagai residual CWS dengan alasan yang sama seperti REL-03/04 — konsisten dengan
-kebijakan sebelumnya, gate kembali CLEAR — atau (b) menahan rilis sampai penyebab renderer ditemukan
-(langkah diagnosis ada di bagian Verifikasi). Jangan menghapus `test/last-e2e.json` untuk "membersihkan" gate.
+**Final `sync` NgodingPakeAI** menutup siklus + membangun ulang wiki. Ringkasan ditulis per slice oleh
+subagen ke `.ngodingpakeai/summaries.part-*.json` lalu digabung ke `summaries.json` sebelum `sync`.
+Statusnya dicatat di bagian Verifikasi (baris "Sync").
 
-**Fase 5/5 selesai kecuali 1 task yang ditunda.** Semua task plan `done`, kecuali panduan
-Windows/Linux (`doing` = penanda "lanjut nanti"). `task next` masih mengembalikan task itu;
-jangan jalankan final `sync` sampai pengguna memutuskan nasibnya.
-
-**Task Windows/Linux (`1c23b894-…`) berstatus `failed` atas permintaan pengguna.**
-Panduannya SUDAH ditulis (`docs/USER-GUIDE-WINLINUX.md`, tersaji di `guide.html`) dan
-diverifikasi dari isi; yang belum: eksekusi nyata di mesin Windows. Status `failed` TIDAK
-menyelesaikan slice frontend, sehingga 23 task layer backend Fase 5 tetap terkunci dan
-`task next` terus mengembalikan task ini. Jalan keluar: pengguna menyetujui `task complete`
-(deliverable ada, caveat tercatat) atau menanganinya di web UI. Jangan `reset`/`complete`
-tanpa persetujuan pengguna.
-
-Fase 4 layer backend (halaman Dukungan Windows Linux) sudah selesai seluruhnya.
+**Task Windows/Linux (`1c23b894-…`)** dipindahkan pengguna lewat web UI sehingga layer backend terbuka;
+panduannya ada di `docs/USER-GUIDE-WINLINUX.md` (diverifikasi dari isi; belum pernah dieksekusi di Windows).
 
 ## Selesai di sesi ini
 
@@ -155,7 +144,10 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 
 ## Verifikasi
 
-- `npm test` → **221/221 lulus** (termasuk sample-library 9, learning 19, register-extras 5, mini-markdown 11).
+- **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
+  `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
+  https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
+- `npm test` → **242/242 lulus** (satu suite Puppeteer flaky hanya saat dijalankan bersamaan dengan beban lain) (termasuk sample-library 9, learning 19, register-extras 5, mini-markdown 11).
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
 - `npm run e2e` → PASS (headed, Chrome for Testing). `npm run release:gate` → CLEAR.
 - `npm run smoke -- --crossos` → 26/26 Fase 1 + 9/9 lintas-OS.

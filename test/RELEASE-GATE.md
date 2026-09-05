@@ -1,6 +1,6 @@
 # Gerbang rilis — Chrome Web Store 1.1
 
-Dibuat oleh `scripts/mark-release-priorities.mjs` pada 2026-09-05T15:49:56.935Z.
+Dibuat oleh `scripts/mark-release-priorities.mjs` pada 2026-09-05T16:35:34.787Z.
 
 **Status: LOLOS GERBANG** — tidak ada cacat wajib terbuka untuk ship CWS.
 
