@@ -39,7 +39,7 @@
         mode: 'offline',
         title: 'Demo meeting — Local TransSub',
         url: '',
-        srcLang: 'ja',
+        srcLang: 'zh',
         tgtLang: 'en',
         lines: [
           { t0: 0, t1: 3.2, text: 'こんにちは', translation: 'Hello' },

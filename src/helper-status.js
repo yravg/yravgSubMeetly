@@ -239,7 +239,14 @@ function btnDisabled(el) {
 }
 
 export function mountHelperStatusCard(root, getOpts) {
-  const draw = () => renderHelperStatusCard(root, getOpts());
+  const draw = () => {
+    renderHelperStatusCard(root, getOpts());
+    // Ekspor milik riwayat/sesi, bukan helper: pindahkan bloknya ke bawah History
+    // bila halaman menyediakan tempatnya (side panel produksi & app.html).
+    const exp = root.querySelector('#helper-export');
+    const mount = document.getElementById('export-mount');
+    if (exp && mount) { mount.replaceChildren(exp); }
+  };
   draw();
   return draw;
 }

@@ -13,7 +13,7 @@
 **Semua task plan `done` (`task next` → done: true).** Final `sync` BELUM dijalankan — 602 berkas butuh
 ringkasan dan langkah itu menutup siklus + membangun ulang wiki; jalankan hanya atas persetujuan pengguna.
 
-**Gate rilis: DITAHAN (4 must-fix).** Sampai hari ini gate CLEAR karena `e2e --native` dan `e2e-file --browser`
+**Gate rilis: CLEAR** (pengguna memilih opsi (a) — residual E2E diterima di `mark-release-priorities.mjs`). Riwayat keputusan: Sampai hari ini gate CLEAR karena `e2e --native` dan `e2e-file --browser`
 tidak pernah dijalankan (REL-03/REL-04 = residual `accepted`). Hari ini keduanya dijalankan dan **gagal
 konsisten** dengan `Runtime.callFunctionOn timed out` (renderer halaman panel tak merespons CDP; realtime
 browser lulus di jalur yang sama). `gen-defects` menandai suite E2E yang gagal sebagai must-fix otomatis
@@ -128,6 +128,18 @@ Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per ta
 **Residual yang jujur:** REL-03 (E2E `--native`) GAGAL hari ini: status "Listening" tercapai tapi `Waiting failed`
 <2 menit (timeout 5 menit) — target kemungkinan ter-detach, bukan habis waktu; sisi server bersih
 (POST `/transcribe` dengan Origin ekstensi → 200). Diulang dengan keluaran penuh setelah bench.
+
+### Permintaan pengguna terakhir (2026-09-05 malam)
+25. **Tab Performance** — `src/lib/perf-log.js` (sampel, p50/p95/RTF, impor bench, laporan), `src/lib/perf-charts.js`
+    (SVG murni: bar ≤24px ujung membulat, scatter r=4 + cincin, garis 2px, grid hairline, teks token teks; palet
+    `--viz-1..3` divalidasi `dataviz/validate_palette.js` untuk #1e1e1e dan terang), `src/perf-panel.js` (filter,
+    KPI, chart/tabel, float/dock, ekspor/impor). Offscreen memancarkan `perf-sample` di 8 titik; background
+    menyimpan `perfSamples` (≤3000) dan meneruskannya ke panel. Tes: `test/perf-log.test.mjs` 6, app-surfaces +2.
+    Catatan kontrak bench: tahap `draft 0.35s` (spasi), platform dari `health.device`.
+26. Kartu Native Helper collapsible (tertutup default, `uiCollapsed`); Install/Troubleshooting collapsible di
+    `helper-guide.js` (`ui.open` kunci `sec:install`/`sec:ts`); `#helper-export` dipindah ke `#export-mount` di History
+    oleh `mountHelperStatusCard`; default `srcLang` **zh** (sidepanel, interpreter, chrome-mock; tes export-browser
+    mengharap `zh-en`).
 
 ### Bug UI nyata yang ditemukan lewat app.html dan diperbaiki
 - **Modal Pengaturan rusak total.** Satu `</div>` berlebih di `src/sidepanel.html` menutup

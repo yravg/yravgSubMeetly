@@ -1097,3 +1097,74 @@ body.is-running .bottom-nav-item[data-view='captions'] .label::after {
 .paste-result { margin-top: var(--space-2); font-size: var(--text-xs); color: var(--muted); }
 .paste-result .ok { color: var(--accent); }
 .paste-result .err { color: var(--danger); }
+
+
+/* ==========================================================================
+   Sub-tab Captions (Live | Performance), kartu collapsible, tab Performance
+   ========================================================================== */
+.subtabs { display: inline-flex; gap: 2px; margin: 0 0 10px; padding: 2px; border-radius: var(--radius-full, 999px); background: var(--card2, #262626); border: 1px solid var(--border, #333); }
+.subtabs button { border: 0; background: none; color: var(--muted, #b4b4b4); font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+.subtabs button.active { background: var(--accent, #14b789); color: var(--on-accent, #fff); font-weight: 600; }
+
+.card.collapsible .card-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.card.collapsible .card-toggle h2 { margin: 0; }
+.card.collapsible .card-chevron { display: inline-block; font-size: 20px; line-height: 1; color: var(--muted, #b4b4b4); transform: rotate(90deg); transition: transform var(--transition-fast, 0.15s); }
+.card.collapsible.collapsed .card-chevron { transform: rotate(0deg); }
+.card.collapsible.collapsed > :not(.card-head) { display: none; }
+/* Bagian panduan helper: Install steps / Troubleshooting tertutup default */
+.hg-collapsible .hg-sec-head { cursor: pointer; }
+.hg-collapsible .hg-sec-head h3::before { content: '›'; display: inline-block; margin-right: 6px; color: var(--muted, #b4b4b4); transform: rotate(90deg); transition: transform var(--transition-fast, 0.15s); }
+.hg-collapsible.collapsed .hg-sec-head h3::before { transform: rotate(0deg); }
+.hg-collapsible.collapsed > :not(.notes-block-head) { display: none; }
+
+/* Palet chart — 3 seri kategorikal tervalidasi (dataviz validate_palette: PASS gelap & terang) */
+:root { --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-seq: var(--accent, #14b789); --viz-grid: var(--border, #333); --viz-text: var(--muted, #b4b4b4); --viz-surface: var(--card, #1f1f1f); }
+:root[data-theme='light'], body.light { --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; }
+.viz { display: block; max-width: 100%; }
+.viz-grid, .viz-axis { stroke: var(--viz-grid); stroke-width: 1; shape-rendering: crispEdges; }
+.viz-target { stroke: var(--warn-text, #e0b05c); stroke-width: 1; }
+.viz-tick, .viz-label, .viz-value, .viz-empty { fill: var(--viz-text); font-size: 11px; font-family: inherit; }
+.viz-label { fill: var(--text, #f5f5f5); }
+.viz-bar { fill: var(--viz-seq); }
+.viz-bar-other { fill: var(--muted, #8a8a8a); }
+.viz-dot { stroke: var(--viz-surface); stroke-width: 2; }
+.viz-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.viz-s1 { fill: var(--viz-1); stroke: var(--viz-1); } .viz-s2 { fill: var(--viz-2); stroke: var(--viz-2); } .viz-s3 { fill: var(--viz-3); stroke: var(--viz-3); }
+.viz-line.viz-s1, .viz-line.viz-s2, .viz-line.viz-s3 { fill: none; }
+.viz-dot.viz-s1, .viz-dot.viz-s2, .viz-dot.viz-s3 { stroke: var(--viz-surface); }
+.viz-hit { cursor: default; }
+.viz-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11.5px; color: var(--muted, #b4b4b4); margin: 2px 0 6px; }
+.viz-key i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; border-radius: 1px; }
+.perf-series .perf-chip i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+#view-perf { position: relative; }
+.perf-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.perf-title { font-size: 15px; margin: 0 0 2px; }
+.perf-sub { margin: 0; font-size: 12px; color: var(--muted, #b4b4b4); line-height: 1.45; }
+.perf-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+.perf-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0 10px; font-size: 11.5px; color: var(--muted, #b4b4b4); }
+.perf-filters label { display: inline-flex; align-items: center; gap: 6px; }
+.perf-filters select { font: inherit; font-size: 12px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border, #333); background: var(--card3, #2c2c2c); color: var(--text, #f5f5f5); }
+.perf-series { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.perf-chip { font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border, #333); background: var(--card3, #2c2c2c); color: var(--text, #f5f5f5); cursor: pointer; }
+.perf-chip.off { opacity: 0.45; }
+.perf-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.perf-kpi { background: var(--card2, #262626); border: 1px solid var(--border, #333); border-radius: 10px; padding: 8px 10px; }
+.perf-kpi-v { display: block; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.perf-kpi-l { display: block; font-size: 11px; color: var(--muted, #b4b4b4); }
+.perf-chart { background: var(--card2, #262626); border: 1px solid var(--border, #333); border-radius: 12px; padding: 10px 12px 6px; margin-bottom: 10px; }
+.perf-chart h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 6px; }
+.perf-table-wrap { overflow-x: auto; }
+.perf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.perf-table th, .perf-table td { border-bottom: 1px solid var(--border, #333); padding: 5px 8px; text-align: left; }
+.perf-table th { color: var(--muted, #b4b4b4); font-weight: 600; }
+.perf-table td:nth-child(n+5) { text-align: right; font-variant-numeric: tabular-nums; }
+.perf-empty { color: var(--muted, #b4b4b4); font-size: 12.5px; padding: 18px 0; }
+.perf-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.perf-import { cursor: pointer; }
+.perf-tip { position: absolute; z-index: var(--z-tooltip, 60); pointer-events: none; background: var(--card3, #2c2c2c); border: 1px solid var(--border, #333); border-radius: 8px; padding: 5px 9px; font-size: 11.5px; color: var(--text, #f5f5f5); box-shadow: var(--shadow-md, 0 6px 20px rgba(0,0,0,.4)); max-width: 220px; }
+
+.perf-win { position: fixed; z-index: var(--z-modal, 70); width: min(620px, 94vw); max-height: 80vh; display: flex; flex-direction: column; background: var(--card, #1f1f1f); border: 1px solid var(--border, #333); border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 60px rgba(0,0,0,.55)); }
+.perf-win-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border, #333); cursor: move; user-select: none; font-size: 13px; font-weight: 600; }
+.perf-win-head .spacer { flex: 1; }
+.perf-win-body { position: relative; padding: 10px 12px; overflow: auto; }

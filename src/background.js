@@ -543,6 +543,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
 
+      case 'perf-sample': {
+        // Sampel waktu ASR/MT dari offscreen: teruskan ke panel dan simpan lokal
+        // (dibatasi) supaya tab Performance bisa membandingkan mesin/bahasa antar sesi.
+        const d = msg.data || {};
+        toPanel('perf-sample', d);
+        void (async () => {
+          try {
+            const { perfSamples = [] } = await chrome.storage.local.get('perfSamples');
+            perfSamples.push(d);
+            if (perfSamples.length > 3000) perfSamples.splice(0, perfSamples.length - 3000);
+            await chrome.storage.local.set({ perfSamples });
+          } catch (e) {
+            console.warn('perf-sample store', e);
+          }
+        })();
+        break;
+      }
+
       case 'subtitle': {
         const d = msg.data;
         const dualLine = session.config?.dualLine ?? false;

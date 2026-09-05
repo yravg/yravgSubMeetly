@@ -122,8 +122,8 @@ export function renderHelperGuide(root, opts = {}, ui = {}) {
         </ul>
       </div>
 
-      <div class="notes-block hg-install">
-        <div class="notes-block-head">
+      <div class="notes-block hg-install hg-collapsible${ui.open.has('sec:install') ? '' : ' collapsed'}">
+        <div class="notes-block-head hg-sec-head" data-sec="install" role="button" tabindex="0" aria-expanded="${ui.open.has('sec:install')}">
           <h3>${esc(G('steps'))}</h3>
           <div class="seg hg-os-tabs" role="tablist" aria-label="${esc(G('tabs'))}">
             ${GUIDE_OS_ORDER.map(
@@ -164,8 +164,8 @@ export function renderHelperGuide(root, opts = {}, ui = {}) {
         </details>
       </div>
 
-      <div class="notes-block hg-ts">
-        <div class="notes-block-head">
+      <div class="notes-block hg-ts hg-collapsible${ui.open.has('sec:ts') ? '' : ' collapsed'}">
+        <div class="notes-block-head hg-sec-head" data-sec="ts" role="button" tabindex="0" aria-expanded="${ui.open.has('sec:ts')}">
           <h3>${esc(G('troubleshooting'))}</h3>
           <span class="notes-meta">${tips.length}</span>
         </div>
@@ -224,6 +224,19 @@ export function renderHelperGuide(root, opts = {}, ui = {}) {
         b.classList.remove('copied');
       }, 1400);
     });
+  });
+
+  // Install steps & Troubleshooting tertutup secara bawaan — panel ini dibuka orang
+  // yang ingin status, bukan tutorial; klik judulnya untuk membuka.
+  root.querySelectorAll('.hg-sec-head[data-sec]').forEach((head) => {
+    const toggle = (e) => {
+      if (e.target.closest('button, a, [role="tab"]')) return; // tab OS / tombol di kepala
+      const key = `sec:${head.dataset.sec}`;
+      if (ui.open.has(key)) ui.open.delete(key); else ui.open.add(key);
+      renderHelperGuide(root, opts, ui);
+    };
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); } });
   });
 
   root.querySelector('#hg-recheck')?.addEventListener('click', () => {

@@ -57,11 +57,36 @@ Subtitel muncul sebagai overlay di halaman dan sebagai baris transkrip di panel.
 
 Untuk percakapan dua bahasa, tekan **Change** di baris *Interpreter mode*:
 
-- **One-way** — satu arah tetap, misalnya JA → EN.
+- **One-way** — satu arah tetap; bawaan **ZH → EN** (Chinese → English).
 - **Two-way** — mengenali kedua bahasa bergantian dan menerjemahkan ke lawan
   bicaranya, seperti juru bahasa konsekutif.
 
 Arah tiap baris ikut tercatat, jadi ekspor dan notulen tetap benar.
+
+---
+
+## Tab Performance (analitik kecepatan)
+
+Di atas kartu-kartu Captions ada dua *child tab*: **Live** dan **Performance**.
+Performance mencatat waktu tiap langkah pipeline secara otomatis — pengenalan
+(ASR), draft helper, terjemahan (MT), refine — beserta mesin (helper native,
+browser WebGPU, browser WASM), platform, pasangan bahasa, dan durasi audio.
+
+- **KPI:** p50 ASR, p50 MT, RTF (waktu proses ÷ durasi audio; < 1 lebih cepat
+  dari realtime), jumlah sampel.
+- **Grafik:** p50 per pasangan bahasa (bar, dengan garis target 500 ms), latensi
+  vs durasi audio (scatter per mesin), latensi sepanjang sampel (garis per mesin).
+  Arahkan kursor ke tanda untuk nilai persisnya; tombol **Table** menampilkan
+  angka yang sama sebagai tabel.
+- **Filter:** tahap, pasangan bahasa, sumber (perangkat ini / bench lab / impor),
+  dan chip mesin.
+- **Float** melepaskan panel menjadi jendela mengapung yang bisa digeser (posisi
+  diingat); **Dock** mengembalikannya.
+- **Export report (JSON/Markdown)** menghasilkan laporan yang bisa Anda bagikan —
+  misalnya untuk melaporkan kecepatan di Windows/Linux — dan **Import** membaca
+  laporan dari mesin lain atau keluaran `scripts/bench-lab.py` untuk dibandingkan.
+
+Semua sampel tersimpan lokal (`perfSamples`, maksimal 3000) dan bisa dihapus.
 
 ---
 
@@ -80,7 +105,7 @@ diproses per jendela, jadi pemakaian memori tetap datar.
 
 ## Ekspor
 
-Kartu **Export** membuat berkas dari transkrip sesi:
+Blok **Export subtitles** (di bawah kartu **History**) membuat berkas dari transkrip sesi:
 
 | Format | Untuk apa |
 | --- | --- |
@@ -162,6 +187,8 @@ Helper lokal di `127.0.0.1:17865` memberi ASR lebih cepat, berkas besar, dan
 terjemahan LLM lokal. Tanpa helper, ekstensi tetap jalan penuh di browser.
 
 - Nyalakan lewat kartu **Native Helper** di Side Panel (**Start / Stop / Restart**).
+- Kartu itu **terlipat secara bawaan** — klik judulnya untuk membuka; Install steps dan
+  Troubleshooting di dalamnya juga terlipat sampai diklik.
 - Kartu itu menampilkan mesin, model, perangkat (CPU/GPU), dan status bridge.
 - **Panduan & diagnostik** di dalamnya memuat langkah pemasangan per sistem
   operasi dan pemeriksaan yang menunjuk langsung ke penyebab masalah.

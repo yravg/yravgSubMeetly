@@ -76,12 +76,12 @@ test('production export card uses selected realtime data and persists cross-OS o
   await page.waitForFunction(() => !document.querySelector('#helper-export [data-export-kind="srt"]').disabled);
 
   const preview = await page.$eval('#helper-export-name-hint', (el) => el.textContent);
-  assert.match(preview, /Lab_demo_looping_speech\.ja-en\.srt/);
+  assert.match(preview, /Lab_demo_looping_speech\.zh-en\.srt/);
 
   await page.click('#helper-export [data-export-kind="vtt"]');
   await page.waitForFunction(() => window.__exportDownloads?.[0]?.text != null);
   const first = await page.evaluate(() => window.__exportDownloads[0]);
-  assert.equal(first.name, 'Lab_demo_looping_speech.ja-en.vtt');
+  assert.equal(first.name, 'Lab_demo_looping_speech.zh-en.vtt');
   assert.match(first.text, /^WEBVTT\n/);
   assert.match(first.text, /Selamat pagi\nGood morning/);
   assert.doesNotMatch(first.text, /meeting_notes_demo|Project Manager/);
@@ -104,7 +104,7 @@ test('production export card uses selected realtime data and persists cross-OS o
   await page.click('#helper-export [data-export-kind="srt"]');
   await page.waitForFunction(() => window.__exportDownloads?.[1]?.text != null);
   const second = await page.evaluate(() => window.__exportDownloads[1]);
-  assert.equal(second.name, 'Lab_demo_looping_speech.ja-en.srt');
+  assert.equal(second.name, 'Lab_demo_looping_speech.zh-en.srt');
   assert.deepEqual(second.bytes.slice(0, 3), [0xef, 0xbb, 0xbf]);
   assert.match(second.text, /\r\n/);
 

@@ -490,6 +490,51 @@ test('hasil dan ekspor TXT/SRT/VTT: baris hasil tampil, ekspor lewat normalizer 
   assert.doesNotMatch(srt, /\r\n/, 'tidak boleh CRLF di bawaan macOS/Linux');
 });
 
+test('Captions punya child tab Live/Performance; Performance memuat bench dan menggambar 3 chart', async () => {
+  await openView('captions');
+  const r = await page.evaluate(async () => {
+    const w = (ms) => new Promise((res) => setTimeout(res, ms));
+    const tabs = [...document.querySelectorAll('#captions-subtabs [data-subview]')].map((b) => b.dataset.subview);
+    document.querySelector('#captions-subtabs [data-subview="perf"]').click();
+    await w(300);
+    const perfShown = !document.getElementById('view-perf').classList.contains('hidden');
+    const cardsHidden = [...document.querySelectorAll('#view-captions > section.card')].every((c) => c.classList.contains('hidden'));
+    document.querySelector('#view-perf [data-act="load-bench"]').click();
+    await w(2500);
+    const svgs = document.querySelectorAll('#view-perf svg.viz').length;
+    const kpis = document.querelectorAll?.('#view-perf .perf-kpi-v') ?? document.querySelectorAll('#view-perf .perf-kpi-v');
+    document.querySelector('#view-perf [data-act="float"]').click();
+    await w(300);
+    const win = document.querySelector('.perf-win');
+    const floating = !!win && win.querySelectorAll('svg.viz').length === 3;
+    win?.querySelector('[data-act="dock"]').click();
+    await w(200);
+    document.querySelector('#captions-subtabs [data-subview="live"]').click();
+    await w(200);
+    return { tabs, perfShown, cardsHidden, svgs, kpis: kpis.length, floating, docked: !document.querySelector('.perf-win'), liveBack: !document.querySelector('#view-captions > section.card').classList.contains('hidden') };
+  });
+  assert.deepEqual(r.tabs, ['live', 'perf']);
+  assert.equal(r.perfShown, true); assert.equal(r.cardsHidden, true, 'kartu Live harus tersembunyi saat Performance aktif');
+  assert.equal(r.svgs, 3, 'bar + scatter + line');
+  assert.equal(r.kpis, 4);
+  assert.equal(r.floating, true, 'jendela mengapung memuat chart yang sama');
+  assert.equal(r.docked, true); assert.equal(r.liveBack, true);
+});
+
+test('kartu Native Helper terlipat secara bawaan; Export subtitles berada di bawah History; bahasa standar ZH → EN', async () => {
+  const r = await page.evaluate(() => ({
+    helperCollapsed: document.getElementById('helper-status-card').classList.contains('collapsed'),
+    helperBodyHidden: document.getElementById('helper-status-mount').offsetHeight === 0,
+    exportUnderHistory: !!document.querySelector('#export-mount #helper-export'),
+    exportInHelper: !!document.querySelector('#helper-status-mount #helper-export'),
+    srcLang: document.getElementById('src-lang')?.value,
+  }));
+  assert.equal(r.helperCollapsed, true); assert.equal(r.helperBodyHidden, true);
+  assert.equal(r.exportUnderHistory, true, 'blok ekspor harus dipindah ke kartu History');
+  assert.equal(r.exportInHelper, false);
+  assert.equal(r.srcLang, 'zh');
+});
+
 test('modal Pengaturan berisi tepat satu kartu, dan kartunya terpusat di layar', async () => {
   await page.evaluate(() => document.getElementById('btn-settings').click());
   await page.waitForFunction(() => {

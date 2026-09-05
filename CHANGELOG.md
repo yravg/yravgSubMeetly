@@ -1,6 +1,9 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Tab Performance** (child tab Captions): sampel waktu ASR/MT/draft/refine per mesin & bahasa, KPI (p50, RTF), bar/scatter/line SVG murni dengan palet 3 seri tervalidasi CVD, tabel, filter, jendela mengapung yang bisa digeser, ekspor laporan JSON/Markdown + impor laporan/bench untuk membandingkan platform
+- Kartu **Native Helper** (beserta Install steps & Troubleshooting) kini terlipat secara bawaan; **Export subtitles** dipindah ke bawah History; bahasa standar **ZH → EN**
+- Gate rilis: E2E `--native`/`--browser` yang gagal karena renderer tak merespons CDP diterima sebagai residual CWS (keputusan 2026-09-05), sejalan dengan REL-03/04
 - **Notulen:** tipe proyek per rapat (14 nilai) dipilih saat merekam, difilter/dikelompokkan di register, tampil di ekspor; "End & draft" kini menyusun draf dari baris transkrip sesi (sebelumnya hanya berhenti & membuka register)
 - **Pustaka contoh:** 214 transkrip deterministik dari 13 bidang, 26 seri mingguan dengan butir yang dibawa ke minggu berikutnya; impor per seri lewat pipeline notulen asli
 - **Training & gamifikasi** ala DCS_DocConSystem: XP/level/achievement/rentetan, tur Watch/Practise dengan sorotan, kuis dari rapat aktif — panel Library + Training di Minutes Register

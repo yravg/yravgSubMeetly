@@ -37,6 +37,7 @@ import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
+import { mountPerfPanel } from './perf-panel.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
 import { detectOs } from './lib/helper-status.js';
@@ -52,7 +53,7 @@ const state = {
   mode: 'realtime', // 'realtime' | 'offline'
   task: 'translate', // 'transcribe' | 'translate'
   view: 'captions', // 'captions' | 'notes'
-  srcLang: 'ja',
+  srcLang: 'zh',
   tgtLang: 'en',
   settings: {
     uiLang: 'en',
@@ -413,6 +414,41 @@ async function exportActiveNotes(kind) {
     setStatus(msg, 'error');
     showToast(msg, 'error');
   }
+}
+
+/** Child tab dari Captions: 'live' (kartu) atau 'perf' (analitik kecepatan). */
+let perfPanel = null;
+function setSubview(sub) {
+  const perf = sub === 'perf';
+  document.querySelectorAll('#captions-subtabs [data-subview]').forEach((b) => {
+    const on = b.dataset.subview === (perf ? 'perf' : 'live');
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
+  });
+  document.querySelectorAll('#view-captions > section.card').forEach((sec) => sec.classList.toggle('hidden', perf));
+  $('view-perf')?.classList.toggle('hidden', !perf);
+  if (perf) perfPanel?.render();
+  try { localStorage.setItem('captionsSubview', perf ? 'perf' : 'live'); } catch { /* opsional */ }
+}
+
+/** Kartu yang bisa dilipat (Native Helper) — tertutup default, status diingat. */
+function initCollapsibles() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('uiCollapsed') || '{}'); } catch { saved = {}; }
+  document.querySelectorAll('.card.collapsible[data-collapse-key]').forEach((card) => {
+    const key = card.dataset.collapseKey;
+    const open = saved[key] === true; // bawaan: tertutup
+    card.classList.toggle('collapsed', !open);
+    const btn = card.querySelector('.card-toggle');
+    btn?.setAttribute('aria-expanded', String(open));
+    btn?.addEventListener('click', () => {
+      const nowOpen = card.classList.contains('collapsed');
+      card.classList.toggle('collapsed', !nowOpen);
+      btn.setAttribute('aria-expanded', String(nowOpen));
+      saved[key] = nowOpen;
+      try { localStorage.setItem('uiCollapsed', JSON.stringify(saved)); } catch { /* opsional */ }
+    });
+  });
 }
 
 function setView(view) {
@@ -2190,6 +2226,9 @@ chrome.runtime.onMessage.addListener((msg) => {
     case 'subtitle':
       pushLive(msg.data);
       break;
+    case 'perf-sample':
+      perfPanel?.push(msg.data);
+      break;
     case 'pipeline-status': {
       const s = msg.data?.state;
       if (s === 'loading') setStatus(t('loadingModels'));
@@ -2500,7 +2539,7 @@ function populateMockData() {
       mode: 'offline',
       title: 'Product Demo Recording',
       url: '',
-      srcLang: 'ja',
+      srcLang: 'zh',
       tgtLang: 'en',
       lines: [
         { t0: 0, t1: 3.5, src: 'こんにちは、皆さん', tgt: 'Hello everyone' },
@@ -2583,6 +2622,16 @@ async function init() {
   }
   const helperMount = $('helper-status-mount');
   if (helperMount) {
+    perfPanel = mountPerfPanel($('view-perf'), {
+      lang: () => (state.settings.uiLang === 'id' ? 'id' : 'en'),
+      toast: (m) => showToast(m, 'ok'),
+    });
+    document.querySelectorAll('#captions-subtabs [data-subview]').forEach((b) =>
+      b.addEventListener('click', () => setSubview(b.dataset.subview)),
+    );
+    initCollapsibles();
+    try { if (localStorage.getItem('captionsSubview') === 'perf') setSubview('perf'); } catch { /* opsional */ }
+
     redrawHelperStatus = mountHelperStatusCard(helperMount, () => ({
       online: !!nativeInfo,
       health: nativeInfo,

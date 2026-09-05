@@ -25,6 +25,12 @@
 
     <main>
       <div id="view-captions" class="view-panel">
+      <!-- Child tabs of Captions: Live (kartu-kartu di bawah) dan Performance (analitik kecepatan). -->
+      <div class="subtabs" id="captions-subtabs" role="tablist" aria-label="Captions views">
+        <button type="button" role="tab" data-subview="live" class="active" aria-selected="true">Live</button>
+        <button type="button" role="tab" data-subview="perf" aria-selected="false">Performance</button>
+      </div>
+      <div id="view-perf" class="hidden"></div>
       <!-- ============ Group 1: Source ============ -->
       <section class="card reveal" aria-labelledby="src-group-title">
         <div class="card-head reveal reveal-delay-1">
@@ -168,12 +174,17 @@
         <div id="history-list" class="history reveal reveal-delay-3">
           <div class="empty" data-i18n="noHistory">No history yet</div>
         </div>
+        <!-- Blok "Export subtitles" dirender helper-status.js lalu dipindah ke sini (dekat riwayat yang diekspor). -->
+        <div id="export-mount" class="reveal reveal-delay-3"></div>
       </section>
 
       <!-- ============ Native helper status (Win/Linux/mac) ============ -->
-      <section class="card reveal reveal-delay-1" id="helper-status-card">
+      <section class="card reveal reveal-delay-1 collapsible collapsed" id="helper-status-card" data-collapse-key="helper">
         <div class="card-head reveal reveal-delay-2">
-          <h2>🖥️ Native Helper</h2>
+          <button type="button" class="card-toggle" id="helper-card-toggle" aria-expanded="false" aria-controls="helper-status-mount">
+            <h2>🖥️ Native Helper</h2>
+            <span class="card-chevron" aria-hidden="true">›</span>
+          </button>
         </div>
         <div id="helper-status-mount" class="reveal reveal-delay-3"></div>
         <div id="helper-guide-mount" class="reveal reveal-delay-4"></div>

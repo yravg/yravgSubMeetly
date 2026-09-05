@@ -33,6 +33,38 @@ function engineOpts() {
 }
 
 // ---------------------------------------------------------------------------
+// Sampel kinerja untuk tab Performance: satu baris per tahap (asr/mt/draft/refine)
+// dengan mesin, perangkat, platform, pasangan bahasa, durasi audio, dan panjang teks.
+// Dikirim ke background (disimpan + diteruskan ke panel). Tidak pernah melempar.
+function perfPlatform() {
+  const p = (navigator.userAgentData?.platform || navigator.platform || '').toLowerCase();
+  if (p.includes('mac')) return 'macos';
+  if (p.includes('win')) return 'windows';
+  if (p.includes('linux')) return 'linux';
+  return 'unknown';
+}
+function perfSample(stage, ms, extra = {}) {
+  try {
+    const engine = curSettings.engine || 'browser';
+    const device = extra.device || (engine === 'native' ? 'native' : String(curSettings.device || 'wasm'));
+    toBG('perf-sample', {
+      at: new Date().toISOString(),
+      stage,
+      ms: Math.round(ms),
+      engine,
+      device,
+      platform: perfPlatform(),
+      src: extra.src || rt?.config?.srcLang || null,
+      tgt: extra.tgt || rt?.config?.tgtLang || null,
+      audioSec: extra.audioSec ?? null,
+      chars: extra.chars ?? null,
+      mode: extra.mode || 'realtime',
+      source: 'session',
+    });
+  } catch { /* telemetri lokal tidak boleh mengganggu pipeline */ }
+}
+
+// ---------------------------------------------------------------------------
 // AI worker RPC — inference runs off the main thread (see ai-worker.js).
 const worker = new Worker(chrome.runtime.getURL('ai-worker.js'), { type: 'module' });
 const pending = new Map();
@@ -216,9 +248,11 @@ async function runPartialRefine() {
 
     if (useNativeDraft) {
       try {
+        const tDraft = performance.now();
         const draft = await nativeDraft(curSettings.nativeUrl, audio, srcLang, tgtLang, {
           language: srcLang,
         });
+        perfSample('draft', performance.now() - tDraft, { device: 'native', audioSec: audio.length / 16000, chars: (draft?.source || '').length });
         if (draft?.source) {
           text = draft.source;
           translation = draft.translation || '';
@@ -229,12 +263,16 @@ async function runPartialRefine() {
     }
 
     if (!text) {
+      const tAsr = performance.now();
       text = await transcribe(audio, { language: srcLang, task: 'transcribe' });
+      perfSample('asr-partial', performance.now() - tAsr, { audioSec: audio.length / 16000, chars: (text || '').length });
       if (!text || isHallucination(text)) return;
       if (text === rt.partialDraft.source && rt.partialDraft.translation) return;
 
       const translateFn = t.translateFast || t.translate;
+      const tMt = performance.now();
       translation = await translateFn(text);
+      perfSample('mt-partial', performance.now() - tMt, { chars: text.length, device: t.kind === 'chrome-translator' ? 'chrome-translator' : undefined });
     } else if (isHallucination(text)) {
       return;
     }
@@ -486,7 +524,9 @@ async function processUtterance({ audio, draft = null }) {
     }
 
     if (t && t.kind === 'whisper-direct') {
+      const tWd = performance.now();
       const en = await transcribe(audio, { language: srcLang, task: 'translate' });
+      perfSample('asr', performance.now() - tWd, { audioSec: audio.length / 16000, chars: (en || '').length });
       if (isHallucination(en)) return;
       toBG('subtitle', {
         final: true,
@@ -500,16 +540,22 @@ async function processUtterance({ audio, draft = null }) {
       return;
     }
 
+    const tAsr = performance.now();
     const text = await transcribe(audio, { language: srcLang, task: 'transcribe' });
+    perfSample('asr', performance.now() - tAsr, { audioSec: audio.length / 16000, chars: (text || '').length });
     if (isHallucination(text)) return;
 
     let translation = '';
     if (taskMode === 'translate' && t && t.kind !== 'none') {
       const draftText = draft?.translation || '';
+      const tMt = performance.now();
+      const mtDevice = t.kind === 'chrome-translator' ? 'chrome-translator' : undefined;
       if (refineTranslation && draftText && typeof t.refine === 'function') {
         translation = await t.refine(text, draftText);
+        perfSample('refine', performance.now() - tMt, { chars: text.length, device: mtDevice });
       } else {
         translation = await t.translate(text);
+        perfSample('mt', performance.now() - tMt, { chars: text.length, device: mtDevice });
       }
       if (!translation) console.warn('translation empty for:', text.slice(0, 80));
     }
