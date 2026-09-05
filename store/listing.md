@@ -47,6 +47,20 @@ Productivity (Accessibility also acceptable)
 Primary UI: English, Chinese (中文). Listing may also offer Indonesian copy.
 
 ## Assets
+
 - Icons: `store/icons/` (16 / 48 / 128)
-- Screenshots: `store/screenshots/` (capture Side Panel + overlay from a loaded extension)
-- Promo tile (optional): 440×280
+- Screenshots: `store/screenshots/` — 1280×800, dihasilkan `npm run pack:store:screens`
+
+  | Berkas | Yang ditampilkan |
+  | --- | --- |
+  | `01-sidepanel-realtime.png` | Side Panel: subtitel langsung + pilihan bahasa |
+  | `02-notes-minutes.png` | Notulen rapat dari transkrip sesi |
+  | `03-settings-helper.png` | Pengaturan mesin, sumber unduhan, model |
+
+  Ditangkap dari `app.html`, yang memuat side panel produksi (`dist/`) — jadi
+  screenshot selalu menunjukkan UI yang benar-benar dikirim. Jangan menyunting
+  PNG-nya dengan tangan; jalankan ulang skripnya setelah UI berubah.
+  `store/screenshots/captions.json` mencatat sumber, ukuran, dan waktu tangkap.
+
+- Promo tile 440×280: **belum ada** — opsional di Chrome Web Store; listing bisa
+  dikirim tanpa itu.

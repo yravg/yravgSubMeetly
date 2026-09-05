@@ -5,7 +5,7 @@ import { MicVAD, NonRealTimeVAD } from '@ricky0123/vad-web';
 import { makeTranslator } from './lib/translate.js';
 import { isHallucination } from './lib/registry.js';
 import { sourceText, needsTranslation, lineDirection } from './lib/translation-utils.js';
-import { nativeDraft, nativeHealth, nativeTranscribeFile } from './lib/native.js';
+import { nativeDraft, nativeHealth, nativeTranscribeFile, nativeTranscribeFileJob } from './lib/native.js';
 import { detectLanguage } from './lib/lang-detect.js';
 import { isConsecutive, interpreterPairs } from './lib/interpreter.js';
 import {
@@ -604,7 +604,7 @@ async function stopCapture() {
 
 // ---------------------------------------------------------------------------
 // Offline file job
-const off = { running: false, cancelled: false };
+const off = { running: false, cancelled: false, /** @type {null | { cancel: () => Promise<void> }} */ job: null };
 
 async function decodeToMono16k(arrayBuffer) {
   const ac = new AudioContext();
@@ -636,22 +636,46 @@ async function runOfflineNativeFile({ name, size, config, settings, emit, transl
     );
   }
   if (!health.ffmpeg) {
-    throw new Error('Files over 1.5 GB need ffmpeg installed on your Mac: brew install ffmpeg');
+    throw new Error(
+      'Files over 1.5 GB need ffmpeg on the helper machine (macOS: brew install ffmpeg · Windows: winget install Gyan.FFmpeg · Linux: apt install ffmpeg), then Restart the helper.',
+    );
   }
 
-  emit('offline-progress', { stage: 'upload', pct: 3 });
   const file = await getOfflineInputFile();
   const whisperDirect = translator.kind === 'whisper-direct';
   const asrTask =
     config.taskMode === 'translate' && whisperDirect ? 'translate' : 'transcribe';
+  const lf = { name, sizeBytes: size || file.size || 0, large: true };
 
-  const segments = await nativeTranscribeFile(
-    url,
-    file,
-    name,
-    { language: config.srcLang, task: asrTask },
-    (pct) => emit('offline-progress', { stage: 'transcribe', pct: 3 + pct * 0.85 }),
-  );
+  let segments;
+  if (health.features?.transcribe_file_jobs) {
+    // Async job: upload progress (XHR), then poll /jobs/:id — cancel works mid-flight.
+    const ctl = {};
+    off.job = ctl;
+    try {
+      segments = await nativeTranscribeFileJob(
+        url,
+        file,
+        name,
+        { language: config.srcLang, task: asrTask, sizeBytes: lf.sizeBytes },
+        (p) => emit('offline-progress', { ...lf, ...p, pct: Math.round(p.pct * 0.88) }),
+        ctl,
+      );
+    } finally {
+      off.job = null;
+    }
+  } else {
+    // Old helper without job endpoints: single synchronous POST, coarse progress.
+    emit('offline-progress', { ...lf, stage: 'upload', pct: 3 });
+    segments = await nativeTranscribeFile(
+      url,
+      file,
+      name,
+      { language: config.srcLang, task: asrTask },
+      (pct) => emit('offline-progress', { ...lf, stage: 'transcribe', pct: 3 + pct * 0.85 }),
+    );
+  }
+  if (off.cancelled) throw new Error('cancelled');
 
   const lines = [];
   const dual = !!config.dualLine;
@@ -676,7 +700,8 @@ async function runOfflineNativeFile({ name, size, config, settings, emit, transl
     lines.push(line);
     emit('offline-line', { line, idx: i + 1, total: segments.length });
     emit('offline-progress', {
-      stage: 'transcribe',
+      ...lf,
+      stage: config.taskMode === 'translate' && !whisperDirect ? 'translate' : 'finalize',
       pct: 88 + (12 * (i + 1)) / segments.length,
       idx: i + 1,
       total: segments.length,
@@ -922,6 +947,8 @@ chrome.runtime.onMessage.addListener((msg) => {
       break;
     case 'offline-cancel':
       off.cancelled = true;
+      // Large-file job on the helper: abort the upload / ask the helper to stop.
+      off.job?.cancel?.().catch(() => {});
       break;
     case 'model-download': {
       (async () => {

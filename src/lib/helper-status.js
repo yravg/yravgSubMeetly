@@ -70,7 +70,9 @@ export const STUB_LARGE_FILE = {
   sizeBytes: 2.4 * 1024 * 1024 * 1024,
   progress: 0.42,
   cancellable: true,
-  status: 'running', // idle | running | cancelled | done
+  status: 'running', // idle | running | cancelling | cancelled | done | error
+  stage: 'transcribe', // upload | queued | transcribe | translate | finalize | …
+  elapsedS: 154,
 };
 
 export function formatBytes(n) {

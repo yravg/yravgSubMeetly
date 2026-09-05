@@ -1,3 +1,12 @@
+# Serah terima Codex / Claude Code
+
+- Baca `HANDOFF.md` sebelum melanjutkan pekerjaan, lalu verifikasi status task melalui CLI NgodingPakeAI dan perubahan lokal melalui Git.
+- NgodingPakeAI adalah sumber status task, PRD, fase, dan layer. `HANDOFF.md` menyimpan konteks pekerjaan yang belum selesai; jangan menganggap laporan agent sebagai bukti tes lulus.
+- Satu agent mengedit satu task pada satu waktu. Catat pemilik dengan label sesi unik, waktu `claimed-at`, dan state `active` saat mulai; ubah menjadi `released` dan lepaskan klaim saat berhenti atau serah terima. Catatan ini adalah koordinasi manual, bukan penguncian otomatis; jika agent lain masih aktif, jangan mengedit bersamaan.
+- Perbarui `HANDOFF.md` setelah task selesai, saat menemukan blocker, sebelum checkpoint, dan sebelum mengakhiri sesi. Isi ref task, fase/layer, perubahan, bukti verifikasi, pekerjaan tersisa, dan langkah berikutnya.
+- Pertahankan perubahan lokal dari sesi sebelumnya; periksa diff sebelum mengedit. Jangan reset task atau membuang perubahan tanpa permintaan pengguna.
+- Jangan simpan token, isi `.env`, atau kredensial dalam catatan. Integrasi MCP bersama ditunda sampai pekerjaan plan selesai sesuai permintaan pengguna.
+
 <!-- ngodingpakeai:skill:start -->
 # NgodingPakeAI — Codebase Sync
 

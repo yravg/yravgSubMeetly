@@ -173,11 +173,12 @@ const baseArgs = [
 ];
 
 async function launch(extra = []) {
-  const executablePath =
-    process.env.PUPPETEER_EXECUTABLE_PATH ||
-    (process.platform === 'darwin'
-      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-      : undefined);
+  // JANGAN default ke Google Chrome bermerek: sejak Chrome 137 ia mengabaikan
+  // --load-extension diam-diam, sehingga ekstensi tak pernah termuat dan
+  // penantian service worker selalu timeout 20 dtk. Chrome for Testing yang
+  // dibundel puppeteer masih menghormatinya. Override eksplisit tetap bisa
+  // lewat PUPPETEER_EXECUTABLE_PATH (mis. Chromium lokal).
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   return puppeteer.launch({
     headless: false,
     executablePath: executablePath && fs.existsSync(executablePath) ? executablePath : undefined,

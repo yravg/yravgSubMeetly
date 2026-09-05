@@ -132,6 +132,123 @@ export async function nativeTranslateRefine(url, text, draft, src, tgt) {
   return (j.text || '').trim();
 }
 
+// Installed language-model inventory + on-disk cache catalog (GET /models).
+// Null when helper unreachable.
+export async function nativeGetModels(url, timeoutMs = 5000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/models`, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Shared local UI prefs (theme + reskin) on the helper — same on-disk home
+// as notes (~/.localtranssub/ui-prefs.json). Null when helper unreachable.
+export async function nativeGetUiPrefs(url, timeoutMs = 1500) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/ui-prefs`, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function nativeSetUiPrefs(url, patch, timeoutMs = 1500) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/ui-prefs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(patch || {}),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Meeting-note documents on the helper (shared JSON store). Shapes follow
+// the v1 helper schema — see _normalize_note_doc in native/server.py.
+export async function nativeGetNotes(url, timeoutMs = 3000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/notes`, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function nativeGetNote(url, id, timeoutMs = 3000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/notes/${encodeURIComponent(id)}`, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function nativeSaveNote(url, note, timeoutMs = 5000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ note }),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function nativeDeleteNote(url, id, timeoutMs = 3000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/notes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      signal: ctrl.signal,
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Gracefully stop the helper server.
 export async function nativeShutdown(url, timeoutMs = 3000) {
   const ctrl = new AbortController();
@@ -141,6 +258,217 @@ export async function nativeShutdown(url, timeoutMs = 3000) {
     return r.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Large-file jobs (>1.5 GiB): POST /transcribe_file_job streams the media to
+// the helper's disk and returns {jobId}; GET /jobs/:id reports
+// {status: running|cancelling|cancelled|done|error, progress, segments, error};
+// POST /jobs/:id/cancel asks the helper to stop. Upload progress comes from
+// XMLHttpRequest (fetch has no upload events).
+
+/** Normalise helper segments → [{t0, t1, text}]. */
+function mapSegments(segs) {
+  return (segs || []).map((s) => ({
+    t0: s.start ?? 0,
+    t1: s.end ?? 0,
+    text: (s.text || '').trim(),
+  }));
+}
+
+/** Upload a File/Blob/ArrayBuffer with progress; resolves {jobId}. */
+export function nativeStartFileJob(
+  url,
+  data,
+  filename,
+  { language = 'auto', task = 'transcribe' } = {},
+  onUpload,
+  onXhr,
+) {
+  const q = new URLSearchParams({ language, task, filename });
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    onXhr?.(xhr);
+    xhr.open('POST', `${base(url)}/transcribe_file_job?${q}`);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onUpload?.(e.loaded, e.total);
+    };
+    xhr.onerror = () => reject(new Error('native /transcribe_file_job: network error'));
+    xhr.onabort = () => reject(new Error('cancelled'));
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error(`native /transcribe_file_job ${xhr.status}: ${xhr.responseText}`));
+        return;
+      }
+      try {
+        const j = JSON.parse(xhr.responseText || '{}');
+        if (!j.jobId) throw new Error('no jobId');
+        resolve({ jobId: j.jobId });
+      } catch (e) {
+        reject(new Error(`native /transcribe_file_job: bad response (${e.message})`));
+      }
+    };
+    xhr.send(data);
+  });
+}
+
+export async function nativeGetJob(url, jobId, timeoutMs = 5000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/jobs/${encodeURIComponent(jobId)}`, { signal: ctrl.signal });
+    if (!r.ok) throw new Error(`native /jobs/${jobId} ${r.status}`);
+    return r.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function nativeCancelJob(url, jobId, timeoutMs = 3000) {
+  if (!jobId) return false;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/jobs/${encodeURIComponent(jobId)}/cancel`, {
+      method: 'POST',
+      signal: ctrl.signal,
+    });
+    return r.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Whole-file transcription as a helper job with real progress + cancel.
+ *
+ * onProgress receives { stage: 'upload'|'queued'|'transcribe', pct (0–100),
+ * loaded?, total?, jobId? } — pct is monotonic across stages: upload 0–40,
+ * helper processing 40–100 (server reports 0.05 → 0.2 → 1.0; we map it
+ * and let elapsed time fill the gap so the bar never looks frozen).
+ *
+ * `ctl.cancel()` aborts the upload or tells the helper to stop the job.
+ */
+export async function nativeTranscribeFileJob(
+  url,
+  data,
+  filename,
+  { language = 'auto', task = 'transcribe', pollMs = 1000, sizeBytes = 0 } = {},
+  onProgress,
+  ctl = {},
+) {
+  let cancelled = false;
+  let jobId = null;
+  let xhr = null;
+  ctl.cancel = async () => {
+    cancelled = true;
+    try {
+      xhr?.abort();
+    } catch {}
+    if (jobId) await nativeCancelJob(url, jobId);
+  };
+
+  onProgress?.({ stage: 'upload', pct: 0, loaded: 0, total: sizeBytes });
+  const started = nativeStartFileJob(
+    url,
+    data,
+    filename,
+    { language, task },
+    (loaded, total) => onProgress?.({ stage: 'upload', pct: Math.round((loaded / total) * 40), loaded, total }),
+    (x) => {
+      xhr = x;
+    },
+  );
+  ({ jobId } = await started);
+  if (cancelled) {
+    await nativeCancelJob(url, jobId);
+    throw new Error('cancelled');
+  }
+  onProgress?.({ stage: 'queued', pct: 40, jobId, loaded: sizeBytes, total: sizeBytes });
+
+  // Estimate: faster-whisper/mlx on a long file runs at ~10–30× realtime; without
+  // duration info we ease the bar from 42 → 95 over time (asymptotic), and the
+  // server's coarse 0.2 → 1.0 jumps snap it forward when they arrive.
+  const t0 = Date.now();
+  let lastPct = 40;
+  while (true) {
+    await new Promise((r) => setTimeout(r, pollMs));
+    if (cancelled) throw new Error('cancelled');
+    let job;
+    try {
+      job = await nativeGetJob(url, jobId);
+    } catch (e) {
+      // transient poll failure — keep waiting unless the helper is really gone
+      if (cancelled) throw new Error('cancelled');
+      continue;
+    }
+    if (job.status === 'done') {
+      onProgress?.({ stage: 'transcribe', pct: 100, jobId, segments: (job.segments || []).length });
+      return mapSegments(job.segments);
+    }
+    if (job.status === 'cancelled') throw new Error('cancelled');
+    if (job.status === 'error') throw new Error(job.error || 'native job failed');
+    const serverP = Number(job.progress) || 0; // 0.05 … 1.0
+    const elapsedS = (Date.now() - t0) / 1000;
+    const eased = 42 + 53 * (1 - Math.exp(-elapsedS / 240)); // ~65% at 4 min, ~90% at 10 min
+    const fromServer = 40 + serverP * 60;
+    const pct = Math.min(95, Math.max(lastPct, Math.round(Math.max(eased, fromServer))));
+    lastPct = pct;
+    onProgress?.({
+      stage: job.status === 'cancelling' ? 'cancelling' : 'transcribe',
+      pct,
+      jobId,
+      elapsedS: Math.round(elapsedS),
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper compute device (Windows/Linux faster-whisper: cpu | cuda; macOS mlx: metal).
+// Contract assumed by the side panel (backend implements it):
+//   GET  /engine/device → { device: 'auto'|'cpu'|'cuda', active: 'cpu'|'cuda'|'apple-silicon', compute, cuda_available, applied: bool }
+//   POST /engine/device { device } → { ok, device, restart_required: true }
+// /health also carries `device` (active) and, once implemented, `device_pref`.
+// Old helpers return 404 — callers treat that as "restart with DEVICE=… manually".
+export const HELPER_DEVICE_OPTIONS = ['auto', 'cpu', 'cuda'];
+
+export async function nativeGetDevice(url, timeoutMs = 2000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/engine/device`, { signal: ctrl.signal });
+    if (r.status === 404) return { supported: false };
+    if (!r.ok) throw new Error(`native /engine/device ${r.status}`);
+    const j = await r.json();
+    return { supported: true, ...j };
+  } catch (e) {
+    if (e?.name === 'AbortError') return { supported: false };
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function nativeSetDevice(url, device, timeoutMs = 3000) {
+  if (!HELPER_DEVICE_OPTIONS.includes(device)) throw new Error(`device must be one of ${HELPER_DEVICE_OPTIONS.join(', ')}`);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/engine/device`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device }),
+      signal: ctrl.signal,
+    });
+    if (r.status === 404) return { supported: false, device, restart_required: true };
+    if (!r.ok) throw new Error(`native /engine/device ${r.status}: ${await r.text()}`);
+    return { supported: true, ...(await r.json()) };
   } finally {
     clearTimeout(timer);
   }

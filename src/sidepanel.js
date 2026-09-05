@@ -12,16 +12,34 @@ import {
   UI_LANGS,
   uniqueLangEntries,
 } from './lib/registry.js';
-import { nativeHealth, nativeShutdown } from './lib/native.js';
-import { nativeHostAction, nativeHostSupported } from './lib/native-host.js';
+import {
+  nativeHealth,
+  nativeShutdown,
+  nativeGetUiPrefs,
+  nativeSetUiPrefs,
+  nativeGetModels,
+  nativeGetDevice,
+  nativeSetDevice,
+  HELPER_DEVICE_OPTIONS,
+} from './lib/native.js';
+import { nativeHostAction, nativeHostConnection, nativeHostSupported } from './lib/native-host.js';
+import { classifyNativeHostError, hostInstalledFromState } from './lib/native-protocol.js';
 import { formatSrt, formatVtt, formatTxt } from './lib/transcript-cache.js';
+import { searchSessions, matchingLines } from './lib/session-search.js';
+import { formatMarkdown, formatCsv, formatJson } from './lib/export-formats.js';
 import { loadExportDir, pickExportDir, clearExportDir, saveExportFile, exportDirLabel } from './lib/export.js';
+import {
+  normalizeExportOptions,
+  applyExportOptions,
+  exportFilename,
+} from './lib/export-options.js';
 import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel } from './notes-panel.js';
 import { mountHelperStatusCard } from './helper-status.js';
-import { exportBasename } from './lib/helper-status.js';
+import { mountHelperGuide } from './helper-guide.js';
+import { detectOs } from './lib/helper-status.js';
 import {
   loadSampleCatalog,
   firstSampleForPair,
@@ -46,6 +64,9 @@ const state = {
     asrModel: DEFAULT_ASR,
     engine: 'browser',
     nativeUrl: DEFAULT_NATIVE_URL,
+    nativeDevice: 'auto', // helper compute: 'auto' | 'cpu' | 'cuda' (Win/Linux faster-whisper)
+    theme: 'auto', // 'auto' | 'light' | 'dark'
+    reskin: 'yraverage', // 'yraverage' | 'coretax' | 'modern' — pola interaksi lokal
     // Two-way (consecutive) interpreting is opt-in; 'simultaneous' is the
     // historical one-way srcLang → tgtLang path.
     interpreter: { mode: 'simultaneous', a: 'ja', b: 'en' },
@@ -57,6 +78,7 @@ const state = {
   offlineFile: null, // { name, size } once staged to OPFS
   offlineStaging: false,
   offlineLines: [],
+  realtimeLines: [],
   currentTab: null,
   qaCatalog: null,
 };
@@ -79,12 +101,16 @@ function applyI18n() {
   // The notes ticker (notes-panel.js) and the Minutes Register read the UI
   // language from <html lang>, so keep it in sync with the setting.
   document.documentElement.lang = state.settings.uiLang || 'en';
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
   });
   const notesMount = $('notes-mount');
   if (notesMount && notesMount.dataset.mounted) mountNotesPanel(notesMount, notesMountOptions());
   renderInterpreterUi();
+  redrawHelperStatus?.();
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +271,16 @@ function syncCaptureStamp() {
   if (on && !state.startedAt) state.startedAt = Date.now();
   else if (!on) state.startedAt = null;
   syncInterpreterLock();
+  syncActiveCapture();
+}
+
+// Kondisi aktif Side Panel ↔ navigasi: satu sumber (state.running /
+// state.offlineRunning) menggerakkan indikator di topbar + bottom nav agar
+// pengguna selalu tahu tugas berjalan walau sedang di tab Notes/Settings.
+function syncActiveCapture() {
+  const on = captureRunning();
+  document.body.classList.toggle('is-running', on);
+  $('topbar-rec')?.classList.toggle('hidden', !on);
 }
 
 /**
@@ -285,17 +321,139 @@ function getCapture() {
 }
 
 /** Apa yang dipasok panel Notulen: keadaan tangkap + jalan berhenti yang sudah ada. */
+// ---------------------------------------------------------------------------
+// Tempel transkrip Teams → notulen
+//
+// Rapat sering sudah punya transkrip di Teams; menjalankan ulang audionya
+// hanya untuk mendapat notulen itu mubazir. Semua penguraian berjalan di
+// perangkat ini — teks tempelan tidak pernah dikirim ke mana pun.
+async function generateMinutesFromPaste() {
+  const raw = $('paste-input')?.value || '';
+  const out = $('paste-result');
+  if (!out) return;
+  out.innerHTML = '';
+  if (!raw.trim()) return;
+
+  const { parseTeamsTranscript, looksLikeTeamsTranscript } = await import('./lib/teams-transcript.js');
+  if (!looksLikeTeamsTranscript(raw)) {
+    out.innerHTML = `<span class="err">${t('pasteNotTeams')}</span>`;
+    return;
+  }
+  const { lines, speakers } = parseTeamsTranscript(raw);
+  if (!lines.length) {
+    out.innerHTML = `<span class="err">${t('pasteNotTeams')}</span>`;
+    return;
+  }
+  const { generateNotesFromTranscript } = await import('./lib/notes-generate.js');
+  const meeting = generateNotesFromTranscript(lines, {
+    title: ($('paste-title')?.value || '').trim() || 'Pasted meeting',
+    locale: state.settings.uiLang === 'id' ? 'id' : 'en',
+    source: 'teams-paste',
+  });
+  const { saveMeeting } = await import('./lib/notes-store.js');
+  await saveMeeting(meeting);
+  out.innerHTML = `<span class="ok">${t('pasteDone', lines.length, speakers.length, meeting.items.length)}</span>`;
+  showToast(t('pasteDone', lines.length, speakers.length, meeting.items.length), 'ok');
+  // Tampilkan notulen yang baru dibuat.
+  const mount = $('notes-mount');
+  if (mount && mount.dataset.mounted) mountNotesPanel(mount, notesMountOptions());
+}
+
 function notesMountOptions() {
-  return { getCapture, onEndCapture: () => onStop() };
+  return {
+    getCapture,
+    onEndCapture: () => onStop(),
+    onExportNotes: (kind) => exportActiveNotes(kind),
+    onPushShared: (meeting, lang) => pushActiveNotes(meeting, lang),
+  };
+}
+
+async function pushActiveNotes(meeting, lang) {
+  if (!nativeInfo) return null;
+  const { pushMeetingToHelper } = await import('./lib/notes-sync.js');
+  const note = await pushMeetingToHelper(
+    state.settings.nativeUrl || DEFAULT_NATIVE_URL,
+    meeting,
+    lang,
+  );
+  if (note) setStatus(t('savedTo', 'Native Helper'), 'ok');
+  return note;
+}
+
+async function exportActiveNotes(kind) {
+  const mount = $('notes-mount');
+  const meetingId = mount?.querySelector('.notes-saved-item.active')?.dataset.meetingId || null;
+  const { listMeetings } = await import('./lib/notes-store.js');
+  const { serializeMeetingTxt, serializeMeetingMarkdown } = await import('./lib/notes-export.js');
+  const meetings = await listMeetings();
+  const meeting = (meetingId && meetings.find((m) => m.id === meetingId)) || meetings[0];
+  if (!meeting) {
+    setStatus(t('noHistory'), 'error');
+    return;
+  }
+  const lang = (document.documentElement.lang || 'en').startsWith('id') ? 'id' : 'en';
+  const out = kind === 'md' ? serializeMeetingMarkdown(meeting, lang) : serializeMeetingTxt(meeting, lang);
+  const safe =
+    String(meeting.title || meeting.id || 'meeting-notes')
+      .replace(/[^\w\s.-]+/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 60) || 'meeting-notes';
+  const name = kind === 'md' ? `${safe}.md` : `${safe}.txt`;
+  try {
+    const res = await saveExportFile(name, out);
+    const msg = res.saved ? t('savedTo', res.path) : t('downloadedTo', name);
+    setStatus(msg, 'ok');
+    showToast(msg, 'ok');
+  } catch (e) {
+    const msg = t('exportFailed', String(e?.message || e));
+    setStatus(msg, 'error');
+    showToast(msg, 'error');
+  }
 }
 
 function setView(view) {
-  state.view = view === 'notes' ? 'notes' : 'captions';
+  state.view = view === 'notes' ? 'notes' : view === 'settings' ? 'settings' : 'captions';
   document.querySelectorAll('#view-tabs button').forEach((b) => {
-    b.classList.toggle('active', b.dataset.view === state.view);
+    const active = b.dataset.view === state.view;
+    b.classList.toggle('active', active);
+    if (active) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
   });
   $('view-captions')?.classList.toggle('hidden', state.view !== 'captions');
   $('view-notes')?.classList.toggle('hidden', state.view !== 'notes');
+  syncBottomNav();
+  
+  // Putar ulang animasi reveal di view yang baru tampil: kelas dilepas,
+  // reflow dipaksa, lalu dipasang lagi dengan stagger. Tanpa ini CSS tidak
+  // mengulang animasi yang sudah selesai sehingga pindah tab tanpa transisi.
+  const visibleView = state.view === 'notes' ? $('view-notes') : $('view-captions');
+  if (visibleView) {
+    const items = [...visibleView.querySelectorAll('.reveal')];
+    for (const el of items) el.classList.remove('reveal');
+    void visibleView.offsetWidth;
+    requestAnimationFrame(() => {
+      items.forEach((el, i) => {
+        el.style.animationDelay = `${Math.min(i * 30, 300)}ms`;
+        el.classList.add('reveal');
+      });
+    });
+  }
+}
+
+function syncBottomNav() {
+  // Kontekstual: bila modal Settings terbuka (dari topbar gear, tombol About,
+  // atau bottom nav), item Settings yang aktif; kalau tidak, ikut view aktif.
+  const settingsOpen = !($('settings-modal')?.classList.contains('hidden') ?? true);
+  document.querySelectorAll('.bottom-nav-item').forEach((b) => {
+    const active =
+      b.dataset.view === 'settings' ? settingsOpen : b.dataset.view === state.view && !settingsOpen;
+    b.classList.toggle('active', active);
+    if (active) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+    if (b.dataset.view === 'settings') b.setAttribute('aria-pressed', String(settingsOpen));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -318,6 +476,7 @@ function setMode(mode) {
   updateButtons();
   updateWarning();
   redrawHelperStatus?.();
+  redrawHelperGuide?.();
 }
 
 function syncDualLineCheckboxes() {
@@ -365,6 +524,7 @@ async function setDualLine(on) {
   persistLastConfig();
   updateWarning();
   await toBG('update-config', { dualLine: state.settings.dualLine });
+  redrawHelperStatus?.();
 }
 
 function setTask(task) {
@@ -376,6 +536,7 @@ function setTask(task) {
   $('tgt-lang').disabled = task !== 'translate';
   updateWarning();
   redrawHelperStatus?.();
+  redrawHelperGuide?.();
 }
 
 // ---------------------------------------------------------------------------
@@ -473,13 +634,36 @@ function updateWarning() {
         `<button class="mini-btn dl-now" data-key="${i.key}">⬇ ${t('download')} — ${i.btn}</button>`,
     )
     .join(' ');
-  el.innerHTML = [issues.map((i) => i.msg).join('<br>'), buttons, directNote]
+  // Model belum tersedia → arahkan ke pemasangan: unduh langsung ATAU kelola
+  // di Settings (daftar lengkap + hapus + uji pasangan).
+  const manage = `<button class="mini-btn manage-models">⚙ ${t('manageModels')}</button>`;
+  el.innerHTML = [issues.map((i) => i.msg).join('<br>'), buttons, manage, directNote]
     .filter(Boolean)
     .join('<br>');
   el.classList.remove('hidden');
   el.querySelectorAll('.dl-now').forEach((b) => {
     b.addEventListener('click', () => startDownload(b.dataset.key));
   });
+  el.querySelector('.manage-models')?.addEventListener('click', () => {
+    openSettings();
+    requestAnimationFrame(() => {
+      document.querySelector('#asr-models')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+// Satu pintu membuka Settings agar banner, topbar, nav bawah, dan tombol
+// About selalu sinkron (lihat syncBottomNav).
+function openSettings({ about = false } = {}) {
+  $('settings-modal').classList.remove('hidden');
+  lastNativeAutoStartMs = 0;
+  labEnsureAttempted = false;
+  checkNative({ allowAutoStart: true });
+  startNativePoll();
+  $('about-block').classList.toggle('hidden', !about);
+  if (about) $('about-block').scrollIntoView({ behavior: 'smooth' });
+  renderModelLists();
+  syncBottomNav();
 }
 
 // Remembered so the right-click context-menu start can reuse the last choices.
@@ -610,6 +794,7 @@ function renderUiLangToggle() {
       fillSelects();
       updateWarning();
       renderHistory();
+      redrawHelperGuide?.();
       renderQaSampleBar();
       renderModelLists();
     });
@@ -700,7 +885,44 @@ async function runQaSample(sample, { autoStart = true } = {}) {
   }
 }
 
+const ASR_PRESETS = { fast: 'whisper-tiny', balanced: 'whisper-base', accurate: 'whisper-small' };
+
+function currentAsrPreset() {
+  for (const [p, key] of Object.entries(ASR_PRESETS)) {
+    if (key === state.settings.asrModel) return p;
+  }
+  return null;
+}
+
+/** Label model aktif untuk sesi: "Whisper Base · Auto". */
+function activeAsrLabel() {
+  const m = ASR_MODELS[state.settings.asrModel];
+  if (!m) return '';
+  const device = state.settings.device === 'auto' ? 'Auto' : state.settings.device.toUpperCase();
+  return `${m.label} · ${device}`;
+}
+
+function renderAsrPreset() {
+  const host = $('asr-preset-toggle');
+  if (!host) return;
+  const cur = currentAsrPreset();
+  host.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.preset === cur);
+  });
+  const hint = $('asr-preset-hint');
+  if (hint) {
+    if (cur) {
+      const m = ASR_MODELS[ASR_PRESETS[cur]];
+      const size = !m.webgpuOnly && state.settings.device === 'wasm' ? m.sizeWasm : m.sizeWebgpu;
+      hint.textContent = t('presetHint', m.label, size, m.note);
+    } else {
+      hint.textContent = t('presetCustom');
+    }
+  }
+}
+
 function renderModelLists() {
+  renderAsrPreset();
   const asrHost = $('asr-models');
   asrHost.innerHTML = '';
   for (const [key, m] of Object.entries(ASR_MODELS)) {
@@ -762,9 +984,104 @@ function modelRow(key, name, sub, { mtPair = null } = {}) {
     const sample = firstSampleForPair(state.qaCatalog, pair);
     $('settings-modal').classList.add('hidden');
     stopNativePoll();
+    syncBottomNav();
     await runQaSample(sample, { autoStart: true });
   });
   return div;
+}
+
+// ---------------------------------------------------------------------------
+// theme: auto (ikut sistem) | light | dark — disimpan di chrome.storage.local
+function applyTheme() {
+  const theme = state.settings.theme || 'auto';
+  document.documentElement.classList.remove('theme-light', 'theme-dark');
+  if (theme === 'light') document.documentElement.classList.add('theme-light');
+  else if (theme === 'dark') document.documentElement.classList.add('theme-dark');
+  document.querySelectorAll('#theme-toggle button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.theme === theme);
+  });
+}
+
+async function setTheme(theme) {
+  const next = ['auto', 'light', 'dark'].includes(theme) ? theme : 'auto';
+  state.settings.theme = next;
+  await saveSettings();
+  applyTheme();
+  pushUiPrefs();
+}
+
+// Perubahan dari permukaan lain (panel kedua, halaman lab) tiba lewat
+// chrome.storage.onChanged — terapkan langsung tanpa reload. Nilai tak
+// dikenal diabaikan; nilai sama dilewati agar tak ada putaran umpan-balik.
+function applyExternalSettings(next) {
+  if (!next || typeof next !== 'object') return;
+  if (['auto', 'light', 'dark'].includes(next.theme) && next.theme !== state.settings.theme) {
+    state.settings.theme = next.theme;
+    applyTheme();
+  }
+  if (
+    ['yraverage', 'coretax', 'modern'].includes(next.reskin) &&
+    next.reskin !== state.settings.reskin
+  ) {
+    state.settings.reskin = next.reskin;
+    applyReskin();
+  }
+}
+
+// Reskin pattern: hanya token visual lokal (aksen + radius), bukan branding.
+function applyReskin() {
+  const reskin = ['yraverage', 'coretax', 'modern'].includes(state.settings.reskin)
+    ? state.settings.reskin
+    : 'yraverage';
+  document.documentElement.dataset.reskin = reskin;
+  document.querySelectorAll('#reskin-toggle button').forEach((b) => {
+    const active = b.dataset.reskin === reskin;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-checked', String(active));
+  });
+}
+
+async function setReskin(reskin) {
+  const next = ['yraverage', 'coretax', 'modern'].includes(reskin) ? reskin : 'yraverage';
+  state.settings.reskin = next;
+  await saveSettings();
+  applyReskin();
+  pushUiPrefs();
+}
+
+// Cermin corak ke Native Helper (best-effort, hanya saat helper online).
+// chrome.storage.local tetap sumber utama; helper menyimpan salinan bersama.
+function pushUiPrefs() {
+  if (!nativeInfo) return;
+  nativeSetUiPrefs(state.settings.nativeUrl || DEFAULT_NATIVE_URL, {
+    theme: state.settings.theme,
+    reskin: state.settings.reskin,
+  }).catch(() => {});
+}
+
+// Tarik salinan bersama saat memakai mesin native — hanya bila helper sudah
+// menyimpan pilihan (stored), supaya bawaan lokal tak tertimpa default.
+async function pullUiPrefs() {
+  if (!nativeInfo) return;
+  const res = await nativeGetUiPrefs(state.settings.nativeUrl || DEFAULT_NATIVE_URL);
+  if (!res?.stored) return;
+  let changed = false;
+  if (['auto', 'light', 'dark'].includes(res.prefs?.theme) && res.prefs.theme !== state.settings.theme) {
+    state.settings.theme = res.prefs.theme;
+    changed = true;
+  }
+  if (
+    ['yraverage', 'coretax', 'modern'].includes(res.prefs?.reskin) &&
+    res.prefs.reskin !== state.settings.reskin
+  ) {
+    state.settings.reskin = res.prefs.reskin;
+    changed = true;
+  }
+  if (changed) {
+    await saveSettings();
+    applyTheme();
+    applyReskin();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -784,6 +1101,14 @@ async function loadSettings() {
   }
   renderUiLangToggle();
   renderEngineToggle();
+  if (!['auto', 'light', 'dark'].includes(state.settings.theme)) {
+    state.settings.theme = 'auto';
+  }
+  applyTheme();
+  if (!['yraverage', 'coretax', 'modern'].includes(state.settings.reskin)) {
+    state.settings.reskin = 'yraverage';
+  }
+  applyReskin();
   document.querySelectorAll('#mirror-toggle button').forEach((b) =>
     b.classList.toggle('active', b.dataset.mirror === state.settings.mirror),
   );
@@ -792,20 +1117,101 @@ async function loadSettings() {
   );
   $('native-block').classList.toggle('hidden', state.settings.engine !== 'native');
   $('native-url').value = state.settings.nativeUrl || DEFAULT_NATIVE_URL;
+  renderNativeDeviceUi();
   syncDualLineCheckboxes();
   syncRefineCheckboxes();
   $('font-size').value = state.settings.overlayFontSize;
   applyInterpreterUi();
+  state.settings.exportOptions = exportOptions();
+}
+
+// ---------------------------------------------------------------------------
+// export options (SRT / VTT / TXT, lintas OS)
+//
+// Formatnya sama di semua OS; yang berbeda hanya detail berkas (akhir baris,
+// BOM, nama berkas). Defaultnya mengikuti OS yang terdeteksi, tapi tetap bisa
+// diubah — pengguna Linux yang mengirim berkas ke rekan Windows butuh CRLF.
+const EXPORT_OS = detectOs();
+
+function exportOptions() {
+  return normalizeExportOptions(state.settings.exportOptions, EXPORT_OS);
+}
+
+function currentExportSource() {
+  const lines = state.mode === 'offline' ? state.offlineLines : state.realtimeLines;
+  if (!lines.length) return null;
+  return {
+    lines,
+    count: lines.length,
+    title: state.mode === 'offline' ? state.offlineFile?.name || 'subtitles' : state.currentTab?.title || 'subtitles',
+    url: state.mode === 'realtime' ? state.currentTab?.url || '' : '',
+    srcLang: state.srcLang,
+    tgtLang: state.task === 'translate' ? state.tgtLang : '',
+    dualLine: state.settings.dualLine,
+  };
+}
+
+async function updateExportOptions(patch) {
+  state.settings.exportOptions = normalizeExportOptions({ ...exportOptions(), ...patch }, EXPORT_OS);
+  await saveSettings();
+  redrawHelperStatus?.();
 }
 
 let nativeInfo = null; // last /health result (null = offline/unknown)
+/**
+ * Large-file (>1.5 GiB) helper job shown in the Native Helper card.
+ * { name, sizeBytes, progress 0–1, status idle|running|cancelling|cancelled|done|error, stage, jobId, cancellable }
+ */
+let largeFileJob = null;
 /** @type {null | (() => void)} */
 let redrawHelperStatus = null;
+/** @type {null | (() => void)} */
+let redrawHelperGuide = null;
+/** Native Messaging host reachable? null = not tried yet (feeds the guide's diagnostics). */
+let nativeHostInstalled = null;
 let nativePollTimer = null;
 let nativeBusy = false;
 let lastNativeAutoStartMs = 0;
 const NATIVE_AUTO_START_COOLDOWN_MS = 30_000;
 let labEnsureAttempted = false;
+
+/** Keadaan sambungan terakhir dari nativeHostConnection() — untuk diagnostik. */
+let nativeHostConn = null;
+let nativeHostProbePending = null;
+
+function noteNativeHostResult(err) {
+  if (!err) {
+    nativeHostInstalled = true;
+    nativeHostConn = { state: 'connected', connected: true, hostInstalled: true, error: null };
+    return;
+  }
+  // Klasifikasikan lewat kontrak bersama: galat yang tak dikenal tidak boleh
+  // meninggalkan status lama yang sudah basi.
+  const state = classifyNativeHostError(err);
+  nativeHostInstalled = hostInstalledFromState(state);
+  nativeHostConn = { state, connected: false, hostInstalled: nativeHostInstalled, error: String(err?.message || err) };
+}
+
+/**
+ * Tanya bridge Native Messaging apakah ia terhubung. Murah (ping, ~4 dtk) jadi
+ * boleh dipanggil saat panel dibuka — tanpa ini diagnostik hanya tahu jawabnya
+ * setelah pengguna menekan Start.
+ */
+async function probeNativeHost() {
+  if (nativeHostProbePending) return nativeHostProbePending;
+  nativeHostProbePending = (async () => {
+    try {
+      const r = await nativeHostConnection({ timeoutMs: 4_000 });
+      nativeHostConn = r;
+      nativeHostInstalled = r.hostInstalled;
+      return r;
+    } finally {
+      nativeHostProbePending = null;
+      redrawHelperGuide?.();
+    }
+  })();
+  return nativeHostProbePending;
+}
 
 async function tryAutoStartNative() {
   if (nativeBusy || !nativeHostSupported()) return false;
@@ -814,8 +1220,10 @@ async function tryAutoStartNative() {
   lastNativeAutoStartMs = now;
   try {
     const res = await nativeHostAction('start', { timeoutMs: 90_000 });
+    noteNativeHostResult(null);
     return !!res?.ok;
   } catch (e) {
+    noteNativeHostResult(e);
     console.warn('native auto-start failed', e);
     return false;
   }
@@ -866,13 +1274,166 @@ async function checkNative({ allowAutoStart = false } = {}) {
           ),
     });
     tryEnsureLab();
+    if (!nativeDeviceInfo) refreshNativeDeviceInfo();
   } else {
+    nativeDeviceInfo = null;
     setNativeUi({ running: false, busy: false, detail: t('nativeOffline') });
   }
   updateWarning();
   updateNativeHostHint();
   redrawHelperStatus?.();
+  redrawHelperGuide?.();
+  renderNativeModels();
+  renderNativeDeviceUi();
   return nativeInfo;
+}
+
+// ---------------------------------------------------------------------------
+// Helper compute device (CPU / GPU) — Windows/Linux faster-whisper; macOS = MLX.
+/** Last /engine/device answer: { supported, device, active, compute, cuda_available } | null */
+let nativeDeviceInfo = null;
+let nativeDeviceMsg = null; // transient hint after a change ({ kind: 'restart'|'manual', device })
+
+function helperIsApple() {
+  return (nativeInfo?.device || '').toLowerCase() === 'apple-silicon' || nativeInfo?.engine === 'mlx-whisper';
+}
+
+function renderNativeDeviceUi() {
+  const row = $('native-device-row');
+  if (!row) return;
+  const want = HELPER_DEVICE_OPTIONS.includes(state.settings.nativeDevice) ? state.settings.nativeDevice : 'auto';
+  const apple = !!nativeInfo && helperIsApple();
+  const active = (nativeInfo?.device || '').toLowerCase();
+  const compute = nativeInfo?.compute || '';
+  const cudaAvail = nativeDeviceInfo?.cuda_available;
+
+  document.querySelectorAll('#native-device-toggle button').forEach((b) => {
+    const d = b.dataset.hdevice;
+    b.classList.toggle('active', apple ? d === 'auto' : d === want);
+    b.setAttribute('aria-checked', String(apple ? d === 'auto' : d === want));
+    b.disabled = apple;
+    if (d === 'cuda' && cudaAvail === false && !apple) b.title = t('helperDeviceNoCuda');
+    else b.removeAttribute('title');
+  });
+
+  const pill = $('native-device-active');
+  if (nativeInfo) {
+    const label = active === 'apple-silicon' ? 'Apple Silicon · MLX' : active || '—';
+    pill.textContent = t('helperDeviceActive', label, active === 'apple-silicon' ? '' : compute);
+    pill.className = `notes-pill ${active && active !== 'cpu' ? 'ready' : 'idle'}`;
+  } else {
+    pill.textContent = t('helperDeviceOffline');
+    pill.className = 'notes-pill idle';
+  }
+
+  const hint = $('native-device-hint');
+  let text = '';
+  let warn = false;
+  if (apple) {
+    text = t('helperDeviceApple');
+  } else if (nativeDeviceMsg) {
+    text = nativeDeviceMsg.kind === 'manual' ? t('helperDeviceManual', nativeDeviceMsg.device) : t('helperDeviceRestart');
+    warn = true;
+  } else if (nativeInfo && want !== 'auto' && active && active !== want) {
+    text = t('helperDeviceMismatch', want, active);
+    warn = true;
+  } else if (want === 'cuda' && cudaAvail === false) {
+    text = t('helperDeviceNoCuda');
+    warn = true;
+  } else {
+    text = t(`helperDevice${want[0].toUpperCase()}${want.slice(1)}_hint`);
+  }
+  hint.textContent = text;
+  hint.classList.toggle('warn', warn);
+}
+
+async function refreshNativeDeviceInfo() {
+  if (!nativeInfo) {
+    nativeDeviceInfo = null;
+    return;
+  }
+  try {
+    nativeDeviceInfo = await nativeGetDevice(state.settings.nativeUrl || DEFAULT_NATIVE_URL);
+  } catch {
+    nativeDeviceInfo = null;
+  }
+  renderNativeDeviceUi();
+}
+
+async function setNativeDevice(device) {
+  if (!HELPER_DEVICE_OPTIONS.includes(device) || helperIsApple()) return;
+  state.settings.nativeDevice = device;
+  await saveSettings();
+  nativeDeviceMsg = null;
+  if (nativeInfo) {
+    try {
+      const res = await nativeSetDevice(state.settings.nativeUrl || DEFAULT_NATIVE_URL, device);
+      nativeDeviceMsg = res.supported ? { kind: 'restart', device } : { kind: 'manual', device };
+      if (res.supported) nativeDeviceInfo = { ...(nativeDeviceInfo || {}), supported: true, device };
+    } catch (e) {
+      nativeDeviceMsg = { kind: 'manual', device };
+    }
+  }
+  renderNativeDeviceUi();
+}
+
+function fmtBytes(n) {
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let v = n;
+  let u = 0;
+  while (v >= 1024 && u < units.length - 1) {
+    v /= 1024;
+    u += 1;
+  }
+  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[u]}`;
+}
+
+// Daftar model terpasang di helper (GET /models) — read-only, refresh tiap
+// checkNative. Cache HF hanya dihitung server bila direktori ada.
+async function renderNativeModels() {
+  const host = $('native-models');
+  if (!host) return;
+  host.innerHTML = '';
+  if (!nativeInfo) return;
+  const res = await nativeGetModels(state.settings.nativeUrl || DEFAULT_NATIVE_URL);
+  if (!res) return;
+  const rows = [];
+  for (const m of res.models || []) {
+    rows.push({
+      name: `${m.kind === 'asr' ? '🎙' : m.kind === 'draft' ? '⚡' : '🌐'} ${m.id || m.key}`,
+      sub: `${m.engine || ''}${m.device ? ` · ${m.device}` : ''}`,
+      state: m.available ? 'done' : '',
+      stateText: m.available ? '✅' : '—',
+    });
+  }
+  for (const c of res.cached || []) {
+    rows.push({
+      name: `💾 ${c.id}`,
+      sub: `${fmtBytes(c.bytes)} · ${c.files} files${c.complete ? '' : ' · incomplete'}`,
+      state: c.complete ? 'done' : '',
+      stateText: c.complete ? '✅' : '…',
+    });
+  }
+  if (!rows.length) return;
+  for (const r of rows) {
+    const div = document.createElement('div');
+    div.className = 'm-item';
+    const name = document.createElement('div');
+    name.className = 'm-meta';
+    const t1 = document.createElement('div');
+    t1.className = 'm-name';
+    t1.textContent = r.name;
+    const t2 = document.createElement('div');
+    t2.className = 'm-sub';
+    t2.textContent = r.sub;
+    name.append(t1, t2);
+    const st = document.createElement('span');
+    st.className = `m-state ${r.state}`.trim();
+    st.textContent = r.stateText;
+    div.append(name, st);
+    host.appendChild(div);
+  }
 }
 
 function updateNativeHostHint() {
@@ -908,8 +1469,19 @@ async function nativeControl(action) {
   });
   try {
     if (nativeHostSupported()) {
-      const res = await nativeHostAction(action, { timeoutMs: 130_000 });
+      let res;
+      try {
+        res = await nativeHostAction(action, { timeoutMs: 130_000 });
+      } catch (e) {
+        noteNativeHostResult(e);
+        throw e;
+      }
+      noteNativeHostResult(null);
       if (!res?.ok) throw new Error(res?.error || 'Native host failed');
+      if (action !== 'stop') {
+        nativeDeviceMsg = null;
+        nativeDeviceInfo = null;
+      }
     } else if (action === 'stop') {
       await nativeShutdown(url);
       await new Promise((r) => setTimeout(r, 400));
@@ -1100,8 +1672,39 @@ function setStatus(text, cls = '') {
   el.className = 'status-line ' + cls;
 }
 
+// Toast umpan balik: ekspor + notulen. aria-live di #toast-stack agar
+// pembaca layar ikut dapat kabar; auto-hilang 5 dtk, bisa ditutup manual.
+function showToast(msg, kind = 'ok') {
+  const stack = $('toast-stack');
+  if (!stack || !msg) return;
+  const el = document.createElement('div');
+  el.className = 'toast ' + (kind === 'error' ? 'error' : 'ok');
+  el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  const body = document.createElement('span');
+  body.className = 'toast-msg';
+  body.textContent = msg;
+  const close = document.createElement('button');
+  close.className = 'toast-close';
+  close.type = 'button';
+  close.setAttribute('aria-label', '✕');
+  close.textContent = '✕';
+  const dismiss = () => {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 220);
+  };
+  close.addEventListener('click', dismiss);
+  el.append(body, close);
+  stack.appendChild(el);
+  while (stack.children.length > 3) stack.firstChild.remove();
+  setTimeout(() => {
+    if (el.isConnected) dismiss();
+  }, 5000);
+}
+if (typeof window !== 'undefined') window.__ltsToast = showToast;
+
 async function startWithStream(streamId, captureType) {
   setStatus(t('loadingModels'));
+  state.realtimeLines = [];
   clearLivePreview();
   $('live-preview').classList.remove('hidden');
   const res = await toBG('panel-start-realtime', {
@@ -1278,6 +1881,8 @@ async function pickFile(file) {
   if (!file) return;
   state.offlineFile = null;
   state.offlineStaging = true;
+  largeFileJob = null;
+  redrawHelperStatus?.();
   const sizeMb = (file.size / 1024 / 1024).toFixed(1);
   $('off-filename').textContent = `${file.name} (${sizeMb} MB) — ${t('stagingFile')}`;
   updateButtons();
@@ -1337,7 +1942,7 @@ function setLiveInterim(host, text) {
   host.scrollTop = host.scrollHeight;
 }
 
-function pushLive({ source, translation, interim, partial, dir }) {
+function pushLive({ source, translation, rawSource, rawTranslation, t0, t1, interim, partial, dir }) {
   if (interim && partial) {
     if (source) setLiveInterim($('live-src-lines'), source);
     if (translation) setLiveInterim($('live-tgt-lines'), translation);
@@ -1351,6 +1956,15 @@ function pushLive({ source, translation, interim, partial, dir }) {
   const dirTag = dir?.src && dir?.tgt ? `${dir.src.toUpperCase()} \u2192 ${dir.tgt.toUpperCase()}` : '';
   if (source) appendLiveLine($('live-src-lines'), source, srcTag);
   if (translation) appendLiveLine($('live-tgt-lines'), translation, dirTag);
+  if ((source || translation) && (t0 != null || t1 != null)) {
+    state.realtimeLines.push({
+      t0: t0 ?? 0,
+      t1: t1 ?? (t0 ?? 0) + 3,
+      src: rawSource ?? source ?? '',
+      tgt: rawTranslation ?? translation ?? '',
+    });
+    redrawHelperStatus?.();
+  }
 }
 
 function fmtTs(sec, srtStyle = false) {
@@ -1364,6 +1978,7 @@ function fmtTs(sec, srtStyle = false) {
 
 function pushOfflineLine({ line, idx, total }) {
   state.offlineLines.push(line);
+  redrawHelperStatus?.();
   const host = $('off-lines');
   const div = document.createElement('div');
   div.innerHTML = `<div class="ts">${fmtTs(line.t0)} → ${fmtTs(line.t1)}</div>`;
@@ -1388,7 +2003,7 @@ function exportLines(kind) {
   exportSession({ lines, title: state.offlineFile?.name, url: '', kind });
 }
 
-async function exportSession({ lines, title, url, kind, dualLine }) {
+async function exportSession({ lines, title, url, kind, dualLine, srcLang, tgtLang }) {
   const meta = { url: url || '', title: title || 'subtitles', dualLine: dualLine ?? state.settings.dualLine };
   const norm = (lines || []).map((l) => ({
     t0: l.t0 ?? 0,
@@ -1399,11 +2014,29 @@ async function exportSession({ lines, title, url, kind, dualLine }) {
   let out = '';
   if (kind === 'srt') out = formatSrt(norm, meta);
   else if (kind === 'vtt') out = formatVtt(norm, meta);
+  else if (kind === 'md') out = formatMarkdown(norm, { ...meta, dualLine: meta.dualLine });
+  else if (kind === 'csv') out = formatCsv(norm, meta);
+  else if (kind === 'json') out = formatJson(norm, { ...meta, srcLang: state.srcLang, tgtLang: state.tgtLang });
   else out = formatTxt(norm, meta);
-  const safe = exportBasename(title || 'subtitles', kind).replace(/\.(srt|vtt|txt)$/i, '');
-  const name = `${safe}.${kind}`;
-  const res = await saveExportFile(name, out);
-  if (res.saved) setStatus(t('savedTo', res.path), 'ok');
+  const opts = exportOptions();
+  out = applyExportOptions(out, opts);
+  const name = exportFilename(title || 'subtitles', kind, {
+    srcLang: srcLang ?? state.srcLang,
+    tgtLang: tgtLang ?? (meta.dualLine || state.task === 'translate' ? state.tgtLang : ''),
+    langSuffix: opts.langSuffix,
+  });
+  try {
+    const res = await saveExportFile(name, out);
+    // Jalur folder → tersimpan; jalur unduhan → berkas terunduh. Keduanya
+    // butuh kabar karena status-line saja mudah terlewat saat tab Notes aktif.
+    const msg = res.saved ? t('savedTo', res.path) : t('downloadedTo', name);
+    setStatus(msg, 'ok');
+    showToast(msg, 'ok');
+  } catch (e) {
+    const msg = t('exportFailed', String(e?.message || e));
+    setStatus(msg, 'error');
+    showToast(msg, 'error');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1416,7 +2049,21 @@ async function renderHistory() {
     host.innerHTML = `<div class="empty">${t('noHistory')}</div>`;
     return;
   }
-  for (const h of history) {
+  // Pencarian mencakup isi transkrip, bukan hanya judul — itu yang diingat
+  // pengguna tentang sebuah sesi.
+  const query = $('history-search')?.value || '';
+  const shown = searchSessions(history, query);
+  if (!shown.length) {
+    host.innerHTML = `<div class="empty">${t('historyNoMatch', query.trim())}</div>`;
+    return;
+  }
+  if (query.trim()) {
+    const count = document.createElement('div');
+    count.className = 'h-meta';
+    count.textContent = t('historyMatchCount', shown.length, history.length);
+    host.appendChild(count);
+  }
+  for (const h of shown) {
     const div = document.createElement('div');
     div.className = 'h-item';
     const when = new Date(h.ts).toLocaleString();
@@ -1432,6 +2079,7 @@ async function renderHistory() {
         <span>${h.lines?.length || 0} ${t('lines')}${maxT ? ` · ${fmtTs(maxT)}` : ''}</span>
       </div>
       <div class="h-actions">
+        <button class="mini-btn h-open" data-i18n="historyOpen">Open</button>
         <button class="mini-btn h-txt">TXT</button>
         <button class="mini-btn h-srt">SRT</button>
         <button class="mini-btn h-vtt">VTT</button>
@@ -1444,6 +2092,16 @@ async function renderHistory() {
     } else {
       urlEl.remove();
     }
+    for (const hit of matchingLines(h, query)) {
+      const snip = document.createElement('div');
+      snip.className = 'h-snippet';
+      snip.textContent = `“${hit.tgt || hit.src || ''}”`;
+      div.appendChild(snip);
+    }
+    div.querySelector('.h-open').addEventListener('click', (e) => {
+      e.stopPropagation();
+      loadHistorySession(h);
+    });
     div.querySelector('.h-txt').addEventListener('click', (e) => {
       e.stopPropagation();
       exportHistory(h, 'txt');
@@ -1465,12 +2123,46 @@ async function renderHistory() {
   }
 }
 
+/**
+ * Muat kembali sesi tersimpan ke panel dan tunjukkan posisi terakhirnya.
+ *
+ * Sebelumnya entri riwayat hanya bisa diekspor atau dihapus — transkripnya
+ * tidak bisa dibuka lagi. Untuk sesi realtime, transkrip di-cache per URL +
+ * pasangan bahasa, jadi memulai sesi baru pada URL yang sama otomatis
+ * menyambung dari `cacheMaxTime`; pemuat ini menunjukkan di mana itu.
+ */
+function loadHistorySession(h) {
+  const lines = (h?.lines || []).map((l) => ({
+    t0: l.t0 ?? (l.t ?? 0) / 1000,
+    t1: l.t1 != null && l.t1 > 1000 ? l.t1 / 1000 : (l.t1 ?? ((l.t ?? 0) / 1000 + 3)),
+    src: l.src || l.source || '',
+    tgt: l.tgt || l.translation || '',
+  }));
+  if (!lines.length) {
+    setStatus(t('exportNoSource'), 'error');
+    return;
+  }
+  setMode('offline');            // panel hasil dipakai bersama mode luring
+  state.offlineLines = [];
+  $('off-lines').innerHTML = '';
+  $('off-results').classList.remove('hidden');
+  for (const line of lines) pushOfflineLine({ line });
+  state.offlineFile = { name: h.title || 'session' };
+  const lastAt = fmtTs(lines[lines.length - 1].t1);
+  $('off-progress-text').textContent = `${lines.length} ${t('lines')}`;
+  setStatus(t('historyLoaded', lines.length, lastAt), 'ok');
+  if (h.url) showToast(t('historyResume', h.url), 'ok');
+  redrawHelperStatus?.();
+}
+
 function exportHistory(h, kind) {
   exportSession({
     lines: h.lines || [],
     title: h.title,
     url: h.url,
     kind,
+    srcLang: h.srcLang,
+    tgtLang: h.tgtLang,
   });
 }
 
@@ -1479,6 +2171,7 @@ async function refreshExportFolderUi() {
   const label = exportDirLabel();
   $('export-folder-label').textContent = label ? `${t('exportFolderSet')}: ${label}` : t('exportFolderNone');
   $('btn-clear-export-folder').classList.toggle('hidden', !label);
+  redrawHelperStatus?.();
 }
 
 // ---------------------------------------------------------------------------
@@ -1499,7 +2192,7 @@ chrome.runtime.onMessage.addListener((msg) => {
       const s = msg.data?.state;
       if (s === 'loading') setStatus(t('loadingModels'));
       else if (s === 'listening')
-        setStatus(`${t('listening')} (${msg.data.device || ''})`, 'ok');
+        setStatus(`${t('listening')} — ${activeAsrLabel()} (${msg.data.device || ''})`, 'ok');
       break;
     }
     case 'error':
@@ -1525,16 +2218,48 @@ chrome.runtime.onMessage.addListener((msg) => {
       break;
     case 'offline-progress': {
       const d = msg.data;
+      if (d.large) {
+        const pct = Math.max(0, Math.min(100, Math.round(d.pct || 0)));
+        largeFileJob = {
+          name: d.name || state.offlineFile?.name || '',
+          sizeBytes: d.sizeBytes || state.offlineFile?.size || 0,
+          progress: pct / 100,
+          status: d.stage === 'cancelling' ? 'cancelling' : 'running',
+          stage: d.stage,
+          jobId: d.jobId || largeFileJob?.jobId || null,
+          loaded: d.loaded,
+          total: d.total,
+          idx: d.idx,
+          count: d.total && d.idx != null ? d.total : undefined,
+          elapsedS: d.elapsedS,
+          cancellable: d.stage !== 'cancelling',
+        };
+        const stageLabel = t(`lfStage_${d.stage}`, d.stage);
+        setStatus(`${activeAsrLabel()} · ${stageLabel} ${pct}%`);
+        $('off-progress-text').textContent =
+          d.stage === 'upload' && d.total
+            ? `${stageLabel} ${pct}% · ${fmtBytes(d.loaded || 0)} / ${fmtBytes(d.total)}`
+            : d.total && d.idx != null
+              ? `${stageLabel} · ${d.idx} / ${d.total}`
+              : `${stageLabel} ${pct}%`;
+        redrawHelperStatus?.();
+        break;
+      }
       if (d.stage === 'transcribe' && d.total) {
-        setStatus(`${t('processing')} ${d.idx || 0}/${d.total}`);
+        setStatus(`${activeAsrLabel()} · ${t('processing')} ${d.idx || 0}/${d.total}`);
+        $('off-progress-text').textContent = `${activeAsrLabel()} · ${d.idx || 0} / ${d.total}`;
       } else {
-        setStatus(`${t('processing')} (${d.stage})`);
+        setStatus(`${activeAsrLabel()} · ${t('processing')} (${d.stage})`);
       }
       break;
     }
     case 'offline-done':
       state.offlineRunning = false;
       syncCaptureStamp();
+      if (largeFileJob) {
+        largeFileJob = { ...largeFileJob, progress: 1, status: 'done', stage: 'done', cancellable: false };
+        redrawHelperStatus?.();
+      }
       setStatus(t('done'), 'ok');
       updateButtons();
       renderHistory();
@@ -1542,6 +2267,16 @@ chrome.runtime.onMessage.addListener((msg) => {
     case 'offline-error':
       state.offlineRunning = false;
       syncCaptureStamp();
+      if (largeFileJob) {
+        largeFileJob = {
+          ...largeFileJob,
+          status: msg.data?.cancelled ? 'cancelled' : 'error',
+          stage: msg.data?.cancelled ? 'cancelled' : 'error',
+          error: msg.data?.cancelled ? '' : msg.data?.message || 'Error',
+          cancellable: false,
+        };
+        redrawHelperStatus?.();
+      }
       setStatus(msg.data?.cancelled ? t('cancelled') : msg.data?.message || 'Error', msg.data?.cancelled ? '' : 'error');
       updateButtons();
       break;
@@ -1559,6 +2294,16 @@ chrome.runtime.onMessage.addListener((msg) => {
 function wire() {
   document.querySelectorAll('#view-tabs button').forEach((b) =>
     b.addEventListener('click', () => setView(b.dataset.view)),
+  );
+  document.querySelectorAll('.bottom-nav-item').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (b.dataset.view === 'settings') {
+        openSettings();
+      } else {
+        setView(b.dataset.view);
+      }
+      syncBottomNav();
+    }),
   );
   // ⌘⇧F / Ctrl+Shift+F — tandai momen. Hanya saat tampilan Notulen terlihat
   // dan ada tugas tangkap yang berjalan; tombolnya sendiri yang menyimpan,
@@ -1580,17 +2325,40 @@ function wire() {
   document.querySelectorAll('#task-toggle button').forEach((b) =>
     b.addEventListener('click', () => setTask(b.dataset.task)),
   );
+  document.querySelectorAll('#theme-toggle button').forEach((b) =>
+    b.addEventListener('click', () => setTheme(b.dataset.theme)),
+  );
+  document.querySelectorAll('#reskin-toggle button').forEach((b) =>
+    b.addEventListener('click', () => setReskin(b.dataset.reskin)),
+  );
+  document.querySelectorAll('#asr-preset-toggle button').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const key = ASR_PRESETS[b.dataset.preset];
+      if (!key || !ASR_MODELS[key]) return;
+      state.settings.asrModel = key;
+      await saveSettings();
+      renderModelLists();
+      updateWarning();
+    }),
+  );
+  chrome.storage.onChanged?.addListener((changes, area) => {
+    if (area && area !== 'local') return;
+    applyExternalSettings(changes.settings?.newValue);
+  });
+  $('btn-reskin-reset')?.addEventListener('click', () => setReskin('yraverage'));
   $('src-lang').addEventListener('change', (e) => {
     state.srcLang = e.target.value;
     renderInterpreterUi();
     updateWarning();
     persistLastConfig();
+    redrawHelperStatus?.();
   });
   $('tgt-lang').addEventListener('change', (e) => {
     state.tgtLang = e.target.value;
     renderInterpreterUi();
     updateWarning();
     persistLastConfig();
+    redrawHelperStatus?.();
   });
 
   $('btn-interpreter').addEventListener('click', openInterpreterModal);
@@ -1612,6 +2380,10 @@ function wire() {
   $('btn-start').addEventListener('click', onStart);
   $('btn-stop').addEventListener('click', onStop);
   $('btn-pick').addEventListener('click', onPickManually);
+  $('btn-paste-generate')?.addEventListener('click', () => void generateMinutesFromPaste());
+  $('history-search')?.addEventListener('input', () => {
+    void renderHistory();
+  });
   $('btn-srt').addEventListener('click', () => exportLines('srt'));
   $('btn-vtt').addEventListener('click', () => exportLines('vtt'));
   $('btn-txt').addEventListener('click', () => exportLines('txt'));
@@ -1628,23 +2400,27 @@ function wire() {
     await refreshExportFolderUi();
   });
 
-  $('btn-settings').addEventListener('click', () => {
-    $('settings-modal').classList.remove('hidden');
-    lastNativeAutoStartMs = 0;
-    labEnsureAttempted = false;
-    checkNative({ allowAutoStart: true });
-    startNativePoll();
-    $('about-block').classList.add('hidden');
-    renderModelLists();
-  });
+  $('btn-settings').addEventListener('click', () => openSettings());
   $('btn-close-settings').addEventListener('click', () => {
     $('settings-modal').classList.add('hidden');
     stopNativePoll();
+    syncBottomNav();
   });
-  $('btn-about').addEventListener('click', () => {
-    $('settings-modal').classList.remove('hidden');
-    $('about-block').classList.remove('hidden');
-    $('about-block').scrollIntoView({ behavior: 'smooth' });
+  $('btn-about').addEventListener('click', () => openSettings({ about: true }));
+  // Esc menutup modal yang terbuka agar kedua nav kembali ke menu aktif.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.isComposing) return;
+    let closed = false;
+    if (!$('settings-modal').classList.contains('hidden')) {
+      $('settings-modal').classList.add('hidden');
+      stopNativePoll();
+      closed = true;
+    }
+    if (!$('interpreter-modal').classList.contains('hidden')) {
+      $('interpreter-modal').classList.add('hidden');
+      closed = true;
+    }
+    if (closed) syncBottomNav();
   });
 
   document.querySelectorAll('#mirror-toggle button').forEach((b) =>
@@ -1653,6 +2429,9 @@ function wire() {
       await saveSettings();
       await loadSettings();
     }),
+  );
+  document.querySelectorAll('#native-device-toggle button').forEach((b) =>
+    b.addEventListener('click', () => setNativeDevice(b.dataset.hdevice)),
   );
   document.querySelectorAll('#device-toggle button').forEach((b) =>
     b.addEventListener('click', async () => {
@@ -1695,6 +2474,84 @@ function wire() {
 }
 
 // ---------------------------------------------------------------------------
+// Mock data for layout demonstration (tiruan)
+function populateMockData() {
+  // Mock history data
+  const mockHistory = [
+    {
+      id: 'mock-1',
+      ts: Date.now() - 3600000,
+      mode: 'realtime',
+      title: 'Team Standup Meeting',
+      url: 'https://meet.google.com/abc-defg-hij',
+      srcLang: 'en',
+      tgtLang: 'id',
+      lines: [
+        { t0: 0, t1: 5.2, src: 'Good morning everyone', tgt: 'Selamat pagi semuanya' },
+        { t0: 5.2, t1: 12.8, src: 'Let me share the updates from yesterday', tgt: 'Izinkan saya berbagi update kemarin' },
+        { t0: 12.8, t1: 20.1, src: 'We completed the API integration', tgt: 'Kami sudah selesaikan integrasi API' },
+      ],
+    },
+    {
+      id: 'mock-2',
+      ts: Date.now() - 7200000,
+      mode: 'offline',
+      title: 'Product Demo Recording',
+      url: '',
+      srcLang: 'ja',
+      tgtLang: 'en',
+      lines: [
+        { t0: 0, t1: 3.5, src: 'こんにちは、皆さん', tgt: 'Hello everyone' },
+        { t0: 3.5, t1: 9.2, src: '今日は新しい機能を紹介します', tgt: "Today I'll introduce new features" },
+      ],
+    },
+    {
+      id: 'mock-3',
+      ts: Date.now() - 10800000,
+      mode: 'realtime',
+      title: 'Client Call - Project Review',
+      url: 'https://zoom.us/j/123456789',
+      srcLang: 'id',
+      tgtLang: 'en',
+      lines: [
+        { t0: 0, t1: 4.1, src: 'Terima kasih sudah bergabung', tgt: 'Thank you for joining' },
+        { t0: 4.1, t1: 11.3, src: 'Proyek ini sudah 80 persen selesai', tgt: 'This project is 80 percent complete' },
+      ],
+    },
+  ];
+
+  // Store mock history if empty
+  chrome.storage.local.get('history', (result) => {
+    if (!result.history || result.history.length === 0) {
+      chrome.storage.local.set({ history: mockHistory });
+    }
+  });
+
+  // Mock live preview data (shown when not running)
+  const mockLiveLines = [
+    { src: 'This is a sample transcription', tgt: 'Ini adalah contoh transkripsi' },
+    { src: 'The system is working correctly', tgt: 'Sistem berfungsi dengan benar' },
+    { src: 'Real-time translation is active', tgt: 'Terjemahan real-time sedang aktif' },
+  ];
+
+  // Populate live preview with mock data after a short delay
+  setTimeout(() => {
+    if (!state.running && !state.offlineRunning) {
+      const srcHost = $('live-src-lines');
+      const tgtHost = $('live-tgt-lines');
+      if (srcHost && tgtHost && srcHost.children.length === 0 && tgtHost.children.length === 0) {
+        mockLiveLines.forEach((line, i) => {
+          setTimeout(() => {
+            appendLiveLine(srcHost, line.src);
+            appendLiveLine(tgtHost, line.tgt);
+          }, i * 400);
+        });
+      }
+    }
+  }, 800);
+}
+
+// ---------------------------------------------------------------------------
 async function init() {
   await loadSettings();
   wire();
@@ -1707,14 +2564,16 @@ async function init() {
   setTask('translate');
   await refreshDownloaded();
   renderModelLists();
+  populateMockData();
+  await renderHistory();
   updateWarning();
   if (state.settings.engine === 'native' || state.mode === 'offline') {
-    checkNative({ allowAutoStart: true });
+    await checkNative({ allowAutoStart: true });
     updateNativeHostHint();
+    await pullUiPrefs();
   }
   await refreshTab();
   await refreshExportFolderUi();
-  await renderHistory();
   const notesMount = $('notes-mount');
   if (notesMount) {
     await mountNotesPanel(notesMount, notesMountOptions());
@@ -1728,7 +2587,41 @@ async function init() {
       engine: state.settings.engine || 'browser',
       task: state.task,
       mode: state.mode,
+      lang: state.settings.uiLang || 'en',
+      largeFile: largeFileJob,
+      exportOptions: exportOptions(),
+      exportSource: currentExportSource(),
+      exportFolder: exportDirLabel(),
+      onExportOptionChange: updateExportOptions,
+      onExport: (kind) => {
+        const source = currentExportSource();
+        if (source) void exportSession({ ...source, kind });
+      },
+      onCancelLargeFile: () => {
+        if (largeFileJob && largeFileJob.status === 'running') {
+          largeFileJob = { ...largeFileJob, status: 'cancelling', stage: 'cancelling', cancellable: false };
+          redrawHelperStatus?.();
+        }
+        toOffscreen('offline-cancel', {});
+      },
     }));
+  }
+  const guideMount = $('helper-guide-mount');
+  if (guideMount) {
+    redrawHelperGuide = mountHelperGuide(guideMount, () => ({
+      lang: state.settings.uiLang || 'en',
+      health: nativeInfo,
+      engine: state.settings.engine || 'browser',
+      nativeHostSupported: nativeHostSupported(),
+      hostInstalled: nativeHostInstalled,
+      hostConnection: nativeHostConn,
+      onRecheck: () => {
+        probeNativeHost();
+        return checkNative({ allowAutoStart: false });
+      },
+    }));
+    // Sekali di awal: isi diagnostik tanpa menunggu pengguna menekan Start.
+    probeNativeHost();
   }
   // resync with a session that may already be running
   const s = await toBG('get-state', {});
@@ -1746,7 +2639,7 @@ async function init() {
       syncRefineCheckboxes();
     }
     $('live-preview').classList.remove('hidden');
-    setStatus(t('listening'), 'ok');
+    setStatus(`${t('listening')} — ${activeAsrLabel()}`, 'ok');
     updateButtons();
   }
   await toBG('ensure-offscreen', {});

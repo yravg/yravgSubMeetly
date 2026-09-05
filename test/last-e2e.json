@@ -1,55 +1,8 @@
 {
   "source": "e2e",
-  "generatedAt": "2026-09-03T08:05:11.697Z",
-  "mode": "e2e-file",
+  "generatedAt": "2026-09-05T10:11:02.067Z",
+  "mode": "e2e-realtime",
   "suites": [
-    {
-      "id": "e2e-realtime",
-      "kind": "e2e",
-      "name": "E2E subtitel tab (tabCapture)",
-      "command": "node scripts/e2e.mjs --harness-only",
-      "script": "scripts/e2e.mjs",
-      "status": "pass",
-      "durationMs": 16,
-      "lastRun": "2026-09-03T08:05:11.645Z",
-      "covers": "Puppeteer + tabCapture allowlisted → subtitel + overlay",
-      "checks": [
-        {
-          "id": "e2e-dist",
-          "name": "Paket dist/ ada",
-          "status": "pass",
-          "detail": "Jalankan npm run build"
-        },
-        {
-          "id": "e2e-audio-page",
-          "name": "Halaman audio uji ada",
-          "status": "pass",
-          "detail": "test/audio-page.html"
-        },
-        {
-          "id": "e2e-speech",
-          "name": "Berkas speech.wav ada",
-          "status": "pass",
-          "detail": "test/speech.wav dibutuhkan audio-page"
-        },
-        {
-          "id": "e2e-lab-server",
-          "name": "Lab server audio-page",
-          "status": "pass",
-          "detail": "http://127.0.0.1:8799/audio-page.html → 200"
-        },
-        {
-          "id": "e2e-puppeteer",
-          "name": "Paket puppeteer terpasang",
-          "status": "pass",
-          "detail": "npm i (devDependency puppeteer)"
-        }
-      ],
-      "log": [
-        "[e2e] harness-only: prasyarat dicek, Chrome headed dilewati"
-      ],
-      "error": null
-    },
     {
       "id": "e2e-file",
       "kind": "e2e",
@@ -57,8 +10,8 @@
       "command": "node scripts/e2e-file.mjs",
       "script": "scripts/e2e-file.mjs",
       "status": "pass",
-      "durationMs": 4,
-      "lastRun": "2026-09-03T08:05:11.696Z",
+      "durationMs": 6,
+      "lastRun": "2026-09-04T15:53:28.105Z",
       "covers": "formatSrt/formatVtt/formatTxt + wiring Offline dropzone; opsional Puppeteer --browser",
       "checks": [
         {
@@ -124,6 +77,172 @@
       ],
       "log": [
         "[e2e-file] mode default: kontrak ekspor + wiring (pakai --browser untuk Puppeteer offline)"
+      ],
+      "error": null
+    },
+    {
+      "id": "e2e-crossos",
+      "kind": "e2e",
+      "name": "E2E lintas-OS (helper → job → ekspor → ffmpeg)",
+      "command": "node scripts/e2e-crossos.mjs",
+      "script": "scripts/e2e-crossos.mjs",
+      "status": "pass",
+      "durationMs": 3165,
+      "lastRun": "2026-09-05T06:51:38.663Z",
+      "platform": "darwin/arm64",
+      "covers": "job berkas streaming, stempel waktu, ekspor SRT/VTT diverifikasi ffmpeg, pembatasan loopback",
+      "checks": [
+        {
+          "id": "crossos-ffmpeg",
+          "name": "ffmpeg tersedia",
+          "status": "pass",
+          "detail": "/opt/homebrew/bin/ffmpeg"
+        },
+        {
+          "id": "crossos-sample",
+          "name": "Sampel media ada",
+          "status": "pass",
+          "detail": "test/speech.wav"
+        },
+        {
+          "id": "crossos-helper",
+          "name": "Helper hidup",
+          "status": "pass",
+          "detail": "engine=mlx-whisper model=mlx-community/whisper-large-v3-turbo"
+        },
+        {
+          "id": "crossos-engine",
+          "name": "Engine sesuai platform",
+          "status": "pass",
+          "detail": "mlx-whisper"
+        },
+        {
+          "id": "crossos-helper-ffmpeg",
+          "name": "Helper menemukan ffmpeg",
+          "status": "pass",
+          "detail": "ok"
+        },
+        {
+          "id": "crossos-loopback",
+          "name": "Asal web ditolak",
+          "status": "pass",
+          "detail": "403"
+        },
+        {
+          "id": "crossos-job",
+          "name": "Job berkas selesai",
+          "status": "pass",
+          "detail": "3 segmen, progress terlihat=true"
+        },
+        {
+          "id": "crossos-times",
+          "name": "Stempel waktu waras",
+          "status": "pass",
+          "detail": "max end=8.48s"
+        },
+        {
+          "id": "crossos-export-srt",
+          "name": "Ekspor SRT bisa dibaca ffmpeg",
+          "status": "pass",
+          "detail": "4 cue terbaca"
+        },
+        {
+          "id": "crossos-export-vtt",
+          "name": "Ekspor VTT bisa dibaca ffmpeg",
+          "status": "pass",
+          "detail": "3 cue terbaca"
+        }
+      ],
+      "log": [
+        "platform=darwin arch=arm64",
+        "job job-1788591095550"
+      ],
+      "error": null
+    },
+    {
+      "id": "e2e-realtime",
+      "kind": "e2e",
+      "name": "E2E subtitel tab (tabCapture)",
+      "command": "node scripts/e2e.mjs",
+      "script": "scripts/e2e.mjs",
+      "status": "pass",
+      "durationMs": 97543,
+      "lastRun": "2026-09-05T10:11:02.033Z",
+      "covers": "Puppeteer + tabCapture allowlisted → subtitel + overlay",
+      "checks": [
+        {
+          "id": "e2e-dist",
+          "name": "Paket dist/ ada",
+          "status": "pass",
+          "detail": "Jalankan npm run build"
+        },
+        {
+          "id": "e2e-audio-page",
+          "name": "Halaman audio uji ada",
+          "status": "pass",
+          "detail": "test/audio-page.html"
+        },
+        {
+          "id": "e2e-speech",
+          "name": "Berkas speech.wav ada",
+          "status": "pass",
+          "detail": "test/speech.wav dibutuhkan audio-page"
+        },
+        {
+          "id": "e2e-lab-server",
+          "name": "Lab server audio-page",
+          "status": "pass",
+          "detail": "http://127.0.0.1:8799/audio-page.html → 200"
+        },
+        {
+          "id": "e2e-puppeteer",
+          "name": "Paket puppeteer terpasang",
+          "status": "pass",
+          "detail": "npm i (devDependency puppeteer)"
+        },
+        {
+          "id": "e2e-sw",
+          "name": "Service worker ekstensi ditemukan",
+          "status": "pass",
+          "detail": "ajoaledpmoiedfkbibbnngcfjljpddio"
+        },
+        {
+          "id": "e2e-tab",
+          "name": "Side Panel menarget AudioTestPage",
+          "status": "pass",
+          "detail": "AudioTestPage"
+        },
+        {
+          "id": "e2e-lines",
+          "name": "Baris subtitel muncul di pratinjau",
+          "status": "pass",
+          "detail": "Terjemahan real-time sedang aktifThis device, hello everyone! This is a local subtitle test, the quick brown fox jumps over the lazy dog, machine learning runs "
+        },
+        {
+          "id": "e2e-overlay",
+          "name": "Overlay diinjeksi ke halaman audio",
+          "status": "pass",
+          "detail": ":host, * { box-sizing: border-box; }\n      .panel {\n        /* Cermin paket motion sidepanel.css (--ease-standard/--transition-base).\n           Shadow DOM terisolasi sehingga token halaman tak terbac"
+        },
+        {
+          "id": "e2e-stop",
+          "name": "End Task menghentikan sesi",
+          "status": "pass",
+          "detail": "#btn-stop diklik"
+        }
+      ],
+      "log": [
+        "[e2e] extension id: ajoaledpmoiedfkbibbnngcfjljpddio",
+        "[e2e] audio page playing",
+        "[e2e] settings: {\"uiLang\":\"en\",\"mirror\":\"huggingface\",\"device\":\"wasm\",\"dualLine\":false,\"overlayFontSize\":24,\"asrModel\":\"whisper-tiny\",\"engine\":\"browser\",\"nativeUrl\":\"http://127.0.0.1:17865\"}",
+        "[e2e] panel sees tab: AudioTestPage",
+        "[e2e] start clicked — waiting for model load + first subtitles (first run downloads ~41 MB)…",
+        "[e2e] status: Loading local AI models…",
+        "[e2e] status: Listening — subtitles appear on the video page — Whisper Tiny · WASM (wasm)",
+        "[e2e] SUBTITLES after 90s: Terjemahan real-time sedang aktifThis device, hello everyone! This is a local subtitle test, the quick brown fox jumps over the lazy dog, machine learning runs completely on this device. Hello everyone! This is a local subtitle test, the quick brown fox jumps over the lazy dog, machine learning runs",
+        "[e2e] overlay injected into page: true",
+        "[e2e] overlay text: :host, * { box-sizing: border-box; }\n      .panel {\n        /* Cermin paket motion sidepanel.css (--ease-standard/--transition-base).\n           Shadow DOM terisolasi sehingga token halaman tak terbac",
+        "[e2e] E2E PASS ✅"
       ],
       "error": null
     }

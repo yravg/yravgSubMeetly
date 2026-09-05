@@ -2,7 +2,7 @@
 
 Dibuat otomatis oleh `scripts/bench-report.mjs` dari `last-models-bench.json`.
 
-- **Generated:** 2026-09-03T03:54:02.026Z
+- **Generated:** 2026-09-04T15:53:08.736Z
 - **Source:** catalog+last-bench
 - **Target draft:** ≤ **500 ms** (`POST /draft` native)
 

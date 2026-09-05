@@ -7,6 +7,29 @@ import AppKit
 import SwiftUI
 import TransSubKit
 
+/// Panel subtitel yang TIDAK PERNAH bisa mengambil fokus keyboard.
+///
+/// `.nonactivatingPanel` hanya mencegah *aplikasi* ikut aktif — ia tidak
+/// mencegah panel menjadi key window. Sementara `.titled` dan `.resizable`
+/// (dipakai agar panel bisa di-drag dan diubah ukurannya) membuat
+/// `canBecomeKey` bernilai true secara bawaan. Akibatnya jendela yang sedang
+/// diketik pengguna melepas status key: kursor berhenti berkedip dan ketikan
+/// nyasar ke panel. Bagi pengguna itu sama saja dengan fokus dirampas.
+///
+/// `becomesKeyOnlyIfNeeded` tidak cukup: ia justru MEMBERI status key ketika
+/// ada view yang butuh first responder (mis. teks yang bisa diseleksi).
+private final class NonKeyOverlayPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+/// `NSHostingView` menolak klik pertama di jendela non-key, sehingga setiap
+/// kontrol toolbar akan butuh dua klik. Panel ini sengaja tidak pernah key,
+/// jadi klik pertama harus tetap diterima.
+private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 @MainActor
 final class OverlayController {
     private var panel: NSPanel?
@@ -38,7 +61,7 @@ final class OverlayController {
             x: screen.frame.midX - size.width / 2,
             y: screen.frame.minY + screen.frame.height * 0.10)
 
-        let p = NSPanel(
+        let p = NonKeyOverlayPanel(
             contentRect: NSRect(origin: origin, size: size),
             // .resizable so the transcript can be sized like the extension panel.
             // .titled + .fullSizeContentView (with the titlebar hidden) instead
@@ -51,6 +74,8 @@ final class OverlayController {
             backing: .buffered,
             defer: false)
         p.isFloatingPanel = true
+        // Harus SETELAH isFloatingPanel: properti itu menetapkan level .floating,
+        // yang akan menimpa nilai ini bila urutannya dibalik.
         // .screenSaver sits above fullscreen video; .statusBar is not enough.
         p.level = .screenSaver
         p.collectionBehavior = [
@@ -77,7 +102,7 @@ final class OverlayController {
         // Effectively unbounded: let it be dragged as large as the display.
         p.maxSize = NSSize(width: 100_000, height: 100_000)
 
-        let host = NSHostingView(rootView: OverlayPanelView(model: model))
+        let host = FirstMouseHostingView(rootView: OverlayPanelView(model: model))
         host.autoresizingMask = [.width, .height]
         p.contentView = host
 
@@ -98,13 +123,28 @@ final class OverlayController {
     }
 
     func resetPosition() {
-        guard let p = panel, let screen = NSScreen.main else { return }
-        let size = NSSize(width: min(760, screen.frame.width * 0.55), height: 300)
+        move(to: "bottom", animate: true)
+    }
+
+    /// Pindah ke preset posisi (top/center/bottom), simpan pilihan + bingkai.
+    func move(to position: String) {
+        move(to: position, animate: true)
+    }
+
+    private func move(to position: String, animate: Bool) {
+        guard let screen = NSScreen.main else { return }
+        let pos = ["top", "center", "bottom"].contains(position) ? position : "bottom"
+        let p = panel
+        let size = p?.frame.size ?? NSSize(width: min(760, screen.frame.width * 0.55), height: 300)
+        let yFrac = pos == "top" ? 0.72 : pos == "center" ? 0.42 : 0.10
         let origin = NSPoint(
             x: screen.frame.midX - size.width / 2,
-            y: screen.frame.minY + screen.frame.height * 0.10)
-        p.setFrame(NSRect(origin: origin, size: size), display: true, animate: true)
-        Prefs.shared.overlayFrame = NSStringFromRect(p.frame)
+            y: screen.frame.minY + screen.frame.height * yFrac)
+        if let p {
+            p.setFrame(NSRect(origin: origin, size: size), display: true, animate: animate)
+            Prefs.shared.overlayFrame = NSStringFromRect(p.frame)
+        }
+        Prefs.shared.overlayPosition = pos
     }
 }
 

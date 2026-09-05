@@ -19,6 +19,10 @@ enum OverlayProbe {
         // Diagnostics must not change the user's saved layout.
         let savedFrame = Prefs.shared.overlayFrame
         defer { Prefs.shared.overlayFrame = savedFrame }
+        // Tempuh inisialisasi yang sama dengan aplikasi sungguhan, kalau tidak
+        // probe menguji objek yang belum terpasang wiring-nya (observer
+        // preferensi dipasang di bootstrap) dan hasilnya menyesatkan.
+        controller.bootstrap()
         controller.showOverlayDemo()
         try? await Task.sleep(nanoseconds: 1_500_000_000)
 
@@ -66,7 +70,23 @@ enum OverlayProbe {
         say("min clamp          : \(Int(w.frame.width))x\(Int(w.frame.height)) "
             + "(floor \(Int(w.minSize.width))x\(Int(w.minSize.height)))")
 
-        let ok = m.contains(.resizable) && m.contains(.titled)
+        // Preferensi tampilan harus BERLAKU pada overlay yang sedang tampil,
+        // bukan hanya tersimpan. Ubah lewat PrefsBridge (jalur yang dipakai
+        // Settings) lalu periksa modelnya ikut berubah.
+        let bridge = PrefsBridge.shared
+        let savedFont = bridge.fontSize
+        let savedOpacity = bridge.opacity
+        bridge.fontSize = savedFont == 30 ? 22 : 30
+        bridge.opacity = savedOpacity == 0.5 ? 0.9 : 0.5
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        let fontApplied = controller.overlayModel.fontSize == bridge.fontSize
+        let opacityApplied = controller.overlayModel.opacity == bridge.opacity
+        say("live font applied  : \(fontApplied) (prefs \(bridge.fontSize) → model \(controller.overlayModel.fontSize))")
+        say("live opacity applied: \(opacityApplied) (prefs \(bridge.opacity) → model \(controller.overlayModel.opacity))")
+        bridge.fontSize = savedFont
+        bridge.opacity = savedOpacity
+
+        let ok = fontApplied && opacityApplied && m.contains(.resizable) && m.contains(.titled)
             && afterMove.origin != start.origin
             && afterResize.width > afterMove.width && afterResize.height > afterMove.height
         say(ok ? "RESULT: PASS — movable and resizable" : "RESULT: FAIL")

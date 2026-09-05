@@ -16,6 +16,46 @@ enum Brand {
     }
 }
 
+/// Pola aksen lokal — cermin dari token reskin ekstensi (sidepanel.css).
+/// Identitas warna yang sama, di-reskin tanpa branding luar.
+enum ReskinPattern: String, CaseIterable, Identifiable {
+    case yraverage
+    case coretax
+    case modern
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .yraverage: "Yraverage Klasik"
+        case .coretax: "Coretax"
+        case .modern: "Yraverage Modern"
+        }
+    }
+
+    func accent(_ scheme: ColorScheme) -> Color {
+        switch self {
+        case .yraverage:
+            Brand.accent(scheme)
+        case .coretax:
+            scheme == .dark
+                ? Color(red: 0x8A / 255, green: 0xB4 / 255, blue: 0xF8 / 255)
+                : Color(red: 0x0B / 255, green: 0x57 / 255, blue: 0xD0 / 255)
+        case .modern:
+            scheme == .dark
+                ? Color(red: 0xC4 / 255, green: 0xB5 / 255, blue: 0xFD / 255)
+                : Color(red: 0x6D / 255, green: 0x28 / 255, blue: 0xD9 / 255)
+        }
+    }
+}
+
+extension Brand {
+    /// Aksen aktif dari preferensi tersimpan — selalu jatuh ke Klasik.
+    static func reskinAccent(_ id: String, _ scheme: ColorScheme) -> Color {
+        (ReskinPattern(rawValue: id) ?? .yraverage).accent(scheme)
+    }
+}
+
 /// The wordmark, redrawn as text so it scales crisply: "yraverage" + a teal
 /// "Sub" tag, matching the logo's construction.
 struct Wordmark: View {

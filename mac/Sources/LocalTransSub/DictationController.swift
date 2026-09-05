@@ -20,6 +20,8 @@ final class DictationController: ObservableObject {
 
     @Published private(set) var mode: Mode = .idle
     @Published var lastError = ""
+    /// True selagi event tap hotkey terpasang dan mendengarkan.
+    @Published private(set) var tapActive = false
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -27,6 +29,9 @@ final class DictationController: ObservableObject {
     private let pcm = PCMBuffer()
     private var transcriberBox: AnyObject?
     private var lastFnDown = Date.distantPast
+    /// Aplikasi yang memegang kursor saat rekaman dimulai. Teks harus kembali
+    /// ke sini walau fokus sempat berpindah selama transkripsi berjalan.
+    private var targetApp: NSRunningApplication?
     private var autoStopTask: Task<Void, Never>?
     private var pill: DictationPill?
 
@@ -46,6 +51,7 @@ final class DictationController: ObservableObject {
         }
         eventTap = nil
         runLoopSource = nil
+        tapActive = false
         Task { await cancelRecording() }
     }
 
@@ -55,6 +61,7 @@ final class DictationController: ObservableObject {
         // flagsChanged carries the fn key; keyDown lets Esc cancel.
         let mask =
             (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.keyUp.rawValue)
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             guard let refcon else { return Unmanaged.passUnretained(event) }
             let controller = Unmanaged<DictationController>.fromOpaque(refcon)
@@ -77,6 +84,7 @@ final class DictationController: ObservableObject {
             lastError =
                 "Input Monitoring permission is required for the dictation hotkey. "
                 + "Grant it in System Settings → Privacy & Security → Input Monitoring."
+            tapActive = false
             return
         }
         eventTap = tap
@@ -84,13 +92,20 @@ final class DictationController: ObservableObject {
         runLoopSource = src
         CFRunLoopAddSource(CFRunLoopGetCurrent(), src, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        tapActive = true
     }
 
     private func handle(type: CGEventType, event: CGEvent) {
-        switch type {
-        case .flagsChanged:
-            let fnDown = event.flags.contains(.maskSecondaryFn)
-            if fnDown {
+        // Esc membatalkan, apa pun hotkey-nya.
+        if type == .keyDown,
+           event.getIntegerValueField(.keyboardEventKeycode) == Int64(kVK_Escape),
+           mode != .idle {
+            Task { await cancelRecording() }
+            return
+        }
+        switch DictationHotkey.state(Prefs.shared.dictationHotkey, type: type, event: event) {
+        case .some(true):
+            do {
                 let now = Date()
                 if now.timeIntervalSince(lastFnDown) < 0.4 {
                     // double-tap → hands-free
@@ -104,17 +119,12 @@ final class DictationController: ObservableObject {
                 }
                 lastFnDown = now
                 if mode == .idle { Task { await beginRecording(handsFree: false) } }
-            } else {
-                if mode == .holding { Task { await finishRecording() } }
             }
 
-        case .keyDown:
-            let code = event.getIntegerValueField(.keyboardEventKeycode)
-            if code == Int64(kVK_Escape), mode != .idle {
-                Task { await cancelRecording() }
-            }
+        case .some(false):
+            if mode == .holding { Task { await finishRecording() } }
 
-        default:
+        case .none:
             break
         }
     }
@@ -123,6 +133,9 @@ final class DictationController: ObservableObject {
 
     private func beginRecording(handsFree: Bool) async {
         guard mode == .idle else { return }
+        let front = NSWorkspace.shared.frontmostApplication
+        targetApp = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier
+            ? nil : front
         guard #available(macOS 26.0, *) else {
             lastError = TranscriberError.unsupportedOS.localizedDescription
             return
@@ -183,6 +196,7 @@ final class DictationController: ObservableObject {
     }
 
     private func cancelRecording() async {
+        targetApp = nil
         guard mode != .idle else { return }
         teardownAudio()
         pcm.clear()
@@ -233,7 +247,19 @@ final class DictationController: ObservableObject {
         var text = collected.joined()
         if Prefs.shared.dictationCleanup { text = DictationCleanup.clean(text) }
         hidePill()
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            targetApp = nil
+            return
+        }
+        // Ada jeda ratusan milidetik–detik antara hotkey dilepas dan ⌘V terkirim
+        // (transkripsi + jeda 400 ms di atas). Kalau fokus sempat pindah, teks
+        // akan mendarat di aplikasi yang salah — dan clipboard lama sudah telanjur
+        // ditimpa. Kembalikan target lebih dulu.
+        if let targetApp, !targetApp.isActive {
+            targetApp.activate()
+            try? await Task.sleep(nanoseconds: 150_000_000)
+        }
+        targetApp = nil
         Inserter.insert(text, restoreClipboard: Prefs.shared.restoreClipboard)
     }
 
@@ -314,6 +340,36 @@ enum DictationCleanup {
     }
 }
 
+/// Menerjemahkan pilihan hotkey di Settings menjadi pencocokan event.
+///
+/// Sebelumnya handler mengunci ke `.maskSecondaryFn`, sehingga tiga dari empat
+/// pilihan di Settings tidak berfungsi — dan sembarang kombinasi fn (fn+panah,
+/// fn+F-key) ikut memulai rekaman.
+enum DictationHotkey {
+    /// Bit device-dependent: membedakan modifier kiri dan kanan.
+    private static let rightCommand: UInt64 = 0x0000_0010
+    private static let rightOption: UInt64 = 0x0000_0040
+
+    /// true = hotkey ditekan, false = dilepas, nil = event bukan hotkey kita.
+    static func state(_ id: String, type: CGEventType, event: CGEvent) -> Bool? {
+        switch id {
+        case "f5":
+            let code = event.getIntegerValueField(.keyboardEventKeycode)
+            guard code == Int64(kVK_F5) else { return nil }
+            if type == .keyDown { return true }
+            if type == .keyUp { return false }
+            return nil
+        case "rightOption", "rightCommand":
+            guard type == .flagsChanged else { return nil }
+            let bit = id == "rightOption" ? rightOption : rightCommand
+            return (event.flags.rawValue & bit) != 0
+        default: // "fn"
+            guard type == .flagsChanged else { return nil }
+            return event.flags.contains(.maskSecondaryFn)
+        }
+    }
+}
+
 /// Inserts text at the cursor via the pasteboard + ⌘V.
 enum Inserter {
     @MainActor
@@ -327,11 +383,14 @@ enum Inserter {
             NSLog("[TransSub] Accessibility not granted — text left on the clipboard.")
             return
         }
-        let src = CGEventSource(stateID: .combinedSessionState)
+        // .privateState, bukan .combinedSessionState: yang terakhir ikut membawa
+        // modifier yang masih ditekan fisik oleh pengguna. Pada mode hands-free
+        // fn sering masih tertekan saat paste, sehingga ⌘V berubah jadi fn-⌘V.
+        let src = CGEventSource(stateID: .privateState)
         let vDown = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true)
         vDown?.flags = .maskCommand
         let vUp = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false)
-        vUp?.flags = .maskCommand
+        vUp?.flags = []
         vDown?.post(tap: .cgAnnotatedSessionEventTap)
         vUp?.post(tap: .cgAnnotatedSessionEventTap)
 
@@ -372,6 +431,11 @@ final class DictationPill {
         p.isFloatingPanel = true
         p.level = .screenSaver
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        // NSPanel default-nya menyembunyikan diri saat app tidak aktif — padahal
+        // pil ini justru muncul ketika aplikasi LAIN sedang dipakai.
+        p.hidesOnDeactivate = false
+        // Indikator status murni: jangan pernah menelan klik pengguna.
+        p.ignoresMouseEvents = true
         p.backgroundColor = .clear
         p.isOpaque = false
         p.hasShadow = true

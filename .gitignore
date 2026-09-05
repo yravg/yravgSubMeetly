@@ -36,3 +36,7 @@ mac/build/
 .DS_Store
 *.log
 *.pid
+
+# Python bytecode
+__pycache__/
+*.pyc

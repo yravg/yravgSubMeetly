@@ -87,6 +87,36 @@ export function serializeMeetingMarkdown(meeting, lang = meeting.locale || 'en',
   return lines.join('\n');
 }
 
+/** Notulen sebagai TXT polos — judul, ringkasan, keputusan, tindak lanjut. */
+export function serializeMeetingTxt(meeting, lang = meeting.locale || 'en') {
+  const stats = meetingStats(meeting);
+  const lines = [
+    meeting.title,
+    `${meeting.id} · ${meeting.date}`,
+    meeting.issuedAt ? `Issued: ${meeting.issuedAt}` : 'Draft — not yet issued',
+    '',
+    `${stats.total} items · ${stats.actionsOpen}/${stats.actionsTotal} actions open · ${stats.decisions} decisions`,
+    '',
+  ];
+  const summary = meeting.summary?.[lang] || meeting.summary?.en || Object.values(meeting.summary || {})[0] || '';
+  if (summary) lines.push('Summary', summary, '');
+  for (const [type, title] of [['decision', 'Decisions'], ['action', 'Action items']]) {
+    const rows = meeting.items.filter((i) => i.type === type);
+    if (!rows.length) continue;
+    lines.push(title);
+    for (const it of rows) {
+      const meta = [];
+      if (it.owner) meta.push(it.owner);
+      if (it.due) meta.push(`due ${it.due}`);
+      if (it.status && it.status !== 'open') meta.push(it.status);
+      lines.push(`- [${it.ref}] ${pickText(it.text, lang)}${meta.length ? ` — ${meta.join(' · ')}` : ''}`);
+    }
+    lines.push('');
+  }
+  lines.push('Drafted on-device. Nothing left this machine.', '');
+  return lines.join('\n');
+}
+
 /** Register sebagai CSV datar — satu baris per butir. */
 export function serializeMeetingCsv(meeting, lang = meeting.locale || 'en') {
   const cols = ['ref', 'type', 'topic', 'text', 'owner', 'due', 'status', 'review', 'confidence'];

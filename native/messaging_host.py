@@ -2,6 +2,7 @@
 """Chrome Native Messaging host — start / stop / restart the Local TransSub helper."""
 import json
 import os
+import platform
 import signal
 import socket
 import struct
@@ -21,11 +22,27 @@ LAB_PORT = int(os.environ.get("LAB_PORT", "8799"))
 BASE = f"http://{HOST}:{PORT}"
 LAB_URL = f"http://127.0.0.1:{LAB_PORT}/lab.html"
 LOG = ROOT / ".native-server.log"
+HOST_NAME = "com.localtranssub.helper"
+# Dinaikkan bila bentuk pesan berubah; ekstensi memakainya untuk mendeteksi
+# host lama yang belum mengenal aksi baru.
+HOST_PROTOCOL = 1
 START_WAIT_SEC = int(os.environ.get("NATIVE_START_WAIT", "120"))
 PORT_FREE_WAIT_SEC = int(os.environ.get("NATIVE_PORT_FREE_WAIT", "15"))
 
 _proc = None
 _lock = threading.Lock()
+
+
+def host_info():
+    """Identitas host — cukup untuk membedakan 'bridge hidup' dari 'helper jalan'."""
+    return {
+        "host": HOST_NAME,
+        "protocol": HOST_PROTOCOL,
+        "python": platform.python_version(),
+        "platform": sys.platform,
+        "root": str(ROOT),
+        "port": PORT,
+    }
 
 
 def read_msg():
@@ -184,9 +201,14 @@ def start_server():
 
 def handle(msg):
     action = msg.get("action", "")
+    if action == "ping":
+        # Bukti bahwa bridge Native Messaging benar-benar terhubung. Sengaja
+        # tidak memanggil /health: balasannya harus instan supaya bisa dipakai
+        # sebagai pemeriksaan status, bukan menunggu helper yang mungkin mati.
+        return {"ok": True, "connected": True, "host": host_info(), "helper_port_open": port_open()}
     if action == "status":
         h = health()
-        return {"ok": True, "running": bool(h), "health": h}
+        return {"ok": True, "running": bool(h), "health": h, "connected": True, "host": host_info()}
     if action == "start":
         return start_server()
     if action == "stop":

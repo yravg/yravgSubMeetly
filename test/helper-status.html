@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Status Native Helper (tiruan)</title>
+    <link rel="stylesheet" href="../src/sidepanel.css" />
+    <link rel="stylesheet" href="../src/notes-panel.css" />
+    <style>
+      body { max-width: 960px; margin: 0 auto; }
+      .os-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+      .mock-note {
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        padding: 10px 14px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-brand"><span class="brand">Helper Status · mock</span></div>
+      <div class="topbar-actions"><a href="/app.html" class="mini-btn" style="text-decoration:none">← Side Panel</a></div>
+    </header>
+    <main>
+      <p class="mock-note">Tiga kartu OS dengan data tiruan: macOS online, Windows offline, Linux online + berkas besar berjalan. Kartu sungguhan mengikuti OS perangkat.</p>
+      <div class="os-grid">
+        <section class="card"><div id="mount-macos"></div></section>
+        <section class="card"><div id="mount-windows"></div></section>
+        <section class="card"><div id="mount-linux"></div></section>
+      </div>
+      <section class="card" style="margin-top:12px">
+        <div class="card-head"><h2>Simulasi job berkas besar (progres nyata)</h2>
+          <div class="seg" id="lf-sim">
+            <button data-sim="run" class="active">Jalankan</button>
+            <button data-sim="error">Gagal</button>
+          </div>
+        </div>
+        <p class="mock-note" style="margin-bottom:10px">Alur yang sama dengan Side Panel: unggah (byte) → antre → transkripsi di helper (shimmer + waktu berjalan) → terjemahan/finalisasi (idx/total) → selesai. Tombol <b>Batalkan</b> memanggil handler yang sama seperti offline-cancel.</p>
+        <div id="mount-sim"></div>
+      </section>
+      <section class="card" style="margin-top:12px">
+        <div class="card-head"><h2>Panduan pemasangan per OS</h2>
+          <div class="seg" id="os-pick">
+            <button data-os="macos" class="active">macOS</button>
+            <button data-os="linux">Linux</button>
+            <button data-os="windows">Windows</button>
+          </div>
+        </div>
+        <pre id="os-steps" style="white-space:pre-wrap;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:12.5px;margin:0"></pre>
+      </section>
+      <section class="card" style="margin-top:12px">
+        <div class="card-head"><h2>Pemecahan masalah</h2></div>
+        <details open><summary><strong>Helper terputus / tidak jalan</strong></summary>
+          <p>Jalankan <code>./scripts/start-native.sh</code> dari root repo, lalu cek <code>curl -sf http://127.0.0.1:17865/health</code>. Di Side Panel → Settings → Engine → Native helper → Refresh.</p></details>
+        <details><summary><strong>Port 17865 sudah dipakai (EADDRINUSE)</strong></summary>
+          <p>Ada proses lain di port itu. Hentikan helper lama via <code>./scripts/stop-native.sh</code>, lalu start ulang.</p></details>
+        <details><summary><strong>Berkas besar gagal / tanpa ffmpeg</strong></summary>
+          <p>Pasang ffmpeg (<code>brew install ffmpeg</code> di macOS, paket distro di Linux), lalu Restart helper dari Settings.</p></details>
+        <details><summary><strong>Native host tidak ditemukan</strong></summary>
+          <p>Pasang host per OS: <code>native/install-host.sh</code> (macOS), <code>install-host-linux.sh</code> (Linux), <code>install-host.bat</code> (Windows) + ID ekstensi dari <code>chrome://extensions</code>.</p></details>
+        <details><summary><strong>Transkripsi lambat di CPU</strong></summary>
+          <p>Di Windows/Linux butuh CUDA untuk GPU; kalau tidak ada, pakai model kecil (Whisper Tiny/Base) atau alihkan ke helper di mesin ber-GPU. Lihat halaman Benchmark.</p></details>
+      </section>
+    </main>
+    <script type="module">
+      import { renderHelperStatusCard } from '../src/helper-status.js';
+      const health = (engine, model, device = engine === 'mlx-whisper' ? 'apple-silicon' : 'cuda', compute = device === 'cuda' ? 'float16' : undefined) => ({ engine, model, translate: true, ffmpeg: true, device, compute });
+      renderHelperStatusCard(document.getElementById('mount-macos'), {
+        os: 'macos', online: true, health: health('mlx-whisper', 'mlx-community/whisper-large-v3-turbo'),
+        engine: 'native', task: 'translate', mode: 'realtime',
+      });
+      renderHelperStatusCard(document.getElementById('mount-windows'), {
+        os: 'windows', online: false, health: null,
+        engine: 'native', task: 'transcribe', mode: 'offline',
+        largeFile: { name: 'rapat-panjang.mkv', sizeBytes: 2_684_354_560, progress: 0.62, status: 'running', cancellable: true },
+      });
+      renderHelperStatusCard(document.getElementById('mount-linux'), {
+        os: 'linux', online: true, health: health('faster-whisper', 'large-v3-turbo'),
+        engine: 'native', task: 'translate', mode: 'realtime',
+      });
+
+      // ---- simulated large-file job (drives the real card API) ----
+      const simRoot = document.getElementById('mount-sim');
+      let simTimer = null;
+      let simJob = null;
+      const simBase = { os: 'linux', online: true, health: health('faster-whisper', 'large-v3-turbo'), engine: 'native', task: 'translate', mode: 'offline', lang: 'id' };
+      const drawSim = () => renderHelperStatusCard(simRoot, { ...simBase, largeFile: simJob, onCancelLargeFile: () => {
+        simJob = { ...simJob, status: 'cancelling', stage: 'cancelling', cancellable: false };
+        drawSim();
+        clearInterval(simTimer);
+        setTimeout(() => { simJob = { ...simJob, status: 'cancelled', stage: 'cancelled' }; drawSim(); }, 900);
+      } });
+      function runSim(failAt = null) {
+        clearInterval(simTimer);
+        const total = 2.7 * 1024 ** 3;
+        let tick = 0;
+        simJob = { name: 'rapat-mingguan-cpoc.mkv', sizeBytes: total, progress: 0, status: 'running', stage: 'upload', loaded: 0, total, cancellable: true };
+        drawSim();
+        simTimer = setInterval(() => {
+          tick++;
+          if (simJob.status !== 'running') return clearInterval(simTimer);
+          if (tick <= 12) {
+            const loaded = Math.min(total, (tick / 12) * total);
+            simJob = { ...simJob, stage: 'upload', loaded, progress: 0.35 * (loaded / total) };
+          } else if (tick === 13) {
+            simJob = { ...simJob, stage: 'queued', progress: 0.35, jobId: 'job-sim' };
+          } else if (tick <= 40) {
+            if (failAt && tick === failAt) { simJob = { ...simJob, status: 'error', stage: 'error', error: 'ffmpeg not installed', cancellable: false }; drawSim(); return clearInterval(simTimer); }
+            simJob = { ...simJob, stage: 'transcribe', progress: Math.min(0.85, 0.35 + (tick - 13) * 0.02), elapsedS: (tick - 13) * 7 };
+          } else if (tick <= 52) {
+            simJob = { ...simJob, stage: 'translate', progress: 0.88 + ((tick - 40) / 12) * 0.12, idx: tick - 40, total: 12, elapsedS: undefined };
+          } else {
+            simJob = { ...simJob, status: 'done', stage: 'done', progress: 1, cancellable: false };
+            clearInterval(simTimer);
+          }
+          drawSim();
+        }, 250);
+      }
+      document.querySelectorAll('#lf-sim button').forEach((b) => {
+        b.addEventListener('click', () => {
+          document.querySelectorAll('#lf-sim button').forEach((x) => x.classList.toggle('active', x === b));
+          runSim(b.dataset.sim === 'error' ? 22 : null);
+        });
+      });
+      runSim();
+
+      const STEPS = {
+        macos: 'cd native\n./run.sh                 # mlx-whisper di Apple Silicon\n./install-host.sh <EXT_ID>\ncurl -sf http://127.0.0.1:17865/health',
+        linux: 'cd native\n./run.sh                 # faster-whisper di .venv\n./install-host-linux.sh <EXT_ID>\ncurl -sf http://127.0.0.1:17865/health',
+        windows: 'cd native\nrun.sh                   :: via Git Bash / WSL\ninstall-host.bat <EXT_ID>\n:: registry: HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.localtranssub.helper',
+      };
+      const stepsEl = document.getElementById('os-steps');
+      const paintSteps = (os) => { stepsEl.textContent = STEPS[os] || STEPS.macos; };
+      document.querySelectorAll('#os-pick button').forEach((b) => {
+        b.addEventListener('click', () => {
+          document.querySelectorAll('#os-pick button').forEach((x) => x.classList.toggle('active', x === b));
+          paintSteps(b.dataset.os);
+        });
+      });
+      paintSteps('macos');
+    </script>
+  </body>
+</html>

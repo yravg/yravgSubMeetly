@@ -53,9 +53,17 @@ import {
   let refineToggle = null;
   let closeBtn = null;
   let minimizeBtn = null;
+  let compactBtn = null;
+  let lockBtn = null;
+  let compactCap = null;
   let reopenFab = null;
   let panelVisible = true;
   let overlayDismissed = false;
+  let compactMode = false;
+  let locked = false;
+  let reskin = 'yraverage';
+  // Aksen corak untuk overlay gelap — varian identitas tiap pola.
+  const RESKIN_ACCENTS = { yraverage: '#14b789', coretax: '#5b9bfa', modern: '#a78bfa' };
   let panelSize = { w: 720, h: 280 };
   const PANEL_MIN = { w: 280, h: 140 };
   const PANEL_MAX = { w: 1200, h: 560 };
@@ -522,6 +530,10 @@ import {
     style.textContent = `
       :host, * { box-sizing: border-box; }
       .panel {
+        /* Cermin paket motion sidepanel.css (--ease-standard/--transition-base).
+           Shadow DOM terisolasi sehingga token halaman tak terbaca di sini. */
+        --lts-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        --lts-dur: 180ms;
         position: fixed;
         left: 50%;
         bottom: 8%;
@@ -542,7 +554,7 @@ import {
         font-family: "YouTube Noto", Roboto, Arial, "Hiragino Sans", "Microsoft YaHei", sans-serif;
         pointer-events: auto;
         opacity: 0;
-        transition: opacity 0.2s ease;
+        transition: opacity var(--lts-dur) var(--lts-ease);
         overflow: hidden;
       }
       .panel.visible { opacity: 1; }
@@ -726,6 +738,16 @@ import {
         align-items: start;
         padding: 3px 10px 3px 8px;
       }
+      @keyframes rowIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .row.row-new { animation: rowIn var(--lts-dur) var(--lts-ease); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .panel, .row, .block, .reopen-fab { transition: none; animation: none; }
+      }
       .row-check {
         margin-top: 8px;
         accent-color: #fff;
@@ -756,25 +778,29 @@ import {
         padding: 7px 12px;
         border-radius: 10px;
         background: rgba(255, 255, 255, 0.1);
-        line-height: 1.45;
+        line-height: 1.55;
         word-break: break-word;
+        overflow-wrap: anywhere;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
       }
       .row.active .block {
         background: rgba(255, 255, 255, 0.16);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+        box-shadow: inset 0 0 0 1px var(--lts-accent, rgba(255, 255, 255, 0.14));
       }
       .block.src {
         font-size: var(--src-size, 18px);
-        color: rgba(255, 255, 255, 0.78);
+        color: rgba(255, 255, 255, 0.85);
         font-weight: 400;
       }
       .block.tgt {
         font-size: var(--tgt-size, 22px);
         color: #fff;
-        font-weight: 500;
+        font-weight: 600;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.5);
       }
-      .block.untranslated { color: rgba(255, 255, 255, 0.65); font-style: italic; }
+      .block.untranslated { color: rgba(255, 255, 255, 0.75); font-style: italic; }
       .row.interim .block.loading {
         color: rgba(255, 255, 255, 0.5);
         font-size: 14px;
@@ -782,7 +808,7 @@ import {
       }
       .row.interim .block.draft {
         opacity: 0.88;
-        border-left: 2px solid rgba(255, 200, 100, 0.55);
+        border-left: 2px solid var(--lts-accent, rgba(255, 200, 100, 0.55));
       }
       .status-bar {
         flex: none;
@@ -823,6 +849,25 @@ import {
       .resize-edge.top { top: 0; }
       .resize-edge.bottom { bottom: 0; }
       .resize-edge:hover { background: rgba(255, 255, 255, 0.06); }
+      .compact-cap {
+        display: none;
+        padding: 8px 14px 10px;
+        font-size: var(--tgt-size, 22px);
+        font-weight: 600;
+        line-height: 1.4;
+        color: #fff;
+        text-align: center;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+      .panel.compact .scroll, .panel.compact .status-bar { display: none; }
+      .panel.compact { height: auto; min-height: 0; }
+      .panel.compact .compact-cap { display: -webkit-box; }
+      .panel.locked .toolbar-actions { opacity: 0.3; pointer-events: none; }
+      .panel.locked .toolbar-title { cursor: default; }
+      .panel.locked .resize-handle, .panel.locked .resize-edge { display: none; }
       .hidden { display: none !important; }
     `;
 
@@ -958,6 +1003,28 @@ import {
     });
     autoScrollLabel.append(autoScrollToggle, document.createTextNode('Auto scroll'));
 
+    compactBtn = document.createElement('button');
+    compactBtn.type = 'button';
+    compactBtn.className = 'tool-close';
+    compactBtn.title = 'Compact caption bar';
+    compactBtn.textContent = '▣';
+    compactBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      compactMode = !compactMode;
+      applyCompactLock();
+    });
+
+    lockBtn = document.createElement('button');
+    lockBtn.type = 'button';
+    lockBtn.className = 'tool-close';
+    lockBtn.title = 'Lock panel (block drag & resize)';
+    lockBtn.textContent = '🔓';
+    lockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      locked = !locked;
+      applyCompactLock();
+    });
+
     minimizeBtn = document.createElement('button');
     minimizeBtn.type = 'button';
     minimizeBtn.className = 'tool-close';
@@ -978,7 +1045,7 @@ import {
       dismissOverlay();
     });
 
-    actions.append(refineLabel, dualLineLabel, forceTranslateWrap, autoScrollLabel, minimizeBtn, closeBtn);
+    actions.append(refineLabel, dualLineLabel, forceTranslateWrap, autoScrollLabel, compactBtn, lockBtn, minimizeBtn, closeBtn);
     toolbar.append(title, actions);
 
     reopenFab = document.createElement('button');
@@ -991,10 +1058,14 @@ import {
     rowsEl = document.createElement('div');
     rowsEl.className = 'scroll';
 
+    compactCap = document.createElement('div');
+    compactCap.className = 'compact-cap';
+    compactCap.textContent = 'Listening…';
+
     statusBar = document.createElement('div');
     statusBar.className = 'status-bar hidden';
 
-    panel.append(resizeTop, toolbar, rowsEl, statusBar, resizeHandle, resizeBottom);
+    panel.append(resizeTop, toolbar, rowsEl, compactCap, statusBar, resizeHandle, resizeBottom);
     shadow.append(style, panel, reopenFab);
     (document.fullscreenElement || document.documentElement).appendChild(host);
 
@@ -1025,6 +1096,7 @@ import {
     );
 
     makeDraggable(title);
+    applyReskinOverlay();
     applyPanelSize();
     applyPos();
 
@@ -1040,9 +1112,32 @@ import {
     if (host.parentNode !== parent) parent.appendChild(host);
   }
 
+  function applyReskinOverlay() {
+    if (!panel) return;
+    panel.style.setProperty(
+      '--lts-accent',
+      RESKIN_ACCENTS[reskin] || RESKIN_ACCENTS.yraverage,
+    );
+  }
+
+  function applyCompactLock() {
+    if (!panel) return;
+    panel.classList.toggle('compact', compactMode);
+    panel.classList.toggle('locked', locked);
+    if (compactBtn) {
+      compactBtn.textContent = compactMode ? '▦' : '▣';
+      compactBtn.title = compactMode ? 'Expand to full transcript' : 'Compact caption bar';
+    }
+    if (lockBtn) {
+      lockBtn.textContent = locked ? '🔒' : '🔓';
+      lockBtn.title = locked ? 'Unlock panel (allow drag & resize)' : 'Lock panel (block drag & resize)';
+    }
+    chrome.storage.local.set({ overlayCompact: compactMode, overlayLocked: locked }).catch(() => {});
+  }
+
   function makeDraggable(handle) {
     handle.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || locked) return;
       handle.setPointerCapture(e.pointerId);
       handle.classList.add('dragging');
       const r = panel.getBoundingClientRect();
@@ -1084,6 +1179,7 @@ import {
 
   function makeVerticalResize(handle, edge) {
     handle.addEventListener('pointerdown', (e) => {
+      if (locked) return;
       e.stopPropagation();
       e.preventDefault();
       handle.setPointerCapture(e.pointerId);
@@ -1110,6 +1206,7 @@ import {
 
   function makeResizable(handle) {
     handle.addEventListener('pointerdown', (e) => {
+      if (locked) return;
       e.stopPropagation();
       e.preventDefault();
       handle.setPointerCapture(e.pointerId);
@@ -1169,37 +1266,60 @@ import {
   function renderRows() {
     if (!rowsEl) return;
     const sorted = [...cues.entries()].sort((a, b) => a[1].t0 - b[1].t0);
-    rowsEl.innerHTML = '';
+    // Baris dipakai ulang per kunci supaya pergantian subtitel mulus di tempat
+    // (tanpa rebuild total yang bikin kedip/menumpuk); hanya baris baru yang
+    // masuk dengan animasi row-new sekali.
+    const existing = new Map();
+    for (const row of rowsEl.querySelectorAll('.row[data-key]:not(.interim)')) {
+      existing.set(row.dataset.key, row);
+    }
+    const seen = new Set();
 
     for (const [key, cue] of sorted) {
-      const row = document.createElement('div');
-      row.className = 'row' + (key === activeKey ? ' active' : '');
-      row.dataset.key = String(key);
+      const k = String(key);
+      seen.add(k);
+      let row = existing.get(k);
+      if (!row) {
+        row = document.createElement('div');
+        row.className = 'row row-new';
+        row.dataset.key = k;
+        row._cueKey = key;
 
-      const check = document.createElement('input');
-      check.type = 'checkbox';
-      check.className = 'row-check';
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.className = 'row-check';
+        check.title = 'Select for Force Translate';
+        check.addEventListener('click', (e) => e.stopPropagation());
+        check.addEventListener('change', () => {
+          if (check.checked) selectedCueKeys.add(row._cueKey);
+          else selectedCueKeys.delete(row._cueKey);
+          updateForceTranslateBtn();
+        });
+
+        const timeBtn = document.createElement('button');
+        timeBtn.type = 'button';
+        timeBtn.className = 'time-btn';
+        timeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          seekVideo(cue.t0);
+        });
+
+        const blocks = document.createElement('div');
+        blocks.className = 'blocks';
+
+        row.append(check, timeBtn, blocks);
+        rowsEl.appendChild(row);
+        const fresh = row;
+        requestAnimationFrame(() => fresh.classList.remove('row-new'));
+      }
+      row.classList.toggle('active', key === activeKey);
+      const check = row.querySelector('.row-check');
       check.checked = selectedCueKeys.has(key);
-      check.title = 'Select for Force Translate';
-      check.addEventListener('click', (e) => e.stopPropagation());
-      check.addEventListener('change', () => {
-        if (check.checked) selectedCueKeys.add(key);
-        else selectedCueKeys.delete(key);
-        updateForceTranslateBtn();
-      });
-
-      const timeBtn = document.createElement('button');
-      timeBtn.type = 'button';
-      timeBtn.className = 'time-btn';
+      const timeBtn = row.querySelector('.time-btn');
       timeBtn.textContent = fmtClock(cue.t0);
       timeBtn.title = 'Jump to ' + fmtClock(cue.t0);
-      timeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        seekVideo(cue.t0);
-      });
-
-      const blocks = document.createElement('div');
-      blocks.className = 'blocks';
+      const blocks = row.querySelector('.blocks');
+      blocks.innerHTML = '';
 
       const hasTranslation = !isUntranslated(cue);
       const displaySrc = dualLine ? (cue.rawSrc || sourceText(cue)) : '';
@@ -1217,12 +1337,15 @@ import {
         blocks.appendChild(tgtBlock);
       }
 
-      row.append(check, timeBtn, blocks);
       rowsEl.appendChild(row);
+    }
+    for (const [k, row] of existing) {
+      if (!seen.has(k)) row.remove();
     }
 
     updateForceTranslateBtn();
 
+    rowsEl.querySelectorAll('.row.interim').forEach((r) => r.remove());
     if (pendingInterim) {
       const row = document.createElement('div');
       row.className = 'row interim';
@@ -1260,6 +1383,12 @@ import {
       rowsEl.appendChild(row);
     }
 
+    if (compactCap) {
+      const last = sorted.length ? sorted[sorted.length - 1][1] : null;
+      const interimText = pendingInterim && interimCue ? (interimCue.rawTgt || interimCue.rawSrc) : '';
+      compactCap.textContent =
+        interimText || (last ? translationText(last) || last.rawSrc : '') || 'Listening…';
+    }
     showPanel();
 
     if (sessionActive && video) {
@@ -1327,18 +1456,26 @@ import {
       refineToggle = null;
       closeBtn = null;
       minimizeBtn = null;
+      compactBtn = null;
+      lockBtn = null;
+      compactCap = null;
       reopenFab = null;
       panelVisible = true;
       overlayDismissed = false;
     }
   }
 
-  chrome.storage.local.get(['overlayPos', 'overlayAutoScroll', 'overlayPanelVisible', 'overlayPanelSize', 'settings']).then(
-    ({ overlayPos, overlayAutoScroll, overlayPanelVisible, overlayPanelSize, settings }) => {
+  chrome.storage.local.get(['overlayPos', 'overlayAutoScroll', 'overlayPanelVisible', 'overlayPanelSize', 'overlayCompact', 'overlayLocked', 'settings']).then(
+    ({ overlayPos, overlayAutoScroll, overlayPanelVisible, overlayPanelSize, overlayCompact, overlayLocked, settings }) => {
     if (overlayPos) pos = overlayPos;
     if (overlayAutoScroll !== undefined) autoScrollEnabled = !!overlayAutoScroll;
     if (overlayPanelVisible !== undefined) panelVisible = !!overlayPanelVisible;
     if (overlayPanelSize?.w && overlayPanelSize?.h) panelSize = overlayPanelSize;
+    compactMode = !!overlayCompact;
+    locked = !!overlayLocked;
+    applyCompactLock();
+    if (typeof settings?.reskin === 'string') reskin = settings.reskin;
+    applyReskinOverlay();
     if (settings?.overlayFontSize) fontSize = settings.overlayFontSize;
     dualLine = !!settings?.dualLine;
     refineTranslation = !!settings?.refineTranslation;
@@ -1367,6 +1504,10 @@ import {
     if (s.refineTranslation !== undefined) {
       refineTranslation = !!s.refineTranslation;
       syncOverlayToggles();
+    }
+    if (typeof s.reskin === 'string' && s.reskin !== reskin) {
+      reskin = s.reskin;
+      applyReskinOverlay();
     }
   });
 
