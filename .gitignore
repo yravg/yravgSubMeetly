@@ -40,3 +40,5 @@ mac/build/
 # Python bytecode
 __pycache__/
 *.pyc
+.e2e-file-profile/
+.superpowers/
