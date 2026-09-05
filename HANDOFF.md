@@ -10,6 +10,18 @@
 
 ## Posisi sekarang
 
+**Semua task plan `done` (`task next` → done: true).** Final `sync` BELUM dijalankan — 602 berkas butuh
+ringkasan dan langkah itu menutup siklus + membangun ulang wiki; jalankan hanya atas persetujuan pengguna.
+
+**Gate rilis: DITAHAN (4 must-fix).** Sampai hari ini gate CLEAR karena `e2e --native` dan `e2e-file --browser`
+tidak pernah dijalankan (REL-03/REL-04 = residual `accepted`). Hari ini keduanya dijalankan dan **gagal
+konsisten** dengan `Runtime.callFunctionOn timed out` (renderer halaman panel tak merespons CDP; realtime
+browser lulus di jalur yang sama). `gen-defects` menandai suite E2E yang gagal sebagai must-fix otomatis
+(`E2E-e2e-native*`, `E2E-e2e-file*`). Keputusan yang menunggu pengguna:
+(a) menerima keduanya sebagai residual CWS dengan alasan yang sama seperti REL-03/04 — konsisten dengan
+kebijakan sebelumnya, gate kembali CLEAR — atau (b) menahan rilis sampai penyebab renderer ditemukan
+(langkah diagnosis ada di bagian Verifikasi). Jangan menghapus `test/last-e2e.json` untuk "membersihkan" gate.
+
 **Fase 5/5 selesai kecuali 1 task yang ditunda.** Semua task plan `done`, kecuali panduan
 Windows/Linux (`doing` = penanda "lanjut nanti"). `task next` masih mengembalikan task itu;
 jangan jalankan final `sync` sampai pengguna memutuskan nasibnya.
