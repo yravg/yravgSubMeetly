@@ -1,6 +1,6 @@
 {
   "source": "release-gate",
-  "generatedAt": "2026-09-05T10:11:29.950Z",
+  "generatedAt": "2026-09-05T15:16:15.926Z",
   "inputs": {
     "smoke": true,
     "e2e": true,
@@ -9,17 +9,56 @@
   },
   "defects": [
     {
-      "id": "REL-01",
-      "title": "Draft native sering di atas target 500 ms",
+      "id": "E2E-e2e-file",
+      "title": "E2E gagal: E2E berkas offline + ekspor SRT/VTT/TXT",
       "severity": "high",
-      "status": "accepted",
-      "mustFix": false,
-      "area": "Native Helper",
-      "featureId": "ext-refine",
-      "summary": "Diterima untuk rilis CWS: helper native opsional di luar zip store; target 500 ms tetap dilacak di bench.",
-      "evidence": "test/last-smoke.json · test/BENCH-COMPARE.md · store ship policy",
-      "priority": "wontfix-documented",
-      "releaseGate": false
+      "status": "open",
+      "mustFix": true,
+      "area": "E2E",
+      "featureId": "ext-offline-file",
+      "summary": "Waiting failed",
+      "evidence": "node scripts/e2e-file.mjs --browser · test/last-e2e.json",
+      "priority": "release-blocker",
+      "releaseGate": true
+    },
+    {
+      "id": "E2E-e2e-file-e2e-file-fatal",
+      "title": "E2E check gagal: Jalankan e2e-file",
+      "severity": "high",
+      "status": "open",
+      "mustFix": true,
+      "area": "E2E",
+      "featureId": "e2e-file",
+      "summary": "Waiting failed",
+      "evidence": "test/last-e2e.json · e2e-file",
+      "priority": "release-blocker",
+      "releaseGate": true
+    },
+    {
+      "id": "E2E-e2e-native",
+      "title": "E2E gagal: E2E mesin native helper (--native)",
+      "severity": "high",
+      "status": "open",
+      "mustFix": true,
+      "area": "E2E",
+      "featureId": "helper-asr",
+      "summary": "Waiting failed",
+      "evidence": "node scripts/e2e.mjs --native · test/last-e2e.json",
+      "priority": "release-blocker",
+      "releaseGate": true
+    },
+    {
+      "id": "E2E-e2e-native-e2e-fatal",
+      "title": "E2E check gagal: Jalankan E2E",
+      "severity": "high",
+      "status": "open",
+      "mustFix": true,
+      "area": "E2E",
+      "featureId": "e2e-native",
+      "summary": "Waiting failed",
+      "evidence": "test/last-e2e.json · e2e-native",
+      "priority": "release-blocker",
+      "releaseGate": true
     },
     {
       "id": "REL-02",
@@ -84,6 +123,19 @@
       "summary": "Lambat di WASM; lebih masuk akal di WebGPU. Angka stub.",
       "evidence": "test/last-models-bench.json · test/BENCH-COMPARE.md",
       "priority": "track",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-01",
+      "title": "Draft native sering di atas target 500 ms",
+      "severity": "medium",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "Native Helper",
+      "featureId": "ext-refine",
+      "summary": "Diterima untuk rilis CWS: helper native opsional di luar zip store; target 500 ms tetap dilacak di bench.",
+      "evidence": "test/last-smoke.json · test/BENCH-COMPARE.md · store ship policy",
+      "priority": "wontfix-documented",
       "releaseGate": false
     },
     {

@@ -94,6 +94,29 @@ Semua ditutup dengan verifikasi perilaku di `app.html`, dijaga `test/app-surface
     Catatan kontrak: `recordQuizAnswer(state, questionId, correct)` memberi XP sendiri —
     jangan dipanggil bersama `awardEvent`.
 
+### Fase 5 — layer backend (23 task, sesi lanjutan)
+Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per task dan buktinya:
+
+| Task | Bukti |
+| --- | --- |
+| Kebijakan privasi CWS | `store/PRIVACY.md` ditulis ulang sesuai kode (izin, storage, notulen, learning, retensi, formulir data-usage); `SUBMIT.md` langkah 3 |
+| Paket MV3 CWS | `npm run pack:store` (31 MB, 35 berkas); `test/store-package.test.mjs` 4/4 (MV3, versi, tanpa junk, izin ↔ MV3-AUDIT) |
+| Uji cepat 26 sub-fitur | `npm run smoke -- --crossos` 26/26 + 9/9 |
+| Uji alur penuh lintas platform | `npm run e2e:crossos` 10/10 (ffmpeg membaca ulang ekspor) |
+| Tolok ukur lab | `bench-lab.py` diperbaiki (dekode ffmpeg; MP3 CC0 tanpa bidang `text`) — lihat catatan |
+| Panduan build / QA / checklist rilis | `docs/DEVELOPMENT.md`, `docs/QA.md`, `docs/RELEASE-CHECKLIST.md` |
+| Deteksi ketersediaan mesin; state manager failover; konfigurasi prioritas | `test/engine-tier.test.mjs` 9/9 (engine-tier, device-tier, engine-session dengan fetch distub); settings via `chrome.storage.local` dibuktikan E2E (`e2e-native-engine`) |
+| Tangkap audio tab; VAD + transkripsi lokal; kirim hasil & status ke UI; overlay | `npm run e2e` PASS (tabCapture → VAD → Whisper → `subtitle` → overlay terinjeksi); `test/app-surfaces.test.mjs` penerima segmen |
+| Terjemahan lokal segmen | `test/translation-utils.test.mjs`, `src/lib/opus.js`, jalur Translator API; smoke MT |
+| Native messaging audio/transkrip; protokol stream | `test/native-connection.test.mjs` 9/9 (framing 4-byte nyata), `native-protocol.js` |
+| Native host terima chunk; pipeline transkripsi helper; progres & batal | `test/native-streaming.test.mjs` 9/9, `test/native-file-job.test.mjs`, job E2E crossos |
+| Terjemahan lokal output di helper | `/translate`, `/draft`, `/translate_refine` (mlx-lm Qwen2.5) — dipakai bench-lab |
+| Penyedia inferensi browser WebGPU | `src/lib/asr.js` pickDevice/hasWebGPU; `engine-tier` tes tier WebGPU; E2E berjalan WASM (WebGPU tak tersedia headless) |
+
+**Residual yang jujur:** REL-03 (E2E `--native`) GAGAL hari ini: status "Listening" tercapai tapi `Waiting failed`
+<2 menit (timeout 5 menit) — target kemungkinan ter-detach, bukan habis waktu; sisi server bersih
+(POST `/transcribe` dengan Origin ekstensi → 200). Diulang dengan keluaran penuh setelah bench.
+
 ### Bug UI nyata yang ditemukan lewat app.html dan diperbaiki
 - **Modal Pengaturan rusak total.** Satu `</div>` berlebih di `src/sidepanel.html` menutup
   `.modal-card` terlalu awal → `#settings-modal` punya 17 anak langsung; karena `.modal` adalah
@@ -113,9 +136,28 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - `npm run e2e` → PASS (headed, Chrome for Testing). `npm run release:gate` → CLEAR.
 - `npm run smoke -- --crossos` → 26/26 Fase 1 + 9/9 lintas-OS.
 - `npm run e2e:crossos` → 10/10. `npm run bench:bigfile --upload` → 5/5.
+- **Tolok ukur lab 2026-09-05 22:42** (`bench-lab.py`, mlx-whisper large-v3-turbo, 50 sampel CC0):
+  200 panggilan draft, **111/200 ≤ 500 ms (56%)**, min 62 / p50 485 / maks 2349 / rata 599 ms —
+  snapshot 22 Agustus (0/16, p50 828) sudah usang. `BENCH-COMPARE.md` baris native: pass.
+  Catatan: `bench-lab.py` rusak sejak sampel jadi MP3 (modul `wave` + bidang `text` hilang); diperbaiki
+  dengan dekode ffmpeg dan sumber MT dari hasil ASR.
+- `npm run e2e:native` → **GAGAL 3×, konsisten.** Status "Listening" tercapai (helper dipakai untuk draft),
+  lalu Puppeteer gagal dengan `Runtime.callFunctionOn timed out` (protocolTimeout 180 dtk): **renderer halaman
+  side panel berhenti merespons CDP** hanya di mode native — mode browser lulus di jalur yang sama. Yang sudah
+  disingkirkan: sisi server (POST `/transcribe` dengan Origin ekstensi → 200, tak ada 403), dialog modal (tidak
+  ada `confirm/prompt/alert`), loop gambar-ulang panduan (`onRecheck` hanya dari tombol). Pengukuran lag di
+  app.html TIDAK valid — tab latar dithrottle ke 1 tick/dtk di kedua mode. Langkah berikut yang disarankan:
+  jalankan E2E native dengan `--headed` + DevTools performance trace pada halaman panel, atau tambahkan
+  `PerformanceObserver('longtask')` ke panel saat `?e2e=1`. Sampai itu, REL-03 = residual `accepted`.
 - `npm run build` → bersih. Sapuan seluruh halaman lab: tanpa galat JS, tanpa overflow horizontal.
 
 ## Catatan yang perlu diketahui
+
+- Paket CWS (`store/releases/local-transsub-1.1.1.zip`, 31 MB / 114 MB tak terkompresi) mengirim
+  ONNX Runtime **dua kali**: `ort/` (20 MB) dan `vad/ort/` (5 varian WASM, ~75 MB). Bukan blocker
+  rilis, tapi peluang pemangkasan ±60 MB bila VAD dibuat memakai runtime yang sama.
+- `store/local-transsub-1.0.0.zip` dan `1.1.0.zip` masih ada di root `store/` — jangan diunggah;
+  `SUBMIT.md` sudah memperingatkan. Belum dihapus karena itu artefak rilis.
 
 - Installer Windows, `run.bat`, dan panduan Win/Linux **belum pernah dieksekusi di Windows**.
   Jalankan `npm run smoke:crossos` + `npm run e2e:crossos` di mesin sungguhan sebelum rilis.

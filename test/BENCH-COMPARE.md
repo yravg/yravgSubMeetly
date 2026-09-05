@@ -2,7 +2,7 @@
 
 Dibuat otomatis oleh `scripts/bench-report.mjs` dari `last-models-bench.json`.
 
-- **Generated:** 2026-09-04T15:53:08.736Z
+- **Generated:** 2026-09-05T14:49:41.418Z
 - **Source:** catalog+last-bench
 - **Target draft:** ≤ **500 ms** (`POST /draft` native)
 
@@ -16,15 +16,15 @@ Dibuat otomatis oleh `scripts/bench-report.mjs` dari `last-models-bench.json`.
 | Whisper Large v3 Turbo | browser | WebGPU q4f16 | 1100 ms | 900 ms | — | 0.35 | warn | Hanya WebGPU. Masih di atas target draft 500 ms. Angka stub. |
 | Voxtral Mini 3B | browser | WebGPU q4 | 2800 ms | 2400 ms | — | 0.9 | fail | Kualitas tinggi, butuh ≥16 GB RAM. Tidak untuk caption live. Angka stub. |
 | Opus-MT (per pasangan) | browser | WASM q8 | — | — | 180 ms | — | pass | Fallback terjemahan lokal. Bukan ASR. Angka stub. |
-| Native mlx-whisper · whisper-large-v3-turbo | native | Apple GPU (MLX) | 520 ms | 410 ms | 664 ms | 0.05 | warn | Draft terbaik 520 ms · ≤500 ms: 0/16 · dari last-bench.json |
+| Native mlx-whisper · whisper-large-v3-turbo | native | Apple GPU (MLX) | 62 ms | 288 ms | 377 ms | 0.05 | pass | Draft terbaik 62 ms · ≤500 ms: 111/200 · dari last-bench.json |
 
 ## Native draft (dari last-bench)
 
 | Metric | Value |
 |--------|-------|
-| Draft calls | 16 |
-| ≤500 ms | 0 / 16 |
-| min / p50 / avg / max | 520 / 828 / 1032 / 3726 ms |
+| Draft calls | 200 |
+| ≤500 ms | 111 / 200 |
+| min / p50 / avg / max | 62 / 485 / 600 / 2349 ms |
 
 ## Cara menjalankan ulang
 

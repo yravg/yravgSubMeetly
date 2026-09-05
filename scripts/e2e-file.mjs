@@ -284,6 +284,7 @@ try {
   else log('ALL OK');
 } catch (err) {
   log('FAIL:', err?.message || err);
+  log('cause:', err?.cause?.message || err?.cause || '(tidak ada)');
   if (!checks.some((c) => c.status === 'fail')) {
     checks.push({
       id: 'e2e-file-fatal',

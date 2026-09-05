@@ -354,6 +354,10 @@ try {
   }
 } catch (err) {
   log('E2E FAIL:', err?.message || err);
+  // Puppeteer melipat penyebab (frame detached, target closed, predicate melempar) ke dalam
+  // `cause`; tanpa ini yang tercetak hanya "Waiting failed" dan tak bisa didiagnosis.
+  log('cause:', err?.cause?.message || err?.cause || '(tidak ada)');
+  log('stack:', String(err?.stack || '').split('\n').slice(0, 4).join(' | '));
   if (!checks.some((c) => c.status === 'fail')) {
     checks.push({
       id: 'e2e-fatal',
