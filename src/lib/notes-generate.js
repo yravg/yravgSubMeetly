@@ -125,6 +125,7 @@ export function generateNotesFromTranscript(lines, meta = {}) {
     title: meta.title || 'Untitled meeting',
     date: meta.date,
     seriesId: meta.seriesId,
+    projectType: meta.projectType,
     locale,
     attendees: speakers.map((name) => ({ name, speakerLabel: name })),
     summary,

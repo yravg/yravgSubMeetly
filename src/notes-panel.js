@@ -20,6 +20,37 @@ import { listMeetings, saveMeeting, deleteMeeting, backendName } from './lib/not
 import { makeT } from './lib/notes-i18n.js';
 import { flagMomentAndSave, addItem, removeItem } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
+import { PROJECT_TYPES, normalizeProjectType } from './lib/notes-schema.js';
+
+/* ---- Tipe proyek: preferensi terakhir dipakai untuk rapat berikutnya ---- */
+const PT_PREF_KEY = 'notesProjectType';
+export const ptKey = (t) => `pt_${String(t || 'general').replace(/-/g, '_')}`;
+
+export async function loadProjectTypePref() {
+  try {
+    if (globalThis.chrome?.storage?.local) {
+      const o = await chrome.storage.local.get(PT_PREF_KEY);
+      return normalizeProjectType(o?.[PT_PREF_KEY]);
+    }
+  } catch { /* jatuh ke localStorage */ }
+  try { return normalizeProjectType(localStorage.getItem(PT_PREF_KEY)); } catch { return 'general'; }
+}
+
+async function saveProjectTypePref(t) {
+  const v = normalizeProjectType(t);
+  try { if (globalThis.chrome?.storage?.local) await chrome.storage.local.set({ [PT_PREF_KEY]: v }); } catch { /* opsional */ }
+  try { localStorage.setItem(PT_PREF_KEY, v); } catch { /* opsional */ }
+  return v;
+}
+
+function projectTypeSelectHtml(T, current) {
+  return `<label class="notes-pt" for="notes-project-type" title="${escapeHtml(T('projectTypeHint'))}">
+        <span>${escapeHtml(T('projectType'))}</span>
+        <select id="notes-project-type" data-tour="notes-project-type">
+          ${PROJECT_TYPES.map((t) => `<option value="${t}"${t === current ? ' selected' : ''}>${escapeHtml(T(ptKey(t)))}</option>`).join('')}
+        </select>
+      </label>`;
+}
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -118,7 +149,7 @@ function waveHtml(running) {
  * Tidak ada tombol Pause — pipeline-nya memang tidak punya jeda, dan kontrol
  * mati lebih buruk daripada kontrol yang tidak ada.
  */
-function captureRailHtml(capture, T, { issued = false } = {}) {
+function captureRailHtml(capture, T, { issued = false, projectType = 'general' } = {}) {
   const running = !!capture.running;
   // Dua alasan berbeda untuk tombol mati: belum merekam, atau notulen aktif
   // sudah terbit (beku). Judul tooltip mengatakan yang mana.
@@ -134,14 +165,15 @@ function captureRailHtml(capture, T, { issued = false } = {}) {
           <span class="notes-engine mono">${escapeHtml(capture.engine || '')}</span>
         </div>
         ${waveHtml(running)}
+        ${projectTypeSelectHtml(T, projectType)}
         <div class="notes-rec-actions">
-          <button type="button" class="btn primary notes-end-btn" id="btn-end-draft"${running ? '' : ' disabled'}>
+          <button type="button" class="btn primary notes-end-btn" id="btn-end-draft" data-tour="notes-end-draft"${running ? '' : ' disabled'}>
             ${escapeHtml(T('endAndDraft'))}
           </button>
         </div>
       </div>
 
-      <button type="button" class="notes-flag" id="btn-flag-moment"${blocked ? ` disabled title="${escapeHtml(why)}"` : ''}>
+      <button type="button" class="notes-flag" id="btn-flag-moment" data-tour="notes-flag"${blocked ? ` disabled title="${escapeHtml(why)}"` : ''}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0b05c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h12l-2.2 3.6L17 12H5"/></svg>
         ${escapeHtml(T('flagMoment'))}
         <span class="notes-flag-key mono">${escapeHtml(flagShortcutHint())}</span>
@@ -149,7 +181,7 @@ function captureRailHtml(capture, T, { issued = false } = {}) {
 }
 
 export function renderNotesPanel(root, state, handlers = {}) {
-  const { meetings, active, lang, T, capture, notice, summaryDraft, addingDecision, addingAction } = state;
+  const { meetings, active, lang, T, capture, notice, summaryDraft, addingDecision, addingAction, projectType = 'general' } = state;
   const stats = active ? meetingStats(active) : null;
   const latest = latestItems(active, lang);
   const decisions = latestByType(active, lang, 'decision');
@@ -161,7 +193,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
 
   root.innerHTML = `
     <div class="notes-panel" data-notes-root>
-      ${capture ? captureRailHtml(capture, T, { issued: !!active?.issuedAt }) : ''}
+      ${capture ? captureRailHtml(capture, T, { issued: !!active?.issuedAt, projectType }) : ''}
 
       <div class="notes-status-row">
         <span class="notes-pill ${notice ? 'error' : active ? 'ready' : 'idle'}" id="notes-status-pill">
@@ -177,7 +209,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
           ${active ? `<span class="notes-count">${stats.total}</span>` : ''}
         </div>
         ${active
-          ? `<p class="notes-meta notes-title-line">${escapeHtml(active.title)} · ${escapeHtml(active.date)}${stats.unreviewed ? ` · <span class="warn">${stats.unreviewed} ${escapeHtml(T('needReview'))}</span>` : ''}</p>
+          ? `<p class="notes-meta notes-title-line">${escapeHtml(active.title)} · ${escapeHtml(active.date)}${active.projectType && active.projectType !== 'general' ? ` · <span class="notes-pt-badge">${escapeHtml(T(ptKey(active.projectType)))}</span>` : ''}${stats.unreviewed ? ` · <span class="warn">${stats.unreviewed} ${escapeHtml(T('needReview'))}</span>` : ''}</p>
              ${counts.length ? `<div class="notes-chips">${counts.map(([t, n]) => `<span class="notes-chip"><i style="background:${TYPE_COLOR[t]}"></i>${escapeHtml(T(t))}<b>${n}</b></span>`).join('')}</div>` : ''}
               <div class="notes-sec">
                 <div class="notes-sec-head"><h4>${escapeHtml(T('secSummary'))}</h4></div>
@@ -244,7 +276,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
       </div>
 
       <div class="notes-toolbar">
-        <button type="button" class="btn primary notes-open-btn" id="btn-open-register">
+        <button type="button" class="btn primary notes-open-btn" id="btn-open-register" data-tour="notes-open-register">
           ${escapeHtml(T('openRegister'))}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 16 16 8"/><path d="M9.5 8H16v6.5"/></svg>
         </button>
@@ -289,6 +321,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
   root.querySelector('#btn-end-draft')?.addEventListener('click', () => handlers.onEndAndDraft?.());
   root.querySelector('#btn-flag-moment')?.addEventListener('click', () => handlers.onFlagMoment?.());
   root.querySelector('#btn-notes-sample')?.addEventListener('click', () => handlers.onLoadSample?.());
+  root.querySelector('#notes-project-type')?.addEventListener('change', (e) => handlers.onProjectType?.(e.target.value));
   root.querySelector('#btn-notes-txt')?.addEventListener('click', () => handlers.onExportNotes?.('txt'));
   root.querySelector('#btn-notes-md')?.addEventListener('click', () => handlers.onExportNotes?.('md'));
   root.querySelector('#btn-notes-sync')?.addEventListener('click', (e) => {
@@ -336,11 +369,12 @@ export function renderNotesPanel(root, state, handlers = {}) {
  * karena applyI18n() memanggil ulang mountNotesPanel pada root yang sama saat
  * bahasa berubah.
  */
-export async function mountNotesPanel(root, { getCapture, onEndCapture, onExportNotes, onPushShared } = {}) {
+export async function mountNotesPanel(root, { getCapture, getSessionLines, onEndCapture, onExportNotes, onPushShared } = {}) {
   const lang = (document.documentElement.lang || 'en').startsWith('id') ? 'id' : 'en';
   const T = makeT(lang);
   let meetings = await listMeetings();
   let activeId = meetings[0]?.id || null;
+  let projectType = await loadProjectTypePref();
 
   if (root.__notesTick) {
     clearInterval(root.__notesTick);
@@ -409,6 +443,44 @@ export async function mountNotesPanel(root, { getCapture, onEndCapture, onExport
     return { running: !!c.running, startedAt: c.startedAt ?? null, engine: c.engine || '' };
   };
 
+  /**
+   * "End & draft" dulu hanya berhenti lalu membuka register — baris transkrip
+   * sesi tidak pernah menjadi butir notulen. Sekarang baris itu dilewatkan ke
+   * generator yang sama dengan jalur tempel-Teams, digabung dengan bendera
+   * yang sudah dicatat, dan diberi tipe proyek yang dipilih saat merekam.
+   */
+  const draftFromSession = async (lines, cap) => {
+    if (!lines.length) return;
+    const active = meetings.find((m) => m.id === activeId) || null;
+    if (active?.issuedAt) return; // notulen terbit itu beku
+    const { generateNotesFromTranscript } = await import('./lib/notes-generate.js');
+    const gen = generateNotesFromTranscript(lines, {
+      title: active?.title || T('untitledMeeting'),
+      locale: lang,
+      source: cap?.engine || 'realtime',
+      projectType,
+      seriesId: active?.seriesId,
+      date: active?.date,
+    });
+    const merged = active
+      ? {
+          ...gen,
+          id: active.id,
+          seq: active.seq,
+          seriesId: active.seriesId,
+          title: active.title,
+          agenda: active.agenda,
+          attendees: active.attendees.length ? active.attendees : gen.attendees,
+          summary: Object.keys(active.summary || {}).length ? active.summary : gen.summary,
+          items: [...active.items, ...gen.items],
+        }
+      : gen;
+    const saved = await saveMeeting(merged);
+    meetings = await listMeetings();
+    activeId = saved?.id || merged.id;
+    say(T('draftFromSession', gen.items.length));
+  };
+
   const flagNow = async () => {
     const cap = readCapture();
     if (!cap?.running) return;
@@ -426,6 +498,7 @@ export async function mountNotesPanel(root, { getCapture, onEndCapture, onExport
           title: T('untitledMeeting'),
           date: new Date().toISOString().slice(0, 10),
           locale: lang,
+          projectType,
         }),
       );
     }
@@ -459,6 +532,7 @@ export async function mountNotesPanel(root, { getCapture, onEndCapture, onExport
         summaryDraft,
         addingDecision,
         addingAction,
+        projectType,
       },
       {
         onOpenRegister: openRegister,
@@ -602,8 +676,24 @@ export async function mountNotesPanel(root, { getCapture, onEndCapture, onExport
           redraw();
         },
         onEndAndDraft: async () => {
+          const cap = readCapture();
+          const lines = (getSessionLines?.() || []).slice();
           await onEndCapture?.();
+          try {
+            await draftFromSession(lines, cap);
+          } catch (e) {
+            console.warn('[notes] draftFromSession:', e?.message || e);
+          }
           openRegister();
+        },
+        onProjectType: async (v) => {
+          projectType = await saveProjectTypePref(v);
+          const meeting = meetings.find((m) => m.id === activeId) || null;
+          if (meeting && !meeting.issuedAt && meeting.projectType !== projectType) {
+            await saveMeeting({ ...meeting, projectType });
+            meetings = await listMeetings();
+          }
+          redraw();
         },
         onSelectMeeting: (id) => {
           activeId = id;

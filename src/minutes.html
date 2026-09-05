@@ -23,7 +23,7 @@
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
       <span data-t="onDevice">On-device</span>
     </span>
-    <select id="m-switch" class="mswitch" aria-label="Meeting"></select>
+    <select id="m-switch" class="mswitch" aria-label="Meeting" data-tour="m-switch"></select>
     <button type="button" class="btn" id="btn-add-item">＋ <span data-t="addItem">Add item</span></button>
     <div class="menuwrap">
       <button type="button" class="btn" id="btn-export" aria-haspopup="menu">
@@ -38,7 +38,7 @@
       </div>
     </div>
     <button type="button" class="btn" id="btn-amend">↻ <span data-t="applyCorrection">Amend</span></button>
-    <button type="button" class="btn primary" id="btn-issue">
+    <button type="button" class="btn primary" id="btn-issue" data-tour="btn-issue">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"/></svg>
       <span data-t="issue">Issue MoM</span>
     </button>
@@ -67,6 +67,7 @@
             <span><span class="k" data-t="present">Present</span> <span class="v mono" id="m-present">—</span></span>
             <span><span class="k" data-t="mom">MoM</span> <span class="v mono" id="m-mom">—</span></span>
             <span><span class="k" data-t="series">Series</span> <span class="v mono" id="m-series">—</span></span>
+            <span><span class="k" data-t="projectType">Type</span> <span class="v" id="m-ptype">—</span></span>
           </div>
         </div>
         <div class="head-actions">
@@ -94,10 +95,10 @@
     <div class="bar">
       <div class="tabs" role="tablist" id="tabs">
         <button role="tab" aria-selected="true" data-view="table" data-t="vRegister">Register</button>
-        <button role="tab" aria-selected="false" data-view="topic" data-t="vTopic">By topic</button>
+        <button role="tab" aria-selected="false" data-view="topic" data-t="vTopic" data-tour="view-topic">By topic</button>
         <button role="tab" aria-selected="false" data-view="doc" data-t="vDoc">Minutes</button>
-        <button role="tab" aria-selected="false" data-view="carry" data-t="vCarry">Carry-forward</button>
-        <button role="tab" aria-selected="false" data-view="series" data-t="vSeries">Series</button>
+        <button role="tab" aria-selected="false" data-view="carry" data-t="vCarry" data-tour="view-carry">Carry-forward</button>
+        <button role="tab" aria-selected="false" data-view="series" data-t="vSeries" data-tour="view-series">Series</button>
       </div>
       <div class="grow"></div>
       <label class="srch"><span aria-hidden="true">⌕</span><input id="q" type="search" /></label>
@@ -109,6 +110,9 @@
           <option value="status" data-t="cStatus">Status</option>
         </select>
       </label>
+      <label class="grpsel"><span data-t="projectType">Type</span>
+        <select id="pt-filter" data-tour="pt-filter"><option value="all" data-t="allTypes">All types</option></select>
+      </label>
       <button class="btn sm" id="btn-mine" aria-pressed="false">◑ <span data-t="mine">Mine</span></button>
       <button class="btn sm" id="btn-dual" aria-pressed="false">⇄ <span data-t="dual">Dual text</span></button>
       <div class="langsw" role="group" aria-label="Interface language">
@@ -118,7 +122,7 @@
     </div>
 
     <div class="chips">
-      <div id="chips" class="chips-types"></div>
+      <div id="chips" data-tour="chips" class="chips-types"></div>
       <div class="grow"></div>
       <button class="chip review" id="btn-review-only" aria-pressed="false">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5"/><path d="M12 16.5h.01"/><circle cx="12" cy="12" r="8.5"/></svg>

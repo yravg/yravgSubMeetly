@@ -73,6 +73,24 @@ Semua ditutup dengan verifikasi perilaku di `app.html`, dijaga `test/app-surface
     setelah 90 dtk, overlay terinjeksi). `npm run release:gate` → **CLEAR**.
 20. `PROJECT-CONTEXT.md` dibuat; `guide.html` menampilkan kedua panduan (`?doc=`).
 
+### Permintaan langsung pengguna (di luar plan NgodingPakeAI) — sesi ini
+21. **Tipe proyek pada notulen** — `projectType` di `createMeeting` (14 nilai, `PROJECT_TYPES` di
+    `notes-schema.js`), pemilih di kartu rekam (`#notes-project-type`), preferensi terakhir
+    (`notesProjectType`), diwariskan `startNextMeeting`, tampil di ekspor MD/TXT, register punya
+    filter `#pt-filter` + optgroup di `#m-switch` + badge `#m-ptype`.
+22. **"End & draft" menghasilkan draf dari baris sesi** — dulu hanya berhenti & buka register; kini
+    `draftFromSession` di `notes-panel.js` memakai `generateNotesFromTranscript` (jalur yang sama
+    dengan tempel-Teams) dan menggabungkan bendera yang sudah ada.
+23. **Pustaka 214 transkrip** (`src/lib/sample-library.js`, generator deterministik, 13 bidang,
+    26 seri mingguan = 76%, indeks 29 KB) — diimpor per seri lewat pipeline asli. Tes 9/9.
+24. **Training/gamify ala DCS_DocConSystem** — `learning-progress.js` (XP/level 7 tingkat/21
+    achievement/pemahaman/rentetan, idempoten per kunci event), `learning-tours.js` (3 tur, target
+    `data-tour`), `learning-quiz.js` (5 jenis pertanyaan). UI di `src/minutes-extras.js` (overlay
+    Library + Training, tour spotlight), dipasang dari `minutes.js`; XP saat `acceptWithXp` dan
+    `doIssue`. Tes: learning 19, `test/register-extras.test.mjs` (Puppeteer) 5.
+    Catatan kontrak: `recordQuizAnswer(state, questionId, correct)` memberi XP sendiri —
+    jangan dipanggil bersama `awardEvent`.
+
 ### Bug UI nyata yang ditemukan lewat app.html dan diperbaiki
 - **Modal Pengaturan rusak total.** Satu `</div>` berlebih di `src/sidepanel.html` menutup
   `.modal-card` terlalu awal → `#settings-modal` punya 17 anak langsung; karena `.modal` adalah
@@ -87,7 +105,8 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 
 ## Verifikasi
 
-- `npm test` → **186/186 lulus**.
+- `npm test` → **219/219 lulus** (termasuk sample-library 9, learning 19, register-extras 5).
+- `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
 - `npm run e2e` → PASS (headed, Chrome for Testing). `npm run release:gate` → CLEAR.
 - `npm run smoke -- --crossos` → 26/26 Fase 1 + 9/9 lintas-OS.
 - `npm run e2e:crossos` → 10/10. `npm run bench:bigfile --upload` → 5/5.

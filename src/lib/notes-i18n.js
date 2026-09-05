@@ -18,6 +18,17 @@ const en = {
   startNext: 'Start next meeting',
   exportStanding: 'Export standing register',
 
+  /* project types */
+  projectType: 'Project type',
+  projectTypeHint: 'Pick before you record — the register groups and filters by it.',
+  pt_general: 'General', pt_weekly_progress: 'Weekly progress', pt_hse: 'HSE / safety',
+  pt_design_review: 'Design review', pt_client_review: 'Client review', pt_standup: 'Stand-up',
+  pt_sprint: 'Sprint planning / retro', pt_sales: 'Sales pipeline', pt_finance: 'Finance / budget',
+  pt_legal: 'Legal / contract', pt_training: 'Training', pt_research: 'Research',
+  pt_healthcare: 'Healthcare', pt_education: 'Education / class',
+  allTypes: 'All types',
+  draftFromSession: (n) => `Draft built from the recording — ${n} items detected, review them`,
+
   /* meeting facts */
   date: 'Date', time: 'Time', chair: 'Chair', present: 'Present', mom: 'MoM',
   series: 'Series', nth: (n) => `meeting ${n}`, cadence: 'Cadence', span: 'Span',
@@ -208,6 +219,17 @@ const en = {
 };
 
 const id = {
+  /* project types */
+  projectType: 'Tipe proyek',
+  projectTypeHint: 'Pilih sebelum merekam — register mengelompokkan dan memfilter berdasarkan ini.',
+  pt_general: 'Umum', pt_weekly_progress: 'Progres mingguan', pt_hse: 'K3 / keselamatan',
+  pt_design_review: 'Tinjauan desain', pt_client_review: 'Tinjauan klien', pt_standup: 'Stand-up',
+  pt_sprint: 'Perencanaan / retro sprint', pt_sales: 'Pipeline penjualan', pt_finance: 'Keuangan / anggaran',
+  pt_legal: 'Hukum / kontrak', pt_training: 'Pelatihan', pt_research: 'Riset',
+  pt_healthcare: 'Kesehatan', pt_education: 'Pendidikan / kelas',
+  allTypes: 'Semua tipe',
+  draftFromSession: (n) => `Draf dibuat dari rekaman — ${n} butir terdeteksi, mohon ditelaah`,
+
   minutes: 'Notulen',
   register: 'Register notulen',
   openRegister: 'Buka register notulen',

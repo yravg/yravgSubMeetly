@@ -42,3 +42,9 @@ Pekerjaan Windows **ditunda** atas permintaan pengguna (task `…windows-dan-lin
 Tiap task plan ditutup dengan bukti (tes yang menjalankan `app.html`), `npm test` hijau,
 `npm run smoke -- --crossos` dan `npm run release:gate` hijau, zip Chrome Web Store terbangun,
 `HANDOFF.md` diperbarui.
+
+## Modul tambahan (2026-09-05, permintaan pengguna)
+- `src/lib/sample-library.js` — 214 transkrip contoh, 13 bidang, 26 seri mingguan; diimpor per seri.
+- `src/lib/learning-progress.js`, `learning-tours.js`, `learning-quiz.js` — XP/level/achievement, tur, kuis (ala DCS_DocConSystem).
+- `src/minutes-extras.js` — UI Library + Training di Minutes Register; XP dikait di `acceptWithXp`/`doIssue`.
+- `projectType` pada meeting (`PROJECT_TYPES`, 14 nilai) — dipilih saat merekam, difilter di register.

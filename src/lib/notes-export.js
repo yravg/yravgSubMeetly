@@ -23,6 +23,8 @@ const DOC_SECTIONS = [
   ['info', 'docNotes', 'Discussion notes'],
 ];
 
+const ptKey = (t) => `pt_${String(t || '').replace(/-/g, '_')}`;
+
 function label(T, key, fallback) {
   if (!T) return fallback;
   const v = T(key);
@@ -41,7 +43,7 @@ export function serializeMeetingMarkdown(meeting, lang = meeting.locale || 'en',
   const lines = [
     `# ${meeting.title}`,
     '',
-    `_${meeting.id}_ · ${meeting.date}${meeting.start ? ` · ${meeting.start}${meeting.end ? `–${meeting.end}` : ''}${meeting.tz ? ` ${meeting.tz}` : ''}` : ''}${meeting.chair ? ` · ${label(T, 'chair', 'Chair')}: ${meeting.chair}` : ''}`,
+    `_${meeting.id}_ · ${meeting.date}${meeting.start ? ` · ${meeting.start}${meeting.end ? `–${meeting.end}` : ''}${meeting.tz ? ` ${meeting.tz}` : ''}` : ''}${meeting.chair ? ` · ${label(T, 'chair', 'Chair')}: ${meeting.chair}` : ''}${meeting.projectType && meeting.projectType !== 'general' ? ` · ${label(T, 'projectType', 'Type')}: ${label(T, ptKey(meeting.projectType), meeting.projectType)}` : ''}`,
     meeting.issuedAt ? `_${label(T, 'issued', 'Issued')}: ${meeting.issuedAt}_` : '_Draft — not yet issued_',
     '',
     `${stats.total} items · ${stats.actionsOpen}/${stats.actionsTotal} actions open · ${stats.decisions} decisions · ${stats.questionsOpen} open questions · agenda ${stats.agendaPct}% covered`,
@@ -93,6 +95,7 @@ export function serializeMeetingTxt(meeting, lang = meeting.locale || 'en') {
   const lines = [
     meeting.title,
     `${meeting.id} · ${meeting.date}`,
+    ...(meeting.projectType && meeting.projectType !== 'general' ? [`Type: ${meeting.projectType}`] : []),
     meeting.issuedAt ? `Issued: ${meeting.issuedAt}` : 'Draft — not yet issued',
     '',
     `${stats.total} items · ${stats.actionsOpen}/${stats.actionsTotal} actions open · ${stats.decisions} decisions`,

@@ -36,7 +36,7 @@ import {
 import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
-import { mountNotesPanel } from './notes-panel.js';
+import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
 import { detectOs } from './lib/helper-status.js';
@@ -349,6 +349,7 @@ async function generateMinutesFromPaste() {
     title: ($('paste-title')?.value || '').trim() || 'Pasted meeting',
     locale: state.settings.uiLang === 'id' ? 'id' : 'en',
     source: 'teams-paste',
+    projectType: await loadProjectTypePref(),
   });
   const { saveMeeting } = await import('./lib/notes-store.js');
   await saveMeeting(meeting);
@@ -362,6 +363,7 @@ async function generateMinutesFromPaste() {
 function notesMountOptions() {
   return {
     getCapture,
+    getSessionLines: () => state.realtimeLines.slice(),
     onEndCapture: () => onStop(),
     onExportNotes: (kind) => exportActiveNotes(kind),
     onPushShared: (meeting, lang) => pushActiveNotes(meeting, lang),

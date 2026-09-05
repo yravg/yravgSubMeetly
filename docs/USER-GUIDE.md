@@ -117,6 +117,39 @@ item beserta pemiliknya, pertanyaan terbuka, risiko, dan metrik.
   rapat yang sudah terlanjur direkam Teams.
 - **Open minutes register** membuka tabel lengkap di tab tersendiri, dengan
   jejak asal tiap butir dan dokumen MoM yang siap diterbitkan.
+- **Project type** di kartu rekam menandai rapat (progres mingguan, K3, tinjauan
+  desain, stand-up, sprint, penjualan, keuangan, hukum, pelatihan, riset,
+  kesehatan, pendidikan, umum). Pilih **sebelum** menekan Start; register
+  mengelompokkan pengalih rapat per tipe dan menyediakan filter tipe. Pilihan
+  terakhir diingat untuk rapat berikutnya.
+- **End & draft** kini menyusun draf notulen dari baris transkrip sesi itu
+  sendiri (bukan hanya bendera), digabung dengan yang sudah Anda tandai.
+
+### Pustaka contoh (Library)
+
+Tombol **📚 Library** di register membuka 200+ transkrip contoh dari 13 bidang
+(EPC/offshore, K3, tinjauan desain, klien, stand-up, sprint, penjualan,
+keuangan, hukum, pelatihan, riset, rumah sakit, sekolah). Sebagian besar
+berupa **seri mingguan** — butir terbuka minggu ini muncul lagi minggu depan.
+Navigasi: bidang → seri → minggu (tombol Prev/Next), pratinjau transkrip, lalu
+**Import whole series** atau **Import this week only**. Impor melewati pipeline
+notulen yang sama dengan rekaman sungguhan.
+
+### Latihan & gamifikasi (Training)
+
+Tombol **🎓 Training** membuka panel kemajuan ala DCS_DocConSystem:
+
+| Tab | Isi |
+| --- | --- |
+| **Progress** | Level & XP, skor pemahaman, rentetan harian, hitungan aktivitas |
+| **Tours** | Tur terpandu **Watch** (otomatis) atau **Practise** (klik kontrol yang disorot): merekam, register, pustaka |
+| **Quiz** | 5 pertanyaan dari rapat yang terbuka (siapa pemilik, tipe butir, jatuh tempo, …) |
+| **Achievements** | 21 pencapaian, terbuka saat syaratnya tercapai |
+
+XP diberikan sekali per kejadian: memulai/menyelesaikan tur, jawaban kuis benar,
+menerima butir AI di register, menerbitkan MoM, mengimpor seri, dan aktivitas
+harian. Semuanya tersimpan lokal di perangkat.
+
 
 Semua tersimpan di `chrome.storage.local`; tidak ada audio, transkrip, atau teks
 yang meninggalkan perangkat.
