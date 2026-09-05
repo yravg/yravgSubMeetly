@@ -14,11 +14,13 @@
 Windows/Linux (`doing` = penanda "lanjut nanti"). `task next` masih mengembalikan task itu;
 jangan jalankan final `sync` sampai pengguna memutuskan nasibnya.
 
-**DITUNDA — jangan dikerjakan tanpa diminta:**
-`siap-rilis/tulis-panduan-pengguna-windows-dan-linux` (`1c23b894-…`) sengaja
-distatuskan `doing` sebagai penanda "dikerjakan nanti". Pengguna meminta semua
-pekerjaan Windows ditunda. `task next` akan terus menyodorkannya — **lewati**, ambil
-task lain dari `task list`.
+**Task Windows/Linux (`1c23b894-…`) berstatus `failed` atas permintaan pengguna.**
+Panduannya SUDAH ditulis (`docs/USER-GUIDE-WINLINUX.md`, tersaji di `guide.html`) dan
+diverifikasi dari isi; yang belum: eksekusi nyata di mesin Windows. Status `failed` TIDAK
+menyelesaikan slice frontend, sehingga 23 task layer backend Fase 5 tetap terkunci dan
+`task next` terus mengembalikan task ini. Jalan keluar: pengguna menyetujui `task complete`
+(deliverable ada, caveat tercatat) atau menanganinya di web UI. Jangan `reset`/`complete`
+tanpa persetujuan pengguna.
 
 Fase 4 layer backend (halaman Dukungan Windows Linux) sudah selesai seluruhnya.
 
@@ -71,7 +73,8 @@ Semua ditutup dengan verifikasi perilaku di `app.html`, dijaga `test/app-surface
     yang sejak Chrome 137 mengabaikan `--load-extension` → SW tak pernah muncul → timeout 20 dtk.
     Kini default Chrome for Testing (override `PUPPETEER_EXECUTABLE_PATH`). `npm run e2e` PASS (subtitel
     setelah 90 dtk, overlay terinjeksi). `npm run release:gate` → **CLEAR**.
-20. `PROJECT-CONTEXT.md` dibuat; `guide.html` menampilkan kedua panduan (`?doc=`).
+20. `PROJECT-CONTEXT.md` dibuat; `guide.html` menampilkan ketiga panduan (`?doc=`), termasuk
+    `USER-GUIDE-WINLINUX.md`; perender kini mendukung kutipan `>`.
 
 ### Permintaan langsung pengguna (di luar plan NgodingPakeAI) — sesi ini
 21. **Tipe proyek pada notulen** — `projectType` di `createMeeting` (14 nilai, `PROJECT_TYPES` di
@@ -105,7 +108,7 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 
 ## Verifikasi
 
-- `npm test` → **219/219 lulus** (termasuk sample-library 9, learning 19, register-extras 5).
+- `npm test` → **221/221 lulus** (termasuk sample-library 9, learning 19, register-extras 5, mini-markdown 11).
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
 - `npm run e2e` → PASS (headed, Chrome for Testing). `npm run release:gate` → CLEAR.
 - `npm run smoke -- --crossos` → 26/26 Fase 1 + 9/9 lintas-OS.
