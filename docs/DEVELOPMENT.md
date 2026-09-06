@@ -7,7 +7,7 @@ akun atau layanan awan.
 | --- | --- | --- | --- |
 | Ekstensi Chrome (MV3) | `src/` | Node 20+ (diuji Node 24), esbuild | `dist/` |
 | Native Helper | `native/` | Python 3.10+, ffmpeg; mlx-whisper (Apple Silicon) / faster-whisper | server HTTP di `127.0.0.1:17865` |
-| Aplikasi macOS | `mac/` | macOS 26+, Swift 6 (Command Line Tools cukup) | `mac/build/yraverageSub.app` |
+| Aplikasi macOS | `mac/` | macOS 26+, Swift 6 (Command Line Tools cukup) | `mac/build/yraverageSubMin.app` |
 
 ---
 
@@ -85,7 +85,7 @@ cd mac
 ./make-signing-cert.sh   # SEKALI: sertifikat penanda tangan lokal
 ./build-app.sh           # build, tanda tangan, verifikasi, pasang bundel
 ./doctor.sh              # toolchain, tanda tangan, ikon, izin
-open build/yraverageSub.app
+open build/yraverageSubMin.app
 ```
 
 Kenapa sertifikat itu wajib: tanda tangan ad-hoc berubah tiap build, dan macOS

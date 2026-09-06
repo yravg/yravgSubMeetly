@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local TransSub native helper.
+"""yraverageSubMin native helper.
 
 A tiny localhost HTTP server that gives the browser extension a fast, accurate
 speech-recognition engine running on this machine:
@@ -1596,7 +1596,7 @@ def warmup():
 
 if __name__ == "__main__":
     draft_note = f" draft={DRAFT_MODEL}" if _draft_available else ""
-    print(f"Local TransSub native helper — engine={ENGINE} model={MODEL}{draft_note} ffmpeg={FFMPEG} "
+    print(f"yraverageSubMin native helper — engine={ENGINE} model={MODEL}{draft_note} ffmpeg={FFMPEG} "
           f"translate={'on' if _translate_available else 'off'}")
     srv = ReuseHTTPServer((HOST, PORT), Handler)
     print(f"listening on http://{HOST}:{PORT}   (Ctrl-C to stop)", flush=True)

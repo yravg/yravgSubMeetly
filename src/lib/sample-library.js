@@ -1,5 +1,5 @@
 /**
- * Pustaka contoh transkrip rapat — Local TransSub.
+ * Pustaka contoh transkrip rapat — yraverageSubMin.
  *
  * ~200 transkrip rapat deterministik dari 13 bidang (EPC, HSE, design review,
  * klien, stand-up, sprint, sales, finance, legal, training, riset, klinis,

@@ -1,4 +1,4 @@
-# Panduan pengguna — yraverageSub di Windows dan Linux
+# Panduan pengguna — yraverageSubMin di Windows dan Linux
 
 Ekstensi Chrome berjalan **sama** di Windows, Linux, dan macOS — panduan
 ekstensi berlaku penuh. Yang berbeda di Windows/Linux hanya **Native Helper**:
@@ -64,7 +64,7 @@ Skrip ini melakukan tiga hal yang khusus Windows:
 
 1. Membuat pembungkus `messaging_host.bat` — Chrome tidak bisa menjalankan
    berkas `.py` langsung sebagai host.
-2. Menulis manifest ke `%LOCALAPPDATA%\yraverageSub\com.localtranssub.helper.json`.
+2. Menulis manifest ke `%LOCALAPPDATA%\yraverageSubMin\com.localtranssub.helper.json`.
 3. Mendaftarkan kunci registry `HKCU\Software\…\NativeMessagingHosts\com.localtranssub.helper`
    untuk Chrome, Edge, dan Chromium — tanpa ini browser tidak menemukan host.
 

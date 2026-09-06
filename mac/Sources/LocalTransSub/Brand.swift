@@ -78,6 +78,6 @@ struct Wordmark: View {
                 )
                 .padding(.leading, size * 0.06)
         }
-        .accessibilityLabel("yraverageSub")
+        .accessibilityLabel("yraverageSubMin")
     }
 }

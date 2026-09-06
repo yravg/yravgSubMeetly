@@ -1,5 +1,5 @@
 /**
- * Skema penyimpanan sesi v1 — Local TransSub.
+ * Skema penyimpanan sesi v1 — yraverageSubMin.
  *
  * Riwayat sesi sebelumnya disimpan sebagai array mentah tanpa versi: setiap
  * penulis (background, offscreen, panel) menaruh bentuknya sendiri, dan tidak

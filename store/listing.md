@@ -1,9 +1,9 @@
-# Chrome Web Store listing copy — Local TransSub 1.1.1
+# Chrome Web Store listing copy — yraverageSubMin 1.1.1
 
 Paste into the Developer Dashboard. Keep English as the primary locale; Indonesian is optional.
 
 ## Name
-Local TransSub
+yraverageSubMin
 
 ## Short description (≤132 characters)
 Realtime subtitles & translation on-device. No accounts — audio stays on your device after models download.
@@ -15,7 +15,7 @@ Subtitel & terjemahan real-time di perangkat. Tanpa akun — audio tetap lokal s
 
 ## Detailed description (English)
 
-Local TransSub adds live and offline subtitles to Chrome tabs and media files using on-device AI:
+yraverageSubMin adds live and offline subtitles to Chrome tabs and media files using on-device AI:
 
 - Transcription with Whisper in the browser (WASM/WebGPU) or an optional Native Helper
 - Layered translation: Whisper-direct, Chrome Translator (when available), Opus-MT, local LLM via helper
@@ -30,7 +30,7 @@ Local TransSub adds live and offline subtitles to Chrome tabs and media files us
 
 ## Detailed description (Indonesian, optional)
 
-Local TransSub menambahkan subtitel langsung pada tab Chrome dan berkas offline dengan AI di perangkat:
+yraverageSubMin menambahkan subtitel langsung pada tab Chrome dan berkas offline dengan AI di perangkat:
 
 - Transkripsi Whisper di browser (WASM/WebGPU) atau Native Helper opsional
 - Terjemahan berjenjang: Whisper-direct, Chrome Translator, Opus-MT, LLM lokal

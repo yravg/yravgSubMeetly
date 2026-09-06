@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the Local TransSub native helper (creates a venv on first run).
+# Start the yraverageSubMin native helper (creates a venv on first run).
 #   TRANSLATE=off ./run.sh     → skip the translation LLM
 #   WHISPER_MODEL=mlx-community/whisper-small-mlx ./run.sh  → smaller/faster model
 #   DRAFT_WHISPER_MODEL=mlx-community/whisper-base-mlx ./run.sh  → fast live drafts (default)

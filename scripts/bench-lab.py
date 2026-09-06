@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Headless benchmark for Local TransSub native helper.
+"""Headless benchmark for yraverageSubMin native helper.
 
 Runs the same checks as test/lab.html without a browser:
   - /draft at 0.35s, 0.5s, 1s, 2s windows

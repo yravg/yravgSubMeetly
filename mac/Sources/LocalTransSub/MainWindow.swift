@@ -42,7 +42,7 @@ final class MainWindowController: NSObject, NSToolbarDelegate {
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false)
-        w.title = "yraverageSub"
+        w.title = "yraverageSubMin"
         w.isReleasedWhenClosed = false
         w.contentView = NSHostingView(rootView: MainView(app: app))
         let toolbar = NSToolbar(identifier: "TransSubSession")

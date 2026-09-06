@@ -21,7 +21,7 @@ chmod +x "$HOST_PY"
 MANIFEST=$(cat <<EOF
 {
   "name": "com.localtranssub.helper",
-  "description": "Local TransSub native helper launcher",
+  "description": "yraverageSubMin native helper launcher",
   "path": "$HOST_PY",
   "type": "stdio",
   "allowed_origins": [

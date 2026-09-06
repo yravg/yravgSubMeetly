@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Chrome Native Messaging host — start / stop / restart the Local TransSub helper."""
+"""Chrome Native Messaging host — start / stop / restart the yraverageSubMin helper."""
 import json
 import os
 import platform

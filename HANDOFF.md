@@ -158,7 +158,7 @@ Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per ta
     `paintStaticStrings()` kini juga menerapkan `data-t-title` (atribut itu sudah lama ada di markup
     tapi tidak pernah dipasang), supaya tombol yang tinggal ikon tetap punya tooltip yang diterjemahkan.
     Terukur bersih 1400 → 520 px; tes menjaga 1400/1100/1000/900/800/700/640.
-32. **Wordmark dan jalan pulang di appbar (2026-09-07).** Ikon generik + teks "Local TransSub"
+32. **Wordmark dan jalan pulang di appbar (2026-09-07).** Ikon generik + teks "yraverageSubMin"
     diganti wordmark **yraverageSubMin**, memakai markup dan geometri yang sama dengan panel sisi
     (`.brand-word` + `.brand-pill`, lekuk kiri dari mask lingkaran) tapi dengan token minutes.css;
     di bawah 720 px hanya pilnya yang tersisa, dan mask dilepas supaya tetap terbaca sebagai kapsul.
@@ -250,10 +250,10 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 
 ## Catatan yang perlu diketahui
 
-- Paket CWS (`store/releases/local-transsub-1.1.1.zip`, 31 MB / 114 MB tak terkompresi) mengirim
+- Paket CWS (`store/releases/yraverage-submin-1.1.1.zip`, 31 MB / 114 MB tak terkompresi) mengirim
   ONNX Runtime **dua kali**: `ort/` (20 MB) dan `vad/ort/` (5 varian WASM, ~75 MB). Bukan blocker
   rilis, tapi peluang pemangkasan ±60 MB bila VAD dibuat memakai runtime yang sama.
-- `store/local-transsub-1.0.0.zip` dan `1.1.0.zip` masih ada di root `store/` — jangan diunggah;
+- `store/yraverage-submin-1.0.0.zip` dan `1.1.0.zip` masih ada di root `store/` — jangan diunggah;
   `SUBMIT.md` sudah memperingatkan. Belum dihapus karena itu artefak rilis.
 
 - Installer Windows, `run.bat`, dan panduan Win/Linux **belum pernah dieksekusi di Windows**.

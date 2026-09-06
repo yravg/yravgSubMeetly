@@ -36,7 +36,7 @@ npm run build
 npm run pack:store
 ```
 
-Canonical upload path: **`store/releases/local-transsub-1.1.1.zip`**.
+Canonical upload path: **`store/releases/yraverage-submin-1.1.1.zip`**.
 
 ## Short blurb
-Local TransSub — on-device realtime subtitles & translation. No Local TransSub cloud inference; models download once when you choose them.
+yraverageSubMin — on-device realtime subtitles & translation. No yraverageSubMin cloud inference; models download once when you choose them.

@@ -11,7 +11,7 @@
 # grant permissions once and they survive rebuilds.
 set -euo pipefail
 
-CERT_NAME="${CERT_NAME:-Local TransSub Dev}"
+CERT_NAME="${CERT_NAME:-yraverageSubMin Dev}"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$CERT_NAME"; then
@@ -29,7 +29,7 @@ distinguished_name = dn
 x509_extensions = v3
 prompt = no
 [ dn ]
-CN = Local TransSub Dev
+CN = yraverageSubMin Dev
 [ v3 ]
 basicConstraints = critical,CA:false
 keyUsage = critical,digitalSignature

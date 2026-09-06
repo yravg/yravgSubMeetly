@@ -572,7 +572,7 @@ function viewDoc() {
       <div class="dist">
         <span class="mono">${esc(m.id)} · ${esc(T('rev'))} ${esc(rev)}</span>
         ${distribution ? `<span>${esc(T('distribution'))}: ${esc(distribution)}</span>` : ''}
-        <span>${esc(T('preparedBy'))}: Local TransSub · ${esc(T('onDevice'))}</span>
+        <span>${esc(T('preparedBy'))}: yraverageSubMin · ${esc(T('onDevice'))}</span>
       </div>
     </div>
   </div></div>`;

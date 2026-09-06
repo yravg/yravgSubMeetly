@@ -1,4 +1,4 @@
-# Panduan pengguna — yraverageSub (ekstensi Chrome)
+# Panduan pengguna — yraverageSubMin (ekstensi Chrome)
 
 Subtitel dan terjemahan langsung untuk tab Chrome dan berkas media, berjalan **di
 perangkat Anda**. Tidak ada akun, tidak ada server. Setelah model terunduh sekali,

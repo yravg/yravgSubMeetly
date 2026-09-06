@@ -24,7 +24,7 @@ Installer host butuh ID ekstensi, karena manifest Native Messaging hanya
 mengizinkan ekstensi yang disebut namanya.
 
 1. Buka `chrome://extensions`, nyalakan **Developer mode**.
-2. Salin ID 32 huruf di kartu **yraverageSub** (mis. `abcdefghijklmnopabcdefghijklmnop`).
+2. Salin ID 32 huruf di kartu **yraverageSubMin** (mis. `abcdefghijklmnopabcdefghijklmnop`).
 
 ID berubah setiap kali ekstensi unpacked dimuat dari folder berbeda — jalankan
 ulang installer host bila itu terjadi.
@@ -99,7 +99,7 @@ faster-whisper. `run.bat` memakai `py -3` bila ada (stub Microsoft Store bernama
    berkas `.py` sebagai Native Messaging host, jadi manifest harus menunjuk ke
    berkas yang bisa dieksekusi. Pembungkus itu memanggil Python (`py -3`, atau
    `python` bila peluncur `py` tidak ada).
-2. **Menulis manifest** ke `%LOCALAPPDATA%\yraverageSub\com.localtranssub.helper.json`.
+2. **Menulis manifest** ke `%LOCALAPPDATA%\yraverageSubMin\com.localtranssub.helper.json`.
 3. **Mendaftarkan kunci registry** — tanpa ini browser tidak menemukan host:
 
    - `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.localtranssub.helper`

@@ -1,4 +1,4 @@
-# Chrome Web Store submission guide — Local TransSub 1.1.1
+# Chrome Web Store submission guide — yraverageSubMin 1.1.1
 
 ## Build & pack (canonical)
 
@@ -8,8 +8,8 @@ npm run pack:store
 # or: chmod +x scripts/pack-store.sh && ./scripts/pack-store.sh
 ```
 
-**Upload this file only:** `store/releases/local-transsub-1.1.1.zip`  
-(Identical copy also written to `store/local-transsub-1.1.1.zip`. Do **not** upload any `1.0.0` zip.)
+**Upload this file only:** `store/releases/yraverage-submin-1.1.1.zip`  
+(Identical copy also written to `store/yraverage-submin-1.1.1.zip`. Do **not** upload any `1.0.0` zip.)
 
 ## Dashboard checklist
 

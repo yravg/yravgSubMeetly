@@ -1,4 +1,4 @@
-# Local TransSub — Notes v2: the Minutes Register
+# yraverageSubMin — Notes v2: the Minutes Register
 
 **Target:** replace the current Notes tab with a Facilitator-class minutes surface — a typed, sortable, provenance-linked register that survives from meeting to meeting.
 
@@ -12,7 +12,7 @@
 
 Loop Facilitator produces a **document**. What a weekly progress meeting actually needs is a **register** — numbered, typed, owned, dated, carried forward, and auditable back to the words that were said.
 
-Loop can't do that last part, because Loop never had the audio. Local TransSub does. **Provenance is the moat.** Every other feature on this list is table stakes; the one thing a competitor structurally cannot copy is a row that plays back the sentence it came from.
+Loop can't do that last part, because Loop never had the audio. yraverageSubMin does. **Provenance is the moat.** Every other feature on this list is table stakes; the one thing a competitor structurally cannot copy is a row that plays back the sentence it came from.
 
 ---
 

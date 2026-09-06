@@ -490,9 +490,9 @@ test('hasil dan ekspor TXT/SRT/VTT: baris hasil tampil, ekspor lewat normalizer 
   const { srt, vtt, txt } = r.text;
   assert.ok(srt && vtt && txt, `ketiga format harus menghasilkan berkas: ${Object.keys(r.text)}`);
   // SRT: indeks berurut dari 1, panah, koma milidetik, baris kosong antar cue.
-  // Cue pertama adalah metadata 1 ms ("Local TransSub / Title: …") — penanda
+  // Cue pertama adalah metadata 1 ms ("yraverageSubMin / Title: …") — penanda
   // asal berkas yang disengaja; cue ucapan menyusul dengan waktu aslinya.
-  assert.match(srt, /^1\r?\n00:00:00,000 --> 00:00:00,001\r?\nLocal TransSub\r?\nTitle: /, 'cue metadata SRT harus di indeks 1');
+  assert.match(srt, /^1\r?\n00:00:00,000 --> 00:00:00,001\r?\nyraverageSubMin\r?\nTitle: /, 'cue metadata SRT harus di indeks 1');
   assert.match(srt, /\n\r?\n2\r?\n00:00:00,000 --> 00:00:02,500\r?\n/, 'cue ucapan pertama harus di indeks 2 dengan waktu aslinya');
   const indices = [...srt.matchAll(/(?:^|\n\r?\n)(\d+)\r?\n\d\d:/g)].map((m) => Number(m[1]));
   assert.deepEqual(indices, [1, 2, 3, 4], `penomoran SRT harus berurut: ${indices}`);

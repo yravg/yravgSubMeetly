@@ -45,7 +45,7 @@ set "WRAPPER=%HOST_DIR%messaging_host.bat"
 )
 
 REM --- manifest ------------------------------------------------------------
-set "MANIFEST_DIR=%LOCALAPPDATA%\yraverageSub"
+set "MANIFEST_DIR=%LOCALAPPDATA%\yraverageSubMin"
 if not exist "%MANIFEST_DIR%" mkdir "%MANIFEST_DIR%"
 set "MANIFEST=%MANIFEST_DIR%\com.localtranssub.helper.json"
 
@@ -55,7 +55,7 @@ set "WRAPPER_JSON=%WRAPPER:\=\\%"
 > "%MANIFEST%" (
   echo {
   echo   "name": "com.localtranssub.helper",
-  echo   "description": "Local TransSub native helper launcher",
+  echo   "description": "yraverageSubMin native helper launcher",
   echo   "path": "%WRAPPER_JSON%",
   echo   "type": "stdio",
   echo   "allowed_origins": [

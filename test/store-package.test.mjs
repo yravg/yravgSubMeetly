@@ -1,5 +1,5 @@
 /**
- * Paket Chrome Web Store (store/releases/local-transsub-<versi>.zip).
+ * Paket Chrome Web Store (store/releases/yraverage-submin-<versi>.zip).
  *   node --test test/store-package.test.mjs
  *
  * Yang dijaga: zip yang diunggah benar-benar paket MV3 versi ini, berisi
@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
 // fileURLToPath, bukan .pathname: path repo ini mengandung spasi (%20 → tidak ditemukan → tes diam-diam dilewati).
-const ZIP = fileURLToPath(new URL(`../store/releases/local-transsub-${pkg.version}.zip`, import.meta.url));
+const ZIP = fileURLToPath(new URL(`../store/releases/yraverage-submin-${pkg.version}.zip`, import.meta.url));
 const hasZip = existsSync(ZIP);
 const hasUnzip = spawnSync('sh', ['-c', 'command -v unzip'], { encoding: 'utf8' }).status === 0;
 const skip = !hasZip ? 'zip belum dibuat (npm run pack:store)' : !hasUnzip ? 'unzip tidak ada' : false;

@@ -37,7 +37,7 @@
         id: 'demo-1',
         ts: Date.now() - 3600_000,
         mode: 'offline',
-        title: 'Demo meeting — Local TransSub',
+        title: 'Demo meeting — yraverageSubMin',
         url: '',
         srcLang: 'zh',
         tgtLang: 'en',

@@ -1,5 +1,5 @@
 /**
- * Skema Minutes Register v2 — Local TransSub.
+ * Skema Minutes Register v2 — yraverageSubMin.
  *
  * Ganti model v1 (summary + decisions:string[] + actions[]) dengan SATU register
  * berisi item bertipe. Setiap item menyimpan teks multi-bahasa, status telaah

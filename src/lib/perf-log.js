@@ -188,7 +188,7 @@ export function toReport(samples, meta = {}) {
     version: 1,
     generatedAt: new Date().toISOString(),
     platform: meta.platform || samples[0]?.platform || 'unknown',
-    app: meta.app || 'yraverageSub',
+    app: meta.app || 'yraverageSubMin',
     counts: { total: samples.length },
     summary: { bySeries, byStage, byPair },
     samples,

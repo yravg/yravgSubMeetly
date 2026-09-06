@@ -64,7 +64,7 @@ struct OverlayPanelView: View {
 
     private func toolbarBody(compact: Bool) -> some View {
         HStack(spacing: compact ? 6 : 10) {
-            Text(compact ? "ySub" : "yraverageSub")
+            Text(compact ? "ySub" : "yraverageSubMin")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.85))
                 .fixedSize()

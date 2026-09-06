@@ -18,7 +18,7 @@ Centang berurutan. Setiap baris menunjuk ke perintah atau berkas yang menjadi bu
 
 - [ ] `npm run build && npm run pack:store:screens` — screenshot 1280×800 ditangkap dari
       `app.html`, skrip gagal bila ada galat halaman.
-- [ ] `npm run pack:store` → `store/releases/local-transsub-<versi>.zip`;
+- [ ] `npm run pack:store` → `store/releases/yraverage-submin-<versi>.zip`;
       `node --test test/store-package.test.mjs` hijau (MV3, versi cocok, tanpa berkas dev).
 - [ ] **Jangan** unggah zip versi lama yang masih ada di `store/`.
 - [ ] Dashboard: ikuti [`store/SUBMIT.md`](../store/SUBMIT.md) — listing dari

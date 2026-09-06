@@ -161,7 +161,7 @@ async function startRealtime(partialCfg) {
     } catch (e) {
       throw new Error(
         String(e.message || e) +
-          ' — Right-click the page → "Start Local TransSub on this page", or use Pick tab manually.',
+          ' — Right-click the page → "Start yraverageSubMin on this page", or use Pick tab manually.',
       );
     }
   }
@@ -331,7 +331,7 @@ chrome.runtime.onInstalled.addListener(() => {
   void migrateHistoryIfNeeded();
   chrome.contextMenus.create({
     id: 'lts-start',
-    title: 'Start Local TransSub on this page / 在此页面启动',
+    title: 'Start yraverageSubMin on this page / 在此页面启动',
     contexts: ['page', 'video', 'audio', 'frame'],
   });
 });

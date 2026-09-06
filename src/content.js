@@ -933,7 +933,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
 
     const title = document.createElement('div');
     title.className = 'toolbar-title';
-    title.textContent = 'Local TransSub';
+    title.textContent = 'yraverageSubMin';
 
     const actions = document.createElement('div');
     actions.className = 'toolbar-actions';

@@ -43,7 +43,7 @@ test('kunci registry Windows yang didokumentasikan memang didaftarkan', () => {
     assert.ok(doc.includes(key), `SETUP.md tidak menyebut ${key}`);
     assert.ok(installBat.includes(key), `install-host.bat tidak mendaftarkan ${key}`);
   }
-  assert.ok(installBat.includes('yraverageSub'), 'lokasi manifest berbeda dari yang didokumentasikan');
+  assert.ok(installBat.includes('yraverageSubMin'), 'lokasi manifest berbeda dari yang didokumentasikan');
 });
 
 test('model MLX tidak pernah dipaksakan ke faster-whisper (Windows/Linux)', () => {

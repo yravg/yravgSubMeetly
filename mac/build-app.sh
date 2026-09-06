@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build yraverageSub.app.
+# Build yraverageSubMin.app.
 #
 # Design rules this script enforces, so the app cannot regress again:
 #
@@ -15,11 +15,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 CONFIG="${CONFIG:-release}"
-APP_NAME="yraverageSub"
+APP_NAME="yraverageSubMin"
 # Bundle id deliberately stable: macOS ties Screen Recording / Accessibility /
 # Input Monitoring grants to it. Changing it forces the user to re-grant.
 BUNDLE_ID="com.localtranssub.app"
-CERT_NAME="${CERT_NAME:-Local TransSub Dev}"
+CERT_NAME="${CERT_NAME:-yraverageSubMin Dev}"
 VERSION="1.0.0"
 OUT="${OUT:-build}"
 APP="$OUT/$APP_NAME.app"
@@ -63,9 +63,9 @@ cat > "$SAPP/Contents/Info.plist" <<PLIST
          policy to .accessory at runtime instead of hard-coding LSUIElement. -->
     <key>NSHighResolutionCapable</key><true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>yraverageSub transcribes your voice on-device for dictation. Audio never leaves your Mac.</string>
+    <string>yraverageSubMin transcribes your voice on-device for dictation. Audio never leaves your Mac.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>yraverageSub uses on-device speech recognition to generate subtitles and dictation. Nothing is uploaded.</string>
+    <string>yraverageSubMin uses on-device speech recognition to generate subtitles and dictation. Nothing is uploaded.</string>
 </dict>
 </plist>
 PLIST

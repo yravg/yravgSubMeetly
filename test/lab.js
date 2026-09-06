@@ -1,4 +1,4 @@
-/** Local TransSub Translation Lab — client logic */
+/** yraverageSubMin Translation Lab — client logic */
 const NATIVE = 'http://127.0.0.1:17865';
 const TARGET_DRAFT_MS = 500;
 

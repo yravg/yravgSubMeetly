@@ -3,8 +3,8 @@
  * Buat paket ZIP produksi untuk Chrome Web Store dari folder dist/.
  *
  * Output kanonis (identik):
- *   store/releases/local-transsub-<version>.zip  ← unggah ke dashboard
- *   store/local-transsub-<version>.zip           ← salinan ringkas di root store/
+ *   store/releases/yraverage-submin-<version>.zip  ← unggah ke dashboard
+ *   store/yraverage-submin-<version>.zip           ← salinan ringkas di root store/
  *
  * Versi diambil dari src/manifest.json dan harus cocok dengan package.json.
  */
@@ -62,8 +62,8 @@ if (distManifest.version !== version) {
 }
 
 mkdirSync(releasesDir, { recursive: true });
-const releaseZip = join(releasesDir, `local-transsub-${version}.zip`);
-const rootZip = join(storeDir, `local-transsub-${version}.zip`);
+const releaseZip = join(releasesDir, `yraverage-submin-${version}.zip`);
+const rootZip = join(storeDir, `yraverage-submin-${version}.zip`);
 
 rmSync(releaseZip, { force: true });
 rmSync(rootZip, { force: true });

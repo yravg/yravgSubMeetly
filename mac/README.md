@@ -1,4 +1,4 @@
-# yraverageSub for macOS
+# yraverageSubMin for macOS
 
 A menu-bar app that puts **live floating subtitles** over any app's audio, transcribes
 media files to SRT/VTT, and does **hold-to-talk dictation** into whatever app has focus.
@@ -45,7 +45,7 @@ missing measurement as success.
 ## Build & run
 
 ```bash
-cd mac && ./build-app.sh && open "build/yraverageSub.app"
+cd mac && ./build-app.sh && open "build/yraverageSubMin.app"
 ```
 
 Requires macOS 26+ and Swift 6 (Command Line Tools are enough — no Xcode needed).
@@ -72,7 +72,7 @@ Run this **once** first:
 
 The underlying rule: an ad-hoc signature's identity is its CDHash, which changes on every
 rebuild; a certificate's identity is `identifier + certificate leaf`, which does not.
-Check any build with `codesign -d -r- build/yraverageSub.app` — it must say
+Check any build with `codesign -d -r- build/yraverageSubMin.app` — it must say
 `certificate leaf`, never `cdhash`.
 
 ## Permissions to grant (one time)
@@ -109,7 +109,7 @@ SRT/VTT/TXT when you stop.
 **Transcribe a file** — the *Transcribe a file* tab: choose any audio/video file, get
 time-stamped lines, export SRT/VTT/TXT.
 
-**Dock icon** — yraverageSub is a normal Dock app; launching it opens its window.
+**Dock icon** — yraverageSubMin is a normal Dock app; launching it opens its window.
 Settings → Subtitles → *Hide Dock icon (menu bar only)* moves it to the menu bar instead,
 applied immediately without a relaunch.
 

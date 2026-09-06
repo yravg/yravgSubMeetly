@@ -34,7 +34,7 @@ export const STUB_TRANSCRIPT = [
     t0: 0,
     t1: 12,
     speaker: 'Alya',
-    text: 'Mari kita mulai. Agenda hari ini: status rilis Local TransSub dan pembagian tindak lanjut.',
+    text: 'Mari kita mulai. Agenda hari ini: status rilis yraverageSubMin dan pembagian tindak lanjut.',
   },
   {
     t0: 12,

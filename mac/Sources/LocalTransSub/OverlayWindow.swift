@@ -91,7 +91,7 @@ final class OverlayController {
         // their clicks because the content view extends under it.
         p.titlebarAppearsTransparent = true
         p.titleVisibility = .hidden
-        p.title = "yraverageSub"
+        p.title = "yraverageSubMin"
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             p.standardWindowButton(button)?.isHidden = true
         }
