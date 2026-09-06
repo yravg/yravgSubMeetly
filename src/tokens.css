@@ -1,0 +1,97 @@
+/* ==========================================================================
+   Token bersama — yraverageSubMin
+   --------------------------------------------------------------------------
+   Satu-satunya tempat skala jarak, tipografi, radius, gerak, dan lapisan
+   didefinisikan. Dimuat SEBELUM stylesheet permukaan mana pun, sehingga tiap
+   permukaan bisa menimpa satu token tertentu di `:root` miliknya — dengan
+   alasan yang ditulis — tanpa perlu menyalin ulang seluruh skala.
+
+   Warna sengaja TIDAK ada di sini: tiap permukaan punya temanya sendiri
+   (minutes: gelap + Coretax; panel sisi: beberapa reskin), jadi warna hidup
+   bersama tema yang memilikinya.
+   ========================================================================== */
+
+:root {
+  /* ---- Jarak: kelipatan 4 px ------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ---- Radius ---------------------------------------------------------- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+
+  /* ---- Tipografi ------------------------------------------------------- */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 15px;
+  --text-xl: 17px;
+  --text-2xl: 20px;
+
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* ---- Gerak -----------------------------------------------------------
+   * Tiga kurva, tiga maksud berbeda — sengaja tidak disatukan, karena
+   * menyatukannya berarti mengubah rasa animasi di salah satu permukaan.
+   *   standard    : perpindahan biasa, lembut di kedua ujung
+   *   sharp       : keluar cepat lalu berhenti tegas (popover, panel mengambang)
+   *   emphasized  : ayunan panjang untuk elemen besar (dok tampilan)
+   */
+  --ease-standard: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-sharp: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-emphasized: cubic-bezier(0.625, 0.05, 0, 1);
+
+  --transition-fast: 120ms var(--ease-standard);
+  --transition-base: 180ms var(--ease-standard);
+  --transition-slow: 250ms var(--ease-standard);
+  --transition-enter: 350ms var(--ease-standard);
+
+  /* ---- Lebar wadah ------------------------------------------------------ */
+  --container-sm: 320px;
+  --container-md: 440px;
+  --container-lg: 480px;
+  --container-xl: 880px;
+
+  /* ---- Tangga lapisan ---------------------------------------------------
+   * Angkanya persis seperti yang sudah dipakai; yang baru hanya namanya.
+   * Nilai mentah yang tersebar adalah sebabnya panel Pengaturan pernah
+   * tercetak di bawah halaman: tidak ada satu tempat pun untuk membaca
+   * urutan lapisan, jadi setiap angka baru dipilih dengan menebak.
+   *
+   * Dua rung ditempati dua nama (40, 60). Itu disengaja: perannya berbeda,
+   * kedalamannya kebetulan sama, dan memaksa salah satunya pindah akan
+   * mengubah tumpukan yang sekarang sudah benar.
+   */
+  --z-under: 0;               /* latar di dalam komponen (pil geser tab) */
+  --z-base: 1;                /* isi di atas latar itu */
+  --z-raised: 2;              /* satu langkah di atas saudaranya */
+  --z-sticky: 3;              /* header lengket */
+  --z-split: 5;               /* gagang ubah ukuran panel */
+  --z-panel: 20;              /* panel yang menutupi konten */
+  --z-dock-hint: 29;          /* bayangan tujuan saat dok diseret */
+  --z-float: 30;              /* panel mengambang, menu tarik-turun */
+  --z-drawer: 40;             /* laci layar penuh di jendela sempit */
+  --z-tooltip: 40;            /* tooltip — serung dengan laci, permukaan beda */
+  --z-dock-snap: 44;
+  --z-dock: 45;               /* dok tampilan */
+  --z-toast: 50;
+  --z-appbar: 55;             /* appbar DAN popover di dalamnya */
+  --z-popover: 60;
+  --z-overlay: 60;            /* overlay modal — sengaja setara popover */
+  --z-spotlight: 70;          /* sorotan tur */
+  --z-spotlight-target: 71;   /* elemen yang disorot, di atas tudungnya */
+}

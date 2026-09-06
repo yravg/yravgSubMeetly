@@ -45,6 +45,7 @@ const statics = [
   ['src/manifest.json', 'manifest.json'],
   ['src/offscreen.html', 'offscreen.html'],
   ['src/sidepanel.html', 'sidepanel.html'],
+  ['src/tokens.css', 'tokens.css'],
   ['src/sidepanel.css', 'sidepanel.css'],
   ['src/notes-panel.css', 'notes-panel.css'],
   ['src/minutes.html', 'minutes.html'],

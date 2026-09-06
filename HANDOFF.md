@@ -226,7 +226,7 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **288/288 lulus** (2026-09-07), termasuk `rename-migration` 8 yang baru. Ini run penuh pertama
+- `npm test` → **294/294 lulus** (2026-09-07), termasuk `rename-migration` 8 dan `design-tokens` 6 yang baru. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
 - (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
@@ -265,6 +265,36 @@ masing-masing dengan migrasi — inilah bagian yang perlu diingat:
 `src/lib/native-host.js` adalah **satu-satunya** tempat `com.localtranssub` masih boleh muncul.
 Dijaga `test/rename-migration.test.mjs` (8 tes), termasuk tes yang gagal kalau ada kunci
 `lts*` baru diperkenalkan tanpa masuk peta migrasi.
+
+## Design system: token bersama (2026-09-07)
+
+`src/tokens.css` kini satu-satunya tempat skala jarak, tipografi, radius, gerak, dan
+**tangga lapisan** didefinisikan. Warna sengaja tidak ikut: tiap permukaan punya temanya
+sendiri. 39 definisi dipindah keluar dari `:root` `sidepanel.css`; 434 nilai literal di
+tiga berkas CSS diganti token.
+
+Yang perlu diingat:
+
+- **`tokens.css` harus dimuat setiap halaman yang memuat stylesheet permukaan.** Kalau
+  tidak, seluruh `var()` gagal **tanpa galat**: teks balik ke 16px, padding hilang. Ini
+  sempat terjadi pada tujuh halaman harness di `test/`. Dijaga tes.
+- **Tangga lapisan `--z-*`** menggantikan 25 angka mentah. Nilainya persis seperti
+  sebelumnya — yang baru hanya namanya. Dua rung (40, 60) sengaja ditempati dua nama.
+- **Penimpaan per permukaan diizinkan, tapi wajib berkomentar**: `minutes.css` menimpa
+  `--radius-lg` (14px, bukan 12px) dan `sidepanel.css` menimpa `--z-sticky` (20, bukan 3
+  — header lengketnya melekat ke seluruh area gulir, bukan di dalam kartu). Tes menolak
+  penimpaan tanpa komentar.
+- **Konversi literal → token tidak selalu aman.** `sidepanel.css` mendefinisikan ulang
+  `--text-*` di media query compact dan `--radius-lg/xl` per reskin, jadi mengganti
+  `12px` literal dengan `var(--text-sm)` di situ membuat nilainya ikut berubah responsif.
+  Yang dikonversi hanya nilai yang resolusinya identik.
+- Penamaan: `.iconbtn` → `.icon-btn`; `--ease-std` → `--ease-sharp`; `--ease-emph` →
+  `--ease-emphasized`. Ketiga kurva easing **tidak** disatukan — nilainya memang berbeda,
+  dan menyatukannya mengubah rasa animasi.
+- Bukti tanpa regresi: gaya terhitung 13 properti pada 142 kelompok elemen di
+  `minutes.html` dan `app.html`, dibandingkan dengan commit sebelum refactor → **0 beda**.
+
+Dijaga `test/design-tokens.test.mjs` (6 tes).
 
 ## Catatan yang perlu diketahui
 

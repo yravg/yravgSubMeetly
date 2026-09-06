@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Minutes Register — yraverageSubMin</title>
+<link rel="stylesheet" href="tokens.css" />
 <link rel="stylesheet" href="minutes.css" />
 </head>
 <body>
@@ -41,7 +42,7 @@
       <span data-t="issue">Issue MoM</span>
     </button>
     <div class="menuwrap">
-      <button type="button" class="iconbtn" id="btn-settings" data-t-title="settingsTitle" title="Layout &amp; appearance" aria-expanded="false" aria-haspopup="dialog">
+      <button type="button" class="icon-btn" id="btn-settings" data-t-title="settingsTitle" title="Layout &amp; appearance" aria-expanded="false" aria-haspopup="dialog">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
       <!-- Settings popover: theme, interface language, density, layout -->
@@ -133,7 +134,7 @@
         </div>
         <div class="head-actions">
           <span class="sample-badge hidden" id="issued-badge"></span>
-          <button type="button" class="iconbtn" id="top-toggle" aria-label="Collapse header"></button>
+          <button type="button" class="icon-btn" id="top-toggle" aria-label="Collapse header"></button>
         </div>
       </div>
 
@@ -278,13 +279,13 @@
         <div class="viewdock-inner" id="dock-full">
           <span class="dgrip" data-t-title="dockGrip" title="Drag to move · drop near the top or bottom edge to snap"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="3" cy="2" r="1.3"/><circle cx="7" cy="2" r="1.3"/><circle cx="3" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="3" cy="12" r="1.3"/><circle cx="7" cy="12" r="1.3"/></svg></span>
 
-          <button type="button" class="iconbtn" id="btn-search-open" data-t-title="kbdSearchTitle" title="Search (/)" aria-pressed="false">
+          <button type="button" class="icon-btn" id="btn-search-open" data-t-title="kbdSearchTitle" title="Search (/)" aria-pressed="false">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
           </button>
           <label class="srch" id="dock-search" hidden><span aria-hidden="true">⌕</span><input id="q" type="search" /><button type="button" class="pbtn" id="btn-search-close" aria-label="Close search"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg></button></label>
 
           <div class="menuwrap">
-            <button type="button" class="iconbtn" id="btn-types" data-t-title="navTypes" title="Item type" aria-pressed="false" aria-expanded="false" aria-haspopup="dialog">
+            <button type="button" class="icon-btn" id="btn-types" data-t-title="navTypes" title="Item type" aria-pressed="false" aria-expanded="false" aria-haspopup="dialog">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
             </button>
             <div class="pop dock-pop" id="types-pop" hidden role="dialog" aria-label="Item type">
@@ -308,7 +309,7 @@
           <button type="button" class="btn sm" id="btn-dual" aria-pressed="false">⇄ <span data-t="dual">Dual text</span></button>
 
           <div class="menuwrap">
-            <button type="button" class="iconbtn langbtn" id="btn-lang" title="Translation" aria-expanded="false" aria-haspopup="dialog">
+            <button type="button" class="icon-btn langbtn" id="btn-lang" title="Translation" aria-expanded="false" aria-haspopup="dialog">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h8"/><path d="M8 3v2c0 4-2.5 7.5-5 9"/><path d="M6 9c1 2.5 3 4.5 6 6"/><path d="m13 21 4-9 4 9"/><path d="M14.5 17.5h5"/></svg>
               <i class="pend" hidden></i>
             </button>
