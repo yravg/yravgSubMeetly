@@ -23,6 +23,8 @@ const DOC_SECTIONS = [
   ['info', 'docNotes', 'Discussion notes'],
 ];
 
+const ptKey = (t) => `pt_${String(t || '').replace(/-/g, '_')}`;
+
 function label(T, key, fallback) {
   if (!T) return fallback;
   const v = T(key);
@@ -41,7 +43,7 @@ export function serializeMeetingMarkdown(meeting, lang = meeting.locale || 'en',
   const lines = [
     `# ${meeting.title}`,
     '',
-    `_${meeting.id}_ · ${meeting.date}${meeting.start ? ` · ${meeting.start}${meeting.end ? `–${meeting.end}` : ''}${meeting.tz ? ` ${meeting.tz}` : ''}` : ''}${meeting.chair ? ` · ${label(T, 'chair', 'Chair')}: ${meeting.chair}` : ''}`,
+    `_${meeting.id}_ · ${meeting.date}${meeting.start ? ` · ${meeting.start}${meeting.end ? `–${meeting.end}` : ''}${meeting.tz ? ` ${meeting.tz}` : ''}` : ''}${meeting.chair ? ` · ${label(T, 'chair', 'Chair')}: ${meeting.chair}` : ''}${meeting.projectType && meeting.projectType !== 'general' ? ` · ${label(T, 'projectType', 'Type')}: ${label(T, ptKey(meeting.projectType), meeting.projectType)}` : ''}`,
     meeting.issuedAt ? `_${label(T, 'issued', 'Issued')}: ${meeting.issuedAt}_` : '_Draft — not yet issued_',
     '',
     `${stats.total} items · ${stats.actionsOpen}/${stats.actionsTotal} actions open · ${stats.decisions} decisions · ${stats.questionsOpen} open questions · agenda ${stats.agendaPct}% covered`,
@@ -84,6 +86,37 @@ export function serializeMeetingMarkdown(meeting, lang = meeting.locale || 'en',
     `Drafted on-device${meeting.engine ? ` — ${meeting.engine.asr}` : ''}. Nothing left this machine.`,
     '',
   );
+  return lines.join('\n');
+}
+
+/** Notulen sebagai TXT polos — judul, ringkasan, keputusan, tindak lanjut. */
+export function serializeMeetingTxt(meeting, lang = meeting.locale || 'en') {
+  const stats = meetingStats(meeting);
+  const lines = [
+    meeting.title,
+    `${meeting.id} · ${meeting.date}`,
+    ...(meeting.projectType && meeting.projectType !== 'general' ? [`Type: ${meeting.projectType}`] : []),
+    meeting.issuedAt ? `Issued: ${meeting.issuedAt}` : 'Draft — not yet issued',
+    '',
+    `${stats.total} items · ${stats.actionsOpen}/${stats.actionsTotal} actions open · ${stats.decisions} decisions`,
+    '',
+  ];
+  const summary = meeting.summary?.[lang] || meeting.summary?.en || Object.values(meeting.summary || {})[0] || '';
+  if (summary) lines.push('Summary', summary, '');
+  for (const [type, title] of [['decision', 'Decisions'], ['action', 'Action items']]) {
+    const rows = meeting.items.filter((i) => i.type === type);
+    if (!rows.length) continue;
+    lines.push(title);
+    for (const it of rows) {
+      const meta = [];
+      if (it.owner) meta.push(it.owner);
+      if (it.due) meta.push(`due ${it.due}`);
+      if (it.status && it.status !== 'open') meta.push(it.status);
+      lines.push(`- [${it.ref}] ${pickText(it.text, lang)}${meta.length ? ` — ${meta.join(' · ')}` : ''}`);
+    }
+    lines.push('');
+  }
+  lines.push('Drafted on-device. Nothing left this machine.', '');
   return lines.join('\n');
 }
 

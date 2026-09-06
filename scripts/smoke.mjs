@@ -9,6 +9,7 @@
  *   node scripts/smoke.mjs
  *   node scripts/smoke.mjs --pipeline   # + smoke transformers.js (ASR + Opus)
  *   node scripts/smoke.mjs --live       # gagal jika helper /health tidak menjawab
+ *   node scripts/smoke.mjs --crossos    # + kesiapan Windows/Linux (blok terpisah)
  *   node scripts/smoke.mjs --only <id>
  *   node scripts/smoke.mjs --json-only
  *
@@ -26,6 +27,7 @@ const OUT_PATH = path.join(ROOT, 'test', 'last-smoke.json');
 
 const PIPELINE = process.argv.includes('--pipeline');
 const LIVE = process.argv.includes('--live');
+const CROSSOS = process.argv.includes('--crossos');
 const JSON_ONLY = process.argv.includes('--json-only');
 const FILTER = (() => {
   const i = process.argv.indexOf('--only');
@@ -455,6 +457,123 @@ const CHECKS = {
   },
 };
 
+/**
+ * Kesiapan Windows/Linux — blok TERPISAH dari katalog 26 sub-fitur Fase 1,
+ * supaya target verifikasi Fase 1 tidak bergeser.
+ *
+ * Semua pemeriksaan di sini berjalan di OS mana pun: yang diperiksa adalah
+ * artefak yang akan dipakai pengguna Windows/Linux (installer, peluncur,
+ * manifest, kontrak helper), bukan perilaku runtime OS tersebut — itu wilayah
+ * scripts/e2e-crossos.mjs pada mesin yang bersangkutan.
+ */
+const CROSSOS_CHECKS = {
+  'crossos-launcher': () => {
+    const sh = read('native/run.sh');
+    const bat = read('native/run.bat');
+    if (!sh || !bat) return { status: 'fail', detail: 'run.sh / run.bat tidak lengkap' };
+    if (!/\.venv\/Scripts\/python\.exe/.test(sh)) {
+      return { status: 'fail', detail: 'run.sh tidak mengenali tata letak venv Windows (Scripts/)' };
+    }
+    if (/^\s*set\s+"?WHISPER_MODEL=.*mlx-community/im.test(bat)) {
+      return { status: 'fail', detail: 'run.bat menyetel model MLX — faster-whisper tidak bisa memuatnya' };
+    }
+    if (!/if \$IS_MAC_ARM; then[\s\S]*?mlx-community/.test(sh)) {
+      return { status: 'fail', detail: 'default model MLX di run.sh tidak dipagari Apple Silicon' };
+    }
+    return { status: 'pass', detail: 'run.sh (POSIX+Scripts) dan run.bat konsisten' };
+  },
+
+  'crossos-installer-linux': () => {
+    const sh = read('native/install-host.sh');
+    if (!sh) return { status: 'fail', detail: 'native/install-host.sh tidak ada' };
+    const missing = ['google-chrome', 'chromium', 'microsoft-edge', '.var/app'].filter((d) => !sh.includes(d));
+    if (missing.length) return { status: 'fail', detail: `manifest tidak ditulis untuk: ${missing.join(', ')}` };
+    if (!exists('native/uninstall-host.sh')) return { status: 'fail', detail: 'uninstall-host.sh tidak ada' };
+    return { status: 'pass', detail: 'Chrome/Chromium/Edge/Flatpak + uninstall' };
+  },
+
+  'crossos-installer-windows': () => {
+    const bat = read('native/install-host.bat');
+    if (!bat) return { status: 'fail', detail: 'native/install-host.bat tidak ada' };
+    // Chrome tidak bisa mengeksekusi .py — manifest harus menunjuk pembungkus.
+    if (!/messaging_host\.bat/.test(bat)) return { status: 'fail', detail: 'pembungkus messaging_host.bat tidak dibuat' };
+    const keys = ['Google\\Chrome', 'Microsoft\\Edge', 'Chromium'];
+    const missing = keys.filter((k) => !bat.includes(`${k}\\NativeMessagingHosts`));
+    if (missing.length) return { status: 'fail', detail: `kunci registry hilang: ${missing.join(', ')}` };
+    if (!exists('native/uninstall-host.bat')) return { status: 'fail', detail: 'uninstall-host.bat tidak ada' };
+    return { status: 'pass', detail: 'pembungkus + 3 kunci registry + uninstall' };
+  },
+
+  'crossos-native-ping': () => {
+    const host = read('native/messaging_host.py');
+    const proto = read('src/lib/native-protocol.js');
+    if (!host || !proto) return { status: 'fail', detail: 'berkas host/protokol tidak ada' };
+    if (!/action == "ping"/.test(host)) return { status: 'fail', detail: 'host tidak menjawab aksi ping' };
+    if (!/'ping'/.test(proto)) return { status: 'fail', detail: "kontrak ekstensi tidak menyebut 'ping'" };
+    return { status: 'pass', detail: 'status bridge bisa ditanya tanpa menyalakan helper' };
+  },
+
+  'crossos-device': () => {
+    const srv = read('native/server.py');
+    if (!srv) return { status: 'fail', detail: 'server.py tidak ada' };
+    if (!srv.includes('"/engine/device"')) return { status: 'fail', detail: '/engine/device tidak dilayani' };
+    if (!/_cuda_available/.test(srv)) return { status: 'fail', detail: 'deteksi CUDA tidak ada' };
+    return { status: 'pass', detail: 'pilihan runtime CPU/GPU tersedia' };
+  },
+
+  'crossos-streaming': () => {
+    const srv = read('native/server.py');
+    if (!srv || !/def asr_file_streaming/.test(srv)) {
+      return { status: 'fail', detail: 'transkripsi streaming tidak ada' };
+    }
+    if (!/streaming_file_jobs/.test(srv)) return { status: 'fail', detail: '/health tidak mengumumkan streaming_file_jobs' };
+    return { status: 'pass', detail: 'berkas >2 GiB diproses per jendela' };
+  },
+
+  'crossos-loopback': () => {
+    const srv = read('native/server.py');
+    if (!srv) return { status: 'fail', detail: 'server.py tidak ada' };
+    if (/Access-Control-Allow-Origin", "\*"/.test(srv)) {
+      return { status: 'fail', detail: 'CORS masih "*" — situs web mana pun bisa membaca transkrip' };
+    }
+    if (!/_host_header_hostname/.test(srv)) return { status: 'fail', detail: 'header Host tidak diperiksa (DNS rebinding)' };
+    return { status: 'pass', detail: 'CORS ketat + penjagaan Host + pengikatan loopback' };
+  },
+
+  'crossos-export-options': () => {
+    const opt = read('src/lib/export-options.js');
+    if (!opt) return { status: 'fail', detail: 'export-options.js tidak ada' };
+    // Notepad dan pemutar lama di Windows paling aman dengan CRLF + BOM.
+    if (!/os === 'windows'/.test(opt)) return { status: 'fail', detail: 'tidak ada default per OS' };
+    return { status: 'pass', detail: 'CRLF+BOM di Windows, LF di Linux/macOS' };
+  },
+
+  'crossos-docs': () => {
+    const doc = read('native/SETUP.md');
+    if (!doc) return { status: 'fail', detail: 'SETUP.md tidak ada' };
+    const missing = ['## Windows', '## Linux', '<EXT_ID>', 'ffmpeg'].filter((k) => !doc.includes(k));
+    if (missing.length) return { status: 'fail', detail: `dokumentasi kurang: ${missing.join(', ')}` };
+    return { status: 'pass', detail: 'pemasangan + verifikasi + pemecahan masalah' };
+  },
+};
+
+async function runCrossOs() {
+  const out = [];
+  for (const [id, fn] of Object.entries(CROSSOS_CHECKS)) {
+    const t0 = Date.now();
+    let r;
+    try {
+      r = await fn();
+    } catch (e) {
+      r = { status: 'fail', detail: String(e.message || e) };
+    }
+    out.push({ id, ...r, durationMs: Date.now() - t0 });
+    const mark = r.status === 'pass' ? '✓' : r.status === 'fail' ? '✗' : '!';
+    log(`${mark} ${id} [${r.status}] ${r.detail}`);
+  }
+  return out;
+}
+
 async function runOne(feature) {
   const check = CHECKS[feature.id];
   const t0 = Date.now();
@@ -541,14 +660,28 @@ async function main() {
   const counts = { pass: 0, fail: 0, warn: 0, pending: 0, skip: 0 };
   for (const r of results) counts[r.status] = (counts[r.status] ?? 0) + 1;
 
+  let crossOs = null;
+  if (CROSSOS) {
+    log(`kesiapan Windows/Linux (${Object.keys(CROSSOS_CHECKS).length} pemeriksaan, blok terpisah)`);
+    crossOs = await runCrossOs();
+  }
+
   const report = {
     source: 'smoke',
     generatedAt: new Date().toISOString(),
     target: VERIFY_TARGET,
     pipeline: PIPELINE,
     live: LIVE,
-    command: `node scripts/smoke.mjs${PIPELINE ? ' --pipeline' : ''}${LIVE ? ' --live' : ''}`,
+    command: `node scripts/smoke.mjs${PIPELINE ? ' --pipeline' : ''}${LIVE ? ' --live' : ''}${CROSSOS ? ' --crossos' : ''}`,
     counts,
+    // Blok terpisah: sengaja TIDAK dihitung ke target 26 sub-fitur Fase 1.
+    crossOs: crossOs
+      ? {
+          platform: `${process.platform}/${process.arch}`,
+          counts: crossOs.reduce((a, r) => ({ ...a, [r.status]: (a[r.status] ?? 0) + 1 }), {}),
+          results: crossOs,
+        }
+      : null,
     results,
     features: results.map((r) => {
       const base = STUB_FEATURES.find((f) => f.id === r.id);
@@ -575,6 +708,11 @@ async function main() {
   log(
     `summary: pass=${counts.pass} fail=${counts.fail} warn=${counts.warn} pending=${counts.pending} skip=${counts.skip}`,
   );
+  if (crossOs) {
+    const cf = crossOs.filter((r) => r.status === 'fail').length;
+    log(`crossos: pass=${crossOs.filter((r) => r.status === 'pass').length} fail=${cf}`);
+    if (cf) process.exitCode = 1;
+  }
 
   if (counts.fail > 0) {
     process.exitCode = 1;

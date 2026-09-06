@@ -1,6 +1,7 @@
 // yraverageSub — menu bar app.
 // No accounts, no telemetry; all speech and translation run on-device.
 import AppKit
+import Combine
 import SwiftUI
 import TransSubKit
 
@@ -81,6 +82,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        // Probe sisip teks dikte (butuh Accessibility).
+        if CommandLine.arguments.contains("--dictation-probe") {
+            let args = CommandLine.arguments
+            let text = args.firstIndex(of: "--text").flatMap { i in
+                i + 1 < args.count ? args[i + 1] : nil
+            } ?? "yraverageSub dictation probe"
+            let restore = args.contains("--restore-clipboard")
+            let delay = args.firstIndex(of: "--delay").flatMap { i in
+                i + 1 < args.count ? Double(args[i + 1]) : nil
+            } ?? 0
+            let expect = args.firstIndex(of: "--expect").flatMap { i in
+                i + 1 < args.count ? args[i + 1] : nil
+            }
+            MainActor.assumeIsolated {
+                Task { @MainActor in
+                    await DictationProbe.run(text: text, restoreClipboard: restore, delay: delay, expect: expect)
+                    NSApp.terminate(nil)
+                }
+            }
+            return
+        }
+        // Probe pemetaan hotkey dikte (tidak butuh izin apa pun).
+        if CommandLine.arguments.contains("--hotkey-probe") {
+            MainActor.assumeIsolated {
+                HotkeyProbe.run()
+                NSApp.terminate(nil)
+            }
+            return
+        }
+        // Probe fokus: apakah menampilkan overlay merampas fokus dari aplikasi
+        // yang sedang dipakai pengguna?
+        if CommandLine.arguments.contains("--focus-probe") {
+            let args = CommandLine.arguments
+            let decoy = args.firstIndex(of: "--decoy").flatMap { i in
+                i + 1 < args.count ? args[i + 1] : nil
+            }
+            let settle = args.firstIndex(of: "--settle").flatMap { i in
+                i + 1 < args.count ? Double(args[i + 1]) : nil
+            } ?? 2.0
+            MainActor.assumeIsolated {
+                Task { @MainActor in
+                    await FocusProbe.run(controller: controller, decoy: decoy, settle: settle)
+                    NSApp.terminate(nil)
+                }
+            }
+            return
+        }
         // Demo mode: render the subtitle overlay with sample text so the
         // floating-window behaviour can be verified without any permissions.
         if CommandLine.arguments.contains("--overlay-demo") {
@@ -119,6 +167,7 @@ final class AppController: ObservableObject {
     let ui = UIState()
     let fileModel = FileTranscribeModel()
     let packInstaller = LanguagePackInstaller()
+    let notesUI = NotesViewState()
     lazy var overlay = OverlayController(model: overlayModel)
     lazy var session = SubtitleSession(model: overlayModel, overlay: overlay)
     lazy var dictation = DictationController()
@@ -135,6 +184,7 @@ final class AppController: ObservableObject {
     private var observers: [NSObjectProtocol] = []
 
     private var permissionTimer: Timer?
+    private var prefObservers: Set<AnyCancellable> = []
 
     /// Hook the overlay panel's controls up to the session.
     private func wireOverlay() {
@@ -145,8 +195,30 @@ final class AppController: ObservableObject {
         }
     }
 
+    /// Teruskan preferensi tampilan ke overlay yang sedang tampil.
+    ///
+    /// Tanpa ini, nilai hanya terbaca saat OverlayModel dibuat dan saat sesi
+    /// dimulai — menggeser slider di Settings tidak mengubah apa pun sampai
+    /// sesi berikutnya, padahal pengguna sedang melihat hasilnya.
+    private func observeOverlayPrefs() {
+        let bridge = PrefsBridge.shared
+        bridge.$fontSize
+            .removeDuplicates()
+            .sink { [weak self] v in self?.overlayModel.fontSize = v }
+            .store(in: &prefObservers)
+        bridge.$opacity
+            .removeDuplicates()
+            .sink { [weak self] v in self?.overlayModel.opacity = v }
+            .store(in: &prefObservers)
+        bridge.$dualLine
+            .removeDuplicates()
+            .sink { [weak self] v in self?.overlayModel.dualLine = v }
+            .store(in: &prefObservers)
+    }
+
     func bootstrap() {
         wireOverlay()
+        observeOverlayPrefs()
         hasScreenPermission = AudioCapture.hasPermission()
         Task { await refreshTargets() }
         dictation.start()

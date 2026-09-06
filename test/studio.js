@@ -11,6 +11,21 @@ import { exportBasename, detectOs, OS_GUIDES } from '../src/lib/helper-status.js
 import { saveExportFile } from '../src/lib/export.js';
 
 const $ = (id) => document.getElementById(id);
+// Cermin bahasa registry (src/lib/registry.js): sumber didukung Whisper,
+// target adalah TARGET_LANGS. Stub hanya punya pasangan en→id asli.
+const STUDIO_SOURCES = [
+  ['auto', 'Otomatis'], ['en', 'English'], ['ja', '日本語'], ['zh', '中文'],
+  ['ko', '한국어'], ['de', 'Deutsch'], ['fr', 'Français'], ['es', 'Español'],
+  ['ru', 'Русский'], ['it', 'Italiano'], ['id', 'Bahasa Indonesia'], ['vi', 'Tiếng Việt'],
+];
+const STUDIO_TARGETS = [
+  ['en', 'English'], ['zh', '中文'], ['de', 'Deutsch'], ['fr', 'Français'],
+  ['es', 'Español'], ['ru', 'Русский'], ['it', 'Italiano'], ['id', 'Bahasa Indonesia'],
+  ['vi', 'Tiếng Việt'], ['ja', '日本語'], ['ko', '한국어'],
+];
+const REAL_TGT = { id: true, en: true };
+let srcLang = 'en';
+let tgtLang = 'id';
 let segments = STUB_SEGMENTS.map((s) => ({ ...s }));
 let dualLine = true;
 let progress = 0;
@@ -49,6 +64,44 @@ function renderTranslatePreview() {
   $('translate-preview').textContent = segments
     .map((s) => (dualLine ? `${s.src}\n${s.tgt}` : s.tgt))
     .join('\n\n');
+}
+
+// Pasangan mock: id/en memakai stub asli; target lain memakai terjemahan
+// tiruan berlabel jelas `[kode]` supaya tak dikira hasil model.
+function applyPair() {
+  segments = STUB_SEGMENTS.map((s) => ({
+    ...s,
+    tgt: tgtLang === 'id' ? s.tgt : tgtLang === 'en' ? s.src : `[${tgtLang}] ${s.src}`,
+  }));
+  const note = $('pair-note');
+  if (note) {
+    note.textContent = REAL_TGT[tgtLang]
+      ? `Pasangan ${srcLang} → ${tgtLang} memakai stub asli.`
+      : `Pasangan ${srcLang} → ${tgtLang} memakai terjemahan tiruan berlabel [${tgtLang}] (mock).`;
+  }
+  renderSegments();
+  renderTranslatePreview();
+}
+
+function fillLangs() {
+  const src = $('studio-src');
+  const tgt = $('studio-tgt');
+  if (src) {
+    src.innerHTML = STUDIO_SOURCES.map(([c, l]) => `<option value="${c}">${l}</option>`).join('');
+    src.value = srcLang;
+    src.addEventListener('change', () => {
+      srcLang = src.value;
+      applyPair();
+    });
+  }
+  if (tgt) {
+    tgt.innerHTML = STUDIO_TARGETS.map(([c, l]) => `<option value="${c}">${l}</option>`).join('');
+    tgt.value = tgtLang;
+    tgt.addEventListener('change', () => {
+      tgtLang = tgt.value;
+      applyPair();
+    });
+  }
 }
 
 function setProgress(p, label) {
@@ -202,6 +255,14 @@ function wire() {
   });
 
   $('file-info').textContent = `${STUB_FILE.name} · ${(STUB_FILE.size / 1024 / 1024).toFixed(2)} MiB (stub)`;
+  const resumeId = new URLSearchParams(location.search).get('resume');
+  const resumeNote = $('resume-note');
+  if (resumeId && resumeNote) {
+    resumeNote.hidden = false;
+    resumeNote.textContent = `Melanjutkan sesi ${resumeId} (mock) — konteks sesi asli tidak terbawa di halaman contoh.`;
+  }
+  fillLangs();
+  applyPair();
   setEngine(engine);
   setExportEnabled(true);
   renderSegments();

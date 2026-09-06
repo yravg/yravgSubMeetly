@@ -26,6 +26,9 @@ final class PrefsBridge: ObservableObject {
         }
     }
     @Published var dictationHotkey: String { didSet { Prefs.shared.dictationHotkey = dictationHotkey } }
+    @Published var overlayPosition: String { didSet { Prefs.shared.overlayPosition = overlayPosition } }
+    @Published var a11yLargeContrast: Bool { didSet { Prefs.shared.a11yLargeContrast = a11yLargeContrast } }
+    @Published var reskin: String { didSet { Prefs.shared.reskin = reskin } }
 
     private init() {
         let p = Prefs.shared
@@ -43,5 +46,8 @@ final class PrefsBridge: ObservableObject {
         audioSourceMode = p.audioSourceMode
         languageMode = p.languageMode
         dictationHotkey = p.dictationHotkey
+        overlayPosition = p.overlayPosition
+        a11yLargeContrast = p.a11yLargeContrast
+        reskin = p.reskin
     }
 }

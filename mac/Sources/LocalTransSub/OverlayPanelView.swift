@@ -1,6 +1,7 @@
 // The floating subtitle panel — native equivalent of the browser extension's
 // in-page overlay: a toolbar of live controls, a scrollable transcript with
 // timestamps and per-line selection, and a status footer.
+import AppKit
 import SwiftUI
 import TransSubKit
 
@@ -13,6 +14,13 @@ enum ForceScope: Hashable {
 
 struct OverlayPanelView: View {
     @ObservedObject var model: OverlayModel
+    @ObservedObject private var prefs = PrefsBridge.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Mode aksesibilitas: teks 25% lebih besar, putih penuh, bingkai tegas.
+    private var a11y: Bool { prefs.a11yLargeContrast }
+    private func big(_ v: CGFloat) -> CGFloat { a11y ? v * 1.25 : v }
+    private func ink(_ normal: Double) -> Double { a11y ? 1.0 : normal }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,7 +38,7 @@ struct OverlayPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(.white.opacity(prefs.a11yLargeContrast ? 0.4 : 0.12), lineWidth: prefs.a11yLargeContrast ? 2 : 1)
         )
     }
 
@@ -134,7 +142,7 @@ struct OverlayPanelView: View {
             }
             .onChange(of: model.scrollTick) { _, _ in
                 guard model.autoScroll else { return }
-                withAnimation(.easeOut(duration: 0.18)) {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
                     if model.interim != nil {
                         proxy.scrollTo("interim", anchor: .bottom)
                     } else if let last = model.cues.last?.id {
@@ -166,19 +174,29 @@ struct OverlayPanelView: View {
             VStack(alignment: .leading, spacing: 2) {
                 if model.dualLine, !cue.source.isEmpty, cue.source != cue.translation {
                     Text(cue.source)
-                        .font(.system(size: model.fontSize * 0.6))
-                        .foregroundStyle(.white.opacity(0.62))
+                        .font(.system(size: big(model.fontSize * 0.6)))
+                        .foregroundStyle(.white.opacity(ink(0.72)))
                 }
                 Text(cue.display)
-                    .font(.system(size: model.fontSize * 0.78, weight: .semibold))
+                    .font(.system(size: big(model.fontSize * 0.78), weight: .semibold))
                     .foregroundStyle(cue.translation.isEmpty && !cue.source.isEmpty
-                                     ? .white.opacity(0.55) : .white)
-                    .textSelection(.enabled)
+                                     ? .white.opacity(ink(0.65)) : .white)
+                    // Sengaja BUKAN .textSelection: menyeleksi teks menuntut
+                    // status first responder, yang memaksa panel jadi key window
+                    // dan merampas fokus ketikan pengguna. Menu konteks bekerja
+                    // di jendela non-key, jadi menyalin tetap bisa.
+                    .lineSpacing(2)
             }
             Spacer(minLength: 0)
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
+        .contextMenu {
+            Button("Copy line") { copyToPasteboard(cue.display) }
+            if !cue.source.isEmpty, cue.source != cue.display {
+                Button("Copy original") { copyToPasteboard(cue.source) }
+            }
+        }
         .background(
             RoundedRectangle(cornerRadius: 7)
                 .fill(cue.id == model.activeID ? Brand.tealDeep.opacity(0.35) : .white.opacity(0.05))
@@ -196,12 +214,12 @@ struct OverlayPanelView: View {
             VStack(alignment: .leading, spacing: 2) {
                 if model.dualLine, !cue.source.isEmpty, cue.source != cue.translation {
                     Text(cue.source)
-                        .font(.system(size: model.fontSize * 0.6))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(.system(size: big(model.fontSize * 0.6)))
+                        .foregroundStyle(.white.opacity(ink(0.5)))
                 }
                 Text(cue.display.isEmpty ? "● ● ●" : cue.display)
-                    .font(.system(size: model.fontSize * 0.78, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.75))
+                    .font(.system(size: big(model.fontSize * 0.78), weight: .medium))
+                    .foregroundStyle(.white.opacity(ink(0.75)))
             }
             Spacer(minLength: 0)
         }
@@ -216,12 +234,12 @@ struct OverlayPanelView: View {
             let cue = model.interim ?? model.cues.last
             if model.dualLine, let c = cue, !c.source.isEmpty, c.source != c.translation {
                 Text(c.source)
-                    .font(.system(size: model.fontSize * 0.7))
-                    .foregroundStyle(.white.opacity(0.75))
+                    .font(.system(size: big(model.fontSize * 0.7)))
+                    .foregroundStyle(.white.opacity(ink(0.75)))
                     .lineLimit(2)
             }
             Text(cue?.display ?? "Listening…")
-                .font(.system(size: model.fontSize, weight: .semibold))
+                .font(.system(size: big(model.fontSize), weight: .semibold))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
@@ -248,6 +266,12 @@ struct OverlayPanelView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .background(.white.opacity(0.04))
+    }
+
+    private func copyToPasteboard(_ text: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
     }
 
     private func clock(_ seconds: Double) -> String {

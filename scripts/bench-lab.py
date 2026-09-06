@@ -39,16 +39,31 @@ def load_manifest() -> dict:
 
 
 def read_wav_pcm(path: Path) -> tuple[np.ndarray, int]:
-    """Return float32 mono @16 kHz."""
-    with wave.open(str(path), "rb") as w:
-        if w.getnchannels() != 1 or w.getsampwidth() != 2:
-            raise ValueError(f"{path.name}: need mono 16-bit PCM")
-        rate = w.getframerate()
-        frames = w.readframes(w.getnframes())
-    if rate != 16000:
-        raise ValueError(f"{path.name}: need 16 kHz (run gen-samples.sh)")
-    pcm_i16 = np.frombuffer(frames, dtype=np.int16)
-    return (pcm_i16.astype(np.float32) / 32768.0), rate
+    """Return float32 mono @16 kHz from ANY media file.
+
+    Katalog sampel pindah ke MP3 CC0 (Sep 2026); modul `wave` hanya membaca WAV,
+    sehingga bench diam-diam rusak. Dekode lewat ffmpeg — jalur yang sama dengan
+    helper — supaya format sampel bebas berubah tanpa mematahkan tolok ukur.
+    """
+    if not path.exists():
+        raise FileNotFoundError(path)
+    try:
+        with wave.open(str(path), "rb") as w:  # WAV 16-bit mono 16 kHz: jalur cepat
+            if w.getnchannels() == 1 and w.getsampwidth() == 2 and w.getframerate() == 16000:
+                frames = w.readframes(w.getnframes())
+                return np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0, 16000
+    except wave.Error:
+        pass
+    ffmpeg = subprocess.run(["sh", "-c", "command -v ffmpeg"], capture_output=True, text=True).stdout.strip()
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg tidak ditemukan — dibutuhkan untuk mendekode sampel non-WAV")
+    r = subprocess.run(
+        [ffmpeg, "-nostdin", "-v", "error", "-i", str(path), "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
+        capture_output=True, timeout=120,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(f"{path.name}: ffmpeg gagal mendekode: {r.stderr.decode(errors='replace')[:200]}")
+    return np.frombuffer(r.stdout, dtype=np.float32), 16000
 
 
 def pcm_slice(pcm: np.ndarray, start_sec: float, dur_sec: float) -> np.ndarray:
@@ -182,10 +197,18 @@ def bench_sample(base_url: str, sample: dict, *, label_suffix: str = "") -> list
     rows.append({"pair": pair, "stage": "final ASR", "ms": j.get("ms", ms), "source": asr_text, "pass": bool(asr_text)})
     print(f"  {'✅' if asr_text else '⚠️'} final ASR {j.get('ms', ms):4d}ms  → {asr_text[:80]}")
 
+    # Katalog CC0 tidak menyimpan transkrip rujukan (bidang "text" tidak ada), jadi
+    # sumber untuk MT/refine adalah hasil ASR final. KeyError di sini pernah
+    # menggugurkan seluruh bench diam-diam.
+    ref_text = (sample.get("text") or asr_text or "").strip()
+    if not ref_text:
+        print("  ⚠️ tidak ada teks sumber — MT/refine dilewati")
+        return rows
+
     j, ms = post_text(
         base_url,
         "/translate",
-        sample["text"],
+        ref_text,
         {"src": sample["src"], "tgt": sample["tgt"], "fast": "1"},
     )
     draft_mt = j.get("text", "")
@@ -194,7 +217,7 @@ def bench_sample(base_url: str, sample: dict, *, label_suffix: str = "") -> list
             "pair": pair,
             "stage": "fast MT",
             "ms": j.get("ms", ms),
-            "source": sample["text"],
+            "source": ref_text,
             "translation": draft_mt,
             "pass": bool(draft_mt),
         }
@@ -204,7 +227,7 @@ def bench_sample(base_url: str, sample: dict, *, label_suffix: str = "") -> list
     j, ms = post_json(
         base_url,
         "/translate_refine",
-        {"text": sample["text"], "draft": draft_mt},
+        {"text": ref_text, "draft": draft_mt},
         {"src": sample["src"], "tgt": sample["tgt"]},
     )
     refined = j.get("text", "")
@@ -213,7 +236,7 @@ def bench_sample(base_url: str, sample: dict, *, label_suffix: str = "") -> list
             "pair": pair,
             "stage": "refine",
             "ms": ms,
-            "source": sample["text"],
+            "source": ref_text,
             "translation": refined,
             "pass": bool(refined),
         }

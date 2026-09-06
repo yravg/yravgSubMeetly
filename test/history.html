@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Riwayat sesi (contoh)</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #1a1d27;
+        --border: #2a3040;
+        --text: #e8ecf4;
+        --muted: #8892a8;
+        --accent: #5b9cff;
+        --ok: #3dd68c;
+        --bad: #ff6b6b;
+        --font: system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 var(--font);
+        min-height: 100vh;
+      }
+      header.page {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header.page h1 { margin: 0; font-size: 18px; font-weight: 600; }
+      header.page p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; min-width: 220px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      main {
+        padding: 20px 24px 40px;
+        max-width: 960px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 720px) { main { grid-template-columns: 1fr; } }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      .card h2 { margin: 0 0 10px; font-size: 15px; }
+      #session-search {
+        width: 100%;
+        background: #10131c;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 10px;
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+        margin-bottom: 10px;
+      }
+      #session-search:focus { outline: 1px solid var(--accent); }
+      .session {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        margin-bottom: 8px;
+      }
+      .session:hover { border-color: var(--accent); }
+      .session.active { border-color: var(--accent); background: rgba(91, 156, 255, 0.08); }
+      .session .t { font-weight: 600; font-size: 13.5px; }
+      .session .m { color: var(--muted); font-size: 12px; margin-top: 2px; }
+      .pill {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        font-weight: 600;
+        background: #1e2433;
+        color: var(--muted);
+        margin-right: 6px;
+      }
+      .pill.live { background: #3d1a1a; color: var(--bad); }
+      .pill.file { background: #1a3d2e; color: var(--ok); }
+      .line { padding: 7px 0; border-top: 1px solid var(--border); font-size: 13px; }
+      .line:first-child { border-top: none; }
+      .line .ts { color: var(--accent); font-size: 11px; font-variant-numeric: tabular-nums; }
+      .line .src { color: var(--muted); }
+      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+      .btn {
+        background: #232839;
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 14px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .btn:hover { border-color: var(--accent); }
+      .btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+      .empty { color: var(--muted); font-style: italic; }
+      .mock-note {
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page">
+      <h1>Riwayat sesi</h1>
+      <p>Halaman contoh — daftar sesi, pratinjau transkrip, dan aksi per sesi tanpa menyentuh penyimpanan asli.</p>
+      <a href="/app.html">← Side Panel</a>
+      <a href="/studio.html">Studio →</a>
+    </header>
+    <main id="history-main">
+      <section class="card" id="list-card">
+        <h2>Sesi tersimpan</h2>
+        <input type="search" id="session-search" placeholder="Cari judul, bahasa, atau isi…" aria-label="Cari sesi" />
+        <div id="session-list"></div>
+      </section>
+      <section class="card">
+        <div id="detail-back" hidden style="margin-bottom:8px"><a href="/history.html">← Semua sesi</a></div>
+        <h2 id="detail-title">Pilih sesi</h2>
+        <div id="detail-meta"></div>
+        <div id="detail-lines"></div>
+        <div class="toolbar" id="detail-actions" hidden>
+          <button type="button" class="btn" data-exp="srt">SRT</button>
+          <button type="button" class="btn" data-exp="vtt">VTT</button>
+          <button type="button" class="btn" data-exp="txt">TXT</button>
+          <button type="button" class="btn" data-exp="md">Markdown</button>
+          <button type="button" class="btn" data-exp="json">JSON</button>
+          <button type="button" class="btn" id="btn-copy-link">Salin tautan</button>
+          <button type="button" class="btn" id="btn-resume-studio">Lanjutkan di Studio</button>
+          <button type="button" class="btn danger" id="btn-del-session">Hapus</button>
+        </div>
+        <p class="mock-note">Contoh murni: unduhan memakai Blob lokal; Hapus hanya menghapus dari daftar contoh ini.</p>
+      </section>
+    </main>
+
+    <script>
+      // Data contoh cermin bentuk riwayat ekstensi (chrome.storage → history).
+      let sessions = [
+        {
+          id: 'demo-standup', ts: Date.now() - 3600_000, mode: 'realtime',
+          title: 'Standup pagi — tim rilis', url: 'https://meet.example/rilis',
+          srcLang: 'id', tgtLang: 'en',
+          lines: [
+            { t0: 0, t1: 4.2, src: 'Selamat pagi semuanya', tgt: 'Good morning everyone' },
+            { t0: 4.2, t1: 9.8, src: 'Smoke dua puluh enam sub-fitur sudah hijau', tgt: 'All twenty-six smoke sub-features are green' },
+            { t0: 9.8, t1: 15.1, src: 'Fokus sisa ke E2E dan helper native', tgt: 'Remaining focus is E2E and the native helper' },
+          ],
+        },
+        {
+          id: 'demo-demo', ts: Date.now() - 86400_000, mode: 'offline',
+          title: 'Demo produk (berkas)', url: '',
+          srcLang: 'ja', tgtLang: 'en',
+          lines: [
+            { t0: 0, t1: 3.5, src: 'こんにちは、皆さん', tgt: 'Hello everyone' },
+            { t0: 3.5, t1: 9.2, src: '今日は新しい機能を紹介します', tgt: "Today I'll introduce the new features" },
+          ],
+        },
+      ];
+      let activeId = sessions[0]?.id || null;
+
+      const $ = (id) => document.getElementById(id);
+      const fmtTs = (s) => {
+        s = Math.max(0, s);
+        const h = String(Math.floor(s / 3600)).padStart(2, '0');
+        const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+        const sec = String(Math.floor(s % 60)).padStart(2, '0');
+        return `${h}:${m}:${sec}`;
+      };
+
+      function matches(s, q) {
+        if (!q) return true;
+        const hay = [s.title, s.url, s.srcLang, s.tgtLang,
+          ...s.lines.map((l) => `${l.src || ''} ${l.tgt || ''}`)]
+          .join(' ').toLowerCase();
+        return q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+      }
+
+      function renderList() {
+        const host = $('session-list');
+        const q = ($('session-search')?.value || '').trim();
+        host.innerHTML = '';
+        const shown = sessions.filter((s) => matches(s, q));
+        if (!shown.length) {
+          host.innerHTML = sessions.length
+            ? '<p class="empty">Tidak cocok dengan pencarian.</p>'
+            : '<p class="empty">Belum ada sesi contoh.</p>';
+          return;
+        }
+        shown.forEach((s) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'session' + (s.id === activeId ? ' active' : '');
+          const when = new Date(s.ts).toLocaleString();
+          b.innerHTML = `<span class="pill ${s.mode === 'realtime' ? 'live' : 'file'}">${s.mode === 'realtime' ? '🔴 realtime' : '📁 berkas'}</span>` +
+            `<div class="t"></div><div class="m">${when} · ${s.srcLang} → ${s.tgtLang} · ${s.lines.length} baris</div>`;
+          b.querySelector('.t').textContent = s.title;
+          b.addEventListener('click', () => {
+            activeId = s.id;
+            renderList();
+            renderDetail();
+          });
+          host.appendChild(b);
+        });
+      }
+
+      function active() {
+        return sessions.find((s) => s.id === activeId) || null;
+      }
+
+      function renderDetail() {
+        const s = active();
+        $('detail-actions').hidden = !s;
+        if (!s) {
+          $('detail-title').textContent = 'Pilih sesi';
+          $('detail-meta').innerHTML = '';
+          $('detail-lines').innerHTML = '<p class="empty">Tidak ada sesi terpilih.</p>';
+          return;
+        }
+        $('detail-title').textContent = s.title;
+        $('detail-meta').innerHTML =
+          `<span class="pill ${s.mode === 'realtime' ? 'live' : 'file'}">${s.mode}</span>` +
+          `<span class="pill">${s.srcLang} → ${s.tgtLang}</span>` +
+          (s.url ? `<div class="m" style="color:var(--muted);font-size:12px;margin-top:4px"></div>` : '');
+        const urlEl = $('detail-meta').querySelector('.m');
+        if (urlEl) urlEl.textContent = s.url;
+        $('detail-lines').innerHTML = s.lines.map((l) =>
+          `<div class="line"><div class="ts">${fmtTs(l.t0)} → ${fmtTs(l.t1)}</div>` +
+          (l.src ? `<div class="src"></div>` : '') +
+          `<div class="tgt"></div></div>`,
+        ).join('');
+        [...$('detail-lines').querySelectorAll('.line')].forEach((el, i) => {
+          if (s.lines[i].src) el.querySelector('.src').textContent = s.lines[i].src;
+          el.querySelector('.tgt').textContent = s.lines[i].tgt || s.lines[i].src;
+        });
+      }
+
+      function stampSrt(t, comma) {
+        const ms = Math.round(t * 1000);
+        const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
+        const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
+        const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
+        const f = String(ms % 1000).padStart(3, '0');
+        return `${h}:${m}:${s}${comma ? ',' : '.'}${f}`;
+      }
+
+      function build(kind) {
+        const s = active();
+        if (!s) return '';
+        if (kind === 'srt') {
+          return s.lines.map((l, i) =>
+            `${i + 1}\n${stampSrt(l.t0, true)} --> ${stampSrt(l.t1, true)}\n${l.tgt || l.src}\n`).join('\n');
+        }
+        if (kind === 'vtt') {
+          return 'WEBVTT\n\n' + s.lines.map((l) =>
+            `${stampSrt(l.t0, false)} --> ${stampSrt(l.t1, false)}\n${l.tgt || l.src}\n`).join('\n');
+        }
+        if (kind === 'md') {
+          const head = [`# ${s.title}`, '', `_${s.id}_ · ${s.srcLang} → ${s.tgtLang}`, ''];
+          const body = s.lines.map((l) => `- **[${fmtTs(l.t0)}]** ${l.tgt || l.src}`);
+          return [...head, ...body, ''].join('\n');
+        }
+        if (kind === 'json') {
+          return JSON.stringify(s, null, 2);
+        }
+        return s.lines.map((l) => `[${fmtTs(l.t0)}] ${l.tgt || l.src}`).join('\n') + '\n';
+      }
+
+      document.querySelectorAll('[data-exp]').forEach((b) => {
+        b.addEventListener('click', () => {
+          const kind = b.dataset.exp;
+          const s = active();
+          if (!s) return;
+          const blob = new Blob([build(kind)], { type: 'text/plain;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `${s.id}.${kind}`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        });
+      });
+
+      $('btn-resume-studio').addEventListener('click', () => {
+        const s = active();
+        if (!s) return;
+        location.href = `/studio.html?resume=${encodeURIComponent(s.id)}`;
+      });
+
+      $('btn-del-session').addEventListener('click', () => {
+        sessions = sessions.filter((s) => s.id !== activeId);
+        activeId = sessions[0]?.id || null;
+        renderList();
+        renderDetail();
+      });
+
+      $('btn-copy-link').addEventListener('click', async () => {
+        const s = active();
+        if (!s) return;
+        const url = `${location.origin}${location.pathname}?id=${encodeURIComponent(s.id)}`;
+        try {
+          await navigator.clipboard.writeText(url);
+          $('btn-copy-link').textContent = 'Tersalin!';
+        } catch {
+          $('btn-copy-link').textContent = url;
+        }
+        setTimeout(() => { $('btn-copy-link').textContent = 'Salin tautan'; }, 2000);
+      });
+
+      $('session-search').addEventListener('input', renderList);
+
+      // Tautan dalam (?id=): mode halaman detail — sembunyikan daftar.
+      const params = new URLSearchParams(location.search);
+      const deepId = params.get('id');
+      if (deepId && sessions.some((s) => s.id === deepId)) {
+        activeId = deepId;
+        document.getElementById('list-card').hidden = true;
+        document.getElementById('detail-back').hidden = false;
+        document.getElementById('history-main').style.gridTemplateColumns = '1fr';
+      }
+
+      renderList();
+      renderDetail();
+    </script>
+  </body>
+</html>

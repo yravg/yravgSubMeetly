@@ -65,6 +65,35 @@ const STORE_SHIP_ACCEPT = {
       'Diterima untuk rilis CWS: kontrak e2e-file lulus; jalur Puppeteer --browser residual opsional.',
     evidence: 'scripts/e2e-file.mjs · test/last-e2e.json',
   },
+  // Keputusan pengguna 2026-09-05: jalur --native dan --browser DIJALANKAN dan gagal
+  // konsisten dengan `Runtime.callFunctionOn timed out` (renderer panel tak merespons
+  // CDP; realtime browser lulus di jalur yang sama). Diterima dengan alasan yang sama
+  // seperti REL-03/REL-04 — helper bukan artefak store, jalur --browser opsional —
+  // sambil penyebab rendernya dilacak (HANDOFF.md).
+  'E2E-e2e-native': {
+    title: 'E2E gagal: E2E mesin native helper (--native)',
+    when: (ctx) => ctx.smokeOk,
+    summary: 'Diterima untuk rilis CWS: Native Helper bukan artefak Web Store; renderer panel tak merespons CDP saat --native — dilacak terpisah.',
+    evidence: 'scripts/e2e.mjs --native · test/last-e2e.json · HANDOFF.md',
+  },
+  'E2E-e2e-native-e2e-fatal': {
+    title: 'E2E check gagal: Jalankan E2E',
+    when: (ctx) => ctx.smokeOk,
+    summary: 'Diterima untuk rilis CWS: sub-check dari suite --native yang diterima di atas.',
+    evidence: 'test/last-e2e.json · e2e-native',
+  },
+  'E2E-e2e-file': {
+    title: 'E2E gagal: E2E berkas offline + ekspor SRT/VTT/TXT',
+    when: (ctx) => ctx.smokeOk && ctx.e2eFileOk,
+    summary: 'Diterima untuk rilis CWS: kontrak e2e-file lulus; jalur Puppeteer --browser opsional dan gagal dengan gejala CDP yang sama.',
+    evidence: 'scripts/e2e-file.mjs --browser · test/last-e2e.json · HANDOFF.md',
+  },
+  'E2E-e2e-file-e2e-file-fatal': {
+    title: 'E2E check gagal: Jalankan e2e-file',
+    when: (ctx) => ctx.smokeOk && ctx.e2eFileOk,
+    summary: 'Diterima untuk rilis CWS: sub-check dari suite --browser yang diterima di atas.',
+    evidence: 'test/last-e2e.json · e2e-file',
+  },
 };
 
 function load(rel) {

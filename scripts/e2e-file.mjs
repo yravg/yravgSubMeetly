@@ -175,11 +175,9 @@ async function runBrowserOffline() {
   pass('e2e-file-dist', 'dist/ siap', 'manifest.json');
 
   const samplePath = fs.existsSync(SAMPLE) ? SAMPLE : FALLBACK_SPEECH;
-  const executablePath =
-    process.env.PUPPETEER_EXECUTABLE_PATH ||
-    (process.platform === 'darwin'
-      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-      : undefined);
+  // Chrome bermerek ≥137 mengabaikan --load-extension diam-diam; pakai Chrome
+  // for Testing bundel puppeteer kecuali di-override lewat PUPPETEER_EXECUTABLE_PATH.
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
 
   const browser = await puppeteer.launch({
     headless: false,
@@ -286,6 +284,7 @@ try {
   else log('ALL OK');
 } catch (err) {
   log('FAIL:', err?.message || err);
+  log('cause:', err?.cause?.message || err?.cause || '(tidak ada)');
   if (!checks.some((c) => c.status === 'fail')) {
     checks.push({
       id: 'e2e-file-fatal',

@@ -10,6 +10,7 @@ struct SettingsView: View {
     @ObservedObject var installer: LanguagePackInstaller
     @ObservedObject var prefs: PrefsBridge
     @ObservedObject var ui: UIState
+    @Environment(\.colorScheme) private var scheme
     @StateObject private var langStatus = LanguageStatusModel()
 
     init(app: AppController) {
@@ -32,7 +33,7 @@ struct SettingsView: View {
         // fires on a visible view, and the main window may be closed.
         .languagePackHost(installer)
         .padding(14)
-        .tint(Brand.teal)
+        .tint(Brand.reskinAccent(prefs.reskin, scheme))
     }
 
     /// Which translation models are installed, without having to start a
@@ -173,6 +174,21 @@ struct SettingsView: View {
 
     private var appearance: some View {
         Form {
+            Picker("Accent pattern", selection: $prefs.reskin) {
+                ForEach(ReskinPattern.allCases) { pattern in
+                    Text(pattern.title).tag(pattern.rawValue)
+                }
+            }
+            if prefs.reskin != ReskinPattern.yraverage.rawValue {
+                Button("Reset to Yraverage Klasik") {
+                    prefs.reskin = ReskinPattern.yraverage.rawValue
+                }
+                .controlSize(.small)
+            }
+            Text("Yraverage Klasik, Coretax interaction pattern, or Yraverage Modern — same local identity, no outside branding.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Slider(value: $prefs.fontSize, in: 14...48, step: 1) {
                 Text("Font size  \(Int(prefs.fontSize))")
             }
@@ -180,7 +196,19 @@ struct SettingsView: View {
                 Text("Background opacity")
             }
             Toggle("Show original + translation", isOn: $prefs.dualLine)
-            Button("Reset subtitle position") { app.overlay.resetPosition() }
+            Toggle("Large text & high contrast", isOn: $prefs.a11yLargeContrast)
+            Picker("Overlay position", selection: $prefs.overlayPosition) {
+                Text("Top").tag("top")
+                Text("Center").tag("center")
+                Text("Bottom").tag("bottom")
+            }
+            .onChange(of: prefs.overlayPosition) { _, pos in
+                app.overlay.move(to: pos)
+            }
+            HStack(spacing: 8) {
+                Button("Reset subtitle position") { app.overlay.resetPosition() }
+                Button("Preview overlay") { app.showOverlayDemo() }
+            }
             Divider()
             Toggle("Hide Dock icon (menu bar only)", isOn: $prefs.hideDockIcon)
                 .onChange(of: prefs.hideDockIcon) { _, _ in app.applyDockVisibility() }
@@ -204,6 +232,17 @@ struct SettingsView: View {
                 Text("Right ⌘ Command").tag("rightCommand")
                 Text("F5").tag("f5")
             }
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(app.dictation.tapActive ? Color.green : Color.orange)
+                    .frame(width: 7, height: 7)
+                Text(app.dictation.tapActive
+                     ? "Hotkey armed: \(hotkeyName(prefs.dictationHotkey)) — hold to dictate"
+                     : "Hotkey listener off — grant Input Monitoring, then relaunch")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
             Text("Hold to dictate; release to paste at the cursor. Double-tap for hands-free; Esc cancels.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -270,6 +309,16 @@ struct SettingsView: View {
                     Text(ui.packStatus).font(.caption)
                 }
             }
+        }
+    }
+
+    private func hotkeyName(_ id: String) -> String {
+        switch id {
+        case "fn": "fn (Globe)"
+        case "rightOption": "Right ⌥ Option"
+        case "rightCommand": "Right ⌘ Command"
+        case "f5": "F5"
+        default: id
         }
     }
 

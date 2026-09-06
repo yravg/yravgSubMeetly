@@ -139,14 +139,42 @@ function round3(n) {
   return Math.round(n * 1000) / 1000;
 }
 
-function cueBody(l, dualLine) {
+/**
+ * Rapikan daftar cue sebelum ditulis: waktu jadi angka berhingga, durasi
+ * selalu positif, dan cue urut menaik menurut waktu mulai.
+ *
+ * Cue yang mundur membuat penomoran SRT tidak sesuai urutan waktu (indeks SRT
+ * harus berurut). Sumbernya nyata: transkripsi streaming dan tangkapan langsung
+ * bisa menyelesaikan jendela tidak berurutan.
+ */
+export function normalizeCues(cues) {
+  const out = (cues || []).map((c) => {
+    const t0raw = Number(c.t0);
+    const t0 = Number.isFinite(t0raw) ? Math.max(0, t0raw) : 0;
+    const t1raw = Number(c.t1);
+    // Durasi nol/negatif = cue yang tak pernah tampil.
+    const t1 = Number.isFinite(t1raw) && t1raw > t0 ? t1raw : t0 + 3;
+    return { ...c, t0, t1 };
+  });
+  // Stabil: cue dengan waktu mulai sama mempertahankan urutan aslinya.
+  return out
+    .map((c, i) => [c, i])
+    .sort((a, b) => a[0].t0 - b[0].t0 || a[1] - b[1])
+    .map(([c]) => c);
+}
+
+function cueBody(l) {
   const src = (l.src || l.source || '').trim();
   const tgt = (l.tgt || l.translation || '').trim();
-  if (dualLine && src && tgt && src !== tgt) return `${tgt}\n${src}`;
+  // Keep both lines whenever the session produced both: an exported subtitle
+  // file is an archive, and dropping the original is lossy and unrecoverable.
+  // Source first, then translation — the same order formatTxt() already uses
+  // and the order the design prototype (test/studio.js) renders.
+  if (src && tgt && src !== tgt) return `${src}\n${tgt}`;
   return tgt || src;
 }
 
-export function formatSrt(lines, { url, title, dualLine } = {}) {
+export function formatSrt(lines, { url, title } = {}) {
   const cues = [];
   if (url || title) {
     const meta = [`Local TransSub`, title && `Title: ${title}`, url && `Source: ${url}`]
@@ -154,30 +182,29 @@ export function formatSrt(lines, { url, title, dualLine } = {}) {
       .join('\n');
     cues.push({ t0: 0, t1: 0.001, src: '', tgt: meta, _meta: true });
   }
-  for (const l of splitSubtitleCues(lines || [])) {
+  for (const l of normalizeCues(splitSubtitleCues(lines || []))) {
     cues.push(l);
   }
   return cues
     .map((l, i) => {
       const t0 = l.t0 ?? 0;
       const t1 = l.t1 ?? t0 + 3;
-      const text = l._meta ? l.tgt : cueBody(l, dualLine);
+      const text = l._meta ? l.tgt : cueBody(l);
       return `${i + 1}\n${fmtSrt(t0)} --> ${fmtSrt(t1)}\n${text}\n`;
     })
     .join('\n');
 }
 
-export function formatVtt(lines, { url, title, dualLine } = {}) {
+export function formatVtt(lines, { url, title } = {}) {
   const hdr = ['WEBVTT'];
   if (url) hdr.push(`NOTE Source: ${url}`);
   if (title) hdr.push(`NOTE Title: ${title}`);
-  hdr.push('');
-  const body = splitSubtitleCues(lines || [])
-    .map((l) => {
-      const t0 = l.t0 ?? 0;
-      const t1 = l.t1 ?? t0 + 3;
-      return `${fmtVtt(t0)} --> ${fmtVtt(t1)}\n${cueBody(l, dualLine)}\n`;
-    })
+  // WebVTT mewajibkan BARIS KOSONG antara blok header dan cue pertama.
+  // Tanpa itu ffmpeg membuang cue pertama, dan bila ada baris NOTE ia membuang
+  // seluruh cue. Chrome memaafkannya, jadi cacat ini lama tidak terlihat.
+  hdr.push('', '');
+  const body = normalizeCues(splitSubtitleCues(lines || []))
+    .map((l) => `${fmtVtt(l.t0)} --> ${fmtVtt(l.t1)}\n${cueBody(l)}\n`)
     .join('\n');
   return hdr.join('\n') + body;
 }
@@ -200,8 +227,16 @@ export function formatTxt(lines, { url, title } = {}) {
   return hdr.join('\n') + body;
 }
 
+/** Detik → milidetik yang selalu berupa bilangan bulat non-negatif. */
+function safeMs(sec) {
+  const n = Number(sec);
+  // Nilai rusak (undefined, "x", Infinity) dulu menghasilkan "NaN:NaN:NaN,NaN"
+  // — berkas yang tak bisa diurai pemutar mana pun. Lebih baik jatuh ke 0.
+  return Number.isFinite(n) ? Math.max(0, Math.round(n * 1000)) : 0;
+}
+
 function fmtSrt(sec) {
-  const ms = Math.max(0, Math.round(sec * 1000));
+  const ms = safeMs(sec);
   const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
   const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
   const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
@@ -210,7 +245,7 @@ function fmtSrt(sec) {
 }
 
 function fmtVtt(sec) {
-  const ms = Math.max(0, Math.round(sec * 1000));
+  const ms = safeMs(sec);
   const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
   const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
   const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');

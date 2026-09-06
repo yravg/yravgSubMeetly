@@ -2,14 +2,17 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Local TransSub</title>
+    <title>yraverageSubMin</title>
     <link rel="stylesheet" href="sidepanel.css" />
     <link rel="stylesheet" href="notes-panel.css" />
   </head>
   <body>
     <header class="topbar">
       <div class="topbar-brand">
-        <span class="brand">Local TransSub</span>
+        <span id="topbar-rec" class="topbar-rec hidden" aria-hidden="true"></span>
+        <span class="brand">
+          <span class="brand-word">yraverage</span><span class="brand-pill">SubMin</span>
+        </span>
         <nav class="view-tabs" id="view-tabs" aria-label="Main views">
           <button type="button" data-view="captions" class="active" data-i18n="tabCaptions">
             Captions
@@ -18,34 +21,52 @@
         </nav>
       </div>
       <div class="topbar-actions">
+        <div class="density" id="density-toggle" role="group" data-i18n-aria-label="densityGroup" aria-label="Panel density">
+          <button type="button" data-density-mode="simple" class="active" aria-pressed="true" data-i18n-title="densitySimpleHint">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5h11M2.5 11h11"/></svg>
+            <span data-i18n="densitySimple">Simple</span>
+          </button>
+          <button type="button" data-density-mode="detail" aria-pressed="false" data-i18n-title="densityDetailHint">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M2.5 3.5h11M2.5 6.5h11M2.5 9.5h11M2.5 12.5h11"/></svg>
+            <span data-i18n="densityDetail">Detail</span>
+          </button>
+        </div>
         <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
       </div>
     </header>
 
     <main>
       <div id="view-captions" class="view-panel">
-      <!-- ============ Subtitle Generation ============ -->
-      <section class="card">
-        <div class="card-head">
-          <h2 data-i18n="genTitle">💬 Subtitle Generation</h2>
-          <div class="seg" id="mode-toggle">
+      <!-- Child tabs of Captions: Live (kartu-kartu di bawah) dan Performance (analitik kecepatan). -->
+      <div class="subtabs" id="captions-subtabs" data-density="detail" role="tablist" aria-label="Captions views">
+        <button type="button" role="tab" data-subview="live" class="active" aria-selected="true">Live</button>
+        <button type="button" role="tab" data-subview="perf" aria-selected="false">Performance</button>
+      </div>
+      <div id="view-perf" class="hidden"></div>
+      <!-- ============ Group 1: Source ============ -->
+      <section class="card reveal" aria-labelledby="src-group-title">
+        <div class="card-head reveal reveal-delay-1">
+          <h2 id="src-group-title" data-i18n="srcGroup">🎙 Source</h2>
+          <div class="seg reveal reveal-delay-2" id="mode-toggle">
             <button data-mode="offline" data-i18n="offline">Offline</button>
             <button data-mode="realtime" class="active" data-i18n="realtime">Realtime</button>
           </div>
         </div>
 
         <!-- Realtime: current tab -->
-        <div id="rt-target" class="target-card">
+        <div id="rt-target" class="target-card reveal reveal-delay-3">
           <img id="tab-favicon" class="favicon" alt="" />
           <div class="target-meta">
             <div id="tab-title" class="target-title">—</div>
             <div id="tab-url" class="target-url"></div>
           </div>
-          <span class="target-tag" data-i18n="currentPage">Current page</span>
+          <span id="target-tag" class="target-tag" data-i18n="currentPage">Current page</span>
+          <button id="btn-goto-session-tab" class="mini-btn hidden" data-i18n="gotoSessionTab">Go to tab</button>
         </div>
+        <div id="session-tab-hint" class="hint hidden reveal reveal-delay-3" data-i18n="sessionKeepsRunning"></div>
 
         <!-- Offline: file drop -->
-        <div id="off-drop" class="dropzone hidden">
+        <div id="off-drop" class="dropzone hidden reveal reveal-delay-3">
           <input type="file" id="off-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.webm,.ogg" hidden />
           <div class="drop-icon">⬆️</div>
           <div data-i18n="dropHint">Click or drag audio/video files here</div>
@@ -54,7 +75,7 @@
         </div>
 
         <!-- CC0 QA samples (visible when catalog is reachable, e.g. lab :8799) -->
-        <div id="qa-sample-bar" class="qa-sample-bar hidden">
+        <div id="qa-sample-bar" class="qa-sample-bar hidden reveal reveal-delay-4">
           <div class="qa-sample-head">
             <span class="lbl" data-i18n="qaSamples">CC0 test samples</span>
             <span class="qa-sample-hint" data-i18n="qaSamplesHint"
@@ -66,10 +87,17 @@
             <button type="button" id="btn-qa-run" class="mini-btn" data-i18n="qaRunSample">Run sample</button>
           </div>
         </div>
+      </section>
 
-        <div class="task-row">
+      <!-- ============ Group 2: Task & Languages ============ -->
+      <section class="card reveal reveal-delay-1" aria-labelledby="task-group-title">
+        <div class="card-head reveal reveal-delay-2">
+          <h2 id="task-group-title" data-i18n="taskGroup">⚙ Task &amp; Languages</h2>
+        </div>
+
+        <div class="task-row reveal reveal-delay-3">
           <label class="lbl" data-i18n="taskMode">Task Mode</label>
-          <div class="task-toggles">
+          <div class="task-toggles" data-density="detail">
             <label class="dual-inline" title="Live draft + semantic refinement when sentence ends">
               <span data-i18n="refineShort">Refine</span>
               <input type="checkbox" id="refine-main" class="switch" />
@@ -80,12 +108,12 @@
             </label>
           </div>
         </div>
-        <div class="seg wide" id="task-toggle">
+        <div class="seg wide reveal reveal-delay-3" id="task-toggle">
           <button data-task="transcribe" data-i18n="transcribe">Transcribe</button>
           <button data-task="translate" class="active" data-i18n="plusTranslate">+ Translate</button>
         </div>
 
-        <div class="interp-row" id="interpreter-row">
+        <div class="interp-row reveal reveal-delay-3" id="interpreter-row" data-density="detail">
           <span class="interp-row-title" data-i18n="interpreterMode">Interpreter mode</span>
           <span class="interp-row-sep">·</span>
           <span class="interp-row-summary" id="interpreter-summary"></span>
@@ -94,7 +122,7 @@
           </button>
         </div>
 
-        <div class="lang-row" id="lang-row">
+        <div class="lang-row reveal reveal-delay-3" id="lang-row">
           <div class="lang-col">
             <label class="lbl" for="src-lang" data-i18n="sourceLang">From (speech)</label>
             <select id="src-lang" aria-label="Source speech language"></select>
@@ -105,20 +133,45 @@
           </div>
         </div>
 
-        <div id="model-warning" class="warning hidden"></div>
-        <div id="dl-list" class="dl-list hidden"></div>
+        <div id="model-warning" class="warning hidden reveal reveal-delay-3" data-density="detail"></div>
+        <div id="dl-list" class="dl-list hidden reveal reveal-delay-3" data-density="detail"></div>
 
-        <div id="status-line" class="status-line"></div>
+        <div id="status-line" class="status-line reveal reveal-delay-3"><span id="status-dot" class="status-dot hidden"></span><span id="status-text"></span></div>
+        <ol id="start-steps" class="start-steps hidden reveal reveal-delay-3" aria-label="Start progress">
+          <li data-step="capture" data-i18n="stepCapture">Capture</li>
+          <li data-step="models" data-i18n="stepModels">Models</li>
+          <li data-step="warmup" data-i18n="stepWarmup">Warm-up</li>
+          <li data-step="listening" data-i18n="stepListening">Listening</li>
+        </ol>
+        <div id="error-box" class="error-box hidden reveal reveal-delay-3" role="alert">
+          <div id="error-title" class="error-title"></div>
+          <div id="error-hint" class="error-hint"></div>
+          <details id="error-detail-wrap" class="error-detail hidden">
+            <summary data-i18n="errShowDetail">Technical detail</summary>
+            <code id="error-detail"></code>
+          </details>
+          <div class="error-actions">
+            <button id="btn-error-action" class="mini-btn hidden"></button>
+            <button id="btn-error-dismiss" class="mini-btn" data-i18n-title="errDismiss">✕</button>
+          </div>
+        </div>
+      </section>
 
-        <div class="btn-row">
-          <button id="btn-start" class="btn primary" data-i18n="startTask">Start Task</button>
+      <!-- ============ Group 3: Actions & Preview ============ -->
+      <section class="card reveal reveal-delay-1" id="action-card" aria-labelledby="action-group-title">
+        <div class="card-head reveal reveal-delay-2">
+          <h2 id="action-group-title" data-i18n="actionGroup">▶ Actions &amp; Preview</h2>
+        </div>
+
+        <div class="btn-row reveal reveal-delay-3">
+          <button id="btn-start" data-tour="btn-start" class="btn primary" data-i18n="startTask">Start Task</button>
           <button id="btn-stop" class="btn" disabled data-i18n="endTask">End Task</button>
         </div>
-        <button id="btn-pick" class="btn ghost" data-i18n="pickManually">🖥 Pick tab / window manually</button>
-        <div id="pick-hint" class="pick-hint hidden"></div>
+        <button id="btn-pick" class="btn ghost reveal reveal-delay-3" data-density="detail" data-i18n="pickManually">🖥 Pick tab / window manually</button>
+        <div id="pick-hint" class="pick-hint hidden reveal reveal-delay-3"></div>
 
         <!-- Live preview: one box (translation only) or two (original + translation) -->
-        <div id="live-preview" class="live-preview hidden">
+        <div id="live-preview" class="live-preview hidden reveal reveal-delay-3">
           <div id="live-src-box" class="live-box live-src-box hidden">
             <div class="live-box-label" data-i18n="liveOriginal">Original</div>
             <div id="live-src-lines" class="live-box-body"></div>
@@ -130,53 +183,105 @@
         </div>
 
         <!-- Offline results -->
-        <div id="off-results" class="results hidden">
+        <div id="off-results" class="results hidden reveal reveal-delay-3">
           <div class="results-head">
             <span id="off-progress-text"></span>
             <div class="results-actions">
-              <button id="btn-srt" class="mini-btn">SRT</button>
-              <button id="btn-vtt" class="mini-btn">VTT</button>
-              <button id="btn-txt" class="mini-btn">TXT</button>
+              <button id="btn-srt" class="mini-btn" data-i18n-title="fmtSrtHint">SRT</button>
+              <button id="btn-vtt" class="mini-btn" data-i18n-title="fmtVttHint">VTT</button>
+              <button id="btn-txt" class="mini-btn" data-i18n-title="fmtTxtHint">TXT</button>
             </div>
+          </div>
+          <div id="export-dest-hint" class="export-dest-hint">
+            <span id="export-dest-text"></span>
+            <button id="btn-export-dest-change" class="link-btn" data-i18n="exportDestChange">Change…</button>
           </div>
           <div id="off-lines" class="lines"></div>
         </div>
       </section>
 
       <!-- ============ History ============ -->
-      <section class="card">
-        <div class="card-head">
+      <section class="card reveal reveal-delay-1">
+        <div class="card-head reveal reveal-delay-2">
           <h2 data-i18n="history">🕘 History</h2>
         </div>
-        <div id="history-list" class="history">
+        <input id="history-search" class="history-search" type="search"
+               data-i18n-placeholder="historySearch" placeholder="Search transcripts…" />
+        <div id="history-list" class="history reveal reveal-delay-3">
           <div class="empty" data-i18n="noHistory">No history yet</div>
         </div>
+        <!-- Blok "Export subtitles" dirender helper-status.js lalu dipindah ke sini (dekat riwayat yang diekspor). -->
+        <div id="export-mount" class="reveal reveal-delay-3"></div>
       </section>
 
       <!-- ============ Native helper status (Win/Linux/mac) ============ -->
-      <section class="card" id="helper-status-card">
-        <div class="card-head">
-          <h2>🖥️ Native Helper</h2>
+      <section class="card reveal reveal-delay-1 collapsible collapsed" id="helper-status-card" data-density="detail" data-collapse-key="helper">
+        <div class="card-head reveal reveal-delay-2">
+          <button type="button" class="card-toggle" id="helper-card-toggle" aria-expanded="false" aria-controls="helper-status-mount">
+            <h2>🖥️ Native Helper</h2>
+            <span class="card-chevron" aria-hidden="true">›</span>
+          </button>
         </div>
-        <div id="helper-status-mount"></div>
+        <div id="helper-status-mount" class="reveal reveal-delay-3"></div>
+        <div id="helper-guide-mount" class="reveal reveal-delay-4"></div>
       </section>
       </div>
 
       <!-- ============ Meeting notes (top-level Notes tab) ============ -->
       <div id="view-notes" class="view-panel hidden">
-      <section class="card" id="notes-card">
-        <div class="card-head">
-          <h2 data-i18n="notesTitle">📝 Meeting notes</h2>
+      <section class="card reveal collapsible" id="notes-card" data-collapse-key="notes" data-collapse-default="open">
+        <div class="card-head notes-card-head reveal reveal-delay-1">
+          <button type="button" class="card-toggle" id="notes-card-toggle" aria-expanded="true" aria-controls="notes-body">
+            <h2 data-i18n="notesTitle">📝 Meeting notes</h2>
+            <span class="card-chevron" aria-hidden="true">›</span>
+          </button>
+          <div class="notes-mbar" id="notes-meeting-bar"></div>
         </div>
-        <div id="notes-mount"></div>
+        <div id="notes-body">
+        <details id="paste-transcript" class="paste-transcript reveal reveal-delay-2" data-density="detail">
+          <summary data-i18n="pasteTitle">Paste a Teams transcript → minutes</summary>
+          <p class="notes-meta" data-i18n="pasteHelp">
+            Open the Teams meeting transcript, select all, copy, and paste it here.
+          </p>
+          <textarea id="paste-input" rows="6" data-i18n-placeholder="pastePlaceholder"
+                    placeholder="Paste the transcript here…"></textarea>
+          <div class="paste-row">
+            <input id="paste-title" type="text" data-i18n-placeholder="pasteMeetingTitle"
+                   placeholder="Meeting title (optional)" />
+            <button id="btn-paste-generate" class="mini-btn" data-i18n="pasteGenerate">Make minutes</button>
+          </div>
+          <div id="paste-result" class="paste-result"></div>
+        </details>
+        <div id="notes-mount" class="reveal reveal-delay-2"></div>
+        </div>
       </section>
       </div>
     </main>
 
+    <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
+
     <footer class="footer">
-      <span>© 2026 Local TransSub</span>
+      <span>© 2026 yraverageSubMin</span>
       <span class="ver">v1.1.1 <button id="btn-about" class="link-btn">ⓘ</button></span>
     </footer>
+
+    <!-- Bottom Navigation Bar (New UI) -->
+    <nav class="bottom-nav" id="bottom-nav" aria-label="Bottom navigation">
+      <div class="bottom-nav-inner">
+        <button type="button" class="bottom-nav-item active" data-view="captions" aria-label="Captions" title="Captions">
+          <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 17l4-4 4 4M12 3v14M20 17l-4-4-4 4"/><path d="M4 11a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z"/></svg>
+          <span class="label">Captions</span>
+        </button>
+        <button type="button" class="bottom-nav-item" data-view="notes" aria-label="Notes" title="Notes">
+          <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <span class="label">Notes</span>
+        </button>
+        <button type="button" class="bottom-nav-item" data-view="settings" aria-label="Settings" title="Settings">
+          <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="label">Settings</span>
+        </button>
+      </div>
+    </nav>
 
     <!-- ============ Interpreter mode modal ============ -->
     <div id="interpreter-modal" class="modal hidden">
@@ -272,10 +377,46 @@
           <h2>⚙️ <span data-i18n="settings">Settings</span></h2>
           <button id="btn-close-settings" class="icon-btn">✕</button>
         </div>
+        <div class="settings-search-row">
+          <input type="search" id="settings-search" class="settings-search" autocomplete="off" spellcheck="false"
+                 placeholder="Search settings…" data-i18n-placeholder="settingsSearch"
+                 data-i18n-aria-label="settingsSearch" aria-label="Search settings" />
+        </div>
+        <div id="settings-no-match" class="hint hidden"></div>
 
         <div class="setting-row">
           <label for="ui-lang-toggle" data-i18n="uiLang">UI language</label>
           <select id="ui-lang-toggle"></select>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="theme">Theme</label>
+          <div class="seg" id="theme-toggle">
+            <button data-theme="auto" class="active" data-i18n="themeAuto">Auto</button>
+            <button data-theme="light" data-i18n="themeLight">Light</button>
+            <button data-theme="dark" data-i18n="themeDark">Dark</button>
+          </div>
+        </div>
+
+        <div class="setting-col">
+          <label class="lbl" data-i18n="reskin">Reskin pattern</label>
+          <div class="reskin-grid" id="reskin-toggle" role="radiogroup" aria-label="Reskin pattern">
+            <button type="button" class="reskin-card active" data-reskin="yraverage" role="radio" aria-checked="true">
+              <span class="reskin-mock reskin-mock-yraverage" aria-hidden="true"><i></i><b></b></span>
+              <span data-i18n="reskinYraverage">Yraverage</span>
+            </button>
+            <button type="button" class="reskin-card" data-reskin="coretax" role="radio" aria-checked="false">
+              <span class="reskin-mock reskin-mock-coretax" aria-hidden="true"><i></i><b></b></span>
+              <span data-i18n="reskinCoretax">Coretax</span>
+            </button>
+            <button type="button" class="reskin-card" data-reskin="modern" role="radio" aria-checked="false">
+              <span class="reskin-mock reskin-mock-modern" aria-hidden="true"><i></i><b></b></span>
+              <span data-i18n="reskinModern">Yraverage Modern</span>
+            </button>
+          </div>
+          <div class="reskin-foot">
+            <button type="button" id="btn-reskin-reset" class="mini-btn" data-i18n="reskinReset">Reset to default</button>
+          </div>
         </div>
 
         <div class="setting-row">
@@ -297,7 +438,20 @@
             <button id="btn-native-check" class="mini-btn" data-i18n="check">Refresh</button>
           </div>
           <div id="native-host-hint" class="hint native-host-hint hidden"></div>
+          <div class="native-device-row" id="native-device-row">
+            <div class="native-device-head">
+              <label class="lbl" data-i18n="helperDevice">Helper compute</label>
+              <span id="native-device-active" class="notes-pill idle"></span>
+            </div>
+            <div class="seg" id="native-device-toggle" role="radiogroup" aria-label="Helper compute device">
+              <button type="button" data-hdevice="auto" class="active" data-i18n="helperDeviceAuto">Auto</button>
+              <button type="button" data-hdevice="cpu">CPU</button>
+              <button type="button" data-hdevice="cuda" data-i18n="helperDeviceGpu">GPU (CUDA)</button>
+            </div>
+            <div id="native-device-hint" class="hint native-device-hint"></div>
+          </div>
           <div class="hint" data-i18n="nativeNote"></div>
+          <div id="native-models" class="model-list"></div>
         </div>
 
         <div class="setting-row">
@@ -324,6 +478,7 @@
             <button id="btn-pick-export-folder" class="mini-btn" data-i18n="exportFolderPick">Choose…</button>
             <button id="btn-clear-export-folder" class="mini-btn hidden" data-i18n="exportFolderClear">Clear</button>
           </div>
+          <div class="hint" data-i18n="exportFolderHint"></div>
         </div>
 
         <div class="setting-row">
@@ -346,6 +501,15 @@
           Models download once from HuggingFace and are cached locally — everything runs
           offline afterwards. If downloads stall, switch the download source and retry.
         </div>
+        <div class="setting-row">
+          <label data-i18n="asrPreset">Speed vs accuracy</label>
+          <div class="seg" id="asr-preset-toggle">
+            <button data-preset="fast" data-i18n="presetFast">Fast</button>
+            <button data-preset="balanced" data-i18n="presetBalanced">Balanced</button>
+            <button data-preset="accurate" data-i18n="presetAccurate">Accurate</button>
+          </div>
+        </div>
+        <div class="hint" id="asr-preset-hint"></div>
         <div id="asr-models" class="model-list"></div>
         <h3 class="models-title" data-i18n="mtModels">Translation models (per language pair)</h3>
         <div id="mt-models" class="model-list"></div>

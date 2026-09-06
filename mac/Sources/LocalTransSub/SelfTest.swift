@@ -100,6 +100,19 @@ enum SelfTest {
 
         await controller.session.stop()
 
+        // Transkrip sesi terakhir harus SELAMAT dari stop, kalau tidak menu
+        // Export (yang digating oleh lines.isEmpty) hilang begitu sesi berhenti
+        // dan pengguna kehilangan hasilnya.
+        let afterStop = controller.session.lines
+        say("lines setelah stop : \(afterStop.count)")
+        if let last = afterStop.last {
+            let srt = SubtitleExporter.format([last], as: .srt, dualLine: false)
+            say("contoh SRT sesi terakhir: \(srt.replacingOccurrences(of: "\n", with: " ⏎ ").prefix(90))")
+        }
+        say(afterStop.isEmpty
+            ? "EXPORT-AFTER-STOP: FAIL — transkrip hilang saat sesi dihentikan"
+            : "EXPORT-AFTER-STOP: PASS — \(afterStop.count) baris masih bisa diekspor")
+
         let transcript = lines.map(\.source).joined(separator: " ")
         let translated = lines.filter { !$0.translation.isEmpty }.count
         if transcript.isEmpty {

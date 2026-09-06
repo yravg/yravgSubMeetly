@@ -18,7 +18,12 @@
         border-inline: 1px solid var(--border, #3a3a3a);
         min-height: 100vh;
         position: relative;
-        transition: max-width 0.2s ease;
+        /* JANGAN menambahkan `transition: max-width` di sini. `max-width`
+           bernilai var(--shell-w), dan saat panel notulen me-render ulang,
+           transisi itu membuat max-width terkunci pada nilai lama: --shell-w
+           berubah ke 880px tapi lebar nyatanya tetap 480px, sehingga tombol
+           lebar Auto/Compact/Wide/Full berhenti bekerja sampai halaman dimuat
+           ulang. Dijaga oleh test/app-surfaces.test.mjs. */
       }
       .app-banner {
         display: flex;
@@ -205,9 +210,16 @@
         <details class="pages-menu" id="pages-menu">
           <summary>All test pages ▾</summary>
           <div class="pages-list">
+            <a class="primary" href="/guide.html"><b>Panduan pengguna — ekstensi</b><span>Pasang, subtitel langsung, berkas, ekspor, notulen, helper.</span></a>
+            <a class="primary" href="/guide.html?doc=USER-GUIDE-MACOS.md"><b>Panduan pengguna — macOS</b><span>Audio sistem, overlay layar penuh, dikte global, izin macOS.</span></a>
+            <a class="primary" href="/guide.html?doc=USER-GUIDE-WINLINUX.md"><b>Panduan pengguna — Windows &amp; Linux</b><span>Native Helper faster-whisper, installer host per OS, GPU CUDA, ekspor CRLF/BOM.</span></a>
             <a class="primary" href="/src/minutes.html"><b>Minutes Register (full tab)</b><span>Typed register, provenance drawer, series view and the issued-MoM document.</span></a>
             <a href="/lab.html"><b>Translation Lab</b><span>Media player + automated zh↔en / ja↔en benchmark against the native helper.</span></a>
             <a href="/studio.html"><b>Offline Studio (transcription / export)</b><span>File transcription, dual-line translation and the SRT/VTT/TXT export panel.</span></a>
+            <a href="/models.html"><b>Model manager (mock)</b><span>ASR + translation model sizes, download states and actions — preview only.</span></a>
+            <a href="/history.html"><b>Session history (samples)</b><span>Saved sessions list, transcript preview and per-session export — sample data.</span></a>
+            <a href="/helper-status.html"><b>Helper status (mock)</b><span>Native Helper cards for macOS / Windows / Linux with sample states.</span></a>
+            <a href="/helper-guide.html"><b>Helper install guide &amp; troubleshooting (harness)</b><span>Per-OS install steps, live diagnostics and ranked troubleshooting — the panel inside the Native Helper card.</span></a>
             <a href="/notes-panel.html"><b>Meeting notes ticker (harness)</b><span>Side-panel notes ticker on the v2 register.</span></a>
             <div class="sec">Release QA</div>
             <a href="/verify.html"><b>Phase 1 release verification</b><span>Status dashboard for the 26 baseline sub-features before smoke, E2E and the lab are wired up.</span></a>
@@ -230,6 +242,10 @@
 
     <!-- chrome mock must run before offscreen (Worker uses getURL) -->
     <script src="/chrome-mock.js"></script>
+    <!-- Overlay subtitel (content-script) di-host di halaman ini juga, sehingga
+         app.html menampilkan seluruh permukaan ekstensi: panel + overlay.
+         Mock meneruskan pesan {target:'content'} kepadanya. -->
+    <script src="/dist/content.js"></script>
     <script type="module">
       import '/dist/offscreen.js';
       window.__browserOffscreenLoaded = true;

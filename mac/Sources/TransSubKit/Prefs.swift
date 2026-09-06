@@ -15,6 +15,8 @@ public enum PrefKey {
     public static let dictationCleanup = "dictationCleanup"
     public static let restoreClipboard = "restoreClipboard"
     public static let overlayFrame = "overlayFrame"
+    public static let overlayPosition = "overlayPosition" // top | center | bottom
+    public static let a11yLargeContrast = "a11yLargeContrast"
     public static let maxOverlayLines = "maxOverlayLines"
     public static let overlayAutoScroll = "overlayAutoScroll"
     public static let overlayPanelMode = "overlayPanelMode"
@@ -22,6 +24,7 @@ public enum PrefKey {
     public static let maxOverlayCues = "maxOverlayCues"
     public static let audioSourceMode = "audioSourceMode" // app | system | mic
     public static let languageMode = "languageMode" // transcribe | translate
+    public static let reskin = "reskin" // yraverage | coretax | modern
 }
 
 public final class Prefs: @unchecked Sendable {
@@ -48,6 +51,9 @@ public final class Prefs: @unchecked Sendable {
             PrefKey.maxOverlayCues: 400,
             PrefKey.audioSourceMode: "app",
             PrefKey.languageMode: "transcribe",
+            PrefKey.overlayPosition: "bottom",
+            PrefKey.a11yLargeContrast: false,
+            PrefKey.reskin: "yraverage",
         ])
     }
 
@@ -126,8 +132,35 @@ public final class Prefs: @unchecked Sendable {
         get { d.string(forKey: PrefKey.languageMode) ?? "transcribe" }
         set { d.set(newValue, forKey: PrefKey.languageMode) }
     }
+    /// Pola aksen lokal — selalu salah satu dari tiga nilai yang dikenal.
+    public var reskin: String {
+        get {
+            let v = d.string(forKey: PrefKey.reskin) ?? "yraverage"
+            return ["yraverage", "coretax", "modern"].contains(v) ? v : "yraverage"
+        }
+        set {
+            d.set(["yraverage", "coretax", "modern"].contains(newValue) ? newValue : "yraverage",
+                  forKey: PrefKey.reskin)
+        }
+    }
     public var overlayFrame: String {
         get { d.string(forKey: PrefKey.overlayFrame) ?? "" }
         set { d.set(newValue, forKey: PrefKey.overlayFrame) }
+    }
+    /// Teks besar + kontras tinggi di overlay.
+    public var a11yLargeContrast: Bool {
+        get { d.bool(forKey: PrefKey.a11yLargeContrast) }
+        set { d.set(newValue, forKey: PrefKey.a11yLargeContrast) }
+    }
+    /// top | center | bottom — preset posisi overlay.
+    public var overlayPosition: String {
+        get {
+            let v = d.string(forKey: PrefKey.overlayPosition) ?? "bottom"
+            return ["top", "center", "bottom"].contains(v) ? v : "bottom"
+        }
+        set {
+            d.set(["top", "center", "bottom"].contains(newValue) ? newValue : "bottom",
+                  forKey: PrefKey.overlayPosition)
+        }
     }
 }

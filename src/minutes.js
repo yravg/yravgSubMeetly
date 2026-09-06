@@ -26,6 +26,7 @@ import {
 } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
+import { mountExtras } from './minutes-extras.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -49,6 +50,7 @@ const state = {
   seriesAll: false,
   sort: { key: 'ref', dir: 1 },
   group: 'none',
+  ptFilter: 'all',
   sel: /** @type {string|null} */ (null),
   adding: false,
   // ?lang= from the side panel wins once, then the toggle is remembered.
@@ -65,6 +67,11 @@ let T = makeT(state.lang);
 
 function activeMeeting() {
   return state.meetings.find((m) => m.id === state.activeId) || null;
+}
+const ptKey = (t) => `pt_${String(t || 'general').replace(/-/g, '_')}`;
+/** Rapat yang lolos filter tipe proyek — dipakai pengalih rapat, bukan tabel butir. */
+function visibleMeetings() {
+  return state.ptFilter === 'all' ? state.meetings : state.meetings.filter((m) => (m.projectType || 'general') === state.ptFilter);
 }
 function seriesOf(m) {
   return state.meetings.filter((x) => x.seriesId === m.seriesId).sort((a, b) => a.seq - b.seq);
@@ -712,6 +719,7 @@ function paintHeader() {
   $('#m-present').textContent = m.attendees.length ? T('presentN', m.attendees.length) : '—';
   $('#m-mom').textContent = m.id;
   $('#m-series').textContent = T('seriesNth', series.findIndex((x) => x.id === m.id) + 1);
+  $('#m-ptype').textContent = T(ptKey(m.projectType));
   $('#prov-line').textContent = m.engine
     ? T('pipeline', m.engine.asr, m.engine.segments, m.items.length)
     : T('noSource');
@@ -757,8 +765,24 @@ function paintChips() {
 }
 
 function paintSwitcher() {
+  const opt = (m) => `<option value="${esc(m.id)}" ${m.id === state.activeId ? 'selected' : ''}>${esc(m.date)} — ${esc(weekLabel(m))}${m.issuedAt ? ' ✓' : ''}</option>`;
+  const vis = visibleMeetings();
+  const types = [...new Set(vis.map((m) => m.projectType || 'general'))];
   const sel = $('#m-switch');
-  sel.innerHTML = state.meetings.map((m) => `<option value="${esc(m.id)}" ${m.id === state.activeId ? 'selected' : ''}>${esc(m.date)} — ${esc(weekLabel(m))}${m.issuedAt ? ' ✓' : ''}</option>`).join('');
+  // Lebih dari satu tipe → kelompokkan per tipe supaya 200 rapat tetap bisa dinavigasi.
+  sel.innerHTML = types.length > 1
+    ? types.map((t) => `<optgroup label="${esc(T(ptKey(t)))}">${vis.filter((m) => (m.projectType || 'general') === t).map(opt).join('')}</optgroup>`).join('')
+    : vis.map(opt).join('');
+
+  const counts = new Map();
+  for (const m of state.meetings) { const t = m.projectType || 'general'; counts.set(t, (counts.get(t) || 0) + 1); }
+  const pf = $('#pt-filter');
+  if (pf) {
+    pf.innerHTML = `<option value="all">${esc(T('allTypes'))} (${state.meetings.length})</option>` +
+      [...counts.entries()].map(([t, n]) => `<option value="${t}"${t === state.ptFilter ? ' selected' : ''}>${esc(T(ptKey(t)))} (${n})</option>`).join('');
+    pf.value = counts.has(state.ptFilter) ? state.ptFilter : 'all';
+    pf.hidden = counts.size < 2;
+  }
 }
 
 function paintFooter(rows) {
@@ -1124,7 +1148,7 @@ async function saveDrawer() {
   const changed = Object.keys(patch).some((k) => JSON.stringify(patch[k]) !== JSON.stringify(it[k]));
   let meeting;
   if (!changed && it.review === 'ai') {
-    meeting = await acceptItemAndSave(m, it.ref, { by: state.me || 'local' });
+    meeting = await acceptWithXp(m, it);
   } else if (changed) {
     meeting = await editItemAndSave(m, it.ref, patch, { by: state.me || 'local' });
   } else {
@@ -1149,11 +1173,18 @@ async function doSaveSummary() {
   }
 }
 
+/** Terima butir lalu catat XP — satu jalur untuk tombol, drawer, dan tombol pintas `a`. */
+async function acceptWithXp(m, it) {
+  const meeting = await acceptItemAndSave(m, it.ref, { by: state.me || 'local' });
+  globalThis.__learn?.award('item-accepted', `item-accepted:${m.id}:${it.ref}`);
+  return meeting;
+}
+
 async function acceptSelected() {
   const m = activeMeeting();
   const it = activeItem();
   if (!m || !it || m.issuedAt || it.review !== 'ai') return;
-  replaceActive(await acceptItemAndSave(m, it.ref, { by: state.me || 'local' }));
+  replaceActive(await acceptWithXp(m, it));
   toast(T('msgAccepted'));
   paint();
 }
@@ -1181,7 +1212,7 @@ async function doKeepAsHeard() {
   const m = activeMeeting();
   const it = activeItem();
   if (!m || !it) return;
-  replaceActive(await acceptItemAndSave(m, it.ref, { by: state.me || 'local' }));
+  replaceActive(await acceptWithXp(m, it));
   toast(T('keptAsHeard'));
   paint();
 }
@@ -1198,6 +1229,7 @@ async function doIssue(force = false) {
   try {
     const meeting = await issueMeetingAndSave(m, { force, by: state.me || 'local' });
     replaceActive(meeting);
+    globalThis.__learn?.award('mom-issued', `mom-issued:${meeting.id}`);
     toast(T('msgIssued'));
     state.view = 'doc';
     syncTabs();
@@ -1353,10 +1385,27 @@ function wireEvents() {
     paint();
   });
 
+  mountExtras({
+    lang: () => state.lang,
+    meetings: () => state.meetings,
+    activeMeeting,
+    reload: () => reloadAll(true),
+    setActive: (id) => { state.activeId = id; state.sel = null; },
+    paint,
+    toast,
+  });
+
   $('#m-switch').addEventListener('change', (e) => {
     state.activeId = e.target.value;
     state.sel = null;
     state.adding = false;
+    paint();
+  });
+  $('#pt-filter')?.addEventListener('change', (e) => {
+    state.ptFilter = e.target.value;
+    const vis = visibleMeetings();
+    if (!vis.some((m) => m.id === state.activeId)) state.activeId = vis[0]?.id || state.activeId;
+    state.sel = null;
     paint();
   });
 

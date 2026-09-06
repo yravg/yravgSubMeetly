@@ -21,6 +21,33 @@ export const NOTE_SCHEMA_VERSION = 2;
 export const ITEM_TYPES = /** @type {const} */ ([
   'decision', 'action', 'question', 'risk', 'metric', 'info',
 ]);
+/**
+ * Tipe proyek/rapat — dipilih saat mulai merekam, dipakai register untuk
+ * memfilter dan mengelompokkan, serta oleh pustaka contoh dan modul latihan.
+ * Nilai tak dikenal jatuh ke 'general' supaya data lama tetap terbaca.
+ */
+export const PROJECT_TYPES = /** @type {const} */ ([
+  'general',
+  'weekly-progress',
+  'hse',
+  'design-review',
+  'client-review',
+  'standup',
+  'sprint',
+  'sales',
+  'finance',
+  'legal',
+  'training',
+  'research',
+  'healthcare',
+  'education',
+]);
+
+export function normalizeProjectType(v) {
+  const t = String(v || '').trim().toLowerCase();
+  return PROJECT_TYPES.includes(t) ? t : 'general';
+}
+
 export const ITEM_STATUSES = /** @type {const} */ (['open', 'progress', 'closed', 'carried']);
 export const REVIEW_STATES = /** @type {const} */ (['ai', 'accepted', 'edited']);
 /** Sumbu kedua matriks risiko: severity (`priority`) × likelihood. */
@@ -283,6 +310,7 @@ export function createMeeting(partial = {}) {
     id: str(partial.id || `MOM-${rnd()}`),
     seriesId: str(partial.seriesId || 'default'),
     seq: num(partial.seq, 1),
+    projectType: normalizeProjectType(partial.projectType),
     title: str(partial.title || 'Untitled meeting').trim(),
     date,
     start: strOrNull(partial.start),

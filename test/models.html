@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Kelola model bahasa (mock)</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #1a1d27;
+        --border: #2a3040;
+        --text: #e8ecf4;
+        --muted: #8892a8;
+        --accent: #5b9cff;
+        --ok: #3dd68c;
+        --warn: #ffb020;
+        --bad: #ff6b6b;
+        --font: system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 var(--font);
+        min-height: 100vh;
+      }
+      header.page {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header.page h1 { margin: 0; font-size: 18px; font-weight: 600; }
+      header.page p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; min-width: 220px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      main { padding: 20px 24px 40px; max-width: 960px; margin: 0 auto; }
+      .pill {
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill.ok { background: #1a3d2e; color: var(--ok); }
+      .pill.warn { background: #3d3018; color: var(--warn); }
+      .pill.muted { background: #1e2433; color: var(--muted); }
+      .storage {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 20px;
+      }
+      .storage .bar {
+        height: 10px;
+        border-radius: 999px;
+        background: #10131c;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      .storage .fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--accent), var(--ok));
+        border-radius: 999px;
+        transition: width 0.3s ease;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 24px;
+        font-size: 13px;
+      }
+      caption {
+        text-align: left;
+        font-weight: 600;
+        font-size: 15px;
+        padding: 12px 16px;
+        background: var(--panel);
+      }
+      th, td {
+        text-align: left;
+        padding: 9px 12px;
+        border-top: 1px solid var(--border);
+        vertical-align: middle;
+      }
+      th { color: var(--muted); font-weight: 600; font-size: 12px; }
+      .muted { color: var(--muted); }
+      .btn {
+        background: #232839;
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 5px 12px;
+        font: inherit;
+        font-size: 12.5px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn:hover:not(:disabled) { border-color: var(--accent); }
+      .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+      .btn.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+      .prog {
+        height: 6px;
+        border-radius: 999px;
+        background: #10131c;
+        overflow: hidden;
+        margin-top: 6px;
+        min-width: 120px;
+      }
+      .prog > div {
+        height: 100%;
+        width: 0%;
+        background: var(--accent);
+        border-radius: 999px;
+        transition: width 0.15s linear;
+      }
+      .mock-note {
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      @media (max-width: 640px) {
+        th:nth-child(3), td:nth-child(3) { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page">
+      <h1>Kelola model bahasa</h1>
+      <p>Halaman mock — pratinjau status unduhan, ukuran, dan aksi tiap model tanpa mengunduh apa pun.</p>
+      <a href="/app.html">← Side Panel</a>
+      <a href="/bench.html">Benchmark →</a>
+    </header>
+    <main>
+      <div class="storage">
+        <div><strong>Penyimpanan model (mock)</strong> — <span id="storage-text">0 MB dari 0 MB</span></div>
+        <div class="bar"><div class="fill" id="storage-fill"></div></div>
+      </div>
+
+      <table id="asr-table">
+        <caption>Model ucapan (ASR)</caption>
+        <thead><tr><th>Model</th><th>Ukuran</th><th>Catatan</th><th>Status</th><th>Aksi</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <table id="mt-table">
+        <caption>Model terjemahan (per pasangan bahasa)</caption>
+        <thead><tr><th>Pasangan</th><th>Ukuran</th><th>Model</th><th>Status</th><th>Aksi</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <p class="mock-note">Mock murni: tombol menjalankan simulasi progres di tab ini saja — tidak ada unduhan, tidak ada jaringan model. Kelola sungguhan ada di Settings → Model Files pada ekstensi.</p>
+    </main>
+
+    <script>
+      // Mock data cermin registry (src/lib/registry.js) — angka ilustratif.
+      const ASR = [
+        { key: 'whisper-tiny', label: 'Whisper Tiny', size: '~45 / ~120 MB', note: 'fastest, lowest accuracy', state: 'downloaded' },
+        { key: 'whisper-base', label: 'Whisper Base', size: '~80 / ~210 MB', note: 'seimbang', state: 'downloaded' },
+        { key: 'whisper-small', label: 'Whisper Small', size: '~200 / ~450 MB', note: 'lebih akurat', state: 'idle' },
+        { key: 'whisper-medium', label: 'Whisper Medium', size: '~450 MB / ~1 GB', note: 'berat, paling akurat', state: 'idle' },
+      ];
+      // Cermin MT_PAIRS registry + 2 celah nyata (en-ja, en-ko: belum ada
+      // ekspor ONNX lokal → target Jepang/Korea hanya via API bawaan browser
+      // atau helper native; di sini eksplisit sebagai Rencana, bukan unduhan).
+      const MT = [
+        { key: 'ja-en', label: 'Jepang → Inggris', model: 'Xenova/opus-mt-ja-en', size: '~116 MB', state: 'downloaded' },
+        { key: 'zh-en', label: 'Mandarin → Inggris', model: 'Xenova/opus-mt-zh-en', size: '~120 MB', state: 'idle' },
+        { key: 'ko-en', label: 'Korea → Inggris', model: 'Xenova/opus-mt-ko-en', size: '~115 MB', state: 'idle' },
+        { key: 'de-en', label: 'Jerman → Inggris', model: 'Xenova/opus-mt-de-en', size: '~115 MB', state: 'idle' },
+        { key: 'fr-en', label: 'Prancis → Inggris', model: 'Xenova/opus-mt-fr-en', size: '~115 MB', state: 'idle' },
+        { key: 'es-en', label: 'Spanyol → Inggris', model: 'Xenova/opus-mt-es-en', size: '~115 MB', state: 'idle' },
+        { key: 'ru-en', label: 'Rusia → Inggris', model: 'Xenova/opus-mt-ru-en', size: '~115 MB', state: 'idle' },
+        { key: 'it-en', label: 'Italia → Inggris', model: 'Xenova/opus-mt-it-en', size: '~115 MB', state: 'idle' },
+        { key: 'nl-en', label: 'Belanda → Inggris', model: 'Xenova/opus-mt-nl-en', size: '~115 MB', state: 'idle' },
+        { key: 'pl-en', label: 'Polandia → Inggris', model: 'Xenova/opus-mt-pl-en', size: '~115 MB', state: 'idle' },
+        { key: 'ar-en', label: 'Arab → Inggris', model: 'Xenova/opus-mt-ar-en', size: '~115 MB', state: 'idle' },
+        { key: 'vi-en', label: 'Vietnam → Inggris', model: 'Xenova/opus-mt-vi-en', size: '~115 MB', state: 'idle' },
+        { key: 'id-en', label: 'Indonesia → Inggris', model: 'Helsinki-NLP/opus-mt-id-en', size: '~115 MB', state: 'idle' },
+        { key: 'uk-en', label: 'Ukraina → Inggris', model: 'Xenova/opus-mt-uk-en', size: '~115 MB', state: 'idle' },
+        { key: 'en-zh', label: 'Inggris → Mandarin', model: 'Xenova/opus-mt-en-zh', size: '~121 MB', state: 'idle' },
+        { key: 'en-de', label: 'Inggris → Jerman', model: 'Xenova/opus-mt-en-de', size: '~115 MB', state: 'idle' },
+        { key: 'en-fr', label: 'Inggris → Prancis', model: 'Xenova/opus-mt-en-fr', size: '~115 MB', state: 'idle' },
+        { key: 'en-es', label: 'Inggris → Spanyol', model: 'Xenova/opus-mt-en-es', size: '~115 MB', state: 'idle' },
+        { key: 'en-ru', label: 'Inggris → Rusia', model: 'Xenova/opus-mt-en-ru', size: '~115 MB', state: 'idle' },
+        { key: 'en-it', label: 'Inggris → Italia', model: 'Xenova/opus-mt-en-it', size: '~115 MB', state: 'idle' },
+        { key: 'en-vi', label: 'Inggris → Vietnam', model: 'Xenova/opus-mt-en-vi', size: '~115 MB', state: 'idle' },
+        { key: 'en-id', label: 'Inggris → Indonesia', model: 'Helsinki-NLP/opus-mt-en-id', size: '~115 MB', state: 'downloading', pct: 42 },
+        { key: 'en-ja', label: 'Inggris → Jepang', model: '—', size: '—', state: 'planned' },
+        { key: 'en-ko', label: 'Inggris → Korea', model: '—', size: '—', state: 'planned' },
+      ];
+      const MB = { downloaded: 0 };
+      const SIZE_MB = { 'whisper-tiny': 120, 'whisper-base': 210, 'whisper-small': 450, 'whisper-medium': 1000, 'ja-en': 116, 'zh-en': 120, 'ko-en': 115, 'de-en': 115, 'fr-en': 115, 'es-en': 115, 'ru-en': 115, 'it-en': 115, 'nl-en': 115, 'pl-en': 115, 'ar-en': 115, 'vi-en': 115, 'id-en': 115, 'uk-en': 115, 'en-zh': 121, 'en-de': 115, 'en-fr': 115, 'en-es': 115, 'en-ru': 115, 'en-it': 115, 'en-vi': 115, 'en-id': 115 };
+      const CAP_MB = 2100;
+
+      // Alur pasang mock: idle → downloading → verifying → downloaded (+ aktif).
+      let activeAsr = 'whisper-base';
+      function pill(m) {
+        if (m.state === 'downloaded') {
+          return `<span class="pill ok">Terunduh</span>` +
+            (m.key === activeAsr ? ' <span class="pill ok">Aktif</span>' : '');
+        }
+        if (m.state === 'verifying') return '<span class="pill warn">Memverifikasi…</span>';
+        if (m.state === 'downloading') return `<span class="pill warn">Mengunduh ${m.pct || 0}%</span>`;
+        if (m.state === 'planned') return '<span class="pill muted">Rencana</span>';
+        return '<span class="pill muted">Belum ada</span>';
+      }
+
+      function renderStorage() {
+        document.getElementById('storage-text').textContent =
+          `${MB.downloaded} MB dari ~${CAP_MB} MB katalog`;
+        document.getElementById('storage-fill').style.width =
+          Math.min(100, Math.round((MB.downloaded / CAP_MB) * 100)) + '%';
+      }
+
+      function row(cells) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = cells.join('');
+        return tr;
+      }
+
+      function renderAsr() {
+        const tb = document.querySelector('#asr-table tbody');
+        tb.innerHTML = '';
+        ASR.forEach((m) => {
+          const useBtn = (m.state === 'downloaded' && m.key !== activeAsr)
+            ? ` <button class="btn" data-use="${m.key}">Jadikan aktif</button>` : '';
+          const delBtn = confirmKey === m.key
+            ? `<span class="muted">Yakin hapus?</span> <button class="btn danger" data-del-yes="${m.key}">Ya</button> <button class="btn" data-del-no="${m.key}">Batal</button>`
+            : `<button class="btn danger" data-del="${m.key}">Hapus</button>`;
+          const action = m.state === 'downloaded'
+            ? `${delBtn}${useBtn}`
+            : (m.state === 'downloading' || m.state === 'verifying')
+              ? `<button class="btn" disabled>${m.state === 'verifying' ? 'Memverifikasi…' : 'Mengunduh…'}</button><div class="prog"><div style="width:${m.state === 'verifying' ? 100 : (m.pct || 0)}%"></div></div>`
+              : `<button class="btn" data-dl="${m.key}">Unduh</button>`;
+          tb.appendChild(row([
+            `<td><strong>${m.label}</strong><div class="muted">${m.key}</div></td>`,
+            `<td class="muted">${m.size}</td>`,
+            `<td class="muted">${m.note}</td>`,
+            `<td data-status="${m.key}">${pill(m)}</td>`,
+            `<td>${action}</td>`,
+          ]));
+        });
+      }
+
+      function renderMt() {
+        const tb = document.querySelector('#mt-table tbody');
+        tb.innerHTML = '';
+        MT.forEach((m) => {
+          const delBtn = confirmKey === m.key
+            ? `<span class="muted">Yakin hapus?</span> <button class="btn danger" data-del-yes="${m.key}">Ya</button> <button class="btn" data-del-no="${m.key}">Batal</button>`
+            : `<button class="btn danger" data-del="${m.key}">Hapus</button>`;
+          const action = m.state === 'planned'
+            ? `<button class="btn" disabled title="Belum ada ekspor ONNX lokal untuk pasangan ini">Rencana</button>`
+            : m.state === 'downloaded'
+            ? `<button class="btn" data-test="${m.key}">Uji</button> ${delBtn}`
+            : m.state === 'downloading'
+              ? `<button class="btn" disabled>Mengunduh…</button><div class="prog"><div style="width:${m.pct || 0}%"></div></div>`
+              : `<button class="btn" data-dl="${m.key}">Unduh</button>`;
+          tb.appendChild(row([
+            `<td><strong>${m.label}</strong></td>`,
+            `<td class="muted">${m.size}</td>`,
+            `<td class="muted">${m.model}</td>`,
+            `<td data-status="${m.key}">${pill(m)}</td>`,
+            `<td>${action}</td>`,
+          ]));
+        });
+      }
+
+      function find(key) {
+        return ASR.find((m) => m.key === key) || MT.find((m) => m.key === key);
+      }
+
+      function refreshStatus(key) {
+        const m = find(key);
+        const bar = document.querySelector(`[data-status="${key}"]`);
+        if (m && bar) bar.innerHTML = pill(m);
+      }
+
+      function simulate(key) {
+        const m = find(key);
+        if (!m || m.state !== 'idle') return;
+        m.state = 'downloading';
+        m.pct = 0;
+        renderAsr();
+        renderMt();
+        const timer = setInterval(() => {
+          m.pct = Math.min(100, (m.pct || 0) + 9);
+          refreshStatus(key);
+          const prog = document.querySelector(`[data-status="${key}"]`)
+            ?.closest('tr')?.querySelector('.prog > div');
+          if (prog) prog.style.width = m.pct + '%';
+          if (m.pct >= 100) {
+            clearInterval(timer);
+            m.state = 'verifying';
+            refreshStatus(key);
+            renderAsr();
+            renderMt();
+            setTimeout(() => {
+              m.state = 'downloaded';
+              MB.downloaded += SIZE_MB[key] || 0;
+              if (m.key.startsWith('whisper-')) activeAsr = m.key;
+              renderAsr();
+              renderMt();
+              renderStorage();
+            }, 800);
+          }
+        }, 120);
+      }
+
+      // Hapus dua langkah: klik Hapus → konfirmasi sebaris → Ya/Batal.
+      let confirmKey = null;
+      document.addEventListener('click', (e) => {
+        const dl = e.target.closest('[data-dl]');
+        if (dl) { confirmKey = null; simulate(dl.dataset.dl); return; }
+        const use = e.target.closest('[data-use]');
+        if (use) {
+          confirmKey = null;
+          activeAsr = use.dataset.use;
+          renderAsr();
+          return;
+        }
+        const yes = e.target.closest('[data-del-yes]');
+        if (yes) {
+          const m = find(yes.dataset.delYes);
+          confirmKey = null;
+          if (m && m.state === 'downloaded') {
+            m.state = 'idle';
+            MB.downloaded = Math.max(0, MB.downloaded - (SIZE_MB[m.key] || 0));
+            if (m.key === activeAsr) {
+              const fallback = ASR.find((x) => x.state === 'downloaded');
+              activeAsr = fallback ? fallback.key : null;
+            }
+            renderAsr();
+            renderMt();
+            renderStorage();
+          }
+          return;
+        }
+        const no = e.target.closest('[data-del-no]');
+        if (no) {
+          confirmKey = null;
+          renderAsr();
+          renderMt();
+          return;
+        }
+        const del = e.target.closest('[data-del]');
+        if (del) {
+          confirmKey = del.dataset.del;
+          renderAsr();
+          renderMt();
+          return;
+        }
+        const test = e.target.closest('[data-test]');
+        if (test) {
+          const cell = test.closest('tr').querySelector('td:nth-child(4)');
+          if (cell) cell.innerHTML = '<span class="pill ok">Uji OK (mock)</span>';
+        }
+      });
+
+      MB.downloaded = ASR.filter((m) => m.state === 'downloaded')
+        .reduce((s, m) => s + (SIZE_MB[m.key] || 0), 0)
+        + MT.filter((m) => m.state === 'downloaded')
+          .reduce((s, m) => s + (SIZE_MB[m.key] || 0), 0);
+      renderAsr();
+      renderMt();
+      renderStorage();
+    </script>
+  </body>
+</html>

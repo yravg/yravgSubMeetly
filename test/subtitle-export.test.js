@@ -35,12 +35,14 @@ test('formatSrt does not dump a paragraph into one cue', () => {
   }
 });
 
-test('formatVtt respects dualLine and does not always double the text', () => {
-  const single = formatVtt([{ t0: 0, t1: 4, src: 'Hello world', tgt: '你好世界' }], {
-    dualLine: false,
-  });
-  assert.match(single, /你好世界/);
-  assert.doesNotMatch(single, /Hello world/);
+test('formatVtt keeps both source and translation — an export is an archive', () => {
+  // Ekspor sengaja menyimpan keduanya: membuang teks asli itu lossy dan tidak
+  // bisa dipulihkan. Kartu ekspor produksi mengandalkan ini
+  // (test/export-browser.test.mjs), jadi tidak ada opsi untuk mematikannya.
+  const both = formatVtt([{ t0: 0, t1: 4, src: 'Hello world', tgt: '你好世界' }]);
+  assert.match(both, /你好世界/);
+  assert.match(both, /Hello world/);
+  assert.match(both, /Hello world\n你好世界/, 'sumber dulu, lalu terjemahan');
 
   const dual = formatVtt([{ t0: 0, t1: 4, src: 'Hello world', tgt: '你好世界' }], {
     dualLine: true,
