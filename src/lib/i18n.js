@@ -1,4 +1,12 @@
 const en = {
+  fmtSrtHint: 'SRT — timed subtitles for VLC, YouTube, video editors',
+  fmtVttHint: 'VTT — WebVTT for web players and HTML5 video',
+  fmtTxtHint: 'TXT — plain text without timestamps, easy to copy',
+  exportDestDownloads: 'Saves to your Downloads folder (Chrome default)',
+  exportDestFolder: (name) => `Saves to folder “${name}”`,
+  exportDestChange: 'Change…',
+  exportFolderHint:
+    'By default Chrome saves each export to Downloads and shows its download bar. Pick a folder to write files straight there instead; Chrome asks for permission once.',
   requestingCapture: 'Requesting tab audio from Chrome…',
   loadingAsr: 'Loading speech model…',
   loadingTranslator: 'Loading translation model…',
@@ -246,6 +254,14 @@ const en = {
 };
 
 const zh = {
+  fmtSrtHint: 'SRT — 带时间轴字幕，适用于 VLC、YouTube、剪辑软件',
+  fmtVttHint: 'VTT — WebVTT，适用于网页播放器与 HTML5 视频',
+  fmtTxtHint: 'TXT — 无时间轴纯文本，便于复制',
+  exportDestDownloads: '保存到“下载”文件夹（Chrome 默认）',
+  exportDestFolder: (name) => `保存到文件夹“${name}”`,
+  exportDestChange: '更改…',
+  exportFolderHint:
+    '默认情况下 Chrome 会把每次导出保存到“下载”并显示下载栏。选择文件夹后将直接写入该处；Chrome 只询问一次权限。',
   requestingCapture: '正在向 Chrome 请求标签页音频…',
   loadingAsr: '正在加载语音模型…',
   loadingTranslator: '正在加载翻译模型…',
@@ -477,6 +493,14 @@ export const I18N = {
   vi: { ...en, uiLang: 'Ngôn ngữ UI', offline: 'Ngoại tuyến', realtime: 'Thời gian thực', startTask: 'Bắt đầu', endTask: 'Kết thúc', settings: 'Cài đặt', qaTest: 'Thử', qaRunSample: 'Chạy mẫu', qaSamples: 'Mẫu CC0', theme: 'Chủ đề', themeAuto: 'Tự động', themeLight: 'Sáng', themeDark: 'Tối' },
   id: {
     ...en,
+    fmtSrtHint: 'SRT — subtitel berstempel waktu untuk VLC, YouTube, penyunting video',
+    fmtVttHint: 'VTT — WebVTT untuk pemutar web dan video HTML5',
+    fmtTxtHint: 'TXT — teks polos tanpa stempel waktu, mudah disalin',
+    exportDestDownloads: 'Disimpan ke folder Downloads (bawaan Chrome)',
+    exportDestFolder: (name) => `Disimpan ke folder “${name}”`,
+    exportDestChange: 'Ganti…',
+    exportFolderHint:
+      'Secara bawaan Chrome menyimpan tiap ekspor ke Downloads dan menampilkan bilah unduhannya. Pilih folder agar berkas langsung ditulis ke sana; Chrome hanya meminta izin sekali.',
     requestingCapture: 'Meminta audio tab dari Chrome…',
     loadingAsr: 'Memuat model suara…',
     loadingTranslator: 'Memuat model terjemahan…',

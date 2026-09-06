@@ -1289,3 +1289,15 @@ body.is-running .bottom-nav-item[data-view='captions'] .label::after {
 }
 .error-actions { display: flex; gap: var(--space-1); margin-top: var(--space-2); }
 .error-actions .mini-btn:last-child { margin-left: auto; }
+
+/* Lokasi simpan diumumkan SEBELUM tombol ditekan, bukan hanya sesudahnya. */
+.export-dest-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: -2px 0 var(--space-2);
+}
+.export-dest-hint .link-btn { font-size: 11.5px; padding: 0; text-decoration: underline; }

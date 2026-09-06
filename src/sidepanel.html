@@ -183,10 +183,14 @@
           <div class="results-head">
             <span id="off-progress-text"></span>
             <div class="results-actions">
-              <button id="btn-srt" class="mini-btn">SRT</button>
-              <button id="btn-vtt" class="mini-btn">VTT</button>
-              <button id="btn-txt" class="mini-btn">TXT</button>
+              <button id="btn-srt" class="mini-btn" data-i18n-title="fmtSrtHint">SRT</button>
+              <button id="btn-vtt" class="mini-btn" data-i18n-title="fmtVttHint">VTT</button>
+              <button id="btn-txt" class="mini-btn" data-i18n-title="fmtTxtHint">TXT</button>
             </div>
+          </div>
+          <div id="export-dest-hint" class="export-dest-hint">
+            <span id="export-dest-text"></span>
+            <button id="btn-export-dest-change" class="link-btn" data-i18n="exportDestChange">Change…</button>
           </div>
           <div id="off-lines" class="lines"></div>
         </div>
@@ -464,6 +468,7 @@
             <button id="btn-pick-export-folder" class="mini-btn" data-i18n="exportFolderPick">Choose…</button>
             <button id="btn-clear-export-folder" class="mini-btn hidden" data-i18n="exportFolderClear">Clear</button>
           </div>
+          <div class="hint" data-i18n="exportFolderHint"></div>
         </div>
 
         <div class="setting-row">

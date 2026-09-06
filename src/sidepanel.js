@@ -2335,6 +2335,10 @@ async function refreshExportFolderUi() {
   const label = exportDirLabel();
   $('export-folder-label').textContent = label ? `${t('exportFolderSet')}: ${label}` : t('exportFolderNone');
   $('btn-clear-export-folder').classList.toggle('hidden', !label);
+  // Tujuan yang sama, dieja di sebelah tombol ekspor supaya pengguna tahu
+  // berkasnya mendarat di mana SEBELUM menekan.
+  const dest = $('export-dest-text');
+  if (dest) dest.textContent = label ? t('exportDestFolder', label) : t('exportDestDownloads');
   redrawHelperStatus?.();
 }
 
@@ -2572,6 +2576,7 @@ function wire() {
   $('btn-stop').addEventListener('click', onStop);
   $('btn-pick').addEventListener('click', onPickManually);
   $('btn-error-action').addEventListener('click', onErrorAction);
+  $('btn-export-dest-change').addEventListener('click', () => $('btn-settings').click());
   $('btn-error-dismiss').addEventListener('click', hideError);
   $('btn-paste-generate')?.addEventListener('click', () => void generateMinutesFromPaste());
   $('history-search')?.addEventListener('input', () => {
