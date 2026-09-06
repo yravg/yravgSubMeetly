@@ -1301,3 +1301,11 @@ body.is-running .bottom-nav-item[data-view='captions'] .label::after {
   margin: -2px 0 var(--space-2);
 }
 .export-dest-hint .link-btn { font-size: 11.5px; padding: 0; text-decoration: underline; }
+
+/* Selama sesi berjalan, kartu target tetap menunjuk tab yang disubtitle —
+ * bukan tab yang kebetulan sedang dibuka. Garis putus-putus menandai
+ * "sesi ada di tempat lain". */
+.target-card.live { border-color: rgba(20, 183, 137, 0.5); }
+.target-card.live.elsewhere { border-style: dashed; }
+.target-tag.live { animation: pulse 1.4s infinite; }
+#session-tab-hint { margin: calc(var(--space-2) * -1) 0 var(--space-2); }

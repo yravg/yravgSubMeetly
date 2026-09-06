@@ -1,4 +1,8 @@
 const en = {
+  liveThisTab: '🔴 Live',
+  liveOtherTab: '🔴 Live on another tab',
+  gotoSessionTab: 'Go to tab',
+  sessionKeepsRunning: 'Captions keep running on the tab above while you work elsewhere.',
   fmtSrtHint: 'SRT — timed subtitles for VLC, YouTube, video editors',
   fmtVttHint: 'VTT — WebVTT for web players and HTML5 video',
   fmtTxtHint: 'TXT — plain text without timestamps, easy to copy',
@@ -254,6 +258,10 @@ const en = {
 };
 
 const zh = {
+  liveThisTab: '🔴 进行中',
+  liveOtherTab: '🔴 在另一个标签页进行中',
+  gotoSessionTab: '前往该标签页',
+  sessionKeepsRunning: '您在其他标签页工作时，上方标签页的字幕仍会继续。',
   fmtSrtHint: 'SRT — 带时间轴字幕，适用于 VLC、YouTube、剪辑软件',
   fmtVttHint: 'VTT — WebVTT，适用于网页播放器与 HTML5 视频',
   fmtTxtHint: 'TXT — 无时间轴纯文本，便于复制',
@@ -493,6 +501,10 @@ export const I18N = {
   vi: { ...en, uiLang: 'Ngôn ngữ UI', offline: 'Ngoại tuyến', realtime: 'Thời gian thực', startTask: 'Bắt đầu', endTask: 'Kết thúc', settings: 'Cài đặt', qaTest: 'Thử', qaRunSample: 'Chạy mẫu', qaSamples: 'Mẫu CC0', theme: 'Chủ đề', themeAuto: 'Tự động', themeLight: 'Sáng', themeDark: 'Tối' },
   id: {
     ...en,
+    liveThisTab: '🔴 Berjalan',
+    liveOtherTab: '🔴 Berjalan di tab lain',
+    gotoSessionTab: 'Ke tab itu',
+    sessionKeepsRunning: 'Subtitel tetap berjalan di tab di atas selagi Anda bekerja di tab lain.',
     fmtSrtHint: 'SRT — subtitel berstempel waktu untuk VLC, YouTube, penyunting video',
     fmtVttHint: 'VTT — WebVTT untuk pemutar web dan video HTML5',
     fmtTxtHint: 'TXT — teks polos tanpa stempel waktu, mudah disalin',

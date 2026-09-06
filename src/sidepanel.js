@@ -51,6 +51,7 @@ import {
 const $ = (id) => document.getElementById(id);
 
 const state = {
+  sessionTab: null, // tab yang sedang disubtitle selagi sesi realtime hidup
   mode: 'realtime', // 'realtime' | 'offline'
   task: 'translate', // 'transcribe' | 'translate'
   view: 'captions', // 'captions' | 'notes'
@@ -1723,21 +1724,61 @@ async function acquireLabDisplayStream() {
   return stream;
 }
 
-async function refreshTab() {
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+function renderTargetCard(tab, { live = false, elsewhere = false } = {}) {
   const fallbackIcon = chrome.runtime.getURL('icons/icon16.png');
-  if (tab && /^https?:/.test(tab.url || '')) {
-    state.currentTab = tab;
+  if (tab) {
     $('tab-title').textContent = tab.title || tab.url;
-    $('tab-url').textContent = tab.url;
+    $('tab-url').textContent = tab.url || '';
     $('tab-favicon').src = tab.favIconUrl || fallbackIcon;
   } else {
-    state.currentTab = null;
     $('tab-title').textContent = t('noTab');
     $('tab-url').textContent = '';
     $('tab-favicon').src = fallbackIcon;
   }
+  const card = $('rt-target');
+  card.classList.toggle('live', live);
+  card.classList.toggle('elsewhere', live && elsewhere);
+  const tag = $('target-tag');
+  tag.classList.toggle('live', live);
+  tag.textContent = live ? (elsewhere ? t('liveOtherTab') : t('liveThisTab')) : t('currentPage');
+  $('btn-goto-session-tab').classList.toggle('hidden', !(live && elsewhere));
+  $('session-tab-hint').classList.toggle('hidden', !(live && elsewhere));
+}
+
+// Sesi realtime TIDAK ikut berpindah saat pengguna ganti tab, jadi kartu
+// target tidak boleh berpura-pura ikut pindah: selama sesi hidup ia tetap
+// menunjuk state.sessionTab.
+async function refreshTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const usable = tab && /^https?:/.test(tab.url || '') ? tab : null;
+  state.currentTab = usable;
+  if (state.mode === 'realtime' && state.running && state.sessionTab) {
+    const elsewhere = !tab || tab.id !== state.sessionTab.id;
+    if (!elsewhere && usable) state.sessionTab = { ...state.sessionTab, ...usable };
+    renderTargetCard(state.sessionTab, { live: true, elsewhere });
+  } else {
+    renderTargetCard(usable);
+  }
   updateButtons();
+}
+
+async function rememberSessionTab(tabId) {
+  if (tabId == null) {
+    state.sessionTab = state.currentTab;
+    return;
+  }
+  try {
+    state.sessionTab = await chrome.tabs.get(tabId);
+  } catch {
+    state.sessionTab = state.currentTab;
+  }
+}
+
+function gotoSessionTab() {
+  const tab = state.sessionTab;
+  if (!tab) return;
+  chrome.tabs.update?.(tab.id, { active: true })?.catch?.(() => {});
+  if (tab.windowId != null) chrome.windows?.update?.(tab.windowId, { focused: true })?.catch?.(() => {});
 }
 
 function updateButtons() {
@@ -1874,9 +1915,11 @@ async function startWithStream(streamId, captureType) {
   });
   if (res?.ok) {
     state.running = true;
+    state.sessionTab = state.currentTab;
     syncCaptureStamp();
     $('pick-hint').classList.add('hidden');
     updateButtons();
+    refreshTab();
   } else if (res?.error) {
     if (isLabHarness()) releaseLabCapture();
     showCaptureError(res.error);
@@ -2002,12 +2045,14 @@ async function onStop() {
   if (state.mode === 'realtime') {
     await toBG('panel-stop', {});
     state.running = false;
+    state.sessionTab = null;
     syncCaptureStamp();
     if (isLabHarness()) releaseLabCapture();
     setStatus('');
     setStartStep(null);
     hideError();
     updateButtons();
+    refreshTab();
   } else {
     toOffscreen('offline-cancel', {});
   }
@@ -2352,8 +2397,12 @@ chrome.runtime.onMessage.addListener((msg) => {
       syncCaptureStamp();
       updateButtons();
       if (!state.running && state.mode === 'realtime') {
+        state.sessionTab = null;
         setStatus('');
         setStartStep(null);
+        refreshTab();
+      } else if (state.running && msg.data.tabId != null && state.sessionTab?.id !== msg.data.tabId) {
+        rememberSessionTab(msg.data.tabId).then(refreshTab);
       }
       break;
     case 'subtitle':
@@ -2577,6 +2626,7 @@ function wire() {
   $('btn-pick').addEventListener('click', onPickManually);
   $('btn-error-action').addEventListener('click', onErrorAction);
   $('btn-export-dest-change').addEventListener('click', () => $('btn-settings').click());
+  $('btn-goto-session-tab').addEventListener('click', gotoSessionTab);
   $('btn-error-dismiss').addEventListener('click', hideError);
   $('btn-paste-generate')?.addEventListener('click', () => void generateMinutesFromPaste());
   $('history-search')?.addEventListener('input', () => {
