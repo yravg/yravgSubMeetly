@@ -65,6 +65,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: flex; align-items: center; gap: 10px;
   padding: 0 20px; height: 46px; flex-shrink: 0;
   background: var(--bg); border-bottom: 1px solid var(--border);
+  /* Popover appbar (Pengaturan, menu Export) hidup di dalam elemen ini, jadi
+     appbar-nya sendiri yang harus berada di atas konten — bukan cukup z-index
+     tinggi pada popovernya. Tema Coretax memberi appbar backdrop-filter, dan
+     itu MEMBUAT stacking context: tanpa z-index di sini, `z-index: 60` pada
+     popover hanya berlaku di dalam appbar dan seluruhnya tercetak di bawah
+     halaman. Ditulis eksplisit supaya kedua tema berperilaku sama, bukan
+     kebetulan lolos karena tema gelap tidak memakai blur.
+     55 = di atas dok (45) dan toast (50), di bawah overlay modal (60). */
+  position: relative;
+  z-index: 55;
 }
 /* ---- Wordmark yraverageSubMin ----------------------------------------
  * Sama seperti di panel sisi: dua potong teks, bukan berkas gambar, jadi

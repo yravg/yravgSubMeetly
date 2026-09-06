@@ -379,6 +379,66 @@ test('appbar memakai wordmark yraverageSubMin dan "Minutes" membawa kembali ke h
   await wait(500);
 });
 
+test('popover appbar tampil di atas halaman pada kedua tema', async () => {
+  // Tema Coretax memberi .appbar backdrop-filter, yang membuat stacking
+  // context: tanpa z-index pada appbar-nya sendiri, popover di dalamnya
+  // tercetak di bawah konten meski z-index-nya 60.
+  const probe = (id) => page.evaluate((popId) => {
+    const pop = document.getElementById(popId);
+    if (pop.hidden) return { tertutup: true };
+    const b = pop.getBoundingClientRect();
+    const pts = [[b.x + b.width / 2, b.y + 20], [b.x + b.width / 2, b.y + b.height / 2], [b.x + b.width / 2, b.bottom - 12]];
+    return {
+      diAtas: pts.every(([x, y]) => { const el = document.elementFromPoint(x, y); return el && pop.contains(el); }),
+      detail: pts.map(([x, y]) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? (pop.contains(el) ? 'ok' : `tertutup ${el.tagName}.${String(el.className).slice(0, 24)}`) : 'null';
+      }),
+    };
+  }, id);
+
+  for (const theme of ['dark', 'coretax']) {
+    await page.evaluate(() => document.getElementById('btn-settings').click());
+    await wait(250);
+    await page.evaluate((t) => document.querySelector(`[data-theme-pick="${t}"]`).click(), theme);
+    await wait(400);
+    await page.evaluate(() => { document.body.click(); });
+    await wait(200);
+
+    await page.evaluate(() => document.getElementById('btn-settings').click());
+    await wait(350);
+    const st = await probe('settings-pop');
+    assert.equal(st.diAtas, true, `panel Pengaturan tertutup konten pada tema ${theme}: ${JSON.stringify(st.detail)}`);
+    await page.evaluate(() => { document.body.click(); });
+    await wait(250);
+
+    await page.evaluate(() => document.getElementById('btn-export').click());
+    await wait(300);
+    const ex = await probe('export-menu');
+    assert.equal(ex.diAtas, true, `menu Export tertutup konten pada tema ${theme}: ${JSON.stringify(ex.detail)}`);
+    await page.evaluate(() => { document.body.click(); });
+    await wait(200);
+
+    // Menaikkan appbar tidak boleh membuatnya menembus overlay modal.
+    await page.evaluate(() => document.getElementById('btn-library').click());
+    await wait(400);
+    const tertutupOverlay = await page.evaluate(() => {
+      const ab = document.querySelector('.appbar').getBoundingClientRect();
+      const el = document.elementFromPoint(ab.x + ab.width / 2, ab.y + ab.height / 2);
+      return !!el && !!el.closest('.lt-overlay');
+    });
+    assert.equal(tertutupOverlay, true, `appbar menembus overlay Library pada tema ${theme}`);
+    await page.evaluate(() => document.getElementById('lt-close').click());
+    await wait(300);
+  }
+
+  await page.evaluate(() => document.getElementById('btn-settings').click());
+  await wait(250);
+  await page.evaluate(() => document.querySelector('[data-theme-pick="dark"]').click());
+  await wait(300);
+  await page.evaluate(() => { document.body.click(); });
+});
+
 test('tidak ada galat runtime di halaman selama seluruh alur', () => {
   assert.deepEqual(pageErrors, [], `galat halaman: ${pageErrors.join(' | ')}`);
 });

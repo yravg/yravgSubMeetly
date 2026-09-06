@@ -169,6 +169,14 @@ Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per ta
     jalan pulang tetap ada di layar sempit. Tujuannya ditentukan saat boot — `/app.html` di lab,
     `sidepanel.html` saat `location.protocol === 'chrome-extension:'` karena **app.html tidak ikut
     dipaket** (`dist/` hanya berisi minutes/offscreen/sidepanel).
+33. **Popover appbar tercetak di bawah halaman pada tema Coretax.** `html[data-theme="coretax"] .appbar`
+    memakai `backdrop-filter`, dan itu **membuat stacking context**; `z-index: 60` pada `#settings-pop`
+    dan `#export-menu` karena itu hanya berlaku *di dalam* appbar, yang sendirinya `position: static`
+    tanpa z-index — seluruh popover jatuh ke belakang konten. Tema gelap lolos hanya karena
+    `--glass-blur` di sana kosong, jadi bugnya tergantung tema. `.appbar` kini `position: relative;
+    z-index: 55` — eksplisit di atas dok (45) dan toast (50), di bawah `.lt-overlay` (60) supaya
+    overlay Library/Training tetap menutupi appbar. Tes menguji kedua tema untuk `#settings-pop`,
+    `#export-menu`, dan urutan overlay; sudah diperiksa **gagal** kalau z-index-nya dilepas.
 
 ### Penyebab flaky `export-browser` akhirnya ketemu (2026-09-06)
 Bukan beban mesin. Toast umpan balik (`.toast-stack`, fixed, bawah-tengah) memberi
@@ -218,7 +226,7 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **279/279 lulus** (2026-09-07), termasuk `dock-motion` 10 yang baru. Ini run penuh pertama
+- `npm test` → **280/280 lulus** (2026-09-07), termasuk `dock-motion` 11 yang baru. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
 - (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
