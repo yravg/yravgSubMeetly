@@ -24,9 +24,9 @@
       <span data-t="onDevice">On-device</span>
     </span>
     <select id="m-switch" class="mswitch" aria-label="Meeting" data-tour="m-switch"></select>
-    <button type="button" class="btn" id="btn-add-item">＋ <span data-t="addItem">Add item</span></button>
+    <button type="button" class="btn collapsible" id="btn-add-item" data-t-title="addItem" title="Add item">＋ <span data-t="addItem">Add item</span></button>
     <div class="menuwrap">
-      <button type="button" class="btn" id="btn-export" aria-haspopup="menu">
+      <button type="button" class="btn collapsible" id="btn-export" data-t-title="export" title="Export" aria-haspopup="menu">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7.5 11 12 15.5 16.5 11"/><path d="M4.5 19.5h15"/></svg>
         <span data-t="export">Export</span>
       </button>
@@ -37,8 +37,8 @@
         <button type="button" data-export="print" data-t="printPdf">Print / PDF</button>
       </div>
     </div>
-    <button type="button" class="btn" id="btn-amend">↻ <span data-t="applyCorrection">Amend</span></button>
-    <button type="button" class="btn primary" id="btn-issue" data-tour="btn-issue">
+    <button type="button" class="btn collapsible" id="btn-amend" data-t-title="applyCorrection" title="Amend">↻ <span data-t="applyCorrection">Amend</span></button>
+    <button type="button" class="btn primary" id="btn-issue" data-tour="btn-issue" data-t-title="issue" title="Issue MoM">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"/></svg>
       <span data-t="issue">Issue MoM</span>
     </button>

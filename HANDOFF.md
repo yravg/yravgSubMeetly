@@ -146,6 +146,18 @@ Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per ta
     `.settings-pop` kini `max-height: calc(100vh - 58px)` + `overflow-y: auto`
     (`overscroll-behavior: contain`, scrollbar tipis). Dijaga tes pada tinggi 950/800/700/650:
     panel harus muat dan `#btn-layout-reset` harus lolos `elementFromPoint` setelah digulir.
+31. **Meluber mendatar di bawah ~1070 px (lama, akhirnya diperbaiki).** Penyebabnya khusus appbar —
+    isi halaman sendiri sudah muat; `scrollWidth` mentok 1070 karena deretan tombol toolbar tidak
+    pernah menyusut. Akibatnya seluruh halaman menggulir mendatar dan popover yang ditambatkan
+    `right: 0` (termasuk panel Pengaturan) jatuh di luar jendela. Pelipatan bertahap:
+    ≤1100 px label tombol `.collapsible` (Add item, Export, Amend, Library, Training) dilipat jadi
+    ikon; ≤880 px label pil On-device hilang dan `.mswitch` dibatasi 130 px; ≤720 px nama brand,
+    label Issue MoM dan `#learn-pill` ikut disembunyikan. Dok dibatasi `max-width: calc(100vw - 16px)`
+    dan **hanya `#tabs`** yang diberi `overflow-x` — bagian lain dok memuat popover yang akan
+    terpotong kalau ikut jadi kontainer gulir.
+    `paintStaticStrings()` kini juga menerapkan `data-t-title` (atribut itu sudah lama ada di markup
+    tapi tidak pernah dipasang), supaya tombol yang tinggal ikon tetap punya tooltip yang diterjemahkan.
+    Terukur bersih 1400 → 520 px; tes menjaga 1400/1100/1000/900/800/700/640.
 
 ### Penyebab flaky `export-browser` akhirnya ketemu (2026-09-06)
 Bukan beban mesin. Toast umpan balik (`.toast-stack`, fixed, bawah-tengah) memberi
@@ -195,7 +207,7 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **277/277 lulus** (2026-09-06), termasuk `dock-motion` 8 yang baru. Ini run penuh pertama
+- `npm test` → **278/278 lulus** (2026-09-07), termasuk `dock-motion` 9 yang baru. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
 - (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
@@ -222,9 +234,6 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - Paket CWS (`store/releases/local-transsub-1.1.1.zip`, 31 MB / 114 MB tak terkompresi) mengirim
   ONNX Runtime **dua kali**: `ort/` (20 MB) dan `vad/ort/` (5 varian WASM, ~75 MB). Bukan blocker
   rilis, tapi peluang pemangkasan ±60 MB bila VAD dibuat memakai runtime yang sama.
-- Halaman register **meluber horizontal di bawah ~1070 px** (`scrollWidth` 1070 tetap): appbar
-  ikut tergeser sehingga popover yang ditambatkan `right: 0` bisa jatuh di luar layar. Sudah ada
-  sebelum pekerjaan dok; belum diperbaiki karena butuh keputusan tata letak, bukan tambalan CSS.
 - `store/local-transsub-1.0.0.zip` dan `1.1.0.zip` masih ada di root `store/` — jangan diunggah;
   `SUBMIT.md` sudah memperingatkan. Belum dihapus karena itu artefak rilis.
 

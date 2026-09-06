@@ -599,6 +599,25 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
 @media (max-width: 1100px) {
   .srail { width: 320px; }
   .crumbs { display: none; }
+  /* Appbar butuh ~1070 px penuh. Di bawah itu ia meluber keluar layar dan
+     menyeret seluruh halaman ikut menggulir mendatar — popover yang
+     ditambatkan `right: 0` lalu berakhir di luar jendela. Label tombol
+     sekunder dilipat jadi ikon; judulnya pindah ke tooltip. */
+  .appbar .btn.collapsible { padding: 0 9px; gap: 0; }
+  .appbar .btn.collapsible > span:not(.lt-lvl) { display: none; }
+}
+@media (max-width: 880px) {
+  .appbar { padding: 0 12px; gap: 7px; }
+  .appbar .pill.ondevice > span { display: none; }
+  .appbar .pill.ondevice { padding: 3px 7px; }
+  .appbar .btn.primary { padding: 0 10px; }
+  .mswitch { max-width: 130px; }
+}
+@media (max-width: 720px) {
+  .brand span { display: none; }
+  .appbar .btn.primary > span { display: none; }
+  .appbar .btn.primary { padding: 0 9px; gap: 0; }
+  #learn-pill { display: none; }
 }
 @media (max-width: 900px) {
   .drawer { position: fixed; inset: 0; width: 100%; z-index: 40; border-left: none; }
@@ -824,7 +843,13 @@ html.gesturing .panel, html.gesturing .viewdock, html.gesturing [data-split] { t
 .dock-snap { left: var(--cx, 50%); }
 .viewdock.pos-free { transform: none; }
 .viewdock.dragging { box-shadow: var(--shadow-float), 0 0 0 2px var(--accent); }
-.viewdock-inner { display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 6px; }
+.viewdock-inner { display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 6px; min-width: 0; }
+/* Dok tidak boleh lebih lebar dari jendela. Yang menyusut hanyalah deretan tab
+   (satu-satunya bagian tanpa popover di dalamnya, jadi aman diberi overflow);
+   grip, pencarian, filter dan tombol bahasa tetap utuh dan bisa diraih. */
+.viewdock { max-width: calc(100vw - 16px); }
+.viewdock .tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.viewdock .tabs::-webkit-scrollbar { display: none; }
 .viewdock .dgrip { color: var(--muted2); cursor: grab; display: inline-flex; padding: 4px 4px 4px 6px; touch-action: none; }
 .viewdock .dgrip:hover { color: var(--text); }
 .viewdock .tabs { background: var(--card3); }

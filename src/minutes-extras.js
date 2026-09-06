@@ -134,8 +134,8 @@ export function mountExtras(ctx) {
   const btns = document.createElement('div');
   btns.className = 'lt-appbar-btns';
   btns.innerHTML = `
-      <button type="button" class="btn sm" id="btn-library" data-tour="view-library">📚 <span>${esc(tx('library'))}</span></button>
-      <button type="button" class="btn sm" id="btn-training">🎓 <span>${esc(tx('training'))}</span> <span class="lt-lvl" id="learn-pill"></span></button>`;
+      <button type="button" class="btn sm collapsible" id="btn-library" data-tour="view-library" title="${esc(tx('library'))}">📚 <span>${esc(tx('library'))}</span></button>
+      <button type="button" class="btn sm collapsible" id="btn-training" title="${esc(tx('training'))}">🎓 <span>${esc(tx('training'))}</span> <span class="lt-lvl" id="learn-pill"></span></button>`;
   // Sebelum pengalih rapat: tetap terlihat di keadaan kosong.
   (appbar?.querySelector('#m-switch') || appbar?.lastElementChild)?.insertAdjacentElement('beforebegin', btns);
 

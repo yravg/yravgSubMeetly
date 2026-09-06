@@ -290,6 +290,62 @@ test('panel Pengaturan tetap muat di layar pendek dan isi terbawahnya bisa dirai
   await page.waitForSelector('#btn-settings');
 });
 
+test('halaman tidak meluber mendatar di jendela sempit; appbar dan dok tetap terjangkau', async () => {
+  // Appbar butuh ~1070 px penuh. Sebelum dilipat, di bawah lebar itu halaman
+  // menggulir mendatar dan popover yang ditambatkan `right: 0` — termasuk
+  // panel Pengaturan — berakhir di luar jendela.
+  for (const width of [1400, 1100, 1000, 900, 800, 700, 640]) {
+    await page.setViewport({ width, height: 700 });
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('#btn-settings');
+    await wait(500);
+    const r = await page.evaluate(() => {
+      const gear = document.getElementById('btn-settings').getBoundingClientRect();
+      const dock = document.getElementById('viewdock').getBoundingClientRect();
+      const grip = document.querySelector('#viewdock .dgrip').getBoundingClientRect();
+      return {
+        meluber: document.documentElement.scrollWidth > window.innerWidth,
+        gearDalam: gear.right <= window.innerWidth + 1 && gear.left >= -1,
+        dokDalam: dock.left >= -1 && dock.right <= window.innerWidth + 1,
+        gripDalam: grip.left >= -1,
+      };
+    });
+    assert.equal(r.meluber, false, `halaman menggulir mendatar pada lebar ${width}`);
+    assert.equal(r.gearDalam, true, `tombol Pengaturan di luar layar pada lebar ${width}`);
+    assert.equal(r.dokDalam, true, `dok tampilan di luar layar pada lebar ${width}`);
+    assert.equal(r.gripDalam, true, `grip dok terpotong pada lebar ${width}`);
+  }
+
+  // Label yang dilipat harus tetap punya tooltip, dan tombolnya tetap berfungsi.
+  const collapsed = await page.evaluate(() => {
+    const el = document.getElementById('btn-export');
+    return { labelTersembunyi: getComputedStyle(el.querySelector('span')).display === 'none', title: el.title };
+  });
+  assert.equal(collapsed.labelTersembunyi, true, 'label tombol tidak dilipat di layar sempit');
+  assert.ok(collapsed.title, 'tombol yang labelnya dilipat harus punya tooltip');
+  await page.evaluate(() => document.getElementById('btn-export').click());
+  await wait(250);
+  assert.equal(await page.evaluate(() => !document.getElementById('export-menu').hidden), true,
+    'tombol yang dilipat berhenti berfungsi');
+  await page.evaluate(() => { document.body.click(); });
+
+  // Deretan tab dok menyusut dengan menggulir, bukan dengan terpotong.
+  const tab = await page.evaluate(async () => {
+    const tabs = [...document.querySelectorAll('#tabs [role="tab"]')];
+    const last = tabs[tabs.length - 1];
+    last.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    await new Promise((res) => requestAnimationFrame(res));
+    const b = last.getBoundingClientRect();
+    const hit = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+    return { terjangkau: !!hit && (hit === last || last.contains(hit)) };
+  });
+  assert.equal(tab.terjangkau, true, 'tab terakhir di dok tidak bisa diraih di layar sempit');
+
+  await page.setViewport({ width: 1400, height: 900 });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForSelector('#btn-settings');
+});
+
 test('tidak ada galat runtime di halaman selama seluruh alur', () => {
   assert.deepEqual(pageErrors, [], `galat halaman: ${pageErrors.join(' | ')}`);
 });

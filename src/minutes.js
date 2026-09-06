@@ -1685,6 +1685,9 @@ function wireEvents() {
 
 function paintStaticStrings() {
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = T(el.dataset.t); });
+  // Tombol yang labelnya dilipat jadi ikon di layar sempit hanya menyisakan
+  // tooltip, jadi tooltipnya harus ikut diterjemahkan.
+  document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = T(el.dataset.tTitle); });
   $('#q').placeholder = T('search');
 }
 
