@@ -334,6 +334,7 @@ export function startNextMeeting(source, partial = {}) {
     attendees: source.attendees,
     topics: source.topics,
     locale: source.locale,
+    projectType: source.projectType,
     date: partial.date || today(),
     id: partial.id || `${source.seriesId}-W${String(seq).padStart(2, '0')}`,
     ...partial,

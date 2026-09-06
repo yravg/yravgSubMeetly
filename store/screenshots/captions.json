@@ -1,0 +1,22 @@
+{
+  "source": "app.html",
+  "size": "1280x800",
+  "capturedAt": "2026-09-05T08:28:33.116Z",
+  "shots": [
+    {
+      "file": "01-sidepanel-realtime.png",
+      "surface": "captions",
+      "caption": "Side Panel: subtitel langsung + pilihan bahasa"
+    },
+    {
+      "file": "02-notes-minutes.png",
+      "surface": "notes",
+      "caption": "Notulen rapat dari transkrip sesi"
+    },
+    {
+      "file": "03-settings-helper.png",
+      "surface": "settings",
+      "caption": "Pengaturan mesin + status Native Helper & ekspor"
+    }
+  ]
+}

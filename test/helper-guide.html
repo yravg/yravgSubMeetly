@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local TransSub — Panduan pemasangan &amp; pemecahan masalah (harness)</title>
+    <link rel="stylesheet" href="../src/sidepanel.css" />
+    <link rel="stylesheet" href="../src/notes-panel.css" />
+    <style>
+      body { max-width: 1100px; margin: 0 auto; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; }
+      .mock-note { border: 1px dashed var(--border); border-radius: 12px; padding: 10px 14px; color: var(--muted); font-size: 12.5px; }
+      .scenario-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+      .scenario-head h2 { font-size: 14px; margin: 0; }
+      .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-brand"><span class="brand">Helper Guide · harness</span></div>
+      <div class="topbar-actions"><a href="/app.html" class="mini-btn" style="text-decoration:none">← Side Panel</a></div>
+    </header>
+    <main>
+      <p class="mock-note">
+        Panel yang sama dengan yang dipasang di kartu <b>Native Helper</b> Side Panel, dirender di empat skenario
+        dengan data /health tiruan. Tab OS, tombol Salin, dan urutan pemecahan masalah (yang ditandai diagnostik naik ke atas)
+        bisa dicoba langsung. <b>Live</b> di bawah memakai helper sungguhan di 127.0.0.1:17865 bila hidup.
+      </p>
+      <div class="controls">
+        <span class="lbl">Bahasa UI</span>
+        <div class="seg" id="lang-pick">
+          <button data-lang="id" class="active">Indonesia</button>
+          <button data-lang="en">English</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <section class="card" style="margin-top:12px">
+        <div class="scenario-head"><h2>Live — helper sungguhan (127.0.0.1:17865)</h2><span class="notes-meta" id="live-meta">…</span></div>
+        <div id="mount-live"></div>
+      </section>
+    </main>
+    <script type="module">
+      import { renderHelperGuide } from '../src/helper-guide.js';
+      import { nativeHealth } from '../src/lib/native.js';
+
+      const HEALTH_LINUX_CUDA = { ok: true, engine: 'faster-whisper', model: 'large-v3-turbo', ffmpeg: true, translate: false, device: 'cuda', platform: 'linux', features: { transcribe_file_jobs: true } };
+      const HEALTH_WIN_CPU_NOFFMPEG = { ok: true, engine: 'faster-whisper', model: 'small', ffmpeg: false, translate: false, device: 'cpu', platform: 'windows', features: {} };
+      const HEALTH_MAC = { ok: true, engine: 'mlx-whisper', model: 'mlx-community/whisper-large-v3-turbo', ffmpeg: true, translate: true, translate_model: 'mlx-community/Qwen2.5-3B-Instruct-4bit', device: 'apple-silicon', platform: 'darwin', features: { transcribe_file_jobs: true } };
+
+      const SCENARIOS = [
+        { key: 'win-offline', title: 'Windows · helper mati · mesin Native', opts: { os: 'windows', health: null, engine: 'native', nativeHostSupported: true, hostInstalled: false } },
+        { key: 'win-cpu', title: 'Windows · helper hidup di CPU tanpa ffmpeg · helper lama', opts: { os: 'windows', health: HEALTH_WIN_CPU_NOFFMPEG, engine: 'native', nativeHostSupported: true, hostInstalled: true } },
+        { key: 'linux-cuda', title: 'Linux · CUDA · semua sehat', opts: { os: 'linux', health: HEALTH_LINUX_CUDA, engine: 'native', nativeHostSupported: true, hostInstalled: true } },
+        { key: 'mac-browser', title: 'macOS · helper hidup · mesin masih Browser', opts: { os: 'macos', health: HEALTH_MAC, engine: 'browser', nativeHostSupported: true, hostInstalled: true } },
+      ];
+
+      let lang = 'id';
+      const grid = document.getElementById('grid');
+      const uis = new Map();
+      function drawAll() {
+        for (const s of SCENARIOS) {
+          let sec = document.getElementById(`sec-${s.key}`);
+          if (!sec) {
+            sec = document.createElement('section');
+            sec.className = 'card';
+            sec.id = `sec-${s.key}`;
+            sec.innerHTML = `<div class="scenario-head"><h2>${s.title}</h2></div><div id="mount-${s.key}"></div>`;
+            grid.appendChild(sec);
+            uis.set(s.key, { os: null, open: new Set(), touched: false });
+          }
+          renderHelperGuide(document.getElementById(`mount-${s.key}`), { ...s.opts, lang }, uis.get(s.key));
+        }
+        drawLive();
+      }
+
+      const liveUi = { os: null, open: new Set(), touched: false };
+      let liveHealth = null;
+      async function drawLive() {
+        const mount = document.getElementById('mount-live');
+        const meta = document.getElementById('live-meta');
+        renderHelperGuide(mount, { lang, health: liveHealth, engine: 'native', nativeHostSupported: false, hostInstalled: null, onRecheck: refreshLive }, liveUi);
+        meta.textContent = liveHealth ? `${liveHealth.engine} · ${liveHealth.model} · ${liveHealth.platform}` : 'helper tidak terjangkau';
+      }
+      async function refreshLive() {
+        liveHealth = await nativeHealth('http://127.0.0.1:17865');
+        drawLive();
+      }
+
+      document.querySelectorAll('#lang-pick button').forEach((b) => {
+        b.addEventListener('click', () => {
+          document.querySelectorAll('#lang-pick button').forEach((x) => x.classList.toggle('active', x === b));
+          lang = b.dataset.lang;
+          drawAll();
+        });
+      });
+
+      drawAll();
+      refreshLive();
+    </script>
+  </body>
+</html>

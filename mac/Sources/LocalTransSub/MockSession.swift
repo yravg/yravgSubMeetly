@@ -10,6 +10,7 @@ enum MockSession {
         SubtitleLine(start: 12.0, end: 16.5, source: "Soft launch can proceed after those pass.", translation: "Soft launch bisa jalan setelah itu lulus."),
     ]
 
+    @MainActor
     static func apply(to model: OverlayModel) {
         model.clear()
         model.dualLine = true

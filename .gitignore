@@ -36,3 +36,12 @@ mac/build/
 .DS_Store
 *.log
 *.pid
+
+# Python bytecode
+__pycache__/
+*.pyc
+.e2e-file-profile/
+.superpowers/
+
+# Potongan ringkasan per-slice dari subagen (digabung ke summaries.json)
+.ngodingpakeai/summaries.part-*.json

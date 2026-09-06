@@ -636,3 +636,69 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
   .paper { width: 100%; box-shadow: none; border-radius: 0; padding: 0; }
   .paper section, .paper .pfoot { break-inside: avoid; }
 }
+
+
+/* ==========================================================================
+   Library + Training (minutes-extras.js)
+   ========================================================================== */
+.lt-appbar-btns { display: inline-flex; gap: 6px; }
+.lt-lvl { font-size: 10.5px; color: var(--accent-soft); background: var(--accent-dim); border-radius: 999px; padding: 1px 7px; margin-left: 2px; }
+.lt-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.55); display: flex; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow: auto; }
+.lt-panel { width: min(1180px, 100%); background: var(--bg); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; max-height: calc(100vh - 80px); }
+.lt-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.lt-head h2 { font-size: 15px; font-weight: 600; }
+.lt-head .spacer, .lt-actions .spacer { flex: 1; }
+.lt-tabs { display: inline-flex; gap: 2px; background: var(--card2); border: 1px solid var(--border); border-radius: 999px; padding: 2px; }
+.lt-tabs button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+.lt-tabs button[aria-selected="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+.lt-body { padding: 14px 16px 18px; overflow: auto; }
+.lt-sub { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+.lt-empty { color: var(--muted2); font-size: 12.5px; padding: 30px 0; text-align: center; }
+.lt-cols { display: grid; grid-template-columns: 200px 260px 1fr; gap: 14px; }
+@media (max-width: 900px) { .lt-cols { grid-template-columns: 1fr; } }
+.lt-col h3, .lt-detail h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+.lt-col h3 + .lt-list { margin-bottom: 14px; }
+.lt-list { display: flex; flex-direction: column; gap: 3px; }
+.lt-row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--border); color: var(--text2); border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.lt-row:hover { background: var(--row-hover); }
+.lt-row.on { border-color: var(--accent); color: var(--text); background: var(--accent-dim); }
+.lt-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lt-row b { font-size: 11px; color: var(--muted); font-weight: 500; }
+.lt-row:disabled { opacity: 0.5; cursor: default; }
+.lt-weeks { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 10px; }
+.lt-week { font: inherit; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--card2); color: var(--text2); cursor: pointer; }
+.lt-week.in { border-color: rgba(20, 183, 137, 0.45); color: var(--accent-soft); }
+.lt-week.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.lt-weeknav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 11.5px; color: var(--muted); }
+.lt-detail h4 { font-size: 13px; font-weight: 600; margin: 6px 0 8px; }
+.lt-preview { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; max-height: 300px; overflow: auto; font-size: 12px; }
+.lt-line { display: grid; grid-template-columns: 44px 120px 1fr; gap: 10px; padding: 3px 0; border-bottom: 1px dashed var(--grid); }
+.lt-line:last-child { border-bottom: 0; }
+.lt-line .mono { color: var(--muted2); }
+.lt-line b { color: var(--accent-soft); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lt-more { color: var(--muted2); font-size: 11px; padding-top: 6px; }
+.lt-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.lt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.lt-grid-4 .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.lt-big { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 6px 0 2px; }
+.lt-bar { height: 8px; border-radius: 999px; background: var(--card3); overflow: hidden; margin: 8px 0 6px; }
+.lt-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s ease; }
+.lt-tours { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.lt-tour-row { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; gap: 10px; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.lt-tour-row .lt-bar { margin: 0; }
+.lt-q { margin-bottom: 10px; }
+.lt-choices { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+.lt-choices .btn { height: auto; padding: 6px 12px; white-space: normal; text-align: left; border-radius: 10px; }
+.lt-choices .btn.ok { border-color: var(--accent); color: var(--accent-soft); background: var(--accent-dim); }
+.lt-choices .btn.bad { border-color: rgba(224, 108, 117, 0.6); color: #f0b8bc; }
+.lt-locked { opacity: 0.55; }
+.lt-unlocked { border-color: rgba(20, 183, 137, 0.45); }
+
+/* Sorotan tur: gelapkan semuanya kecuali lingkaran di sekitar target. */
+.lt-spot { position: fixed; inset: 0; z-index: 70; pointer-events: none;
+  background: radial-gradient(circle var(--sr, 0px) at var(--sx, 50%) var(--sy, 50%), transparent 98%, rgba(0, 0, 0, 0.62) 100%); }
+.lt-spot .lt-card { position: fixed; width: 360px; pointer-events: auto; background: var(--card); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55); font-size: 12.5px; color: var(--text); }
+.lt-spot .lt-card h3 { font-size: 14px; font-weight: 600; margin: 4px 0 6px; }
+.lt-spot .lt-card p { margin: 0 0 6px; color: var(--text2); line-height: 1.5; }
+.lt-spot .lt-card .sub { font-size: 11px; color: var(--muted); }
+.lt-target { outline: 2px solid var(--accent) !important; outline-offset: 3px; border-radius: 6px; position: relative; z-index: 71 !important; }

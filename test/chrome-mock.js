@@ -5,6 +5,31 @@
 // (getDisplayMedia or <audio>.captureStream) — not chrome.tabCapture.
 (() => {
   const listeners = [];
+
+  // localStorage tier for the storage mock below. Reads return undefined (not
+  // null) when a key was never persisted, so a seeded default can win instead.
+  function readPersisted(key) {
+    let raw;
+    try {
+      raw = localStorage.getItem(key);
+    } catch {
+      return undefined; // private mode / blocked site data
+    }
+    if (raw === null) return undefined;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return undefined; // corrupt entry — fall back to the seed
+    }
+  }
+  function writePersisted(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      /* quota or private mode — the in-memory tier still has it this session */
+    }
+  }
+
   const store = {
     settings: null,
     history: [
@@ -14,7 +39,7 @@
         mode: 'offline',
         title: 'Demo meeting — Local TransSub',
         url: '',
-        srcLang: 'ja',
+        srcLang: 'zh',
         tgtLang: 'en',
         lines: [
           { t0: 0, t1: 3.2, text: 'こんにちは', translation: 'Hello' },
@@ -41,6 +66,32 @@
   window.__mockEmit = (msg) => listeners.forEach((f) => f(msg));
   window.__chromeMockStore = store;
 
+  // chrome.storage.onChanged ala lab: set/remove memberi tahu listener
+  // sehalaman; antar-tab mengalir lewat DOM 'storage' (tidak menyala di tab
+  // penulis, tepat seperti Chrome) sehingga dua permukaan sinkron tanpa reload.
+  const storageListeners = [];
+  function emitStorage(changes) {
+    for (const f of [...storageListeners]) {
+      try {
+        f(changes, 'local');
+      } catch (e) {
+        console.warn('[chrome-mock] storage listener failed', e);
+      }
+    }
+  }
+  function parseStored(raw) {
+    if (raw == null) return undefined;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  }
+  window.addEventListener('storage', (e) => {
+    if (!e.key) return;
+    emitStorage({ [e.key]: { oldValue: parseStored(e.oldValue), newValue: parseStored(e.newValue) } });
+  });
+
   function emitPanel(type, data) {
     window.__mockEmit({ target: 'panel', type, data });
   }
@@ -48,6 +99,92 @@
   function emitOffscreen(type, data) {
     window.__mockEmit({ target: 'offscreen', type, data });
   }
+
+  // Overlay content-script (dist/content.js) hidup di halaman yang sama saat
+  // app.html memuatnya. Di ekstensi sungguhan background mencapainya lewat
+  // chrome.tabs.sendMessage; di lab itu dipetakan ke listener sehalaman.
+  function emitContent(type, data) {
+    const msg = { target: 'content', type, data };
+    labMock.content.log.push(msg);
+    window.__mockEmit(msg);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Kendali skenario untuk tes dan demo: window.__labMock
+  //
+  // Mock ini dulu hanya punya jalur bahagia, sehingga status "helper mati",
+  // fallback ke browser, dan mode manual tidak pernah bisa dipicu di app.html.
+  // `helper.mode` mengatur fetch ke 127.0.0.1:17865:
+  //   'passthrough' — apa adanya (helper sungguhan bila hidup)
+  //   'offline'     — semua permintaan gagal seperti helper tidak jalan
+  //   'fixture'     — jawab dari `helper.health` / `helper.device` tanpa jaringan
+  // `helper.latencyMs` menunda jawaban; `helper.failNext` menggagalkan N permintaan
+  // berikutnya lalu kembali normal — untuk menguji pemulihan.
+  const HELPER_ORIGIN_RE = /^https?:\/\/(127\.0\.0\.1|localhost):17865(\/|$)/;
+  const labMock = {
+    helper: {
+      mode: 'passthrough',
+      latencyMs: 0,
+      failNext: 0,
+      health: {
+        ok: true,
+        engine: 'faster-whisper',
+        engine_label: 'faster-whisper',
+        model: 'large-v3-turbo',
+        device: 'cuda',
+        platform: 'Linux',
+        ffmpeg: true,
+        translate: false,
+        features: { transcribe_file_jobs: true, streaming_file_jobs: true },
+      },
+      device: { device: 'auto', active: 'cuda', compute: 'float16', cuda_available: true, supported: true, applied: true },
+      log: [],
+    },
+    content: { log: [] },
+    reset() {
+      labMock.helper.mode = 'passthrough';
+      labMock.helper.latencyMs = 0;
+      labMock.helper.failNext = 0;
+      labMock.helper.log.length = 0;
+      labMock.content.log.length = 0;
+    },
+  };
+  window.__labMock = labMock;
+
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async (input, init = {}) => {
+    const url = typeof input === 'string' ? input : input?.url || String(input);
+    if (!HELPER_ORIGIN_RE.test(url) || labMock.helper.mode === 'passthrough') return realFetch(input, init);
+    const method = (init.method || 'GET').toUpperCase();
+    const path = new URL(url).pathname;
+    labMock.helper.log.push({ method, path });
+    if (labMock.helper.latencyMs) await new Promise((r) => setTimeout(r, labMock.helper.latencyMs));
+    if (labMock.helper.failNext > 0) {
+      labMock.helper.failNext -= 1;
+      throw new TypeError('Failed to fetch');
+    }
+    if (labMock.helper.mode === 'offline') throw new TypeError('Failed to fetch');
+    const json = (status, body) =>
+      new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+    if (path === '/health') return json(200, labMock.helper.health);
+    if (path === '/engine/device' && method === 'GET') return json(200, labMock.helper.device);
+    if (path === '/engine/device' && method === 'POST') {
+      let want = 'auto';
+      try {
+        want = JSON.parse(init.body || '{}').device || 'auto';
+      } catch {
+        /* biarkan 'auto' */
+      }
+      labMock.helper.device = { ...labMock.helper.device, device: want, applied: want === 'auto' || want === labMock.helper.device.active };
+      return json(200, {
+        ok: true,
+        supported: labMock.helper.device.supported,
+        device: want,
+        restart_required: want !== labMock.helper.device.active,
+      });
+    }
+    return json(404, { error: 'not found' });
+  };
 
   async function getSettings() {
     return store.settings || {};
@@ -125,6 +262,7 @@
       videoTime: 0,
     };
     emitPanel('state', publicState());
+    emitContent('session', { active: false });
   }
 
   async function startLabRealtime(data) {
@@ -170,6 +308,8 @@
       settings,
     });
     emitPanel('state', publicState());
+    // Sama seperti background sungguhan: overlay di halaman diberi tahu sesi mulai.
+    emitContent('session', { active: true, config, cacheCues: [], cacheMaxTime: 0 });
     return { ok: true };
   }
 
@@ -238,6 +378,7 @@
         if (labSession.active && data) {
           labSession.config = { ...labSession.config, ...data };
           emitOffscreen('update-config', { config: labSession.config });
+          emitContent('config', { config: labSession.config });
         }
         return { ok: true };
 
@@ -259,6 +400,7 @@
       case 'subtitle': {
         const d = data || {};
         emitPanel('subtitle', d);
+        emitContent('subtitle', d);
         if (labSession.active && d.final && d.t0 != null) {
           const line = {
             t0: d.t0,
@@ -273,6 +415,7 @@
 
       case 'pipeline-status':
         emitPanel('pipeline-status', data);
+        emitContent('pipeline-status', data);
         return { ok: true };
 
       case 'pipeline-error':
@@ -294,14 +437,18 @@
         emitPanel(type, data);
         return { ok: true };
 
-      case 'native-helper-status':
+      case 'native-helper-status': {
+        // Konsisten dengan pembungkus fetch: mode 'fixture' berarti helper "hidup".
+        const online = labMock.helper.mode === 'fixture';
         return {
-          ok: false,
-          online: false,
+          ok: online,
+          online,
           nativeMessaging: false,
-          health: null,
+          health: online ? labMock.helper.health : null,
+          engine_label: online ? labMock.helper.health.engine_label || labMock.helper.health.engine : null,
           url: (await getSettings()).nativeUrl || 'http://127.0.0.1:17865',
         };
+      }
 
       default:
         console.log('[chrome-mock] sendMessage', msg);
@@ -335,23 +482,60 @@
       getURL: (p) => '/dist/' + String(p || '').replace(/^\//, ''),
       // Intentionally omitted: connectNative — nativeHostSupported() stays false in a tab.
     },
+    // Backed by localStorage, one entry per key, JSON-encoded — NOT a plain
+    // object. The lab has two surfaces that must share one store: app.html
+    // (which sees this mock, so notes-store picks its chrome.storage.local
+    // backend) and /dist/minutes.html (no mock, so notes-store falls back to
+    // localStorage). Keeping the mock in memory gave them separate stores:
+    // "Open minutes register" always landed on an empty register, and a
+    // captured meeting vanished on reload. Same key names as the localStorage
+    // backend, so both read and write the same bytes.
     storage: {
       local: {
         get: async (keys) => {
           const out = {};
           const arr = Array.isArray(keys) ? keys : typeof keys === 'string' ? [keys] : Object.keys(keys || {});
-          for (const k of arr) if (store[k] != null) out[k] = store[k];
+          for (const k of arr) {
+            const persisted = readPersisted(k);
+            const v = persisted === undefined ? store[k] : persisted;
+            if (v != null) out[k] = v;
+          }
           return out;
         },
-        set: async (obj) => Object.assign(store, obj),
+        set: async (obj) => {
+          const changes = {};
+          for (const [k, v] of Object.entries(obj)) {
+            const persisted = readPersisted(k);
+            const oldValue = persisted === undefined ? store[k] : persisted;
+            changes[k] = { oldValue, newValue: v };
+          }
+          Object.assign(store, obj);
+          for (const [k, v] of Object.entries(obj)) writePersisted(k, v);
+          emitStorage(changes);
+        },
         remove: async (keys) => {
           const arr = Array.isArray(keys) ? keys : [keys];
-          for (const k of arr) delete store[k];
+          const changes = {};
+          for (const k of arr) {
+            const persisted = readPersisted(k);
+            const oldValue = persisted === undefined ? store[k] : persisted;
+            changes[k] = { oldValue, newValue: undefined };
+            delete store[k];
+            try {
+              localStorage.removeItem(k);
+            } catch {
+              /* private mode — the in-memory tier still dropped it */
+            }
+          }
+          emitStorage(changes);
         },
       },
       onChanged: {
-        addListener: () => {},
-        removeListener: () => {},
+        addListener: (f) => storageListeners.push(f),
+        removeListener: (f) => {
+          const i = storageListeners.indexOf(f);
+          if (i >= 0) storageListeners.splice(i, 1);
+        },
       },
     },
     tabs: {
@@ -365,7 +549,11 @@
       ],
       onActivated: { addListener: () => {} },
       onUpdated: { addListener: () => {} },
-      sendMessage: async () => {},
+      // Jalur background → overlay di ekstensi sungguhan. Di lab, overlay ada
+      // di halaman yang sama, jadi pesannya diteruskan ke listener sehalaman.
+      sendMessage: async (_tabId, msg) => {
+        if (msg && msg.target === 'content') emitContent(msg.type, msg.data);
+      },
     },
     tabCapture: {
       getMediaStreamId: async () => {

@@ -300,6 +300,11 @@ class LabHandler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # Never cache: this server exists to show the CURRENT build. Without
+        # this the handler sends only Last-Modified, so browsers heuristically
+        # cache /dist/*.js and /chrome-mock.js and keep serving a stale copy
+        # after a rebuild — the page looks unchanged and the edit appears lost.
+        self.send_header("Cache-Control", "no-store, max-age=0")
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -319,6 +324,13 @@ class LabHandler(SimpleHTTPRequestHandler):
             return self._serve_under(ROOT / "dist", parsed.path[len("/dist") :].lstrip("/"))
         if parsed.path == "/src" or parsed.path.startswith("/src/"):
             return self._serve_under(ROOT / "src", parsed.path[len("/src") :].lstrip("/"))
+        # Panduan pengguna hidup di docs/ dan dibaca guide.html lewat fetch,
+        # supaya dokumen dan halaman yang menampilkannya tidak pernah menyimpang.
+        if parsed.path == "/docs" or parsed.path.startswith("/docs/"):
+            return self._serve_under(ROOT / "docs", parsed.path[len("/docs") :].lstrip("/"))
+        # Panduan pengguna menautkan native/SETUP.md; tanpa rute ini tautannya 404.
+        if parsed.path == "/native" or parsed.path.startswith("/native/"):
+            return self._serve_under(ROOT / "native", parsed.path[len("/native") :].lstrip("/"))
         return super().do_GET()
 
     def _serve_under(self, base: Path, rel: str):

@@ -20,7 +20,7 @@ function usable(code) {
  * @param {string} tgtLang        current "To (translation)" language
  * @returns {{mode: 'simultaneous'|'consecutive', a: string, b: string}}
  */
-export function normalizeInterpreter(settings, srcLang = 'ja', tgtLang = 'en') {
+export function normalizeInterpreter(settings, srcLang = 'zh', tgtLang = 'en') {
   const raw = settings && typeof settings === 'object' ? settings.interpreter : null;
   const mode = raw && raw.mode === 'consecutive' ? 'consecutive' : 'simultaneous';
   // 'auto' (and '') never survive into the record — a stale 'auto' would come

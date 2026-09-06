@@ -5,7 +5,7 @@ import { MicVAD, NonRealTimeVAD } from '@ricky0123/vad-web';
 import { makeTranslator } from './lib/translate.js';
 import { isHallucination } from './lib/registry.js';
 import { sourceText, needsTranslation, lineDirection } from './lib/translation-utils.js';
-import { nativeDraft, nativeHealth, nativeTranscribeFile } from './lib/native.js';
+import { nativeDraft, nativeHealth, nativeTranscribeFile, nativeTranscribeFileJob } from './lib/native.js';
 import { detectLanguage } from './lib/lang-detect.js';
 import { isConsecutive, interpreterPairs } from './lib/interpreter.js';
 import {
@@ -30,6 +30,38 @@ let curSettings = {};
 
 function engineOpts() {
   return { engine: curSettings.engine || 'browser', nativeUrl: curSettings.nativeUrl };
+}
+
+// ---------------------------------------------------------------------------
+// Sampel kinerja untuk tab Performance: satu baris per tahap (asr/mt/draft/refine)
+// dengan mesin, perangkat, platform, pasangan bahasa, durasi audio, dan panjang teks.
+// Dikirim ke background (disimpan + diteruskan ke panel). Tidak pernah melempar.
+function perfPlatform() {
+  const p = (navigator.userAgentData?.platform || navigator.platform || '').toLowerCase();
+  if (p.includes('mac')) return 'macos';
+  if (p.includes('win')) return 'windows';
+  if (p.includes('linux')) return 'linux';
+  return 'unknown';
+}
+function perfSample(stage, ms, extra = {}) {
+  try {
+    const engine = curSettings.engine || 'browser';
+    const device = extra.device || (engine === 'native' ? 'native' : String(curSettings.device || 'wasm'));
+    toBG('perf-sample', {
+      at: new Date().toISOString(),
+      stage,
+      ms: Math.round(ms),
+      engine,
+      device,
+      platform: perfPlatform(),
+      src: extra.src || rt?.config?.srcLang || null,
+      tgt: extra.tgt || rt?.config?.tgtLang || null,
+      audioSec: extra.audioSec ?? null,
+      chars: extra.chars ?? null,
+      mode: extra.mode || 'realtime',
+      source: 'session',
+    });
+  } catch { /* telemetri lokal tidak boleh mengganggu pipeline */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -216,9 +248,11 @@ async function runPartialRefine() {
 
     if (useNativeDraft) {
       try {
+        const tDraft = performance.now();
         const draft = await nativeDraft(curSettings.nativeUrl, audio, srcLang, tgtLang, {
           language: srcLang,
         });
+        perfSample('draft', performance.now() - tDraft, { device: 'native', audioSec: audio.length / 16000, chars: (draft?.source || '').length });
         if (draft?.source) {
           text = draft.source;
           translation = draft.translation || '';
@@ -229,12 +263,16 @@ async function runPartialRefine() {
     }
 
     if (!text) {
+      const tAsr = performance.now();
       text = await transcribe(audio, { language: srcLang, task: 'transcribe' });
+      perfSample('asr-partial', performance.now() - tAsr, { audioSec: audio.length / 16000, chars: (text || '').length });
       if (!text || isHallucination(text)) return;
       if (text === rt.partialDraft.source && rt.partialDraft.translation) return;
 
       const translateFn = t.translateFast || t.translate;
+      const tMt = performance.now();
       translation = await translateFn(text);
+      perfSample('mt-partial', performance.now() - tMt, { chars: text.length, device: t.kind === 'chrome-translator' ? 'chrome-translator' : undefined });
     } else if (isHallucination(text)) {
       return;
     }
@@ -486,7 +524,9 @@ async function processUtterance({ audio, draft = null }) {
     }
 
     if (t && t.kind === 'whisper-direct') {
+      const tWd = performance.now();
       const en = await transcribe(audio, { language: srcLang, task: 'translate' });
+      perfSample('asr', performance.now() - tWd, { audioSec: audio.length / 16000, chars: (en || '').length });
       if (isHallucination(en)) return;
       toBG('subtitle', {
         final: true,
@@ -500,16 +540,22 @@ async function processUtterance({ audio, draft = null }) {
       return;
     }
 
+    const tAsr = performance.now();
     const text = await transcribe(audio, { language: srcLang, task: 'transcribe' });
+    perfSample('asr', performance.now() - tAsr, { audioSec: audio.length / 16000, chars: (text || '').length });
     if (isHallucination(text)) return;
 
     let translation = '';
     if (taskMode === 'translate' && t && t.kind !== 'none') {
       const draftText = draft?.translation || '';
+      const tMt = performance.now();
+      const mtDevice = t.kind === 'chrome-translator' ? 'chrome-translator' : undefined;
       if (refineTranslation && draftText && typeof t.refine === 'function') {
         translation = await t.refine(text, draftText);
+        perfSample('refine', performance.now() - tMt, { chars: text.length, device: mtDevice });
       } else {
         translation = await t.translate(text);
+        perfSample('mt', performance.now() - tMt, { chars: text.length, device: mtDevice });
       }
       if (!translation) console.warn('translation empty for:', text.slice(0, 80));
     }
@@ -604,7 +650,7 @@ async function stopCapture() {
 
 // ---------------------------------------------------------------------------
 // Offline file job
-const off = { running: false, cancelled: false };
+const off = { running: false, cancelled: false, /** @type {null | { cancel: () => Promise<void> }} */ job: null };
 
 async function decodeToMono16k(arrayBuffer) {
   const ac = new AudioContext();
@@ -636,22 +682,46 @@ async function runOfflineNativeFile({ name, size, config, settings, emit, transl
     );
   }
   if (!health.ffmpeg) {
-    throw new Error('Files over 1.5 GB need ffmpeg installed on your Mac: brew install ffmpeg');
+    throw new Error(
+      'Files over 1.5 GB need ffmpeg on the helper machine (macOS: brew install ffmpeg · Windows: winget install Gyan.FFmpeg · Linux: apt install ffmpeg), then Restart the helper.',
+    );
   }
 
-  emit('offline-progress', { stage: 'upload', pct: 3 });
   const file = await getOfflineInputFile();
   const whisperDirect = translator.kind === 'whisper-direct';
   const asrTask =
     config.taskMode === 'translate' && whisperDirect ? 'translate' : 'transcribe';
+  const lf = { name, sizeBytes: size || file.size || 0, large: true };
 
-  const segments = await nativeTranscribeFile(
-    url,
-    file,
-    name,
-    { language: config.srcLang, task: asrTask },
-    (pct) => emit('offline-progress', { stage: 'transcribe', pct: 3 + pct * 0.85 }),
-  );
+  let segments;
+  if (health.features?.transcribe_file_jobs) {
+    // Async job: upload progress (XHR), then poll /jobs/:id — cancel works mid-flight.
+    const ctl = {};
+    off.job = ctl;
+    try {
+      segments = await nativeTranscribeFileJob(
+        url,
+        file,
+        name,
+        { language: config.srcLang, task: asrTask, sizeBytes: lf.sizeBytes },
+        (p) => emit('offline-progress', { ...lf, ...p, pct: Math.round(p.pct * 0.88) }),
+        ctl,
+      );
+    } finally {
+      off.job = null;
+    }
+  } else {
+    // Old helper without job endpoints: single synchronous POST, coarse progress.
+    emit('offline-progress', { ...lf, stage: 'upload', pct: 3 });
+    segments = await nativeTranscribeFile(
+      url,
+      file,
+      name,
+      { language: config.srcLang, task: asrTask },
+      (pct) => emit('offline-progress', { ...lf, stage: 'transcribe', pct: 3 + pct * 0.85 }),
+    );
+  }
+  if (off.cancelled) throw new Error('cancelled');
 
   const lines = [];
   const dual = !!config.dualLine;
@@ -676,7 +746,8 @@ async function runOfflineNativeFile({ name, size, config, settings, emit, transl
     lines.push(line);
     emit('offline-line', { line, idx: i + 1, total: segments.length });
     emit('offline-progress', {
-      stage: 'transcribe',
+      ...lf,
+      stage: config.taskMode === 'translate' && !whisperDirect ? 'translate' : 'finalize',
       pct: 88 + (12 * (i + 1)) / segments.length,
       idx: i + 1,
       total: segments.length,
@@ -922,6 +993,8 @@ chrome.runtime.onMessage.addListener((msg) => {
       break;
     case 'offline-cancel':
       off.cancelled = true;
+      // Large-file job on the helper: abort the upload / ask the helper to stop.
+      off.job?.cancel?.().catch(() => {});
       break;
     case 'model-download': {
       (async () => {

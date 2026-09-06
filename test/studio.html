@@ -31,12 +31,24 @@
 
       <section class="card" id="page-transcribe">
         <div class="card-head"><h2>Bangun halaman utama transkripsi</h2></div>
+        <p class="notes-meta" id="resume-note" hidden></p>
         <div id="file-picker" class="dropzone">
           <input type="file" id="studio-file" accept="audio/*,video/*" hidden />
           <div class="drop-icon">⬆️</div>
           <div>Klik atau jatuhkan audio/video</div>
           <div id="file-info" class="drop-file notes-meta"></div>
         </div>
+        <div class="lang-row" style="margin-top:10px">
+          <div class="lang-col">
+            <label class="lbl" for="studio-src">Dari (ucapan)</label>
+            <select id="studio-src" aria-label="Source speech language"></select>
+          </div>
+          <div class="lang-col">
+            <label class="lbl" for="studio-tgt">Ke (terjemahan)</label>
+            <select id="studio-tgt" aria-label="Target translation language"></select>
+          </div>
+        </div>
+        <p class="notes-meta" id="pair-note" style="margin-top:6px"></p>
         <div class="notes-status-row" style="margin-top:10px">
           <span id="engine-pill" class="notes-pill idle">Mesin: …</span>
           <span id="progress-text" class="notes-meta">0%</span>

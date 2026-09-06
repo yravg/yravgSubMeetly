@@ -1,6 +1,6 @@
 {
   "source": "release-gate",
-  "generatedAt": "2026-09-03T08:05:11.815Z",
+  "generatedAt": "2026-09-05T16:35:34.787Z",
   "inputs": {
     "smoke": true,
     "e2e": true,
@@ -9,15 +9,54 @@
   },
   "defects": [
     {
-      "id": "REL-01",
-      "title": "Draft native sering di atas target 500 ms",
+      "id": "E2E-e2e-file",
+      "title": "E2E gagal: E2E berkas offline + ekspor SRT/VTT/TXT",
       "severity": "high",
       "status": "accepted",
       "mustFix": false,
-      "area": "Native Helper",
-      "featureId": "ext-refine",
-      "summary": "Diterima untuk rilis CWS: helper native opsional di luar zip store; target 500 ms tetap dilacak di bench.",
-      "evidence": "test/last-smoke.json · test/BENCH-COMPARE.md · store ship policy",
+      "area": "E2E",
+      "featureId": "ext-offline-file",
+      "summary": "Diterima untuk rilis CWS: kontrak e2e-file lulus; jalur Puppeteer --browser opsional dan gagal dengan gejala CDP yang sama.",
+      "evidence": "scripts/e2e-file.mjs --browser · test/last-e2e.json · HANDOFF.md",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    },
+    {
+      "id": "E2E-e2e-file-e2e-file-fatal",
+      "title": "E2E check gagal: Jalankan e2e-file",
+      "severity": "high",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "E2E",
+      "featureId": "e2e-file",
+      "summary": "Diterima untuk rilis CWS: sub-check dari suite --browser yang diterima di atas.",
+      "evidence": "test/last-e2e.json · e2e-file",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    },
+    {
+      "id": "E2E-e2e-native",
+      "title": "E2E gagal: E2E mesin native helper (--native)",
+      "severity": "high",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "E2E",
+      "featureId": "helper-asr",
+      "summary": "Diterima untuk rilis CWS: Native Helper bukan artefak Web Store; renderer panel tak merespons CDP saat --native — dilacak terpisah.",
+      "evidence": "scripts/e2e.mjs --native · test/last-e2e.json · HANDOFF.md",
+      "priority": "wontfix-documented",
+      "releaseGate": false
+    },
+    {
+      "id": "E2E-e2e-native-e2e-fatal",
+      "title": "E2E check gagal: Jalankan E2E",
+      "severity": "high",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "E2E",
+      "featureId": "e2e-native",
+      "summary": "Diterima untuk rilis CWS: sub-check dari suite --native yang diterima di atas.",
+      "evidence": "test/last-e2e.json · e2e-native",
       "priority": "wontfix-documented",
       "releaseGate": false
     },
@@ -84,6 +123,19 @@
       "summary": "Lambat di WASM; lebih masuk akal di WebGPU. Angka stub.",
       "evidence": "test/last-models-bench.json · test/BENCH-COMPARE.md",
       "priority": "track",
+      "releaseGate": false
+    },
+    {
+      "id": "REL-01",
+      "title": "Draft native sering di atas target 500 ms",
+      "severity": "medium",
+      "status": "accepted",
+      "mustFix": false,
+      "area": "Native Helper",
+      "featureId": "ext-refine",
+      "summary": "Diterima untuk rilis CWS: helper native opsional di luar zip store; target 500 ms tetap dilacak di bench.",
+      "evidence": "test/last-smoke.json · test/BENCH-COMPARE.md · store ship policy",
+      "priority": "wontfix-documented",
       "releaseGate": false
     },
     {
@@ -192,7 +244,11 @@
       "REL-01",
       "REL-02",
       "REL-03",
-      "REL-04"
+      "REL-04",
+      "E2E-e2e-native",
+      "E2E-e2e-native-e2e-fatal",
+      "E2E-e2e-file",
+      "E2E-e2e-file-e2e-file-fatal"
     ],
     "storeShipContext": {
       "smokeOk": true,

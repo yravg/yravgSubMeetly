@@ -1,6 +1,6 @@
 # Gerbang rilis — Chrome Web Store 1.1
 
-Dibuat oleh `scripts/mark-release-priorities.mjs` pada 2026-09-03T08:05:11.815Z.
+Dibuat oleh `scripts/mark-release-priorities.mjs` pada 2026-09-05T16:35:34.787Z.
 
 **Status: LOLOS GERBANG** — tidak ada cacat wajib terbuka untuk ship CWS.
 
@@ -8,9 +8,9 @@ Dibuat oleh `scripts/mark-release-priorities.mjs` pada 2026-09-03T08:05:11.815Z.
 
 | Metrik | Nilai |
 |--------|------:|
-| Total cacat | 13 |
+| Total cacat | 17 |
 | Wajib terbuka | 0 |
-| Open / Accepted / Fixed | 2 / 10 / 1 |
+| Open / Accepted / Fixed | 2 / 14 / 1 |
 
 ## Wajib sebelum rilis
 
@@ -20,10 +20,14 @@ _Tidak ada._
 
 | ID | Ringkasan |
 |----|-----------|
-| REL-01 | Diterima untuk rilis CWS: helper native opsional di luar zip store; target 500 ms tetap dilacak di bench. |
+| E2E-e2e-file | Diterima untuk rilis CWS: kontrak e2e-file lulus; jalur Puppeteer --browser opsional dan gagal dengan gejala CDP yang sama. |
+| E2E-e2e-file-e2e-file-fatal | Diterima untuk rilis CWS: sub-check dari suite --browser yang diterima di atas. |
+| E2E-e2e-native | Diterima untuk rilis CWS: Native Helper bukan artefak Web Store; renderer panel tak merespons CDP saat --native — dilacak terpisah. |
+| E2E-e2e-native-e2e-fatal | Diterima untuk rilis CWS: sub-check dari suite --native yang diterima di atas. |
 | REL-02 | Diterima untuk rilis CWS: harness E2E lulus; --pick headed tetap residual manual sebelum demos besar. |
 | REL-03 | Diterima untuk rilis CWS: Native Helper bukan artefak Web Store; verifikasi --native residual platform. |
 | REL-04 | Diterima untuk rilis CWS: kontrak e2e-file lulus; jalur Puppeteer --browser residual opsional. |
+| REL-01 | Diterima untuk rilis CWS: helper native opsional di luar zip store; target 500 ms tetap dilacak di bench. |
 
 ## Kebijakan
 

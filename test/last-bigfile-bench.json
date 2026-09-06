@@ -1,0 +1,68 @@
+{
+  "source": "bench-bigfile",
+  "generatedAt": "2026-09-05T07:18:06.750Z",
+  "platform": "darwin/arm64",
+  "status": "pass",
+  "command": "node scripts/bench-bigfile.mjs --size-gib 2.5",
+  "measures": {
+    "big": {
+      "audio_seconds": 15218,
+      "windows": 51,
+      "max_window_samples": 4832000,
+      "chunk_sec": 300,
+      "overlap_sec": 2,
+      "elapsed_s": 12.374426126480103,
+      "peak_rss_mb": 108.203125,
+      "file_bytes": 2684455278,
+      "gib": 2.50009380094707,
+      "mibPerSec": 206.88604271445251,
+      "xRealtime": 1229.7944037529885
+    },
+    "baseline": {
+      "audio_seconds": 914,
+      "windows": 4,
+      "max_window_samples": 4832000,
+      "chunk_sec": 300,
+      "overlap_sec": 2,
+      "elapsed_s": 0.8128910064697266,
+      "peak_rss_mb": 109.859375,
+      "file_bytes": 161229678,
+      "gib": 0.15015683881938457
+    },
+    "sizeRatio": 16.64988301967582,
+    "rssRatio": 0.9849239084056322,
+    "upload": {
+      "bytesReceived": 2684455278,
+      "seconds": 3.096,
+      "streaming": true
+    }
+  },
+  "checks": [
+    {
+      "id": "over-2gib",
+      "status": "pass",
+      "detail": "2.50 GiB"
+    },
+    {
+      "id": "memori-datar",
+      "status": "pass",
+      "detail": "berkas 17× lebih besar, puncak RSS hanya 0.98× (108 MB vs 110 MB)"
+    },
+    {
+      "id": "jendela-dibatasi",
+      "status": "pass",
+      "detail": "jendela terbesar 4832000 sampel ≤ batas 4832000"
+    },
+    {
+      "id": "berkas-habis-dibaca",
+      "status": "pass",
+      "detail": "100.0% durasi terbaca"
+    },
+    {
+      "id": "unggah-2gib",
+      "status": "pass",
+      "detail": "helper menerima 2684455278 byte dari 2684455278 (2.50 GiB, 3.1 dtk, 827 MiB/dtk)"
+    }
+  ],
+  "notMeasured": "wall-clock ASR seluruh berkas (±4 jam audio); yang diukur adalah I/O dan memori jalur streaming"
+}

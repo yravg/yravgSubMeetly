@@ -6,10 +6,14 @@ import TransSubKit
 struct MainView: View {
     @ObservedObject var app: AppController
     @ObservedObject var ui: UIState
+    @ObservedObject var prefs: PrefsBridge
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var scheme
 
     init(app: AppController) {
         self.app = app
         self.ui = app.ui
+        self.prefs = PrefsBridge.shared
     }
 
     var body: some View {
@@ -32,17 +36,73 @@ struct MainView: View {
 
             Divider()
 
-            if ui.tab == 0 {
-                LiveView(app: app)
-            } else if ui.tab == 1 {
-                FileView(model: app.fileModel)
-            } else {
-                NotesView()
+            Group {
+                if ui.tab == 0 {
+                    LiveView(app: app)
+                } else if ui.tab == 1 {
+                    FileView(model: app.fileModel)
+                } else {
+                    NotesView(vm: app.notesUI)
+                }
             }
+            .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+            BottomStatusBar(app: app)
         }
         .frame(minWidth: 480, minHeight: 560)
-        .tint(Brand.teal)
+        .tint(Brand.reskinAccent(prefs.reskin, scheme))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: ui.tab)
         .languagePackHost(app.packInstaller)
+    }
+}
+
+/// Bilah status bawah yang kontekstual: mengikuti tab aktif (atas) sehingga
+/// jendela punya navigasi atas–bawah yang selaras. Murni SwiftUI asli.
+struct BottomStatusBar: View {
+    @ObservedObject var app: AppController
+    @ObservedObject var ui: UIState
+
+    init(app: AppController) {
+        self.app = app
+        self.ui = app.ui
+    }
+
+    var body: some View {
+        Divider()
+        HStack(spacing: 8) {
+            if ui.tab == 0 {
+                if app.session.isRunning {
+                    Circle().fill(.red).frame(width: 7, height: 7)
+                    Text("Listening · \(app.session.lines.count) lines")
+                } else {
+                    Circle().fill(.secondary).frame(width: 7, height: 7)
+                    Text(app.session.lines.isEmpty
+                         ? "Idle"
+                         : "Stopped · \(app.session.lines.count) lines")
+                }
+            } else if ui.tab == 1 {
+                if app.fileModel.busy {
+                    ProgressView().controlSize(.small)
+                    Text(app.fileModel.status.isEmpty ? "Working…" : app.fileModel.status)
+                } else {
+                    Text(app.fileModel.lines.isEmpty
+                         ? "No file transcribed yet"
+                         : "\(app.fileModel.lines.count) lines")
+                }
+            } else {
+                Circle()
+                    .fill(app.session.isRunning ? .red : .secondary)
+                    .frame(width: 7, height: 7)
+                Text(app.session.isRunning ? "Recording — notes capture live" : "Meeting notes")
+            }
+            Spacer()
+            Text("100% local · on-device")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -79,7 +139,7 @@ struct LiveView: View {
                     }
                 }
 
-                GroupBox("Audio source") {
+                GroupBox("Source") {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("Capture", selection: Binding(
                             get: { app.selectedTarget.id },
@@ -101,7 +161,7 @@ struct LiveView: View {
                     .padding(6)
                 }
 
-                GroupBox("Languages") {
+                GroupBox("Task & languages") {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("Spoken", selection: $prefs.sourceLocale) {
                             ForEach(Languages.sources) { Text($0.name).tag($0.id) }
@@ -117,63 +177,72 @@ struct LiveView: View {
                     .padding(6)
                 }
 
-                HStack {
-                    Button(session.isRunning ? "Stop" : "Start subtitles") { app.toggle() }
-                        .keyboardShortcut(.defaultAction)
-                        .buttonStyle(.borderedProminent)
-                        .tint(session.isRunning ? .red : Brand.teal)
-                        .disabled(!app.hasScreenPermission)
-                    if !session.lines.isEmpty {
-                        Menu("Export") {
-                            ForEach(SubtitleFormat.allCases, id: \.self) { f in
-                                Button(f.rawValue.uppercased()) { session.export(as: f) }
+                GroupBox("Actions & preview") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Button(session.isRunning ? "Stop" : "Start subtitles") { app.toggle() }
+                                .keyboardShortcut(.defaultAction)
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+                                .tint(session.isRunning ? .red : Brand.teal)
+                                .disabled(!app.hasScreenPermission)
+                            if !session.lines.isEmpty {
+                                Menu("Export") {
+                                    ForEach(SubtitleFormat.allCases, id: \.self) { f in
+                                        Button(f.rawValue.uppercased()) { session.export(as: f) }
+                                    }
+                                }
+                                .frame(width: 110)
+                                .controlSize(.large)
+                            }
+                            Spacer()
+                            if session.isRunning {
+                                HStack(spacing: 6) {
+                                    Circle().fill(.red).frame(width: 8, height: 8)
+                                    Text("Listening").font(.caption)
+                                }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("Listening — subtitles active")
                             }
                         }
-                        .frame(width: 110)
-                    }
-                    Spacer()
-                    if session.isRunning {
-                        HStack(spacing: 6) {
-                            Circle().fill(Brand.teal).frame(width: 8, height: 8)
-                            Text("Listening").font(.caption)
-                        }
-                    }
-                }
 
-                if !session.statusText.isEmpty {
-                    Text(session.statusText).font(.caption).foregroundStyle(.secondary)
-                }
-                if !session.translationNote.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(session.translationNote)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                        // The low-latency model is a separate download and is
-                        // the only way to reach ~0.1-0.2 s per line.
-                        if session.translationNote.contains("low-latency") {
-                            HStack(spacing: 8) {
-                                Button(app.packInstaller.busy
-                                       ? "Requesting…" : "Install fast model") {
-                                    app.packInstaller.install(
-                                        from: Languages.baseCode(prefs.sourceLocale),
-                                        to: prefs.targetLanguage)
-                                }
-                                .disabled(app.packInstaller.busy)
-                                if !app.packInstaller.status.isEmpty {
-                                    Text(app.packInstaller.status)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                        if !session.statusText.isEmpty {
+                            Text(session.statusText).font(.caption).foregroundStyle(.secondary)
+                        }
+                        if !session.translationNote.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(session.translationNote)
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                // The low-latency model is a separate download and is
+                                // the only way to reach ~0.1-0.2 s per line.
+                                if session.translationNote.contains("low-latency") {
+                                    HStack(spacing: 8) {
+                                        Button(app.packInstaller.busy
+                                               ? "Requesting…" : "Install fast model") {
+                                            app.packInstaller.install(
+                                                from: Languages.baseCode(prefs.sourceLocale),
+                                                to: prefs.targetLanguage)
+                                        }
+                                        .disabled(app.packInstaller.busy)
+                                        if !app.packInstaller.status.isEmpty {
+                                            Text(app.packInstaller.status)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
                                 }
                             }
                         }
+                        if !session.errorText.isEmpty {
+                            Banner(text: session.errorText, action: "Open Settings", tint: .red) {
+                                NSWorkspace.shared.open(
+                                    URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!)
+                            }
+                        }
                     }
-                }
-                if !session.errorText.isEmpty {
-                    Banner(text: session.errorText, action: "Open Settings", tint: .red) {
-                        NSWorkspace.shared.open(
-                            URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!)
-                    }
+                    .padding(6)
                 }
 
                 if !session.lines.isEmpty {
@@ -226,41 +295,57 @@ struct FileView: View {
                     .padding(18)
                 }
 
-                Picker("Spoken language", selection: $prefs.sourceLocale) {
-                    ForEach(Languages.sources) { Text($0.name).tag($0.id) }
+                GroupBox("Task & languages") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Picker("Spoken language", selection: $prefs.sourceLocale) {
+                            ForEach(Languages.sources) { Text($0.name).tag($0.id) }
+                        }
+                        Toggle("Translate", isOn: $prefs.translateEnabled)
+                        Picker("Into", selection: $prefs.targetLanguage) {
+                            ForEach(Languages.targets) { Text($0.name).tag($0.id) }
+                        }
+                        .disabled(!prefs.translateEnabled)
+                    }
+                    .padding(6)
                 }
-                Toggle("Translate", isOn: $prefs.translateEnabled)
-                Picker("Into", selection: $prefs.targetLanguage) {
-                    ForEach(Languages.targets) { Text($0.name).tag($0.id) }
-                }
-                .disabled(!prefs.translateEnabled)
 
-                HStack {
-                    Button("Transcribe") { Task { await model.transcribe() } }
-                        .disabled(model.url == nil || model.busy)
-                        .keyboardShortcut(.defaultAction)
-                        .buttonStyle(.borderedProminent)
-                        .tint(Brand.teal)
-                    if !model.lines.isEmpty {
-                        Menu("Export") {
-                            ForEach(SubtitleFormat.allCases, id: \.self) { f in
-                                Button(f.rawValue.uppercased()) { model.export(f) }
+                GroupBox("Actions & results") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Button("Transcribe") { Task { await model.transcribe() } }
+                                .disabled(model.url == nil || model.busy)
+                                .keyboardShortcut(.defaultAction)
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+                                .tint(Brand.teal)
+                            if !model.lines.isEmpty {
+                                Menu("Export") {
+                                    ForEach(SubtitleFormat.allCases, id: \.self) { f in
+                                        Button(f.rawValue.uppercased()) { model.export(f) }
+                                    }
+                                }
+                                .frame(width: 110)
+                                .controlSize(.large)
+                            }
+                            Spacer()
+                            if model.busy {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .accessibilityLabel("Transcribing file")
                             }
                         }
-                        .frame(width: 110)
-                    }
-                    Spacer()
-                    if model.busy { ProgressView().controlSize(.small) }
-                }
 
-                if !model.status.isEmpty {
-                    Text(model.status).font(.caption).foregroundStyle(.secondary)
-                }
-                if !model.error.isEmpty {
-                    Text(model.error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                        if !model.status.isEmpty {
+                            Text(model.status).font(.caption).foregroundStyle(.secondary)
+                        }
+                        if !model.error.isEmpty {
+                            Text(model.error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(6)
                 }
 
                 if !model.lines.isEmpty {

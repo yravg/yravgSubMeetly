@@ -1,6 +1,6 @@
 {
   "source": "catalog+last-bench",
-  "generatedAt": "2026-09-03T03:54:02.026Z",
+  "generatedAt": "2026-09-05T14:49:41.418Z",
   "targetDraftMs": 500,
   "models": [
     {
@@ -87,147 +87,273 @@
       "engine": "native",
       "device": "Apple GPU (MLX)",
       "size": "~1.6 GB",
-      "draftMs": 520,
-      "asrMs": 410,
-      "mtMs": 664,
+      "draftMs": 62,
+      "asrMs": 288,
+      "mtMs": 377,
       "rtf": 0.05,
-      "status": "warn",
-      "note": "Draft terbaik 520 ms · ≤500 ms: 0/16 · dari last-bench.json"
+      "status": "pass",
+      "note": "Draft terbaik 62 ms · ≤500 ms: 111/200 · dari last-bench.json"
     }
   ],
   "live": [],
   "nativeRows": [
     {
-      "pair": "zh→en",
-      "stage": "draft 0.35s",
-      "ms": 566,
-      "asr_ms": 82,
-      "translate_ms": 484,
-      "source": "今天",
-      "translation": "Today",
-      "pass": false
-    },
-    {
-      "pair": "zh→en",
-      "stage": "draft 0.5s",
-      "ms": 557,
-      "asr_ms": 95,
-      "translate_ms": 462,
-      "source": "今天",
-      "translation": "Today",
-      "pass": false
-    },
-    {
-      "pair": "zh→en",
-      "stage": "draft 1.0s",
-      "ms": 1101,
-      "asr_ms": 190,
-      "translate_ms": 910,
-      "source": "今天天气",
-      "translation": "Today's weather is.",
-      "pass": false
-    },
-    {
-      "pair": "zh→en",
-      "stage": "draft 2.0s",
-      "ms": 1140,
-      "asr_ms": 189,
-      "translate_ms": 951,
-      "source": "今天天氣很好,我們",
-      "translation": "Today the weather is good, we.",
-      "pass": false
-    },
-    {
-      "pair": "zh→en",
-      "stage": "final ASR",
-      "ms": 5550,
-      "source": "今天天气很好,我们去公园散步吧。",
-      "pass": true
-    },
-    {
-      "pair": "zh→en",
-      "stage": "fast MT",
-      "ms": 1951,
-      "source": "今天天气很好，我们去公园散步吧。",
-      "translation": "The weather is nice today, let's go for a walk in the park.",
-      "pass": true
-    },
-    {
-      "pair": "zh→en",
-      "stage": "refine",
-      "ms": 986,
-      "source": "今天天气很好，我们去公园散步吧。",
-      "translation": "The weather is nice today, let's go for a walk in the park.",
-      "pass": true
-    },
-    {
       "pair": "en→zh",
       "stage": "draft 0.35s",
-      "ms": 3726,
-      "asr_ms": 2811,
-      "translate_ms": 915,
-      "source": "the weather.",
-      "translation": "天气。",
-      "pass": false
+      "ms": 335,
+      "asr_ms": 65,
+      "translate_ms": 270,
+      "source": "the",
+      "translation": "这是什么",
+      "pass": true
     },
     {
       "pair": "en→zh",
       "stage": "draft 0.5s",
-      "ms": 605,
-      "asr_ms": 94,
-      "translate_ms": 510,
-      "source": "the weather is",
-      "translation": "天气是",
-      "pass": false
+      "ms": 394,
+      "asr_ms": 75,
+      "translate_ms": 318,
+      "source": "the approve.",
+      "translation": "它已获批准。",
+      "pass": true
     },
     {
       "pair": "en→zh",
       "stage": "draft 1.0s",
-      "ms": 661,
-      "asr_ms": 108,
-      "translate_ms": 553,
-      "source": "The weather is nice today.",
-      "translation": "今天的天气很好。",
-      "pass": false
+      "ms": 439,
+      "asr_ms": 73,
+      "translate_ms": 365,
+      "source": "the approval of the",
+      "translation": "the approval of the",
+      "pass": true
     },
     {
       "pair": "en→zh",
       "stage": "draft 2.0s",
-      "ms": 828,
-      "asr_ms": 138,
-      "translate_ms": 689,
-      "source": "The weather is nice today, let's go!",
-      "translation": "天气今天很好，一起去吧！",
-      "pass": false
+      "ms": 446,
+      "asr_ms": 79,
+      "translate_ms": 366,
+      "source": "the approval of the administration.",
+      "translation": "行政的批准。",
+      "pass": true
     },
     {
       "pair": "en→zh",
       "stage": "final ASR",
-      "ms": 2503,
-      "source": "The weather is nice today, let's go for a walk in the park.",
+      "ms": 2794,
+      "source": "the approval of the administration and be finally ratified by the senate it was naturally supposed by the army that there would be no more fighting and officers and men were of course anxious to get home but knowing there must be delay they contended",
       "pass": true
     },
     {
       "pair": "en→zh",
       "stage": "fast MT",
-      "ms": 1919,
-      "source": "The weather is nice today. Let's go for a walk in the park.",
-      "translation": "天气今天很好，去公园散步如何。",
+      "ms": 1222,
+      "source": "the approval of the administration and be finally ratified by the senate it was naturally supposed by the army that there would be no more fighting and officers and men were of course anxious to get home but knowing there must be delay they contended",
+      "translation": "The administration's approval and final ratification by the Senate naturally supposed by the army.",
       "pass": true
     },
     {
       "pair": "en→zh",
       "stage": "refine",
-      "ms": 933,
-      "source": "The weather is nice today. Let's go for a walk in the park.",
-      "translation": "天气今天很好，一起去公园散步如何。",
+      "ms": 1094,
+      "source": "the approval of the administration and be finally ratified by the senate it was naturally supposed by the army that there would be no more fighting and officers and men were of course anxious to get home but knowing there must be delay they contended",
+      "translation": "The administration's approval and final ratification by the Senate naturally supposed by the army that there would be no more fighting, and officers and men were anxious to get home, knowing there must be a delay.",
+      "pass": true
+    },
+    {
+      "pair": "en→de",
+      "stage": "draft 0.35s",
+      "ms": 898,
+      "asr_ms": 593,
+      "translate_ms": 305,
+      "source": "Okay.",
+      "translation": "Okay.",
+      "pass": false
+    },
+    {
+      "pair": "en→de",
+      "stage": "draft 0.5s",
+      "ms": 375,
+      "asr_ms": 72,
+      "translate_ms": 302,
+      "source": "Okay.",
+      "translation": "Okay.",
+      "pass": true
+    },
+    {
+      "pair": "en→de",
+      "stage": "draft 1.0s",
+      "ms": 387,
+      "asr_ms": 81,
+      "translate_ms": 305,
+      "source": "Okay. One.",
+      "translation": "Okay. Eins.",
+      "pass": true
+    },
+    {
+      "pair": "en→de",
+      "stage": "draft 2.0s",
+      "ms": 364,
+      "asr_ms": 69,
+      "translate_ms": 294,
+      "source": "one connecting",
+      "translation": "ein联接",
+      "pass": true
+    },
+    {
+      "pair": "en→de",
+      "stage": "final ASR",
+      "ms": 1571,
+      "source": "one connecting memphis and the mississippi river with the east and the other leading south to all the cotton states still another railroad connects corinth with jackson in west tennessee if we obtained possession of corinth the enemy would have",
+      "pass": true
+    },
+    {
+      "pair": "en→de",
+      "stage": "fast MT",
+      "ms": 703,
+      "source": "one connecting memphis and the mississippi river with the east and the other leading south to all the cotton states still another railroad connects corinth with jackson in west tennessee if we obtained possession of corinth the enemy would have",
+      "translation": "One connecting Memphis and the Mississippi River with the east, and the other leading south to all the cotton states.",
+      "pass": true
+    },
+    {
+      "pair": "en→de",
+      "stage": "refine",
+      "ms": 988,
+      "source": "one connecting memphis and the mississippi river with the east and the other leading south to all the cotton states still another railroad connects corinth with jackson in west tennessee if we obtained possession of corinth the enemy would have",
+      "translation": "One connects Memphis and the Mississippi River with the east, and the other leads south to all the cotton states. If we captured Corinth, the enemy would.",
+      "pass": true
+    },
+    {
+      "pair": "en→fr",
+      "stage": "draft 0.35s",
+      "ms": 568,
+      "asr_ms": 568,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "en→fr",
+      "stage": "draft 0.5s",
+      "ms": 356,
+      "asr_ms": 61,
+      "translate_ms": 295,
+      "source": "And",
+      "translation": "Et",
+      "pass": true
+    },
+    {
+      "pair": "en→fr",
+      "stage": "draft 1.0s",
+      "ms": 395,
+      "asr_ms": 70,
+      "translate_ms": 325,
+      "source": "NM video",
+      "translation": "Pas de vidéo NM.",
+      "pass": true
+    },
+    {
+      "pair": "en→fr",
+      "stage": "draft 2.0s",
+      "ms": 458,
+      "asr_ms": 75,
+      "translate_ms": 383,
+      "source": "and immediately assumed",
+      "translation": "et s'est immédiatement emparé",
+      "pass": true
+    },
+    {
+      "pair": "en→fr",
+      "stage": "final ASR",
+      "ms": 1573,
+      "source": "and immediately assumed command in the field on the twenty first general pope arrived with an army of thirty thousand strong fresh from the capture of island number ten in the mississippi river he went into camp at hamburg landing five miles above",
+      "pass": true
+    },
+    {
+      "pair": "en→fr",
+      "stage": "fast MT",
+      "ms": 672,
+      "source": "and immediately assumed command in the field on the twenty first general pope arrived with an army of thirty thousand strong fresh from the capture of island number ten in the mississippi river he went into camp at hamburg landing five miles above",
+      "translation": "And immediately assumed command in the field on the twenty-first, General Pope arrived with an army of thirty thousand.",
+      "pass": true
+    },
+    {
+      "pair": "en→fr",
+      "stage": "refine",
+      "ms": 2048,
+      "source": "and immediately assumed command in the field on the twenty first general pope arrived with an army of thirty thousand strong fresh from the capture of island number ten in the mississippi river he went into camp at hamburg landing five miles above",
+      "translation": "And immediately assumed command in the field on the twenty-first. General Pope arrived with an army of thirty thousand, fresh from capturing Island Number Ten on the Mississippi River, and he went into camp at Hamburg Landing, five miles above.",
       "pass": true
     },
     {
       "pair": "ja→en",
       "stage": "draft 0.35s",
-      "ms": 1059,
-      "asr_ms": 1059,
+      "ms": 1155,
+      "asr_ms": 810,
+      "translate_ms": 345,
+      "source": "ありがとう",
+      "translation": "Thank you",
+      "pass": false
+    },
+    {
+      "pair": "ja→en",
+      "stage": "draft 0.5s",
+      "ms": 381,
+      "asr_ms": 82,
+      "translate_ms": 298,
+      "source": "とりあえず、",
+      "translation": "At least.",
+      "pass": true
+    },
+    {
+      "pair": "ja→en",
+      "stage": "draft 1.0s",
+      "ms": 408,
+      "asr_ms": 84,
+      "translate_ms": 323,
+      "source": "とりが、ブロック",
+      "translation": "The tiger is blocking.",
+      "pass": true
+    },
+    {
+      "pair": "ja→en",
+      "stage": "draft 2.0s",
+      "ms": 501,
+      "asr_ms": 91,
+      "translate_ms": 409,
+      "source": "とりがフロックを着ている",
+      "translation": "The tiger is wearing a flock vest.",
+      "pass": false
+    },
+    {
+      "pair": "ja→en",
+      "stage": "final ASR",
+      "ms": 2017,
+      "source": "一人がフロックを着ている着慣れないせいかメルトンに対して妙に遠慮する傾きがある後の者は皆和服でかつ普段着のままだからとんと正月らしくないこの連中がフロックを眺めてやあやあと一つずつ言ったみんな驚",
+      "pass": true
+    },
+    {
+      "pair": "ja→en",
+      "stage": "fast MT",
+      "ms": 913,
+      "source": "一人がフロックを着ている着慣れないせいかメルトンに対して妙に遠慮する傾きがある後の者は皆和服でかつ普段着のままだからとんと正月らしくないこの連中がフロックを眺めてやあやあと一つずつ言ったみんな驚",
+      "translation": "One is behaving awkwardly in a trench coat, showing hesitation towards the melton. The latter ones are dressed in kim",
+      "pass": true
+    },
+    {
+      "pair": "ja→en",
+      "stage": "refine",
+      "ms": 1454,
+      "source": "一人がフロックを着ている着慣れないせいかメルトンに対して妙に遠慮する傾きがある後の者は皆和服でかつ普段着のままだからとんと正月らしくないこの連中がフロックを眺めてやあやあと一つずつ言ったみんな驚",
+      "translation": "One is wearing a trench coat awkwardly, showing hesitation towards melton. The latter ones are dressed in kimono and still in everyday clothes, making them not at all like a New Year's scene. As they look at each other, one person says \"This is it,\" and another responds \"Next.\" Everyone is surprised.",
+      "pass": true
+    },
+    {
+      "pair": "ja→en",
+      "stage": "draft 0.35s",
+      "ms": 1270,
+      "asr_ms": 1270,
       "translate_ms": null,
       "source": "",
       "translation": "",
@@ -236,134 +362,2917 @@
     {
       "pair": "ja→en",
       "stage": "draft 0.5s",
-      "ms": 928,
-      "asr_ms": 114,
-      "translate_ms": 814,
-      "source": "今日は",
-      "translation": "It's today.",
-      "pass": false
+      "ms": 457,
+      "asr_ms": 75,
+      "translate_ms": 381,
+      "source": "ドキュッ",
+      "translation": "Documentary",
+      "pass": true
     },
     {
       "pair": "ja→en",
       "stage": "draft 1.0s",
-      "ms": 649,
-      "asr_ms": 93,
-      "translate_ms": 555,
-      "source": "今日は1",
-      "translation": "It's today, this day.",
+      "ms": 839,
+      "asr_ms": 839,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
       "pass": false
     },
     {
       "pair": "ja→en",
       "stage": "draft 2.0s",
-      "ms": 646,
-      "asr_ms": 107,
-      "translate_ms": 539,
-      "source": "今日はいい天気ですね",
-      "translation": "It's a nice weather today.",
+      "ms": 526,
+      "asr_ms": 108,
+      "translate_ms": 418,
+      "source": "手置きの上に乗し掛かって",
+      "translation": "Hang on to it above the handrail.",
       "pass": false
     },
     {
       "pair": "ja→en",
       "stage": "final ASR",
-      "ms": 3325,
-      "source": "今日はいい天気ですね。公園を散歩しましょう。",
+      "ms": 1714,
+      "source": "手置きの絵にのしかかって向うを見るとおじさんは一軒ばかり前にいたミノを着た肩の後ろから三角に張った網の底がぶら下がっているこの時かぶった傘が少し動いた傘の中からひどい道だと言ったように聞こえたミノの影は",
       "pass": true
     },
     {
       "pair": "ja→en",
       "stage": "fast MT",
-      "ms": 1797,
-      "source": "今日はいい天気ですね。公園を散歩しましょう。",
-      "translation": "It's a nice day. Let's walk in the park.",
+      "ms": 802,
+      "source": "手置きの絵にのしかかって向うを見るとおじさんは一軒ばかり前にいたミノを着た肩の後ろから三角に張った網の底がぶら下がっているこの時かぶった傘が少し動いた傘の中からひどい道だと言ったように聞こえたミノの影は",
+      "translation": "Looking over his shoulder, Old Man saw Minos, dressed in a kimono, hanging from the bottom of a triangle",
       "pass": true
     },
     {
       "pair": "ja→en",
       "stage": "refine",
-      "ms": 871,
-      "source": "今日はいい天気ですね。公園を散歩しましょう。",
-      "translation": "It's a nice day. Let's go for a walk in the park.",
+      "ms": 1292,
+      "source": "手置きの絵にのしかかって向うを見るとおじさんは一軒ばかり前にいたミノを着た肩の後ろから三角に張った網の底がぶら下がっているこの時かぶった傘が少し動いた傘の中からひどい道だと言ったように聞こえたミノの影は",
+      "translation": "Looking over his shoulder, Old Man saw Minos, dressed in a kimono, hanging from the bottom of a triangle-shaped net. From inside the umbrella, Minos's shadow sounded like he was saying \"It's a terrible road.\"",
       "pass": true
     },
     {
-      "pair": "en→ja",
+      "pair": "ja→en",
       "stage": "draft 0.35s",
-      "ms": 1929,
-      "asr_ms": 1110,
-      "translate_ms": 818,
-      "source": "It's a bleep.",
-      "translation": "それはブラークです。",
+      "ms": 613,
+      "asr_ms": 613,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
       "pass": false
     },
     {
-      "pair": "en→ja",
+      "pair": "ja→en",
       "stage": "draft 0.5s",
-      "ms": 520,
-      "asr_ms": 86,
-      "translate_ms": 433,
-      "source": "It's a beauty.",
-      "translation": "それは美しさです。",
+      "ms": 502,
+      "asr_ms": 94,
+      "translate_ms": 408,
+      "source": "次回の動画をお見せします。",
+      "translation": "Next video is here.",
       "pass": false
     },
     {
-      "pair": "en→ja",
+      "pair": "ja→en",
       "stage": "draft 1.0s",
-      "ms": 904,
-      "asr_ms": 117,
-      "translate_ms": 787,
-      "source": "It's a beautiful day.",
-      "translation": "今日は美しく天気が良い日です。",
-      "pass": false
+      "ms": 468,
+      "asr_ms": 84,
+      "translate_ms": 384,
+      "source": "広くにもなって",
+      "translation": "It has become widespread.",
+      "pass": true
     },
     {
-      "pair": "en→ja",
+      "pair": "ja→en",
       "stage": "draft 2.0s",
-      "ms": 696,
-      "asr_ms": 159,
-      "translate_ms": 536,
-      "source": "It's a beautiful day, shall we take?",
-      "translation": "今日は beautiful 天气、何いかしましょう。",
+      "ms": 542,
+      "asr_ms": 94,
+      "translate_ms": 447,
+      "source": "という録にもなって、子どもも",
+      "translation": "It has become recorded, and even children know.",
       "pass": false
     },
     {
-      "pair": "en→ja",
+      "pair": "ja→en",
       "stage": "final ASR",
-      "ms": 2647,
-      "source": "It's a beautiful day. Shall we take a walk in the park?",
+      "ms": 1939,
+      "source": "六にもなって子供も三人あってあんなことを考えたかと思うと馬鹿馬鹿しくなるけれどけれど本当にこれが事実だろうかあれだけの愛情を自身に注いだのは単に愛情としてのみで恋ではなかったろうか",
       "pass": true
     },
     {
-      "pair": "en→ja",
+      "pair": "ja→en",
       "stage": "fast MT",
-      "ms": 1843,
-      "source": "It's a beautiful day. Shall we take a walk in the park?",
-      "translation": "今日は beautiful 天气です。公園で散歩しましょうか？",
+      "ms": 755,
+      "source": "六にもなって子供も三人あってあんなことを考えたかと思うと馬鹿馬鹿しくなるけれどけれど本当にこれが事実だろうかあれだけの愛情を自身に注いだのは単に愛情としてのみで恋ではなかったろうか",
+      "translation": "Even with six children and three more, it seems absurd to think about such things. But really, was this just love",
       "pass": true
     },
     {
-      "pair": "en→ja",
+      "pair": "ja→en",
       "stage": "refine",
+      "ms": 1007,
+      "source": "六にもなって子供も三人あってあんなことを考えたかと思うと馬鹿馬鹿しくなるけれどけれど本当にこれが事実だろうかあれだけの愛情を自身に注いだのは単に愛情としてのみで恋ではなかったろうか",
+      "translation": "Even with six children and three more, it seems absurd to think about such things. But really, was it just love or was it also a kind of love?",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 0.35s",
+      "ms": 974,
+      "asr_ms": 586,
+      "translate_ms": 388,
+      "source": "嗯",
+      "translation": "\"Oh\"",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 0.5s",
+      "ms": 365,
+      "asr_ms": 70,
+      "translate_ms": 294,
+      "source": "嗯",
+      "translation": "\"Oh\"",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 1.0s",
+      "ms": 341,
+      "asr_ms": 69,
+      "translate_ms": 272,
+      "source": "再",
+      "translation": "Again",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 2.0s",
+      "ms": 355,
+      "asr_ms": 73,
+      "translate_ms": 282,
+      "source": "三月底",
+      "translation": "March end",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "final ASR",
+      "ms": 1779,
+      "source": "三约地 四约将 五约法 道者 令名于上同意 可与之死 可与之生 而不微也 天者 阴阳 寒暑 实至也 地者 远近",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "fast MT",
+      "ms": 794,
+      "source": "三约地 四约将 五约法 道者 令名于上同意 可与之死 可与之生 而不微也 天者 阴阳 寒暑 实至也 地者 远近",
+      "translation": "Three agreements for the land, four agreements for the generals, five agreements for the law. The sage agrees with the names",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "refine",
+      "ms": 1501,
+      "source": "三约地 四约将 五约法 道者 令名于上同意 可与之死 可与之生 而不微也 天者 阴阳 寒暑 实至也 地者 远近",
+      "translation": "Three agreements for the land, four agreements for the generals, five agreements for the law. The sage agrees with the names, and they are in harmony. He agrees to die and live with them, but not lightly. Heaven is about yin and yang, cold and heat, and the actual. Earth is about distance and proximity.",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 0.35s",
+      "ms": 1356,
+      "asr_ms": 1356,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 0.5s",
+      "ms": 465,
+      "asr_ms": 76,
+      "translate_ms": 389,
+      "source": "保序",
+      "translation": "Keep order.",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 1.0s",
+      "ms": 367,
+      "asr_ms": 73,
+      "translate_ms": 293,
+      "source": "保序",
+      "translation": "Keep order.",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 2.0s",
+      "ms": 386,
+      "asr_ms": 89,
+      "translate_ms": 296,
+      "source": "寶序弟子",
+      "translation": "Bo Xu弟子",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "final ASR",
+      "ms": 1883,
+      "source": "总序 弟子归 圣人训 守孝替 赐锦信 犯爱纵 而亲人 有余力 哲学文 入哲孝 父母呼 应误缓 父母",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "fast MT",
+      "ms": 752,
+      "source": "总序 弟子归 圣人训 守孝替 赐锦信 犯爱纵 而亲人 有余力 哲学文 入哲孝 父母呼 应误缓 父母",
+      "translation": "Introduction Students return for the sage's teachings Observe filial piety Receive good fortune Do not violate love towards your relatives",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "refine",
+      "ms": 933,
+      "source": "总序 弟子归 圣人训 守孝替 赐锦信 犯爱纵 而亲人 有余力 哲学文 入哲孝 父母呼 应误缓 父母",
+      "translation": "Introduction: Students return for the sage's teachings. Observe filial piety. Receive good fortune. Do not violate love towards relatives.",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 0.35s",
+      "ms": 1827,
+      "asr_ms": 1827,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 0.5s",
+      "ms": 873,
+      "asr_ms": 97,
+      "translate_ms": 776,
+      "source": "我都心",
+      "translation": "I am heartbroken.",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 1.0s",
+      "ms": 488,
+      "asr_ms": 81,
+      "translate_ms": 406,
+      "source": "我得心情好",
+      "translation": "I'm in a good mood.",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "draft 2.0s",
+      "ms": 529,
+      "asr_ms": 98,
+      "translate_ms": 431,
+      "source": "我的新圈號是跑步和讀",
+      "translation": "My new hashtag is running and reading.",
+      "pass": false
+    },
+    {
+      "pair": "zh→en",
+      "stage": "final ASR",
+      "ms": 2474,
+      "source": "我的興趣愛好是跑步和讀一些雜誌。 Hi there, Xiao here. I come from China and my hobby is jogging and reading some magazines. Hallo, ich bin Xiao und ich komme aus China. Ich...",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "fast MT",
+      "ms": 1294,
+      "source": "我的興趣愛好是跑步和讀一些雜誌。 Hi there, Xiao here. I come from China and my hobby is jogging and reading some magazines. Hallo, ich bin Xiao und ich komme aus China. Ich...",
+      "translation": "My hobby is jogging and reading some magazines. I come from China. Hallo, ich",
+      "pass": true
+    },
+    {
+      "pair": "zh→en",
+      "stage": "refine",
+      "ms": 932,
+      "source": "我的興趣愛好是跑步和讀一些雜誌。 Hi there, Xiao here. I come from China and my hobby is jogging and reading some magazines. Hallo, ich bin Xiao und ich komme aus China. Ich...",
+      "translation": "My hobby is jogging and reading some magazines. I come from China. Hallo, ich bin Xiao und ich komme aus China.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 0.35s",
+      "ms": 1524,
+      "asr_ms": 1114,
+      "translate_ms": 409,
+      "source": "네",
+      "translation": "Okay.",
+      "pass": false
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 0.5s",
+      "ms": 347,
+      "asr_ms": 66,
+      "translate_ms": 281,
+      "source": "네",
+      "translation": "Okay.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 1.0s",
+      "ms": 380,
+      "asr_ms": 81,
+      "translate_ms": 299,
+      "source": "네, 그럼 신",
+      "translation": "Okay then.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 2.0s",
+      "ms": 486,
+      "asr_ms": 90,
+      "translate_ms": 395,
+      "source": "흔신 침실을 참기",
+      "translation": "Handle the bedroom with a smile.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "final ASR",
+      "ms": 2072,
+      "source": "흠신 심신을 잠기게 되었다. 보기만 해도 지긋지긋한 형식상의 아내가 껄이 일본 어느 대학을 졸업하자마자 불의에 죽고 말았다. 껄은 중등교육을 마치 어여쁜 처녀와 신식 결혼을 하였다.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "fast MT",
       "ms": 900,
-      "source": "It's a beautiful day. Shall we take a walk in the park?",
-      "translation": "今日は美しい天気です。公園で散歩しましょうか？",
+      "source": "흠신 심신을 잠기게 되었다. 보기만 해도 지긋지긋한 형식상의 아내가 껄이 일본 어느 대학을 졸업하자마자 불의에 죽고 말았다. 껄은 중등교육을 마치 어여쁜 처녀와 신식 결혼을 하였다.",
+      "translation": "She fell into a deep sleep due to the tedious formal wife, whom she only had to look at, committing sepp",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "refine",
+      "ms": 1324,
+      "source": "흠신 심신을 잠기게 되었다. 보기만 해도 지긋지긋한 형식상의 아내가 껄이 일본 어느 대학을 졸업하자마자 불의에 죽고 말았다. 껄은 중등교육을 마치 어여쁜 처녀와 신식 결혼을 하였다.",
+      "translation": "She fell into a deep sleep due to the tedious formal wife, whom she only had to look at, and then committed seppuku after graduating from a Japanese university. She had a youthful bride in middle school and had a traditional arranged marriage.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 0.35s",
+      "ms": 941,
+      "asr_ms": 592,
+      "translate_ms": 349,
+      "source": "!",
+      "translation": "What is it?",
+      "pass": false
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 0.5s",
+      "ms": 365,
+      "asr_ms": 73,
+      "translate_ms": 291,
+      "source": "컨실러",
+      "translation": "Consultant",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 1.0s",
+      "ms": 498,
+      "asr_ms": 87,
+      "translate_ms": 411,
+      "source": "이걸로 고이고 있는...",
+      "translation": "I am doing this for him.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 2.0s",
+      "ms": 569,
+      "asr_ms": 107,
+      "translate_ms": 462,
+      "source": "코치로 고이고잉 밀어내려도 왔다",
+      "translation": "No matter how Coach Giogiogi pushes me away.",
+      "pass": false
+    },
+    {
+      "pair": "ko→en",
+      "stage": "final ASR",
+      "ms": 2061,
+      "source": "꼼꼼치로 고이고이 밀어내려 놓았다. 이윽고 눌렀던 손을 떼어보았다. 그 언저리는 이제 다시 피가 안이 나려는 것처럼 혈색이 없다 하더니 그 희한 껍풀 밑에 다시금 꽃물이 차츰차츰 밀려온다. 보일듯 말듯한 그 상처로부터 좁쌀낙 같은 핏방울이 송송 솟는다.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "fast MT",
+      "ms": 849,
+      "source": "꼼꼼치로 고이고이 밀어내려 놓았다. 이윽고 눌렀던 손을 떼어보았다. 그 언저리는 이제 다시 피가 안이 나려는 것처럼 혈색이 없다 하더니 그 희한 껍풀 밑에 다시금 꽃물이 차츰차츰 밀려온다. 보일듯 말듯한 그 상처로부터 좁쌀낙 같은 핏방울이 송송 솟는다.",
+      "translation": "He pressed hard and finally released his grip. The once red area now lacked color, but the petals at the bottom were",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "refine",
+      "ms": 1310,
+      "source": "꼼꼼치로 고이고이 밀어내려 놓았다. 이윽고 눌렀던 손을 떼어보았다. 그 언저리는 이제 다시 피가 안이 나려는 것처럼 혈색이 없다 하더니 그 희한 껍풀 밑에 다시금 꽃물이 차츰차츰 밀려온다. 보일듯 말듯한 그 상처로부터 좁쌀낙 같은 핏방울이 송송 솟는다.",
+      "translation": "He pressed hard and finally released his grip. The once red area now lacked color, but the petals at the bottom were slowly releasing more flower essence. Tiny drops of blood, appearing and disappearing, welled up from the wound.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 0.35s",
+      "ms": 883,
+      "asr_ms": 570,
+      "translate_ms": 313,
+      "source": "안녕",
+      "translation": "Hello",
+      "pass": false
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 0.5s",
+      "ms": 355,
+      "asr_ms": 74,
+      "translate_ms": 281,
+      "source": "안녕, 안녕",
+      "translation": "Hello, hello",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 1.0s",
+      "ms": 374,
+      "asr_ms": 67,
+      "translate_ms": 306,
+      "source": "아니면 오늘",
+      "translation": "Then not today.",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "draft 2.0s",
+      "ms": 528,
+      "asr_ms": 92,
+      "translate_ms": 435,
+      "source": "아니면 오늘 가을에 이 핏도를",
+      "translation": "Then why not go today's fall flower.",
+      "pass": false
+    },
+    {
+      "pair": "ko→en",
+      "stage": "final ASR",
+      "ms": 2046,
+      "source": "아니하며 어느 가을에 잎이 떨어지지 아니하리요 우주는 의연히 백대의 한결같거늘 사람의 일은 어찌하여 고금이 다르뇨 지금 세상 사람을 살펴보니 애달프고 불쌍하고 탄식하고 통곡할 만 하도다 전 인의 말씀을 듣든지 역사를 보듯이",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "fast MT",
+      "ms": 919,
+      "source": "아니하며 어느 가을에 잎이 떨어지지 아니하리요 우주는 의연히 백대의 한결같거늘 사람의 일은 어찌하여 고금이 다르뇨 지금 세상 사람을 살펴보니 애달프고 불쌍하고 탄식하고 통곡할 만 하도다 전 인의 말씀을 듣든지 역사를 보듯이",
+      "translation": "No matter which autumn leaves never fall, the universe remains serene as a hundred clear reflections. Why should people's affairs be",
+      "pass": true
+    },
+    {
+      "pair": "ko→en",
+      "stage": "refine",
+      "ms": 1337,
+      "source": "아니하며 어느 가을에 잎이 떨어지지 아니하리요 우주는 의연히 백대의 한결같거늘 사람의 일은 어찌하여 고금이 다르뇨 지금 세상 사람을 살펴보니 애달프고 불쌍하고 탄식하고 통곡할 만 하도다 전 인의 말씀을 듣든지 역사를 보듯이",
+      "translation": "No matter which autumn leaves never fall, the universe remains serene as a hundred clear reflections. Yet, why should people's affairs differ between ancient and modern times? Looking at people in this world, they are pitiable and deserving of sympathy, sighing and weeping.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 0.35s",
+      "ms": 1371,
+      "asr_ms": 1371,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 0.5s",
+      "ms": 101,
+      "asr_ms": 101,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 1.0s",
+      "ms": 486,
+      "asr_ms": 73,
+      "translate_ms": 413,
+      "source": "mit den Lagen",
+      "translation": "with the layout",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 2.0s",
+      "ms": 457,
+      "asr_ms": 85,
+      "translate_ms": 371,
+      "source": "mit den Langen beleuchtet.",
+      "translation": "Light the long ones.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "final ASR",
+      "ms": 1640,
+      "source": "mit den langen beleuchteten fenstern emporragt mit dem kirchenfeste ist auch ein häusliches verbunden es hat sich fast in allen christlichen ländern verbreitet daß man den kindern die ankunft des christkindleins auch eines kindes des wunderbarsten das je auf der welt war",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "fast MT",
+      "ms": 783,
+      "source": "mit den langen beleuchteten fenstern emporragt mit dem kirchenfeste ist auch ein häusliches verbunden es hat sich fast in allen christlichen ländern verbreitet daß man den kindern die ankunft des christkindleins auch eines kindes des wunderbarsten das je auf der welt war",
+      "translation": "The tall windows with lights protrude, along with the church facade, which is intimately connected to the houses, almost merging",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "refine",
+      "ms": 1388,
+      "source": "mit den langen beleuchteten fenstern emporragt mit dem kirchenfeste ist auch ein häusliches verbunden es hat sich fast in allen christlichen ländern verbreitet daß man den kindern die ankunft des christkindleins auch eines kindes des wunderbarsten das je auf der welt war",
+      "translation": "The tall windows with their illuminated lights stand out, along with the church facade, which is intimately connected to the houses, merging almost into one. The custom of greeting the Christkind, the child of the most wonderful one that ever was on earth, has spread almost everywhere in Christian lands.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 0.35s",
+      "ms": 575,
+      "asr_ms": 575,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 0.5s",
+      "ms": 65,
+      "asr_ms": 65,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 1.0s",
+      "ms": 423,
+      "asr_ms": 74,
+      "translate_ms": 349,
+      "source": "Die Spaß hat...",
+      "translation": "The fun has...",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 2.0s",
+      "ms": 519,
+      "asr_ms": 94,
+      "translate_ms": 425,
+      "source": "Die Spaßhaftesten Gesichter der Ganze.",
+      "translation": "The Funniest Faces of Them All.",
+      "pass": false
+    },
+    {
+      "pair": "de→en",
+      "stage": "final ASR",
+      "ms": 1637,
+      "source": "die spaßhaftesten gesichter der ganzen nachbarschaft fielen mir ein wenn der vater beim rasieren saß und da kam mir das lachen darauf hatte mein vater stets liebevoll gesagt gib ruh bübel aber kaum die worte gesprochen waren wuchs wieder ein so wunderliches gesicht das sich erst recht herausplatzte er guckte in den",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "fast MT",
+      "ms": 670,
+      "source": "die spaßhaftesten gesichter der ganzen nachbarschaft fielen mir ein wenn der vater beim rasieren saß und da kam mir das lachen darauf hatte mein vater stets liebevoll gesagt gib ruh bübel aber kaum die worte gesprochen waren wuchs wieder ein so wunderliches gesicht das sich erst recht herausplatzte er guckte in den",
+      "translation": "The funniest faces from the whole neighborhood came to mind when the father was sitting to shave and then came.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "refine",
+      "ms": 1376,
+      "source": "die spaßhaftesten gesichter der ganzen nachbarschaft fielen mir ein wenn der vater beim rasieren saß und da kam mir das lachen darauf hatte mein vater stets liebevoll gesagt gib ruh bübel aber kaum die worte gesprochen waren wuchs wieder ein so wunderliches gesicht das sich erst recht herausplatzte er guckte in den",
+      "translation": "The funniest faces from the whole neighborhood came to mind when the father was shaving, and then came. He always lovingly said, \"Be quiet, child,\" but the moment he spoke, a miraculous face would emerge, which only grew more expressive. He looked in the.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 0.35s",
+      "ms": 895,
+      "asr_ms": 571,
+      "translate_ms": 324,
+      "source": "Und dann...",
+      "translation": "And then...",
+      "pass": false
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 0.5s",
+      "ms": 350,
+      "asr_ms": 72,
+      "translate_ms": 277,
+      "source": "und dann",
+      "translation": "and then",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 1.0s",
+      "ms": 465,
+      "asr_ms": 81,
+      "translate_ms": 383,
+      "source": "und in der Kante.",
+      "translation": "And at the edge.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "draft 2.0s",
+      "ms": 459,
+      "asr_ms": 88,
+      "translate_ms": 371,
+      "source": "der Kenntnisse unterwiesen.",
+      "translation": "Taught the knowledge.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "final ASR",
+      "ms": 2894,
+      "source": "der kenntnisse unterwiesen hatten die man heutzutage für alle menschen für notwendig hält dann verminderten sich auch die welche uns in den gegenständen unterricht gegeben hatten die man kindern beibringen läßt welche zu den gebildeteren oder ausgezeichneteren Vielen Dank.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "fast MT",
+      "ms": 841,
+      "source": "der kenntnisse unterwiesen hatten die man heutzutage für alle menschen für notwendig hält dann verminderten sich auch die welche uns in den gegenständen unterricht gegeben hatten die man kindern beibringen läßt welche zu den gebildeteren oder ausgezeichneteren Vielen Dank.",
+      "translation": "The knowledge taught that today is considered necessary for all humans would also diminish.",
+      "pass": true
+    },
+    {
+      "pair": "de→en",
+      "stage": "refine",
+      "ms": 793,
+      "source": "der kenntnisse unterwiesen hatten die man heutzutage für alle menschen für notwendig hält dann verminderten sich auch die welche uns in den gegenständen unterricht gegeben hatten die man kindern beibringen läßt welche zu den gebildeteren oder ausgezeichneteren Vielen Dank.",
+      "translation": "The knowledge taught, which today is considered necessary for all humans, would diminish as well.",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 0.35s",
+      "ms": 1219,
+      "asr_ms": 813,
+      "translate_ms": 406,
+      "source": "Qu'est-ce qu'il y a ?",
+      "translation": "What's happening?",
+      "pass": false
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 0.5s",
+      "ms": 377,
+      "asr_ms": 72,
+      "translate_ms": 305,
+      "source": "qui couronne...",
+      "translation": "who crowns...",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 1.0s",
+      "ms": 445,
+      "asr_ms": 84,
+      "translate_ms": 361,
+      "source": "qui couronnera notre...",
+      "translation": "who will crown us...",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 2.0s",
+      "ms": 530,
+      "asr_ms": 93,
+      "translate_ms": 436,
+      "source": "qui couronnera notre grand siècle de trav...",
+      "translation": "who will crown our grand century of turmoil...",
+      "pass": false
+    },
+    {
+      "pair": "fr→en",
+      "stage": "final ASR",
+      "ms": 1719,
+      "source": "qui couronnera notre grand siècle de travail de vérité et de liberté mais quelle tache de boue sur votre nom j'allais dire sur votre règne que c'est abominable affaire dreyfus un conseil de guerre vient par ordre d'oser acquitter un esthérasie soufflet suprême à toute vérité à toute justice",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "fast MT",
+      "ms": 677,
+      "source": "qui couronnera notre grand siècle de travail de vérité et de liberté mais quelle tache de boue sur votre nom j'allais dire sur votre règne que c'est abominable affaire dreyfus un conseil de guerre vient par ordre d'oser acquitter un esthérasie soufflet suprême à toute vérité à toute justice",
+      "translation": "who will crown our grand century of work of truth and freedom but what stain of mud on your name I was",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "refine",
+      "ms": 1220,
+      "source": "qui couronnera notre grand siècle de travail de vérité et de liberté mais quelle tache de boue sur votre nom j'allais dire sur votre règne que c'est abominable affaire dreyfus un conseil de guerre vient par ordre d'oser acquitter un esthérasie soufflet suprême à toute vérité à toute justice",
+      "translation": "what stain of mud on your name I was going to say on your reign that it's an abominable affair dreyfus a military court comes by order to dare acquit a traitor supreme to truth and justice",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 0.35s",
+      "ms": 577,
+      "asr_ms": 577,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 0.5s",
+      "ms": 62,
+      "asr_ms": 62,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 1.0s",
+      "ms": 64,
+      "asr_ms": 64,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 2.0s",
+      "ms": 774,
+      "asr_ms": 281,
+      "translate_ms": 493,
+      "source": "une morade",
+      "translation": "a moradé",
+      "pass": false
+    },
+    {
+      "pair": "fr→en",
+      "stage": "final ASR",
+      "ms": 1855,
+      "source": "une morale nue apporte de l'ennui le comte fait passer le précepte avec lui en ces sortes de feintes il faut instruire et plaire et compter pour compter me semble peu d'affaire c'est par cette raison qu'égayant leur esprit nombre de gens fameux en ce genre ont écrit",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "fast MT",
+      "ms": 828,
+      "source": "une morale nue apporte de l'ennui le comte fait passer le précepte avec lui en ces sortes de feintes il faut instruire et plaire et compter pour compter me semble peu d'affaire c'est par cette raison qu'égayant leur esprit nombre de gens fameux en ce genre ont écrit",
+      "translation": "A naked morality brings boredom. The count passes the principle with him in these feints. One must instruct.",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "refine",
+      "ms": 1344,
+      "source": "une morale nue apporte de l'ennui le comte fait passer le précepte avec lui en ces sortes de feintes il faut instruire et plaire et compter pour compter me semble peu d'affaire c'est par cette raison qu'égayant leur esprit nombre de gens fameux en ce genre ont écrit",
+      "translation": "A naked morality brings boredom. The count passes the principle with him in these feints. One must instruct and please and count for counting. I find this a bit of a matter. For this reason, many famous people in this genre have amused their minds by writing.",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 0.35s",
+      "ms": 899,
+      "asr_ms": 596,
+      "translate_ms": 302,
+      "source": "...",
+      "translation": "...",
+      "pass": false
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 0.5s",
+      "ms": 392,
+      "asr_ms": 77,
+      "translate_ms": 314,
+      "source": "pour le temps.",
+      "translation": "For the time.",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 1.0s",
+      "ms": 369,
+      "asr_ms": 72,
+      "translate_ms": 296,
+      "source": "les deux.",
+      "translation": "The two.",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "draft 2.0s",
+      "ms": 480,
+      "asr_ms": 97,
+      "translate_ms": 382,
+      "source": "Utian à l'Ormerci.",
+      "translation": "Thank you very much.",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "final ASR",
+      "ms": 1701,
+      "source": "tiennent à leur merci c'est de les émouvoir par soumission à commisération et à pitié toutefois la braverie la constance et la résolution moyens tout contraires ont quelquefois servi à ce même effet édouard prince de galles celui",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "fast MT",
+      "ms": 673,
+      "source": "tiennent à leur merci c'est de les émouvoir par soumission à commisération et à pitié toutefois la braverie la constance et la résolution moyens tout contraires ont quelquefois servi à ce même effet édouard prince de galles celui",
+      "translation": "They hold them in submission out of pity and compassion, however, bravery braver.",
+      "pass": true
+    },
+    {
+      "pair": "fr→en",
+      "stage": "refine",
+      "ms": 1120,
+      "source": "tiennent à leur merci c'est de les émouvoir par soumission à commisération et à pitié toutefois la braverie la constance et la résolution moyens tout contraires ont quelquefois servi à ce même effet édouard prince de galles celui",
+      "translation": "They hold them in submission out of pity and compassion, however, bravery and constance and resolution served similarly to achieve the same effect. Edward, Prince of Wales, was an example of this.",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 0.35s",
+      "ms": 1004,
+      "asr_ms": 574,
+      "translate_ms": 429,
+      "source": "¡Ya su...",
+      "translation": "It's coming...",
+      "pass": false
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 0.5s",
+      "ms": 392,
+      "asr_ms": 88,
+      "translate_ms": 303,
+      "source": "¡Qué suelo!",
+      "translation": "What weather!",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 1.0s",
+      "ms": 377,
+      "asr_ms": 76,
+      "translate_ms": 301,
+      "source": "de suero.",
+      "translation": "of serum.",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 2.0s",
+      "ms": 516,
+      "asr_ms": 98,
+      "translate_ms": 418,
+      "source": "de asuero. El asuero...",
+      "translation": "ashecor. The Ashecor...",
+      "pass": false
+    },
+    {
+      "pair": "es→en",
+      "stage": "final ASR",
+      "ms": 2247,
+      "source": "azuero el azuero que reinó desde la india hasta la etiopía sobre ciento veinte y siete provincias que en aquellos días asentado que fué el rey azuero en la silla de su reino la cual estaba en susán capital del reino en el tercer año de su reinado",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "fast MT",
+      "ms": 1114,
+      "source": "azuero el azuero que reinó desde la india hasta la etiopía sobre ciento veinte y siete provincias que en aquellos días asentado que fué el rey azuero en la silla de su reino la cual estaba en susán capital del reino en el tercer año de su reinado",
+      "translation": "The azuero who reigned from india to ethiopia over one hundred and twenty-seven provinces that those days.",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "refine",
+      "ms": 910,
+      "source": "azuero el azuero que reinó desde la india hasta la etiopía sobre ciento veinte y siete provincias que en aquellos días asentado que fué el rey azuero en la silla de su reino la cual estaba en susán capital del reino en el tercer año de su reinado",
+      "translation": "Azuero who reigned from India to Ethiopia over one hundred and twenty-seven provinces during those days.",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 0.35s",
+      "ms": 940,
+      "asr_ms": 591,
+      "translate_ms": 349,
+      "source": "en el rato.",
+      "translation": "In the meantime.",
+      "pass": false
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 0.5s",
+      "ms": 403,
+      "asr_ms": 80,
+      "translate_ms": 322,
+      "source": "en al rey.",
+      "translation": "To the king.",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 1.0s",
+      "ms": 468,
+      "asr_ms": 84,
+      "translate_ms": 383,
+      "source": "en al rey moza",
+      "translation": "In King Muzo",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 2.0s",
+      "ms": 519,
+      "asr_ms": 91,
+      "translate_ms": 427,
+      "source": "En el Rey, Moses Virgenes.",
+      "translation": "In the King, Moses Virgenes.",
+      "pass": false
+    },
+    {
+      "pair": "es→en",
+      "stage": "final ASR",
+      "ms": 1766,
+      "source": "al rey mozas vírgenes de buen parecer y ponga el rey personas en todas las provincias de su reino que junte todas las mozas vírgenes de buen parecer en susan residencia regia en la casa de las mujeres al cuidado de egai eunuco del rey guarda de las",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "fast MT",
+      "ms": 722,
+      "source": "al rey mozas vírgenes de buen parecer y ponga el rey personas en todas las provincias de su reino que junte todas las mozas vírgenes de buen parecer en susan residencia regia en la casa de las mujeres al cuidado de egai eunuco del rey guarda de las",
+      "translation": "To the king, fair virgins and appoint the king people in all provinces of his kingdom that he gather all.",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "refine",
+      "ms": 1222,
+      "source": "al rey mozas vírgenes de buen parecer y ponga el rey personas en todas las provincias de su reino que junte todas las mozas vírgenes de buen parecer en susan residencia regia en la casa de las mujeres al cuidado de egai eunuco del rey guarda de las",
+      "translation": "To the king, fair virgins and appoint people in all provinces of his kingdom that he gather them all in the royal residence. Egai, the king's eunuch, shall take care of them.",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 0.35s",
+      "ms": 531,
+      "asr_ms": 531,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 0.5s",
+      "ms": 70,
+      "asr_ms": 70,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 1.0s",
+      "ms": 523,
+      "asr_ms": 82,
+      "translate_ms": 440,
+      "source": "en uno de los corpos.",
+      "translation": "in one of the bodies.",
+      "pass": false
+    },
+    {
+      "pair": "es→en",
+      "stage": "draft 2.0s",
+      "ms": 506,
+      "asr_ms": 99,
+      "translate_ms": 407,
+      "source": "en uno de los corrillos que se formaron",
+      "translation": "in one of the groups that formed",
+      "pass": false
+    },
+    {
+      "pair": "es→en",
+      "stage": "final ASR",
+      "ms": 1814,
+      "source": "en uno de los corrillos que se formaron al pasar los carruajes y la tropa todavía no es el tiempo de la bellota señores repuso otro que se apreciaba de no abrir la boca sin regalar al mundo alguna frutecilla picante y saborosa del árbol de su ingenio su majestad se ha convencido de que no engordará en",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "fast MT",
+      "ms": 780,
+      "source": "en uno de los corrillos que se formaron al pasar los carruajes y la tropa todavía no es el tiempo de la bellota señores repuso otro que se apreciaba de no abrir la boca sin regalar al mundo alguna frutecilla picante y saborosa del árbol de su ingenio su majestad se ha convencido de que no engordará en",
+      "translation": "In one of the clusters formed as carriages passed and the stags have not yet entered the rut, gentlemen.",
+      "pass": true
+    },
+    {
+      "pair": "es→en",
+      "stage": "refine",
+      "ms": 922,
+      "source": "en uno de los corrillos que se formaron al pasar los carruajes y la tropa todavía no es el tiempo de la bellota señores repuso otro que se apreciaba de no abrir la boca sin regalar al mundo alguna frutecilla picante y saborosa del árbol de su ingenio su majestad se ha convencido de que no engordará en",
+      "translation": "In one another cluster formed as carriages passed and the stags have not yet entered the rut, gentlemen.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 0.35s",
+      "ms": 924,
+      "asr_ms": 582,
+      "translate_ms": 341,
+      "source": "Куда?",
+      "translation": "Where?",
+      "pass": false
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 0.5s",
+      "ms": 380,
+      "asr_ms": 80,
+      "translate_ms": 299,
+      "source": "Кубли.",
+      "translation": "Cube.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 1.0s",
+      "ms": 385,
+      "asr_ms": 84,
+      "translate_ms": 300,
+      "source": "Кублики.",
+      "translation": "Cubes.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 2.0s",
+      "ms": 495,
+      "asr_ms": 108,
+      "translate_ms": 386,
+      "source": "и публики. Выжила Аликоны.",
+      "translation": "And Alkonika survived.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "final ASR",
+      "ms": 2017,
+      "source": "публике. Мы желали иконы присовокупить, хотя краткое жизнеописание покойного автора. И тем отчасти удовлетворить справедливому любопытству любителей отечественной словесности. Для сего обратились было мы к Марии Алексеевне Трофилиной, ближайшей родственнице и наследнице Ивана Петровича Белкина. Но, к сожалению, ей невозможно было нам...",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "fast MT",
+      "ms": 1080,
+      "source": "публике. Мы желали иконы присовокупить, хотя краткое жизнеописание покойного автора. И тем отчасти удовлетворить справедливому любопытству любителей отечественной словесности. Для сего обратились было мы к Марии Алексеевне Трофилиной, ближайшей родственнице и наследнице Ивана Петровича Белкина. Но, к сожалению, ей невозможно было нам...",
+      "translation": "The public wished to obtain an icon, although they had a short biography of the deceased author. And partly to satisfy.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "refine",
+      "ms": 1744,
+      "source": "публике. Мы желали иконы присовокупить, хотя краткое жизнеописание покойного автора. И тем отчасти удовлетворить справедливому любопытству любителей отечественной словесности. Для сего обратились было мы к Марии Алексеевне Трофилиной, ближайшей родственнице и наследнице Ивана Петровича Белкина. Но, к сожалению, ей невозможно было нам...",
+      "translation": "The public wished to obtain an icon, although they had a short biography of the deceased author. And partly to satisfy the curiosity of lovers of domestic literature. We turned to Maria Alexandrovna Trofilina, her nearest relative and heir of Ivan Petrovich Belkin. But unfortunately, it was impossible for her to...",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 0.35s",
+      "ms": 949,
+      "asr_ms": 590,
+      "translate_ms": 359,
+      "source": "Читали.",
+      "translation": "We read.",
+      "pass": false
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 0.5s",
+      "ms": 397,
+      "asr_ms": 81,
+      "translate_ms": 315,
+      "source": "Читарила.",
+      "translation": "I was reading.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 1.0s",
+      "ms": 503,
+      "asr_ms": 94,
+      "translate_ms": 408,
+      "source": "Читали его с треком.",
+      "translation": "We read it with subtitles.",
+      "pass": false
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 2.0s",
+      "ms": 472,
+      "asr_ms": 90,
+      "translate_ms": 381,
+      "source": "Читали его с треком.",
+      "translation": "We read it with subtitles.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "final ASR",
+      "ms": 2239,
+      "source": "читали его стариком. Опытность давала ему перед нами многие преимущества. К тому же его обыкновенная угрюмость, крутой нрав и злой язык имели сильное влияние на молодые наши умы. Какая-то таинственность окружала его судьбу. Он казался русским, а носил иностранное имя. Некогда он служил в гусарах и даже...",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "fast MT",
+      "ms": 1200,
+      "source": "читали его стариком. Опытность давала ему перед нами многие преимущества. К тому же его обыкновенная угрюмость, крутой нрав и злой язык имели сильное влияние на молодые наши умы. Какая-то таинственность окружала его судьбу. Он казался русским, а носил иностранное имя. Некогда он служил в гусарах и даже...",
+      "translation": "The old man's experience gave him many advantages over us. Additionally, his usual gruffness made him intimidating.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "refine",
+      "ms": 993,
+      "source": "читали его стариком. Опытность давала ему перед нами многие преимущества. К тому же его обыкновенная угрюмость, крутой нрав и злой язык имели сильное влияние на молодые наши умы. Какая-то таинственность окружала его судьбу. Он казался русским, а носил иностранное имя. Некогда он служил в гусарах и даже...",
+      "translation": "His experience gave him many advantages over us. Additionally, his usual gruffness made him intimidating and imposing.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 0.35s",
+      "ms": 1521,
+      "asr_ms": 1125,
+      "translate_ms": 396,
+      "source": "Ромга",
+      "translation": "Romga",
+      "pass": false
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 0.5s",
+      "ms": 396,
+      "asr_ms": 81,
+      "translate_ms": 315,
+      "source": "Ромгаду",
+      "translation": "Roma gladu",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 1.0s",
+      "ms": 412,
+      "asr_ms": 84,
+      "translate_ms": 328,
+      "source": "Ромгаду.",
+      "translation": "Roma, good day.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "draft 2.0s",
+      "ms": 424,
+      "asr_ms": 82,
+      "translate_ms": 342,
+      "source": "в седере две",
+      "translation": "There are two in the trunk.",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "final ASR",
+      "ms": 1865,
+      "source": "году сидели две женщины одна лет пятидесяти другая уже старушка семидесяти лет первую из них звали марии дмитриевны калитиной ее муж бывший губернский прокурор известный в свое время делец человек бойкий и решительный желчный и упрямый",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "fast MT",
+      "ms": 877,
+      "source": "году сидели две женщины одна лет пятидесяти другая уже старушка семидесяти лет первую из них звали марии дмитриевны калитиной ее муж бывший губернский прокурор известный в свое время делец человек бойкий и решительный желчный и упрямый",
+      "translation": "Last year two women were sitting. One was fifty years old, the other was seventy years old. One of them was",
+      "pass": true
+    },
+    {
+      "pair": "ru→en",
+      "stage": "refine",
+      "ms": 1515,
+      "source": "году сидели две женщины одна лет пятидесяти другая уже старушка семидесяти лет первую из них звали марии дмитриевны калитиной ее муж бывший губернский прокурор известный в свое время делец человек бойкий и решительный желчный и упрямый",
+      "translation": "Last year two women were sitting: one was fifty years old, the other was seventy. One of them was Maria Dmitrenova Kalitinova, whose husband, a former gubernatorial procurator, was known for his quick-wittedness and decisiveness, but was also known for his harshness and stubbornness.",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 0.35s",
+      "ms": 1105,
+      "asr_ms": 776,
+      "translate_ms": 329,
+      "source": "e",
+      "translation": "and",
+      "pass": false
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 0.5s",
+      "ms": 388,
+      "asr_ms": 77,
+      "translate_ms": 311,
+      "source": "E qual è?",
+      "translation": "What is it?",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 1.0s",
+      "ms": 471,
+      "asr_ms": 91,
+      "translate_ms": 380,
+      "source": "e quale verturbate.",
+      "translation": "And which disturbances.",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 2.0s",
+      "ms": 506,
+      "asr_ms": 98,
+      "translate_ms": 407,
+      "source": "e quale perturbazione de barricadio",
+      "translation": "Which disturbance of barricade?",
+      "pass": false
+    },
+    {
+      "pair": "it→en",
+      "stage": "final ASR",
+      "ms": 1949,
+      "source": "e quale perturbazione debba recare in una famigliuola vissuta fino allora relativamente felice la vaga bremosia dell'ignoto l'accorgersi che non si sta bene o che si potrebbe star meglio il movente dell'attività umana che produce la fiumana del progresso è preso qui alle sue sorgenti nelle proporzioni più modeste e materiali",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "fast MT",
+      "ms": 606,
+      "source": "e quale perturbazione debba recare in una famigliuola vissuta fino allora relativamente felice la vaga bremosia dell'ignoto l'accorgersi che non si sta bene o che si potrebbe star meglio il movente dell'attività umana che produce la fiumana del progresso è preso qui alle sue sorgenti nelle proporzioni più modeste e materiali",
+      "translation": "What disturbance should a happy family lived until now cause should wanderlust affect?",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "refine",
+      "ms": 1379,
+      "source": "e quale perturbazione debba recare in una famigliuola vissuta fino allora relativamente felice la vaga bremosia dell'ignoto l'accorgersi che non si sta bene o che si potrebbe star meglio il movente dell'attività umana che produce la fiumana del progresso è preso qui alle sue sorgenti nelle proporzioni più modeste e materiali",
+      "translation": "What disturbance should a happy family, which has previously been relatively happy, cause when the vague unease of not feeling well or better arises? What drives human activity, which produces the flood of progress, is being addressed here at its roots, in more modest and material terms.",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 0.35s",
+      "ms": 891,
+      "asr_ms": 564,
+      "translate_ms": 327,
+      "source": "a cuo...",
+      "translation": "a fuck...",
+      "pass": false
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 0.5s",
+      "ms": 335,
+      "asr_ms": 71,
+      "translate_ms": 264,
+      "source": "Aqua",
+      "translation": "Water",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 1.0s",
+      "ms": 468,
+      "asr_ms": 86,
+      "translate_ms": 382,
+      "source": "A qua è delle te...",
+      "translation": "Here, you are...",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 2.0s",
+      "ms": 512,
+      "asr_ms": 93,
+      "translate_ms": 418,
+      "source": "acqua e delle tegole al sole.",
+      "translation": "Water and tiles drying in the sun.",
+      "pass": false
+    },
+    {
+      "pair": "it→en",
+      "stage": "final ASR",
+      "ms": 2079,
+      "source": "e delle tegole al sole ad esso attrezza non rimanevano che i malavogli di padron toni quelli della casa del nespolo e della provvidenza che era ammarata sul greto sotto il lavatoio accanto alla concetta dello zio cola e alla paranza di padron fortunato cipolla le burrasche che avevano disperso di qua e di",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "fast MT",
+      "ms": 1197,
+      "source": "e delle tegole al sole ad esso attrezza non rimanevano che i malavogli di padron toni quelli della casa del nespolo e della provvidenza che era ammarata sul greto sotto il lavatoio accanto alla concetta dello zio cola e alla paranza di padron fortunato cipolla le burrasche che avevano disperso di qua e di",
+      "translation": "And the tiles exposed to the sun were left only the treacherous of Master Ton and those of Nespolo's",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "refine",
+      "ms": 948,
+      "source": "e delle tegole al sole ad esso attrezza non rimanevano che i malavogli di padron toni quelli della casa del nespolo e della provvidenza che era ammarata sul greto sotto il lavatoio accanto alla concetta dello zio cola e alla paranza di padron fortunato cipolla le burrasche che avevano disperso di qua e di",
+      "translation": "And the tiles exposed to the sun remained only the treachery of Master Ton and those of Nespolo's.",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 0.35s",
+      "ms": 1273,
+      "asr_ms": 967,
+      "translate_ms": 306,
+      "source": "statu",
+      "translation": "status",
+      "pass": false
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 0.5s",
+      "ms": 419,
+      "asr_ms": 79,
+      "translate_ms": 339,
+      "source": "è stato fiel.",
+      "translation": "It has been faithful.",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 1.0s",
+      "ms": 447,
+      "asr_ms": 81,
+      "translate_ms": 366,
+      "source": "stato ufficialmente.",
+      "translation": "officially stated.",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "draft 2.0s",
+      "ms": 536,
+      "asr_ms": 98,
+      "translate_ms": 438,
+      "source": "è stato ufficialmente il 13 marzo.",
+      "translation": "It has officially been March 13.",
+      "pass": false
+    },
+    {
+      "pair": "it→en",
+      "stage": "final ASR",
+      "ms": 1751,
+      "source": "4. La versione PlayStation 4 è disponibile dal 21 luglio, 2015-05, mentre quella per Microsoft Windows dal 6 giugno, 2019. Indice. 1. Trama.",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "fast MT",
+      "ms": 767,
+      "source": "4. La versione PlayStation 4 è disponibile dal 21 luglio, 2015-05, mentre quella per Microsoft Windows dal 6 giugno, 2019. Indice. 1. Trama.",
+      "translation": "The PlayStation 4 version is available from July 21, 2015, while the Windows version is",
+      "pass": true
+    },
+    {
+      "pair": "it→en",
+      "stage": "refine",
+      "ms": 1071,
+      "source": "4. La versione PlayStation 4 è disponibile dal 21 luglio, 2015-05, mentre quella per Microsoft Windows dal 6 giugno, 2019. Indice. 1. Trama.",
+      "translation": "The PlayStation 4 version is available from July 21, 2015, while the Windows version is available from June 6, 2019.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 0.35s",
+      "ms": 953,
+      "asr_ms": 578,
+      "translate_ms": 374,
+      "source": "MUZIEK.",
+      "translation": "Music.",
+      "pass": false
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 0.5s",
+      "ms": 353,
+      "asr_ms": 77,
+      "translate_ms": 275,
+      "source": "MUZIEK.",
+      "translation": "Music.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 1.0s",
+      "ms": 404,
+      "asr_ms": 75,
+      "translate_ms": 329,
+      "source": "En de ander...",
+      "translation": "And the other...",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 2.0s",
+      "ms": 488,
+      "asr_ms": 94,
+      "translate_ms": 393,
+      "source": "De andere jongens hadden ze hem.",
+      "translation": "The other boys had him.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "final ASR",
+      "ms": 2063,
+      "source": "En de andere jongens hadden ze hem van harte gegund. Ze waren er in het geheel niet jaloers op geweest. Bruin was een echte ruziemaker en toch was hij laf van aard. Als het misliep door zijn plagen en sarre zette hij het altijd met bekwame spoed op een loper, maar was hij op een eerbiedige afstand.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "fast MT",
+      "ms": 713,
+      "source": "En de andere jongens hadden ze hem van harte gegund. Ze waren er in het geheel niet jaloers op geweest. Bruin was een echte ruziemaker en toch was hij laf van aard. Als het misliep door zijn plagen en sarre zette hij het altijd met bekwame spoed op een loper, maar was hij op een eerbiedige afstand.",
+      "translation": "The other boys had genuinely liked him. They had never been jealous of him. Brown was a",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "refine",
+      "ms": 1291,
+      "source": "En de andere jongens hadden ze hem van harte gegund. Ze waren er in het geheel niet jaloers op geweest. Bruin was een echte ruziemaker en toch was hij laf van aard. Als het misliep door zijn plagen en sarre zette hij het altijd met bekwame spoed op een loper, maar was hij op een eerbiedige afstand.",
+      "translation": "Brown was a real troublemaker, yet he was cowardly at heart. When things went wrong due to his pranks and shenanigans, he always managed to escalate the situation quickly, but he kept his distance in a respectful manner.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 0.35s",
+      "ms": 591,
+      "asr_ms": 591,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 0.5s",
+      "ms": 75,
+      "asr_ms": 75,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 1.0s",
+      "ms": 381,
+      "asr_ms": 75,
+      "translate_ms": 306,
+      "source": "MUZIEK.",
+      "translation": "Music.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 2.0s",
+      "ms": 426,
+      "asr_ms": 75,
+      "translate_ms": 351,
+      "source": "Die kloppen.",
+      "translation": "It hurts.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "final ASR",
+      "ms": 1936,
+      "source": "dik kwam nader en gaf de man en de vrouw een hand toen hij het meisje ook zijn hand toestak bleef zijn recht voor zich uitstaren tot diks grote verbazing hier is dik trom nelly geef hem een hand zei de moeder je nieuwe buurjongetje ze nam nelly's hand en legde die in de hand van dik",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "fast MT",
+      "ms": 720,
+      "source": "dik kwam nader en gaf de man en de vrouw een hand toen hij het meisje ook zijn hand toestak bleef zijn recht voor zich uitstaren tot diks grote verbazing hier is dik trom nelly geef hem een hand zei de moeder je nieuwe buurjongetje ze nam nelly's hand en legde die in de hand van dik",
+      "translation": "Heavily approaching, he gave both the man and the woman his hand when the girl offered him hers, and he",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "refine",
+      "ms": 1435,
+      "source": "dik kwam nader en gaf de man en de vrouw een hand toen hij het meisje ook zijn hand toestak bleef zijn recht voor zich uitstaren tot diks grote verbazing hier is dik trom nelly geef hem een hand zei de moeder je nieuwe buurjongetje ze nam nelly's hand en legde die in de hand van dik",
+      "translation": "Heavily approaching, he gave both the man and the woman his hand when the girl offered him hers, then he stood staring ahead in great surprise. His mother said, \"This is your new neighbor, boy.\" She took Nelly's hand and placed it in Dik's.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 0.35s",
+      "ms": 1314,
+      "asr_ms": 1314,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 0.5s",
+      "ms": 535,
+      "asr_ms": 99,
+      "translate_ms": 435,
+      "source": "een rampetal.",
+      "translation": "a disaster talk.",
+      "pass": false
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 1.0s",
+      "ms": 499,
+      "asr_ms": 88,
+      "translate_ms": 411,
+      "source": "een rampultaal getrokken.",
+      "translation": "A disaster language has been activated.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "draft 2.0s",
+      "ms": 521,
+      "asr_ms": 109,
+      "translate_ms": 411,
+      "source": "de rompertaal getrokken naar een kubike veel.",
+      "translation": "The rear tire is worn out.",
+      "pass": false
+    },
+    {
+      "pair": "nl→en",
+      "stage": "final ASR",
+      "ms": 1938,
+      "source": "portaal getrokken naar een kubijke wereld die gedijt op verbeelding en hebben geen andere keus dan de wereld onder de knie te krijgen terwijl ze op een missie gaan met een bouwexpert genaamd steve acteur jason momoa personage garrett the garbageman garrison",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "fast MT",
+      "ms": 696,
+      "source": "portaal getrokken naar een kubijke wereld die gedijt op verbeelding en hebben geen andere keus dan de wereld onder de knie te krijgen terwijl ze op een missie gaan met een bouwexpert genaamd steve acteur jason momoa personage garrett the garbageman garrison",
+      "translation": "Portal pulled into a cubic world thriving on imagination where they have no choice but to inhabit the world beneath.",
+      "pass": true
+    },
+    {
+      "pair": "nl→en",
+      "stage": "refine",
+      "ms": 1304,
+      "source": "portaal getrokken naar een kubijke wereld die gedijt op verbeelding en hebben geen andere keus dan de wereld onder de knie te krijgen terwijl ze op een missie gaan met een bouwexpert genaamd steve acteur jason momoa personage garrett the garbageman garrison",
+      "translation": "Portal pulled into a cubic world thriving on imagination, where they have no choice but to inhabit the world beneath as they embark on a mission with construction expert Steve, played by Jason Momoa, as Garret the Garbage Man Garrison.",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 0.35s",
+      "ms": 901,
+      "asr_ms": 571,
+      "translate_ms": 329,
+      "source": "Pod.",
+      "translation": "It's.",
+      "pass": false
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 0.5s",
+      "ms": 349,
+      "asr_ms": 72,
+      "translate_ms": 276,
+      "source": "Podpis...",
+      "translation": "Caption...",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 1.0s",
+      "ms": 372,
+      "asr_ms": 85,
+      "translate_ms": 287,
+      "source": "Podpis zdaniem...",
+      "translation": "Caption reads...",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 2.0s",
+      "ms": 504,
+      "asr_ms": 97,
+      "translate_ms": 407,
+      "source": "Podpis zdaniem wszystkich kupców i panu...",
+      "translation": "Signature for all customers and sir...",
+      "pass": false
+    },
+    {
+      "pair": "pl→en",
+      "stage": "final ASR",
+      "ms": 1937,
+      "source": "Podpis, zdaniem wszystkich kupców i bankierów, był pewniejszą gwarancją niż najlepsza kasa ogniotrwała. Scrooge i Marley byli wspólnikami od niepamiętnych czasów. Po śmierci Marleya Scrooge został jego spadkobiercą i wykonawcą testamentu, a jak przez całe życie był jedynym jego towarzyszem, tak po śmierci sam jeden szedł nad smarą.",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "fast MT",
+      "ms": 752,
+      "source": "Podpis, zdaniem wszystkich kupców i bankierów, był pewniejszą gwarancją niż najlepsza kasa ogniotrwała. Scrooge i Marley byli wspólnikami od niepamiętnych czasów. Po śmierci Marleya Scrooge został jego spadkobiercą i wykonawcą testamentu, a jak przez całe życie był jedynym jego towarzyszem, tak po śmierci sam jeden szedł nad smarą.",
+      "translation": "Scrooge and all customers and bankers were a more reliable guarantee than the best lasting cash.",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "refine",
+      "ms": 1811,
+      "source": "Podpis, zdaniem wszystkich kupców i bankierów, był pewniejszą gwarancją niż najlepsza kasa ogniotrwała. Scrooge i Marley byli wspólnikami od niepamiętnych czasów. Po śmierci Marleya Scrooge został jego spadkobiercą i wykonawcą testamentu, a jak przez całe życie był jedynym jego towarzyszem, tak po śmierci sam jeden szedł nad smarą.",
+      "translation": "Scrooge and all customers and bankers were a more reliable guarantee than the best lasting cash. Scrooge and Marley were partners from long ago. After Marley's death, Scrooge became his heir and executor of the will, and for the rest his entire life he was the only one with whom he had companionship, and even after his own death he was alone in the grave.",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 0.35s",
+      "ms": 913,
+      "asr_ms": 580,
+      "translate_ms": 333,
+      "source": "A na...",
+      "translation": "A na",
+      "pass": false
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 0.5s",
+      "ms": 373,
+      "asr_ms": 73,
+      "translate_ms": 300,
+      "source": "dodanie.",
+      "translation": "\"Added.\"",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 1.0s",
+      "ms": 410,
+      "asr_ms": 82,
+      "translate_ms": 327,
+      "source": "i danie stali",
+      "translation": "The dish is stable.",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 2.0s",
+      "ms": 546,
+      "asr_ms": 98,
+      "translate_ms": 447,
+      "source": "Edanie, stałem przy kominku.",
+      "translation": "Edan, I was standing by the fireplace.",
+      "pass": false
+    },
+    {
+      "pair": "pl→en",
+      "stage": "final ASR",
+      "ms": 1776,
+      "source": "stałem przy kominku schyliłem się i podniosłem laskę którą nasz gość zostawił wczorajszego wieczoru był to kij gruby z dużą gałką utoczoną z drzewa pod gałką była srebrna obrączka a na niej napis jakubowi mortimer m r c s",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "fast MT",
+      "ms": 772,
+      "source": "stałem przy kominku schyliłem się i podniosłem laskę którą nasz gość zostawił wczorajszego wieczoru był to kij gruby z dużą gałką utoczoną z drzewa pod gałką była srebrna obrączka a na niej napis jakubowi mortimer m r c s",
+      "translation": "I was leaning by the fireplace and picked up a stick that our guest left yesterday evening - it was a thick branch.",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "refine",
+      "ms": 1318,
+      "source": "stałem przy kominku schyliłem się i podniosłem laskę którą nasz gość zostawił wczorajszego wieczoru był to kij gruby z dużą gałką utoczoną z drzewa pod gałką była srebrna obrączka a na niej napis jakubowi mortimer m r c s",
+      "translation": "I was leaning by the fireplace and picked up a stick that our guest left yesterday evening - it was thick, with a large knob, one end of which had a silver bracelet, on which was written \"J.K. Mortimer M.R.C.S.\"",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 0.35s",
+      "ms": 1564,
+      "asr_ms": 1132,
+      "translate_ms": 431,
+      "source": "Dobra, już.",
+      "translation": "Okay, ready.",
+      "pass": false
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 0.5s",
+      "ms": 381,
+      "asr_ms": 81,
+      "translate_ms": 299,
+      "source": "Dobra, już.",
+      "translation": "Okay, ready.",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 1.0s",
+      "ms": 373,
+      "asr_ms": 77,
+      "translate_ms": 295,
+      "source": "Która...",
+      "translation": "Which...",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "draft 2.0s",
+      "ms": 436,
+      "asr_ms": 81,
+      "translate_ms": 354,
+      "source": "która w obawie przed",
+      "translation": "who is worried",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "final ASR",
+      "ms": 2683,
+      "source": "Która w obawie przed walkami opuściła teren graniczny zaczęła wrącać teraz do swoich domów, chociaż mogła się spodziewać, że zostaną one kompletnie zniszczone. Ruch powrotny ludności przedstawiał poważny problem dla naszego dowództwa. Na drogach równoległych do frontu oraz drogach do wozu i elektrycznych",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "fast MT",
+      "ms": 756,
+      "source": "Która w obawie przed walkami opuściła teren graniczny zaczęła wrącać teraz do swoich domów, chociaż mogła się spodziewać, że zostaną one kompletnie zniszczone. Ruch powrotny ludności przedstawiał poważny problem dla naszego dowództwa. Na drogach równoległych do frontu oraz drogach do wozu i elektrycznych",
+      "translation": "Which one, fearing battles, left the border area now returns to her homes, although she could have stayed.",
+      "pass": true
+    },
+    {
+      "pair": "pl→en",
+      "stage": "refine",
+      "ms": 1482,
+      "source": "Która w obawie przed walkami opuściła teren graniczny zaczęła wrącać teraz do swoich domów, chociaż mogła się spodziewać, że zostaną one kompletnie zniszczone. Ruch powrotny ludności przedstawiał poważny problem dla naszego dowództwa. Na drogach równoległych do frontu oraz drogach do wozu i elektrycznych",
+      "translation": "Which one, fearing battles, left the border area and is now returning to her homes, although she could have expected them to be completely destroyed. The return of civilians presented a serious problem for our leadership. On parallel roads to the front and roads to railroads and electric lines.",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 0.35s",
+      "ms": 863,
+      "asr_ms": 566,
+      "translate_ms": 296,
+      "source": "وكالت",
+      "translation": "Company",
+      "pass": false
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 0.5s",
+      "ms": 385,
+      "asr_ms": 76,
+      "translate_ms": 308,
+      "source": "كالتين",
+      "translation": "Then translate.",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 1.0s",
+      "ms": 487,
+      "asr_ms": 92,
+      "translate_ms": 395,
+      "source": "قلت انجتيدا",
+      "translation": "I said Engtida",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 2.0s",
+      "ms": 482,
+      "asr_ms": 101,
+      "translate_ms": 381,
+      "source": "لتنشتده من المقادة",
+      "translation": "You broke the pot.",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "final ASR",
+      "ms": 1582,
+      "source": "اشتركوا في القناة",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "fast MT",
+      "ms": 424,
+      "source": "اشتركوا في القناة",
+      "translation": "Subscribe to the channel",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "refine",
+      "ms": 505,
+      "source": "اشتركوا في القناة",
+      "translation": "Subscribe to the channel.",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 0.35s",
+      "ms": 1396,
+      "asr_ms": 1396,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 0.5s",
+      "ms": 792,
+      "asr_ms": 792,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 1.0s",
+      "ms": 773,
+      "asr_ms": 773,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 2.0s",
+      "ms": 849,
+      "asr_ms": 849,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "ar→en",
+      "stage": "final ASR",
+      "ms": 1876,
+      "source": "اشتركوا في القناة",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "fast MT",
+      "ms": 1063,
+      "source": "اشتركوا في القناة",
+      "translation": "Subscribe to the channel",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "refine",
+      "ms": 525,
+      "source": "اشتركوا في القناة",
+      "translation": "Subscribe to the channel.",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 0.35s",
+      "ms": 1883,
+      "asr_ms": 1283,
+      "translate_ms": 600,
+      "source": "وشف",
+      "translation": "And saw",
+      "pass": false
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 0.5s",
+      "ms": 526,
+      "asr_ms": 90,
+      "translate_ms": 436,
+      "source": "وجاهه",
+      "translation": "His face",
+      "pass": false
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 1.0s",
+      "ms": 508,
+      "asr_ms": 121,
+      "translate_ms": 386,
+      "source": "وجهوب تج",
+      "translation": "Obayt tajrib",
+      "pass": false
+    },
+    {
+      "pair": "ar→en",
+      "stage": "draft 2.0s",
+      "ms": 485,
+      "asr_ms": 109,
+      "translate_ms": 375,
+      "source": "وزهوب تجل كرامت.",
+      "translation": "God bless you.",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "final ASR",
+      "ms": 2415,
+      "source": "بتاج الكرامات وخصه بالذوق والشم والسمع والبصر والنطق وحسن الصفات اما بعد ايها الاخ الصالح ارشدنا الله واياك للصواب انا مما وضعته الاوائل",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "fast MT",
+      "ms": 1345,
+      "source": "بتاج الكرامات وخصه بالذوق والشم والسمع والبصر والنطق وحسن الصفات اما بعد ايها الاخ الصالح ارشدنا الله واياك للصواب انا مما وضعته الاوائل",
+      "translation": "May Allah guide us and you in the right path. Dear good person, Allah has distinguished you by good taste, smell",
+      "pass": true
+    },
+    {
+      "pair": "ar→en",
+      "stage": "refine",
+      "ms": 1107,
+      "source": "بتاج الكرامات وخصه بالذوق والشم والسمع والبصر والنطق وحسن الصفات اما بعد ايها الاخ الصالح ارشدنا الله واياك للصواب انا مما وضعته الاوائل",
+      "translation": "May Allah guide us and you in the right path. Dear good person, Allah has distinguished you by good taste, smell, hearing, sight, speech, and good character.",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 0.35s",
+      "ms": 929,
+      "asr_ms": 566,
+      "translate_ms": 362,
+      "source": "Mấy chấp",
+      "translation": "How are you?",
+      "pass": false
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 0.5s",
+      "ms": 479,
+      "asr_ms": 96,
+      "translate_ms": 383,
+      "source": "Mày chạp tụi...",
+      "translation": "You owe me.",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 1.0s",
+      "ms": 387,
+      "asr_ms": 88,
+      "translate_ms": 299,
+      "source": "Mấy chạp thôi",
+      "translation": "Just a moment.",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 2.0s",
+      "ms": 609,
+      "asr_ms": 121,
+      "translate_ms": 488,
+      "source": "Mới chập tối, các nhà đã đóng cửa.",
+      "translation": "It just got dark, the houses are already closed.",
+      "pass": false
+    },
+    {
+      "pair": "vi→en",
+      "stage": "final ASR",
+      "ms": 2273,
+      "source": "Mới chập tối, các nhà đã đóng cửa im im, không đâu còn một chút đèn lửa. Những kẻ cày sâu quốc bẫm suốt ngày mệt nhọc khi ấy đều phải trả nợ mắt để nuôi lấy sức làm việc cho ngày mai. Trừ xóm lý trường, các xóm khác đều im phong phát như cánh đồng không, nếu thỉnh thoảng không có tiếng chó sùa bọn người.",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "fast MT",
+      "ms": 931,
+      "source": "Mới chập tối, các nhà đã đóng cửa im im, không đâu còn một chút đèn lửa. Những kẻ cày sâu quốc bẫm suốt ngày mệt nhọc khi ấy đều phải trả nợ mắt để nuôi lấy sức làm việc cho ngày mai. Trừ xóm lý trường, các xóm khác đều im phong phát như cánh đồng không, nếu thỉnh thoảng không có tiếng chó sùa bọn người.",
+      "translation": "Just after dark, the houses are closed tight, no light anywhere. The long day laborers are tired.",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "refine",
+      "ms": 930,
+      "source": "Mới chập tối, các nhà đã đóng cửa im im, không đâu còn một chút đèn lửa. Những kẻ cày sâu quốc bẫm suốt ngày mệt nhọc khi ấy đều phải trả nợ mắt để nuôi lấy sức làm việc cho ngày mai. Trừ xóm lý trường, các xóm khác đều im phong phát như cánh đồng không, nếu thỉnh thoảng không có tiếng chó sùa bọn người.",
+      "translation": "Just after dark, the houses are closed tight, with no light anywhere. The long-day laborers are tired.",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 0.35s",
+      "ms": 932,
+      "asr_ms": 599,
+      "translate_ms": 332,
+      "source": "Bye!",
+      "translation": "Bye!",
+      "pass": false
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 0.5s",
+      "ms": 357,
+      "asr_ms": 76,
+      "translate_ms": 280,
+      "source": "Bạch!",
+      "translation": "Wow!",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 1.0s",
+      "ms": 419,
+      "asr_ms": 80,
+      "translate_ms": 339,
+      "source": "và chức ấm tay",
+      "translation": "and warm hands",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 2.0s",
+      "ms": 530,
+      "asr_ms": 96,
+      "translate_ms": 434,
+      "source": "và chỉ ấm tay kể hút thú",
+      "translation": "And only warm hands to comfort the beast.",
+      "pass": false
+    },
+    {
+      "pair": "vi→en",
+      "stage": "final ASR",
+      "ms": 2068,
+      "source": "Và chiếc ấm tay, kẻ hút thuốc, người phùng miệng thổi bát nước nóng. Lý trưởng tựa lưng bên bức câu lơn, thủ tiếp tránh hội, phó hội, bằng mâm cỗ, chỉ còn rau chuối và lá tía tô. Thư ký trưởng bạ lễ phép chìa đũa mời nhau gắp mấy miếng thịt mỡ khô.",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "fast MT",
+      "ms": 709,
+      "source": "Và chiếc ấm tay, kẻ hút thuốc, người phùng miệng thổi bát nước nóng. Lý trưởng tựa lưng bên bức câu lơn, thủ tiếp tránh hội, phó hội, bằng mâm cỗ, chỉ còn rau chuối và lá tía tô. Thư ký trưởng bạ lễ phép chìa đũa mời nhau gắp mấy miếng thịt mỡ khô.",
+      "translation": "And the hand warmer, the cigarette holder, the mouth-breather blowing hot water. Mr. Li leaned back against the",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "refine",
+      "ms": 1501,
+      "source": "Và chiếc ấm tay, kẻ hút thuốc, người phùng miệng thổi bát nước nóng. Lý trưởng tựa lưng bên bức câu lơn, thủ tiếp tránh hội, phó hội, bằng mâm cỗ, chỉ còn rau chuối và lá tía tô. Thư ký trưởng bạ lễ phép chìa đũa mời nhau gắp mấy miếng thịt mỡ khô.",
+      "translation": "And the hand warmer, the cigarette holder, and the mouth-breather blowing hot water. Mr. Li leaned back against the large scroll, avoiding the main hall and side hall, using the platter, leaving only banana leaves and water spinach. The secretary respectfully offered the fork for everyone to pick some fatty meat.",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 0.35s",
+      "ms": 556,
+      "asr_ms": 556,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 0.5s",
+      "ms": 66,
+      "asr_ms": 66,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 1.0s",
+      "ms": 73,
+      "asr_ms": 73,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "vi→en",
+      "stage": "draft 2.0s",
+      "ms": 98,
+      "asr_ms": 98,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "vi→en",
+      "stage": "final ASR",
+      "ms": 2246,
+      "source": "Mà mình phải hoang mang Trái lại mình phải chuẩn bị Sẵn sàng Phải củng cố hàng ngũ Dân quân phải chặt chẽ Từ cái biện pháp quân sự Lẫn cái biện pháp an ninh Lẫn cái biện pháp bình định lãnh thổ Vẫn cái vấn đề làm cho Ổn có hậu phương Từ cái chuyện lớn Mà về thực thi",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "fast MT",
+      "ms": 1268,
+      "source": "Mà mình phải hoang mang Trái lại mình phải chuẩn bị Sẵn sàng Phải củng cố hàng ngũ Dân quân phải chặt chẽ Từ cái biện pháp quân sự Lẫn cái biện pháp an ninh Lẫn cái biện pháp bình định lãnh thổ Vẫn cái vấn đề làm cho Ổn có hậu phương Từ cái chuyện lớn Mà về thực thi",
+      "translation": "I have to be confused But I must prepare Ready Strengthen the militia Must be strict",
+      "pass": true
+    },
+    {
+      "pair": "vi→en",
+      "stage": "refine",
+      "ms": 1067,
+      "source": "Mà mình phải hoang mang Trái lại mình phải chuẩn bị Sẵn sàng Phải củng cố hàng ngũ Dân quân phải chặt chẽ Từ cái biện pháp quân sự Lẫn cái biện pháp an ninh Lẫn cái biện pháp bình định lãnh thổ Vẫn cái vấn đề làm cho Ổn có hậu phương Từ cái chuyện lớn Mà về thực thi",
+      "translation": "I must prepare and strengthen the militia. But I must also prepare and be strict in military and security measures, as well. And this ensures a solid rear base.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 0.35s",
+      "ms": 582,
+      "asr_ms": 582,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 0.5s",
+      "ms": 401,
+      "asr_ms": 73,
+      "translate_ms": 327,
+      "source": "di nama ini",
+      "translation": "In this name.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 1.0s",
+      "ms": 380,
+      "asr_ms": 76,
+      "translate_ms": 303,
+      "source": "3 dan 1",
+      "translation": "3 and 1",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 2.0s",
+      "ms": 482,
+      "asr_ms": 87,
+      "translate_ms": 395,
+      "source": "Tinggal di dalam bruma nomor",
+      "translation": "Stay in room number 12",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "final ASR",
+      "ms": 1941,
+      "source": "Tinggal dalam rumah nomor tujuh, meskipun ia senantiasa berusaha supaya yang berbeda dengan orang banyak, tetapi ia dipandang orang seperti orang yang ganjil juga. Dan lagi ia masuk bilangan lead yang kenamaan daripada sebuah perkumpulan yang bernama Reform Club. Ada pun rumah tempat tinggal Pilih Svong.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "fast MT",
+      "ms": 648,
+      "source": "Tinggal dalam rumah nomor tujuh, meskipun ia senantiasa berusaha supaya yang berbeda dengan orang banyak, tetapi ia dipandang orang seperti orang yang ganjil juga. Dan lagi ia masuk bilangan lead yang kenamaan daripada sebuah perkumpulan yang bernama Reform Club. Ada pun rumah tempat tinggal Pilih Svong.",
+      "translation": "Living in House Number Seven, although he always tries to be different from others, he nonetheless.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "refine",
+      "ms": 1300,
+      "source": "Tinggal dalam rumah nomor tujuh, meskipun ia senantiasa berusaha supaya yang berbeda dengan orang banyak, tetapi ia dipandang orang seperti orang yang ganjil juga. Dan lagi ia masuk bilangan lead yang kenamaan daripada sebuah perkumpulan yang bernama Reform Club. Ada pun rumah tempat tinggal Pilih Svong.",
+      "translation": "Living in House Number Seven, he always tries to be different from others, but he is still seen as an odd one out. And he is also listed among the most famous members of the Reform Club. Pilih Svong lives here.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 0.35s",
+      "ms": 602,
+      "asr_ms": 602,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 0.5s",
+      "ms": 63,
+      "asr_ms": 63,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 1.0s",
+      "ms": 513,
+      "asr_ms": 72,
+      "translate_ms": 441,
+      "source": "sudah berapa?",
+      "translation": "How many already?",
+      "pass": false
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 2.0s",
+      "ms": 531,
+      "asr_ms": 100,
+      "translate_ms": 431,
+      "source": "sungguh lah anjay patung patung",
+      "translation": "The goddamn statue is a statue.",
+      "pass": false
+    },
+    {
+      "pair": "id→en",
+      "stage": "final ASR",
+      "ms": 1888,
+      "source": "sungguhlah ajaib patung-patung yang kulihat ditempat nyonya tas saoud itu hidupnya hampir hampir bersamaan rupanya dengan waktuanku yang baru ini barangkali pembaca telah maklum bahwa nyonya tas saoud itu di kota london adalah mempunyai rumah pertontonan yang berisi patung-patung daripada lilin dan banyak orang inggris",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "fast MT",
+      "ms": 704,
+      "source": "sungguhlah ajaib patung-patung yang kulihat ditempat nyonya tas saoud itu hidupnya hampir hampir bersamaan rupanya dengan waktuanku yang baru ini barangkali pembaca telah maklum bahwa nyonya tas saoud itu di kota london adalah mempunyai rumah pertontonan yang berisi patung-patung daripada lilin dan banyak orang inggris",
+      "translation": "The truly amazing statues I saw at Mrs. Saud's place seem to have lived almost together.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "refine",
+      "ms": 1354,
+      "source": "sungguhlah ajaib patung-patung yang kulihat ditempat nyonya tas saoud itu hidupnya hampir hampir bersamaan rupanya dengan waktuanku yang baru ini barangkali pembaca telah maklum bahwa nyonya tas saoud itu di kota london adalah mempunyai rumah pertontonan yang berisi patung-patung daripada lilin dan banyak orang inggris",
+      "translation": "The truly amazing statues I saw at Mrs. Saud's place seem to have lived almost together, it turns out. Many English people probably already know that Mrs. Saud's London home has a theater containing wax statues of candles, and many English people are involved.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 0.35s",
+      "ms": 627,
+      "asr_ms": 627,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 0.5s",
+      "ms": 76,
+      "asr_ms": 76,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 1.0s",
+      "ms": 468,
+      "asr_ms": 82,
+      "translate_ms": 385,
+      "source": "sebuah rumah yang...",
+      "translation": "a house...",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "draft 2.0s",
+      "ms": 479,
+      "asr_ms": 92,
+      "translate_ms": 387,
+      "source": "sebuah rumah yang telah tidur",
+      "translation": "A house that has slept.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "final ASR",
+      "ms": 1844,
+      "source": "sebuah rumah yang telah didirikan dengan belanja tak kurang daripada tiga juta pounds uang saku emas inggris banyaknya billingsvong terus menuju ke kamar makan disitu adalah sembilan buah jendela semuanya menghadap kepada sebuah gebun yang penuh dengan pohon-pohon yang kuning rupanya sebab",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "fast MT",
+      "ms": 570,
+      "source": "sebuah rumah yang telah didirikan dengan belanja tak kurang daripada tiga juta pounds uang saku emas inggris banyaknya billingsvong terus menuju ke kamar makan disitu adalah sembilan buah jendela semuanya menghadap kepada sebuah gebun yang penuh dengan pohon-pohon yang kuning rupanya sebab",
+      "translation": "A house built with more than three thousand pounds of English gold savings.",
+      "pass": true
+    },
+    {
+      "pair": "id→en",
+      "stage": "refine",
+      "ms": 1080,
+      "source": "sebuah rumah yang telah didirikan dengan belanja tak kurang daripada tiga juta pounds uang saku emas inggris banyaknya billingsvong terus menuju ke kamar makan disitu adalah sembilan buah jendela semuanya menghadap kepada sebuah gebun yang penuh dengan pohon-pohon yang kuning rupanya sebab",
+      "translation": "A house built with more than £3,000 of English gold savings. Nine windows facing a garden filled with yellow trees can be found in the dining room.",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 0.35s",
+      "ms": 956,
+      "asr_ms": 633,
+      "translate_ms": 322,
+      "source": "Сподай.",
+      "translation": "Sure.",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 0.5s",
+      "ms": 366,
+      "asr_ms": 78,
+      "translate_ms": 288,
+      "source": "Сподар.",
+      "translation": "Farmer.",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 1.0s",
+      "ms": 472,
+      "asr_ms": 88,
+      "translate_ms": 384,
+      "source": "Сподар Деміян.",
+      "translation": "Sypko Demian.",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 2.0s",
+      "ms": 536,
+      "asr_ms": 100,
+      "translate_ms": 436,
+      "source": "Сподар деміян любив хостей.",
+      "translation": "Sidor Demian loved haystacks.",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "final ASR",
+      "ms": 2754,
+      "source": "Господар Дем'ян любив гостей на бесіду скликати. Він був багатший від усіх селян. Всього доволі мав. Було чим шанувати. Вподобався йому найбільший клим. Земляк хороший. Що й казати. На все умів розумну раду дати. Усі дружили з ним. Прийшов.",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "fast MT",
+      "ms": 1471,
+      "source": "Господар Дем'ян любив гостей на бесіду скликати. Він був багатший від усіх селян. Всього доволі мав. Було чим шанувати. Вподобався йому найбільший клим. Земляк хороший. Що й казати. На все умів розумну раду дати. Усі дружили з ним. Прийшов.",
+      "translation": "George Demian liked to invite guests to his tavern. He was richer than all the villagers. He was very well off",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "refine",
+      "ms": 1628,
+      "source": "Господар Дем'ян любив гостей на бесіду скликати. Він був багатший від усіх селян. Всього доволі мав. Було чим шанувати. Вподобався йому найбільший клим. Земляк хороший. Що й казати. На все умів розумну раду дати. Усі дружили з ним. Прийшов.",
+      "translation": "George Demian liked to invite guests to his tavern. He was richer than all the villagers, and he was very well off. His neighbor was also very good. What else could one say? He always knew how to give good advice. Everyone was friendly with him. And then he came.",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 0.35s",
+      "ms": 1751,
+      "asr_ms": 1751,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 0.5s",
+      "ms": 1035,
+      "asr_ms": 1035,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 1.0s",
+      "ms": 1665,
+      "asr_ms": 214,
+      "translate_ms": 1451,
+      "source": "Чо хопс?",
+      "translation": "What happens?",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 2.0s",
+      "ms": 668,
+      "asr_ms": 136,
+      "translate_ms": 532,
+      "source": "Чо хоп здається?",
+      "translation": "What seems to be the problem?",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "final ASR",
+      "ms": 2707,
+      "source": "Чого б, здається, ще хотіти? Кохати б доленьку свою, І воркувати мило, тихо. Так нідже, і в гаю, Никає заведюще лихо. Знайшовся божевільний шпак, І брата меншого.",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "fast MT",
+      "ms": 1649,
+      "source": "Чого б, здається, ще хотіти? Кохати б доленьку свою, І воркувати мило, тихо. Так нідже, і в гаю, Никає заведюще лихо. Знайшовся божевільний шпак, І брата меншого.",
+      "translation": "It seems they still want to love. Kiss your darling, and cuddle softly, quietly. No more, it's",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "refine",
+      "ms": 1595,
+      "source": "Чого б, здається, ще хотіти? Кохати б доленьку свою, І воркувати мило, тихо. Так нідже, і в гаю, Никає заведюще лихо. Знайшовся божевільний шпак, І брата меншого.",
+      "translation": "It seems they still want to love. Kiss your darling, and cuddle softly, quietly. No more, it's rough in the woods. A terrible wolf was found, and a smaller brother.",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 0.35s",
+      "ms": 2349,
+      "asr_ms": 2349,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 0.5s",
+      "ms": 1909,
+      "asr_ms": 116,
+      "translate_ms": 1792,
+      "source": "Він вонтав.",
+      "translation": "He won't.",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 1.0s",
+      "ms": 364,
+      "asr_ms": 84,
+      "translate_ms": 279,
+      "source": "Вонтара!",
+      "translation": "Welcome!",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "draft 2.0s",
+      "ms": 548,
+      "asr_ms": 113,
+      "translate_ms": 435,
+      "source": "Вонтера, подласка відвідається",
+      "translation": "Welcome, sublessee is visiting.",
+      "pass": false
+    },
+    {
+      "pair": "uk→en",
+      "stage": "final ASR",
+      "ms": 2305,
+      "source": "Волонтера, будь ласка, відвідайте веб-сайт lubrnvokz.org. Звукозапис робила Тетяна Гончарик. Була раз одна бідна жінка. Чоловік її умер, і вона була вдовиця, але мала трьох синів. А був також у тім краю цар. Він казав оголосити, що хто зробить таке.",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "fast MT",
+      "ms": 1107,
+      "source": "Волонтера, будь ласка, відвідайте веб-сайт lubrnvokz.org. Звукозапис робила Тетяна Гончарик. Була раз одна бідна жінка. Чоловік її умер, і вона була вдовиця, але мала трьох синів. А був також у тім краю цар. Він казав оголосити, що хто зробить таке.",
+      "translation": "Volunteer, please visit the website lubrnvokz.org. The audio recording was made by Tetyana Gon",
+      "pass": true
+    },
+    {
+      "pair": "uk→en",
+      "stage": "refine",
+      "ms": 1600,
+      "source": "Волонтера, будь ласка, відвідайте веб-сайт lubrnvokz.org. Звукозапис робила Тетяна Гончарик. Була раз одна бідна жінка. Чоловік її умер, і вона була вдовиця, але мала трьох синів. А був також у тім краю цар. Він казав оголосити, що хто зробить таке.",
+      "translation": "Volunteer, please visit the website lubrnvokz.org. The audio recording was made by Tetyana Goncharik. Once a poor woman, she lost her husband and became a widow with three sons. There was also a man in that place who would say, \"Who will do this?\"",
+      "pass": true
+    },
+    {
+      "pair": "en→es",
+      "stage": "draft 0.35s",
+      "ms": 937,
+      "asr_ms": 601,
+      "translate_ms": 336,
+      "source": "to route.",
+      "translation": "a ruta.",
+      "pass": false
+    },
+    {
+      "pair": "en→es",
+      "stage": "draft 0.5s",
+      "ms": 380,
+      "asr_ms": 74,
+      "translate_ms": 305,
+      "source": "to round.",
+      "translation": "tocubrir",
+      "pass": true
+    },
+    {
+      "pair": "en→es",
+      "stage": "draft 1.0s",
+      "ms": 427,
+      "asr_ms": 82,
+      "translate_ms": 345,
+      "source": "to round the ring.",
+      "translation": "redondear el anillo.",
+      "pass": true
+    },
+    {
+      "pair": "en→es",
+      "stage": "draft 2.0s",
+      "ms": 487,
+      "asr_ms": 87,
+      "translate_ms": 400,
+      "source": "to round the ring and which the exit",
+      "translation": "entrar al ring y salir",
+      "pass": true
+    },
+    {
+      "pair": "en→es",
+      "stage": "final ASR",
+      "ms": 1969,
+      "source": "around the ring in which the exhibition is given each seat but the foremost rising higher than the one in front so that every one can get a full view of the sport when all is ready a bull is turned into the ring three or four men come in",
+      "pass": true
+    },
+    {
+      "pair": "en→es",
+      "stage": "fast MT",
+      "ms": 736,
+      "source": "around the ring in which the exhibition is given each seat but the foremost rising higher than the one in front so that every one can get a full view of the sport when all is ready a bull is turned into the ring three or four men come in",
+      "translation": "alrededor del ring, en cada asiento, pero el primero se eleva más que el que está adelante",
+      "pass": true
+    },
+    {
+      "pair": "en→es",
+      "stage": "refine",
+      "ms": 1373,
+      "source": "around the ring in which the exhibition is given each seat but the foremost rising higher than the one in front so that every one can get a full view of the sport when all is ready a bull is turned into the ring three or four men come in",
+      "translation": "alrededor del ring, en cada asiento, pero el primero se eleva más que el que está adelante para que todos puedan tener una buena vista del deporte cuando esté todo listo, cuando el toro entre en el ring, tres o cuatro hombres entran.",
+      "pass": true
+    },
+    {
+      "pair": "en→ru",
+      "stage": "draft 0.35s",
+      "ms": 897,
+      "asr_ms": 562,
+      "translate_ms": 334,
+      "source": "But...",
+      "translation": "Но...",
+      "pass": false
+    },
+    {
+      "pair": "en→ru",
+      "stage": "draft 0.5s",
+      "ms": 357,
+      "asr_ms": 71,
+      "translate_ms": 286,
+      "source": "But...",
+      "translation": "Но...",
+      "pass": true
+    },
+    {
+      "pair": "en→ru",
+      "stage": "draft 1.0s",
+      "ms": 365,
+      "asr_ms": 69,
+      "translate_ms": 295,
+      "source": "Convert",
+      "translation": "Перевести",
+      "pass": true
+    },
+    {
+      "pair": "en→ru",
+      "stage": "draft 2.0s",
+      "ms": 484,
+      "asr_ms": 79,
+      "translate_ms": 405,
+      "source": "Converge some A-",
+      "translation": "Соберите некоторые А.",
+      "pass": true
+    },
+    {
+      "pair": "en→ru",
+      "stage": "final ASR",
+      "ms": 1685,
+      "source": "converge some eight miles out this disposition of the troops would have given additional roads to march over when the advance commenced within supporting distance of each other before i arrived at savannah sherman who had joined the army of the tennessee",
+      "pass": true
+    },
+    {
+      "pair": "en→ru",
+      "stage": "fast MT",
+      "ms": 759,
+      "source": "converge some eight miles out this disposition of the troops would have given additional roads to march over when the advance commenced within supporting distance of each other before i arrived at savannah sherman who had joined the army of the tennessee",
+      "translation": "Совершите转弯eight miles отсюда тактическая disposition войск дала бы дополн",
+      "pass": true
+    },
+    {
+      "pair": "en→ru",
+      "stage": "refine",
+      "ms": 1545,
+      "source": "converge some eight miles out this disposition of the troops would have given additional roads to march over when the advance commenced within supporting distance of each other before i arrived at savannah sherman who had joined the army of the tennessee",
+      "translation": "Тактическая disposition войск на восемь миль отсюда бы дала дополнительные дороги для движения, когда армия начала продвижение, перед тем как мы прибыли в Севастополь, Шерман уже соединился с армией Теннесси.",
+      "pass": true
+    },
+    {
+      "pair": "en→it",
+      "stage": "draft 0.35s",
+      "ms": 581,
+      "asr_ms": 581,
+      "translate_ms": null,
+      "source": "",
+      "translation": "",
+      "pass": false
+    },
+    {
+      "pair": "en→it",
+      "stage": "draft 0.5s",
+      "ms": 389,
+      "asr_ms": 73,
+      "translate_ms": 316,
+      "source": "The O-",
+      "translation": "L'O",
+      "pass": true
+    },
+    {
+      "pair": "en→it",
+      "stage": "draft 1.0s",
+      "ms": 403,
+      "asr_ms": 76,
+      "translate_ms": 327,
+      "source": "The army of the",
+      "translation": "L'esercito del",
+      "pass": true
+    },
+    {
+      "pair": "en→it",
+      "stage": "draft 2.0s",
+      "ms": 468,
+      "asr_ms": 82,
+      "translate_ms": 386,
+      "source": "the army of the Mississippi.",
+      "translation": "la milizia del Mississippi.",
+      "pass": true
+    },
+    {
+      "pair": "en→it",
+      "stage": "final ASR",
+      "ms": 1749,
+      "source": "the army of the mississippi i was named second in command of the whole and was also supposed to be in command of the right wing and reserve orders were given to all the commanders engaged at shiloh to send in their reports without delay to department headquarters",
+      "pass": true
+    },
+    {
+      "pair": "en→it",
+      "stage": "fast MT",
+      "ms": 688,
+      "source": "the army of the mississippi i was named second in command of the whole and was also supposed to be in command of the right wing and reserve orders were given to all the commanders engaged at shiloh to send in their reports without delay to department headquarters",
+      "translation": "L'esercito del Mississippi mi hanno dato il secondo comando del tutto e ero anche nominato comandante di uno",
+      "pass": true
+    },
+    {
+      "pair": "en→it",
+      "stage": "refine",
+      "ms": 1415,
+      "source": "the army of the mississippi i was named second in command of the whole and was also supposed to be in command of the right wing and reserve orders were given to all the commanders engaged at shiloh to send in their reports without delay to department headquarters",
+      "translation": "L'esercito del Mississippi mi ha dato il secondo comando del tutto e ero anche nominato comandante del diritti, le ordini sono state date a tutti i comandanti impegnati a Shiloh di inviare i loro rapporti senza ritardo ai capi del distaccamento.",
+      "pass": true
+    },
+    {
+      "pair": "en→id",
+      "stage": "draft 0.35s",
+      "ms": 1722,
+      "asr_ms": 1179,
+      "translate_ms": 543,
+      "source": "I'm gonna move it.",
+      "translation": "Aku akan menggesakkaninya.",
+      "pass": false
+    },
+    {
+      "pair": "en→id",
+      "stage": "draft 0.5s",
+      "ms": 386,
+      "asr_ms": 76,
+      "translate_ms": 309,
+      "source": "Namolos.",
+      "translation": "Namoles.",
+      "pass": true
+    },
+    {
+      "pair": "en→id",
+      "stage": "draft 1.0s",
+      "ms": 491,
+      "asr_ms": 84,
+      "translate_ms": 407,
+      "source": "The anomalous turn to leave.",
+      "translation": "Anomalous turn to leave.",
+      "pass": true
+    },
+    {
+      "pair": "en→id",
+      "stage": "draft 2.0s",
+      "ms": 463,
+      "asr_ms": 86,
+      "translate_ms": 377,
+      "source": "The animal is turned loose.",
+      "translation": "Hewan dilepaskan.",
+      "pass": true
+    },
+    {
+      "pair": "en→id",
+      "stage": "final ASR",
+      "ms": 2802,
+      "source": "animal is turned loose a lot of these explosives are attached to him the pain from the pricking of the skin by the needles is exasperating but when the explosions of the cartridges commence the animal becomes frantic as he makes a lunge towards one horseman",
+      "pass": true
+    },
+    {
+      "pair": "en→id",
+      "stage": "fast MT",
+      "ms": 977,
+      "source": "animal is turned loose a lot of these explosives are attached to him the pain from the pricking of the skin by the needles is exasperating but when the explosions of the cartridges commence the animal becomes frantic as he makes a lunge towards one horseman",
+      "translation": "hewan itu dilepas banyak of these explosives are attached to him the pain from the pricking of the skin by",
+      "pass": true
+    },
+    {
+      "pair": "en→id",
+      "stage": "refine",
+      "ms": 1476,
+      "source": "animal is turned loose a lot of these explosives are attached to him the pain from the pricking of the skin by the needles is exasperating but when the explosions of the cartridges commence the animal becomes frantic as he makes a lunge towards one horseman",
+      "translation": "Hewan itu dilepas. Ia diikat dengan banyak peralatan meledak. Sakit dari pricking kulit oleh suntik itu mengganggu, tapi ketika meledakkan kartridge, hewan itu menjadi panik dan langsung melompat ke salah satu penumpang kuda.",
+      "pass": true
+    },
+    {
+      "pair": "en→vi",
+      "stage": "draft 0.35s",
+      "ms": 1186,
+      "asr_ms": 862,
+      "translate_ms": 323,
+      "source": "ability",
+      "translation": "kĩ năng",
+      "pass": false
+    },
+    {
+      "pair": "en→vi",
+      "stage": "draft 0.5s",
+      "ms": 418,
+      "asr_ms": 80,
+      "translate_ms": 338,
+      "source": "Belly, go...",
+      "translation": "Cơ belly đi...",
+      "pass": true
+    },
+    {
+      "pair": "en→vi",
+      "stage": "draft 1.0s",
+      "ms": 368,
+      "asr_ms": 78,
+      "translate_ms": 289,
+      "source": "building of getting back",
+      "translation": "building getting back",
+      "pass": true
+    },
+    {
+      "pair": "en→vi",
+      "stage": "draft 2.0s",
+      "ms": 541,
+      "asr_ms": 90,
+      "translate_ms": 451,
+      "source": "ability of getting back to the boats.",
+      "translation": "Kĩ năng trở lại với những chiếc thuyền.",
+      "pass": false
+    },
+    {
+      "pair": "en→vi",
+      "stage": "final ASR",
+      "ms": 1807,
+      "source": "of getting back to the boats and the expedition had to return without reaching the railroad the guns had to be hauled by hand through the water to get back to the boats on the seventeenth of march the army on the tennessee river consisted of five divisions",
+      "pass": true
+    },
+    {
+      "pair": "en→vi",
+      "stage": "fast MT",
+      "ms": 689,
+      "source": "of getting back to the boats and the expedition had to return without reaching the railroad the guns had to be hauled by hand through the water to get back to the boats on the seventeenth of march the army on the tennessee river consisted of five divisions",
+      "translation": "Quay lại với các tàu và expedition phải退回沒有達 railroad，槍砲必須拖回。",
+      "pass": true
+    },
+    {
+      "pair": "en→vi",
+      "stage": "refine",
+      "ms": 877,
+      "source": "of getting back to the boats and the expedition had to return without reaching the railroad the guns had to be hauled by hand through the water to get back to the boats on the seventeenth of march the army on the tennessee river consisted of five divisions",
+      "translation": "Quay lại với các tàu và expedition phải退回沒有達鐵路，槍砲必須拖回。",
       "pass": true
     }
   ],
   "nativeHealth": {
     "ok": true,
     "engine": "mlx-whisper",
+    "engine_label": "mlx-whisper",
     "model": "mlx-community/whisper-large-v3-turbo",
     "ffmpeg": true,
     "translate": true,
     "translate_model": "mlx-community/Qwen2.5-3B-Instruct-4bit",
     "draft_model": "mlx-community/whisper-base-mlx",
+    "device": "apple-silicon",
+    "compute": null,
+    "engine_mode": "fast",
+    "platform": "darwin",
     "features": {
       "fast_translate": true,
       "translate_refine": true,
-      "draft": true
+      "draft": true,
+      "notes": true,
+      "transcribe_file_jobs": true,
+      "streaming_file_jobs": true,
+      "faster_whisper": false,
+      "ui_prefs": true,
+      "models": true
     }
   },
-  "nativeAt": "2026-08-22T21:57:26",
+  "nativeAt": "2026-09-05T22:42:12",
   "command": "node scripts/bench-models.mjs --catalog-only"
 }

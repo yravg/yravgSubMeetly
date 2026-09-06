@@ -46,8 +46,22 @@ case "$(uname -s)" in
     install_one "$HOME/Library/Application Support/Chromium/NativeMessagingHosts" "Chromium"
     ;;
   Linux)
+    # Di Linux host .py bisa dieksekusi langsung asalkan punya shebang dan bit
+    # executable (dipasang di atas) — tidak perlu pembungkus seperti Windows.
+    command -v python3 >/dev/null 2>&1 || {
+      echo "⚠ python3 tidak ditemukan di PATH — host tidak akan bisa dijalankan browser."
+    }
     install_one "$HOME/.config/google-chrome/NativeMessagingHosts" "Google Chrome"
     install_one "$HOME/.config/chromium/NativeMessagingHosts" "Chromium"
+    install_one "$HOME/.config/microsoft-edge/NativeMessagingHosts" "Microsoft Edge"
+    # Paket Flatpak menyimpan konfigurasinya terpisah; tanpa ini pemasangan
+    # "berhasil" tapi browser Flatpak tetap tidak menemukan host.
+    [ -d "$HOME/.var/app/com.google.Chrome" ] &&
+      install_one "$HOME/.var/app/com.google.Chrome/config/google-chrome/NativeMessagingHosts" "Google Chrome (Flatpak)"
+    [ -d "$HOME/.var/app/org.chromium.Chromium" ] &&
+      install_one "$HOME/.var/app/org.chromium.Chromium/config/chromium/NativeMessagingHosts" "Chromium (Flatpak)"
+    [ -d "$HOME/.var/app/com.microsoft.Edge" ] &&
+      install_one "$HOME/.var/app/com.microsoft.Edge/config/microsoft-edge/NativeMessagingHosts" "Microsoft Edge (Flatpak)"
     ;;
   *)
     echo "Unsupported OS — install the manifest manually. See README."

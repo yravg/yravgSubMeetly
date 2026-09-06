@@ -17,6 +17,14 @@ Inspired by the "Local AI Subtitle" extension, rebuilt from scratch on an open s
 
 ---
 
+Panduan pengguna: [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md) (ekstensi Chrome) dan
+[`docs/USER-GUIDE-MACOS.md`](docs/USER-GUIDE-MACOS.md) (aplikasi macOS),
+[`docs/USER-GUIDE-WINLINUX.md`](docs/USER-GUIDE-WINLINUX.md) (helper di Windows/Linux) — juga bisa
+dibaca sebagai halaman di `http://127.0.0.1:8799/guide.html` saat lab berjalan.
+
+Untuk pengembang: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) (lingkungan & build),
+[`docs/QA.md`](docs/QA.md) (uji & tolok ukur), [`docs/RELEASE-CHECKLIST.md`](docs/RELEASE-CHECKLIST.md).
+
 ## The browser extension
 
 An on-device Chrome extension that generates **realtime floating subtitles** for any

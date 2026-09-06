@@ -6,9 +6,11 @@ import {
   isRangeCached,
   mergeLine,
 } from './lib/transcript-cache.js';
+import { migrateSessions, needsMigration } from './lib/session-migrate.js';
+import { normalizeSession, shouldAutosave, AUTOSAVE_INTERVAL_MS } from './lib/session-schema.js';
 import { needsTranslation, pickUntranslatedLines, mergeLinesByTime, sourceText, translationText } from './lib/translation-utils.js';
 import { normalizeInterpreter, isConsecutive } from './lib/interpreter.js';
-import { nativeHostAction, nativeHostSupported, NATIVE_HOST_NAME } from './lib/native-host.js';
+import { nativeHostAction, nativeHostConnection, nativeHostSupported, NATIVE_HOST_NAME } from './lib/native-host.js';
 import { nativeHealth } from './lib/native.js';
 import { NATIVE_MESSAGING_HOST, LOCAL_HELPER_ORIGIN } from './lib/native-protocol.js';
 
@@ -218,6 +220,8 @@ async function stopSession(reason = 'user') {
       lines: session.lines,
       updatedAt: Date.now(),
     });
+    // force: throttle tidak boleh membuat baris terakhir hilang.
+    await autosaveSession({ force: true });
     await saveHistory({
       id: session.cacheKey,
       ts: session.startedAt,
@@ -247,12 +251,60 @@ async function stopSession(reason = 'user') {
   toPanel('state', publicState());
 }
 
+// ---------------------------------------------------------------------------
+// Penyimpanan sesi otomatis.
+//
+// Riwayat sebelumnya hanya ditulis saat sesi DIHENTIKAN. Kalau service worker
+// MV3 dimatikan, tab ditutup mendadak, atau browser crash di tengah sesi,
+// seluruh transkrip sejak sesi dimulai hilang. Simpan berkala selagi berjalan,
+// di-throttle agar tidak menulis pada setiap baris.
+let lastAutosaveAt = 0;
+let autosavePending = false;
+
+/** Snapshot sesi berjalan ke riwayat. `force` melewati throttle (mis. saat berhenti). */
+async function autosaveSession({ force = false } = {}) {
+  if (!session.cacheKey) return;
+  const now = Date.now();
+  if (!shouldAutosave({
+    now, lastAt: lastAutosaveAt, lineCount: session.lines.length,
+    active: session.active, force, intervalMs: AUTOSAVE_INTERVAL_MS,
+  })) {
+    autosavePending = true;
+    return;
+  }
+  lastAutosaveAt = now;
+  autosavePending = false;
+  await saveHistory({
+    id: session.cacheKey,
+    ts: session.startedAt,
+    mode: 'realtime',
+    title: session.tabTitle,
+    url: session.tabUrl,
+    srcLang: session.config?.srcLang,
+    tgtLang: session.config?.tgtLang,
+    lines: session.lines,
+  });
+}
+
 async function saveHistory(entry) {
   const { history = [] } = await chrome.storage.local.get('history');
-  const idx = history.findIndex((h) => h.id === entry.id);
-  if (idx >= 0) history[idx] = { ...history[idx], ...entry, ts: entry.ts || history[idx].ts };
-  else history.unshift(entry);
-  await chrome.storage.local.set({ history: history.slice(0, 50) });
+  // Data lama tidak berversi dan bentuknya beragam; normalkan dulu supaya
+  // pembaca tidak perlu menebak bentuknya.
+  const list = migrateSessions(history);
+  const next = normalizeSession(entry);
+  const idx = list.findIndex((h) => h.id === next.id);
+  if (idx >= 0) list[idx] = { ...list[idx], ...next, ts: next.ts || list[idx].ts };
+  else list.unshift(next);
+  await chrome.storage.local.set({ history: migrateSessions(list) });
+  toPanel('history-updated', {});
+}
+
+/// Migrasi sekali jalan saat service worker bangun, supaya pembaca lain
+/// (panel, ekspor) selalu melihat bentuk kanonis.
+async function migrateHistoryIfNeeded() {
+  const { history } = await chrome.storage.local.get('history');
+  if (!needsMigration(history)) return;
+  await chrome.storage.local.set({ history: migrateSessions(history) });
   toPanel('history-updated', {});
 }
 
@@ -275,6 +327,8 @@ function publicState() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
+  // Pemasangan/pembaruan adalah saat data lama paling mungkin ditemui.
+  void migrateHistoryIfNeeded();
   chrome.contextMenus.create({
     id: 'lts-start',
     title: 'Start Local TransSub on this page / 在此页面启动',
@@ -341,6 +395,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } catch (e) {
           sendResponse({ ok: false, host: NATIVE_HOST_NAME, error: String(e.message || e) });
         }
+        break;
+      }
+
+      case 'native-host-connection': {
+        // Murah dan selalu menjawab — dipakai diagnostik & kartu status untuk
+        // membedakan "host belum dipasang" dari "helper sedang mati".
+        sendResponse(await nativeHostConnection({ timeoutMs: msg.data?.timeoutMs || 4_000 }));
         break;
       }
 
@@ -482,6 +543,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
 
+      case 'perf-sample': {
+        // Sampel waktu ASR/MT dari offscreen: teruskan ke panel dan simpan lokal
+        // (dibatasi) supaya tab Performance bisa membandingkan mesin/bahasa antar sesi.
+        const d = msg.data || {};
+        toPanel('perf-sample', d);
+        void (async () => {
+          try {
+            const { perfSamples = [] } = await chrome.storage.local.get('perfSamples');
+            perfSamples.push(d);
+            if (perfSamples.length > 3000) perfSamples.splice(0, perfSamples.length - 3000);
+            await chrome.storage.local.set({ perfSamples });
+          } catch (e) {
+            console.warn('perf-sample store', e);
+          }
+        })();
+        break;
+      }
+
       case 'subtitle': {
         const d = msg.data;
         const dualLine = session.config?.dualLine ?? false;
@@ -509,6 +588,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           session.lines = mergeLine(session.lines, line);
           session.cacheMaxTime = Math.max(session.cacheMaxTime, line.t1);
+          // Jangan tunggu sesi berhenti: kalau worker mati, yang belum tersimpan hilang.
+          void autosaveSession();
           if (session.cacheKey) {
             await appendToTranscriptCache(session.cacheKey, line, {
               url: session.tabUrl,

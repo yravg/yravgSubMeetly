@@ -1,6 +1,15 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Tab Performance** (child tab Captions): sampel waktu ASR/MT/draft/refine per mesin & bahasa, KPI (p50, RTF), bar/scatter/line SVG murni dengan palet 3 seri tervalidasi CVD, tabel, filter, jendela mengapung yang bisa digeser, ekspor laporan JSON/Markdown + impor laporan/bench untuk membandingkan platform
+- Kartu **Native Helper** (beserta Install steps & Troubleshooting) kini terlipat secara bawaan; **Export subtitles** dipindah ke bawah History; bahasa standar **ZH → EN**
+- Gate rilis: E2E `--native`/`--browser` yang gagal karena renderer tak merespons CDP diterima sebagai residual CWS (keputusan 2026-09-05), sejalan dengan REL-03/04
+- **Notulen:** tipe proyek per rapat (14 nilai) dipilih saat merekam, difilter/dikelompokkan di register, tampil di ekspor; "End & draft" kini menyusun draf dari baris transkrip sesi (sebelumnya hanya berhenti & membuka register)
+- **Pustaka contoh:** 214 transkrip deterministik dari 13 bidang, 26 seri mingguan dengan butir yang dibawa ke minggu berikutnya; impor per seri lewat pipeline notulen asli
+- **Training & gamifikasi** ala DCS_DocConSystem: XP/level/achievement/rentetan, tur Watch/Practise dengan sorotan, kuis dari rapat aktif — panel Library + Training di Minutes Register
+- **Helper:** hanya loopback (CORS ketat, pemeriksaan Host, tolak bind non-loopback), transkripsi streaming berkas >2 GiB (RAM O(jendela)), `GET/POST /engine/device`, aksi `ping` Native Messaging; `run.sh` tak lagi bergantung pada `.venv/bin/activate`
+- **Perbaikan nyata:** modal Settings rusak oleh `</div>` berlebih (16 baris terlempar keluar kartu); tombol lebar app.html macet karena `transition: max-width`; VTT tanpa baris kosong sesudah header ditolak ffmpeg; E2E memakai Chrome for Testing (Chrome bermerek ≥137 mengabaikan `--load-extension`); `bench-lab.py` rusak sejak sampel pindah ke MP3 (dekode kini lewat ffmpeg)
+- **Rilis:** kebijakan privasi ditulis ulang sesuai kode + formulir data-usage CWS; paket MV3 dijaga `test/store-package.test.mjs`; panduan pengguna (Chrome, macOS, Windows/Linux), `docs/DEVELOPMENT.md`, `docs/QA.md`, `docs/RELEASE-CHECKLIST.md`; tolok ukur draft native 111/200 ≤ 500 ms (p50 485 ms)
 - Minutes Register v2: typed register (decision/action/question/risk/metric/note), provenance per item, carry-forward that keeps age, issue/freeze/amend, Markdown/CSV/JSON export
 - Register workspace implements the full Minutes Register design canvas: correction banner ("Ben and Coding" → "bending and coating") with apply / keep-as-heard / glossary, metric detail with series curve, standing register across the series with age + consecutive-meeting pills, A4 issued-MoM document with ‡/↩ markers and Print/PDF, keyboard j/k/a/o/d
 - Side-panel Notes tab is a "Captured so far" ticker; the table lives in the full-tab register

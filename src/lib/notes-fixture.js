@@ -28,7 +28,7 @@ const ATTENDEES = [
 
 function buildW35() {
   let m = createMeeting({
-    id: 'MOM-CPOC7-W35', seriesId: SAMPLE_SERIES_ID, seq: 35,
+    id: 'MOM-CPOC7-W35', seriesId: SAMPLE_SERIES_ID, seq: 35, projectType: 'weekly-progress',
     title: 'CPOC Phase 7 — GZS Weekly Progress Meeting', date: '2026-08-19',
     start: '10:00', end: '12:00', tz: 'GMT+8', chair: 'Nasmee Samang',
     attendees: ATTENDEES, locale: 'en',

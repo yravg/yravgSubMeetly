@@ -1,34 +1,105 @@
-# Privacy Policy — Local TransSub
+# Privacy Policy — Local TransSub (yraverageSub)
 
-**Effective:** 3 September 2026  
-**Product:** Local TransSub (Chrome MV3 extension, optional Native Helper, optional macOS app)
+**Effective:** 5 September 2026
+**Applies to:** the Chrome extension *Local TransSub*, the optional Native Helper
+(`native/`, bound to `127.0.0.1`), and the optional macOS app.
 
 ## Summary
-Local TransSub does **not** collect, sell, or upload your audio, transcripts, or personal content to servers we operate. Speech recognition and translation run **on your device** after any required model files are present locally.
 
-## Data processed on device
-- **Tab / file / microphone / screen audio** you explicitly start capturing — processed in the browser (WASM/WebGPU) and/or an optional Native Helper bound to `127.0.0.1`, or the macOS app.
-- **Transcripts & subtitles** — may be kept in `chrome.storage`, Origin Private File System (OPFS), or local app storage if you use history/export features.
-- **Preferences** — language, engine, font size, and similar settings stored locally.
+Local TransSub does **not** collect, sell, share, or upload your audio, transcripts,
+meeting minutes, or personal content to any server we operate. There is no account,
+no analytics, no advertising, and no cloud inference. Speech recognition and
+translation run **on your device** once model files are present locally.
 
-## Network activity that is not “our cloud”
-- **Model weight downloads** you trigger (for example from Hugging Face or a mirror you select) land in a local cache; they are not our inference API.
-- **Chrome Translator** language packs (when you use that path) are fetched by the browser from Google’s on-device translation infrastructure, not by a Local TransSub backend.
-- We do **not** send audio or transcript text to a Local TransSub server for recognition or translation.
+Everything below is the long form of that one sentence.
 
-## What we do not do
-- No user accounts for the extension.
-- No analytics telemetry or advertising trackers from this extension.
-- No remote code loading from CDNs for the packaged extension runtime (ORT/VAD assets ship inside the package).
+## What the software processes, and where it stays
 
-## Extension permissions
-Permissions such as `tabCapture`, `desktopCapture`, `storage` / `unlimitedStorage`, `offscreen`, `scripting`, `sidePanel`, `tabs` / `activeTab`, `contextMenus`, `nativeMessaging`, and host access needed to inject the overlay on the page you are captioning exist only to implement those features. They are not used to scrape unrelated browsing for a remote service.
+| Data | Why it is processed | Where it lives | How long |
+| --- | --- | --- | --- |
+| Tab, screen, microphone, or file audio **you start capturing** | Speech recognition (Whisper in the browser via WASM/WebGPU, or the local helper) | In memory during the session; audio is not written to disk by the extension | Discarded when the session ends |
+| Transcript and subtitle lines | Live overlay, side-panel transcript, exports | `chrome.storage.local` (session history, at most 50 sessions) and a transcript cache | Until you delete a session or clear extension data |
+| Files you drop for offline transcription | Decoding and chunked staging for large files | Origin Private File System (OPFS) inside the extension | Removed after processing / on clear |
+| Meeting minutes (decisions, action items, owners, flagged moments, pasted Teams transcripts) | The Notes / Minutes Register feature | `chrome.storage.local` (at most 500 meetings). If you press **Sync** or use the macOS app, the same minutes are written to `~/.localtranssub/notes.json` on your machine | Until you delete the meeting |
+| Training progress (XP, levels, achievements, streaks, quiz answers) | The Training / gamification panel | `chrome.storage.local` key `learningProgress` | Until you clear extension data |
+| Preferences (languages, engine, device, theme, overlay position, project type, export options) | Remembering your settings | `chrome.storage.local`; the helper keeps `device.json`, `engine-mode.json`, `ui-prefs.json` under `~/.localtranssub/` | Until changed or cleared |
+| Model weights | Running recognition/translation offline | Browser cache (extension) and `~/.cache/huggingface/hub` (helper) | Until you delete them from the model manager |
 
-## Native Helper
-The optional helper listens on **loopback only** (`127.0.0.1`). It does not open a public internet port. First-time helper model installs may download weights to local disk.
+The **sample library** (200+ example transcripts) is synthetic, generated
+deterministically inside the extension. It contains no real people, meetings, or
+recordings.
 
-## Contact
-For privacy questions about this open-source project, open an issue on the source repository you obtained the extension from.
+## Network activity — none of it is "our cloud"
 
-## Changes
-Material updates to this policy will be noted in the product changelog / store listing.
+The extension makes network requests only in these cases, all initiated by you:
+
+- **Model downloads** from `huggingface.co` or, if you choose it, `hf-mirror.com`,
+  when you pick a model. Weights are cached locally and never re-uploaded.
+- **Chrome's built-in Translator** language packs (Chrome 138+), fetched by the
+  browser itself from Google's on-device translation infrastructure when you use that
+  path. This is Chrome's feature, not a Local TransSub backend.
+- **Loopback only** — `http://127.0.0.1:17865` for the optional Native Helper.
+  The helper accepts connections from this machine only, rejects web pages by
+  origin, checks the `Host` header against DNS rebinding, and refuses to start on a
+  network-reachable address unless you explicitly force it.
+
+There are **no** requests to a Local TransSub server, no telemetry, no crash
+reporting, no advertising SDKs, and no remote code loading (ONNX runtime and VAD
+assets ship inside the package).
+
+The development lab page (`127.0.0.1:8799`) can load CC0 test clips from your own
+machine. That path is inert in the packaged extension.
+
+## Permissions, honestly
+
+| Permission | What it is used for |
+| --- | --- |
+| `tabCapture`, `desktopCapture` | Capturing the audio of the tab or window you choose to caption |
+| `activeTab`, `tabs`, `scripting`, host access `<all_urls>` | Injecting the subtitle overlay into **the page you are captioning** and reading that tab's title/URL for the session record. The extension does not read or scrape pages you are not captioning |
+| `offscreen` | Running the audio pipeline in an offscreen document (MV3 requirement) |
+| `storage`, `unlimitedStorage` | Settings, session history, minutes, training progress, model cache |
+| `sidePanel`, `contextMenus` | The side-panel UI and its context-menu entries |
+| `nativeMessaging` | Starting/stopping the optional local helper without a terminal |
+
+## Your control
+
+- **See** everything stored: side panel → History and Notes; register → Minutes Register.
+- **Delete** a session or meeting from those screens, delete models from Settings →
+  Model Files, or remove all extension data via `chrome://extensions` → Details →
+  *Clear data* / uninstall.
+- **Helper files** are plain JSON under `~/.localtranssub/`; delete the folder to
+  remove them. `~/.cache/huggingface/hub` holds downloaded weights.
+- **Exports** (SRT/VTT/TXT/MD/CSV/JSON) go only where you save them.
+
+## Children, sale of data, third parties
+
+The software is not directed at children and collects no personal data from anyone.
+We do not sell, rent, or transfer data because we never receive it. No third-party
+service processes your content on our behalf.
+
+## Chrome Web Store data-usage disclosure
+
+For the store's *Privacy practices* form, the accurate answers are: the extension
+does **not** collect or transmit user data to the developer; it does not sell data;
+it does not use data for purposes unrelated to its single purpose; it does not use
+data to determine creditworthiness or for lending. Audio and text are processed
+locally and stored only on the user's device.
+
+## Contact and changes
+
+This is an open-source project. For privacy questions, open an issue on the source
+repository you obtained the extension from. Material changes to this policy are
+recorded in the changelog and reflected on the store listing.
+
+---
+
+## Ringkasan (Bahasa Indonesia)
+
+Local TransSub **tidak** mengumpulkan, menjual, atau mengunggah audio, transkrip,
+notulen, maupun konten pribadi Anda ke server kami. Tidak ada akun, analitik, iklan,
+atau inferensi awan. Pengenalan suara dan terjemahan berjalan di perangkat Anda.
+Yang tersimpan — riwayat sesi, notulen, kemajuan latihan, preferensi, bobot model —
+ada di penyimpanan lokal ekstensi atau folder `~/.localtranssub/` dan
+`~/.cache/huggingface/hub` di komputer Anda, dan bisa Anda hapus sendiri. Koneksi
+jaringan hanya untuk unduhan model yang Anda minta (Hugging Face / HF-Mirror), paket
+bahasa Translator milik Chrome, dan helper lokal di `127.0.0.1`.
