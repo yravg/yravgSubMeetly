@@ -477,7 +477,10 @@ function initCollapsibles() {
   try { saved = JSON.parse(localStorage.getItem('uiCollapsed') || '{}'); } catch { saved = {}; }
   document.querySelectorAll('.card.collapsible[data-collapse-key]').forEach((card) => {
     const key = card.dataset.collapseKey;
-    const open = saved[key] === true; // bawaan: tertutup
+    // Bawaan tertutup, kecuali kartu menyatakan data-collapse-default="open"
+    // (kartu Notulen harus terbuka saat panel pertama dibuka).
+    const openByDefault = card.dataset.collapseDefault === 'open';
+    const open = saved[key] === undefined ? openByDefault : saved[key] === true;
     card.classList.toggle('collapsed', !open);
     const btn = card.querySelector('.card-toggle');
     btn?.setAttribute('aria-expanded', String(open));

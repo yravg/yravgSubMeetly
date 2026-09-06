@@ -24,6 +24,33 @@ import { PROJECT_TYPES, normalizeProjectType } from './lib/notes-schema.js';
 
 /* ---- Tipe proyek: preferensi terakhir dipakai untuk rapat berikutnya ---- */
 const PT_PREF_KEY = 'notesProjectType';
+
+/* ---- Lipatan blok panel ------------------------------------------------
+ * Berbagi peta `uiCollapsed` dengan kartu di sidepanel.js: nilai true
+ * berarti TERBUKA. Blok yang belum pernah disentuh memakai bawaannya. */
+const UI_COLLAPSE_KEY = 'uiCollapsed';
+const MEETINGS_VISIBLE = 5;
+
+function readCollapseMap() {
+  try {
+    return JSON.parse(localStorage.getItem(UI_COLLAPSE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function isCollapsed(key, openByDefault = true) {
+  const map = readCollapseMap();
+  return map[key] === undefined ? !openByDefault : map[key] !== true;
+}
+
+function setCollapsed(key, collapsed) {
+  const map = readCollapseMap();
+  map[key] = !collapsed;
+  try {
+    localStorage.setItem(UI_COLLAPSE_KEY, JSON.stringify(map));
+  } catch { /* penyimpanan opsional */ }
+}
 export const ptKey = (t) => `pt_${String(t || 'general').replace(/-/g, '_')}`;
 
 export async function loadProjectTypePref() {
@@ -180,6 +207,29 @@ function captureRailHtml(capture, T, { issued = false, projectType = 'general' }
       </button>`;
 }
 
+/** Bilah rapat di kepala kartu: pemilih rapat + tombol rapat baru.
+ * Saat `creating` bernilai true ia berubah jadi form nama sebaris. */
+function meetingBarHtml({ meetings, active, T, creating }) {
+  if (creating) {
+    return `<input type="text" class="notes-mnew-input" id="notes-new-title"
+        placeholder="${escapeHtml(T('newMeetingPlaceholder'))}" aria-label="${escapeHtml(T('newMeeting'))}" />
+      <button type="button" class="mini-btn notes-mnew" id="btn-notes-new-save">${escapeHtml(T('create'))}</button>
+      <button type="button" class="mini-btn notes-mnew" id="btn-notes-new-cancel" aria-label="${escapeHtml(T('cancelNewMeeting'))}">✕</button>`;
+  }
+  const newBtn = `<button type="button" class="mini-btn notes-mnew" id="btn-notes-new" title="${escapeHtml(T('newMeeting'))}">＋</button>`;
+  if (!meetings.length) {
+    return `<button type="button" class="mini-btn notes-mnew" id="btn-notes-new">＋ ${escapeHtml(T('newMeeting'))}</button>`;
+  }
+  return `<select class="notes-mswitch" id="notes-meeting-switch" aria-label="${escapeHtml(T('meetings'))}">
+      ${meetings
+        .map(
+          (m) =>
+            `<option value="${escapeHtml(m.id)}"${m.id === active?.id ? ' selected' : ''}>${escapeHtml(`${m.date} — ${m.title}`)}</option>`,
+        )
+        .join('')}
+    </select>${newBtn}`;
+}
+
 export function renderNotesPanel(root, state, handlers = {}) {
   const { meetings, active, lang, T, capture, notice, summaryDraft, addingDecision, addingAction, projectType = 'general' } = state;
   const stats = active ? meetingStats(active) : null;
@@ -187,6 +237,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
   const decisions = latestByType(active, lang, 'decision');
   const actions = latestByType(active, lang, 'action');
   const summary = active ? pickText(active.summary, lang) : '';
+  const meetingsCollapsed = isCollapsed('notesMeetings', true);
   const counts = active
     ? ITEM_TYPES.map((t) => [t, active.items.filter((i) => i.type === t).length]).filter(([, n]) => n > 0)
     : [];
@@ -290,14 +341,18 @@ export function renderNotesPanel(root, state, handlers = {}) {
       <p class="notes-meta notes-hint">${escapeHtml(T('panelHint'))}</p>
 
       ${meetings.length
-        ? `<div class="notes-block" id="notes-recent-block">
+        ? `<div class="notes-block notes-collapsible${meetingsCollapsed ? ' collapsed' : ''}" id="notes-recent-block">
             <div class="notes-block-head">
-              <h3>${escapeHtml(T('meetings'))}</h3>
+              <button type="button" class="notes-block-toggle" id="btn-toggle-meetings"
+                      aria-expanded="${meetingsCollapsed ? 'false' : 'true'}" aria-controls="notes-saved-list">
+                <span class="notes-chevron" aria-hidden="true">›</span>
+                <h3>${escapeHtml(T('meetings'))}</h3>
+              </button>
               <span class="notes-count">${meetings.length}</span>
             </div>
             <div class="notes-saved-list" id="notes-saved-list">
               ${meetings
-                .slice(0, 6)
+                .slice(0, MEETINGS_VISIBLE)
                 .map(
                   (m) => `
                 <div class="notes-saved-row">
@@ -316,6 +371,39 @@ export function renderNotesPanel(root, state, handlers = {}) {
         : ''}
     </div>
   `;
+
+  root.querySelector('#btn-toggle-meetings')?.addEventListener('click', () => {
+    const block = root.querySelector('#notes-recent-block');
+    const nowCollapsed = !block.classList.contains('collapsed');
+    block.classList.toggle('collapsed', nowCollapsed);
+    root.querySelector('#btn-toggle-meetings').setAttribute('aria-expanded', String(!nowCollapsed));
+    setCollapsed('notesMeetings', nowCollapsed);
+  });
+
+  // Bilah rapat hidup di .card-head (di luar root) supaya tetap terpakai
+  // ketika isi kartu Notulen dilipat.
+  const bar = state.headMount;
+  if (bar) {
+    bar.innerHTML = meetingBarHtml({ meetings, active, T, creating: !!state.creatingMeeting });
+    bar.querySelector('#notes-meeting-switch')?.addEventListener('change', (e) =>
+      handlers.onSelectMeeting?.(e.target.value),
+    );
+    bar.querySelector('#btn-notes-new')?.addEventListener('click', () => handlers.onNewMeetingStart?.());
+    bar.querySelector('#btn-notes-new-cancel')?.addEventListener('click', () => handlers.onNewMeetingCancel?.());
+    const input = bar.querySelector('#notes-new-title');
+    const commit = () => handlers.onNewMeetingSave?.(input?.value || '');
+    bar.querySelector('#btn-notes-new-save')?.addEventListener('click', commit);
+    input?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handlers.onNewMeetingCancel?.();
+      }
+    });
+    if (input && document.activeElement !== input) input.focus();
+  }
 
   root.querySelector('#btn-open-register')?.addEventListener('click', () => handlers.onOpenRegister?.());
   root.querySelector('#btn-end-draft')?.addEventListener('click', () => handlers.onEndAndDraft?.());
@@ -388,6 +476,7 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
   // Editor poin keputusan & tindak lanjut: form tambah sebaris + hapus per baris.
   let addingDecision = false;
   let addingAction = false;
+  let creatingMeeting = false;
   const guardEditable = (meeting) => {
     if (!meeting) {
       say(T('msgNoMeeting'));
@@ -533,6 +622,8 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
         addingDecision,
         addingAction,
         projectType,
+        creatingMeeting,
+        headMount: document.getElementById('notes-meeting-bar'),
       },
       {
         onOpenRegister: openRegister,
@@ -697,6 +788,46 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
         },
         onSelectMeeting: (id) => {
           activeId = id;
+          summaryDraft = null;
+          addingDecision = false;
+          addingAction = false;
+          creatingMeeting = false;
+          redraw();
+        },
+        onNewMeetingStart: () => {
+          creatingMeeting = true;
+          redraw();
+        },
+        onNewMeetingCancel: () => {
+          creatingMeeting = false;
+          redraw();
+        },
+        // Rapat baru = seri baru (proyek baru), bukan lanjutan seri yang aktif.
+        // Zona waktu dan pemimpin rapat ikut dari rapat aktif kalau ada, sisanya kosong.
+        onNewMeetingSave: async (rawTitle) => {
+          const title = String(rawTitle || '').trim();
+          if (!title) {
+            say(T('newMeetingNeedsTitle'));
+            return;
+          }
+          const base = meetings.find((m) => m.id === activeId) || null;
+          const meeting = createMeeting({
+            title,
+            projectType,
+            locale: lang,
+            seriesId: `S-${Date.now().toString(36)}`,
+            tz: base?.tz,
+            chair: base?.chair,
+          });
+          try {
+            await saveMeeting(meeting);
+          } catch (e) {
+            say(String(e?.message || e));
+            return;
+          }
+          meetings = await listMeetings();
+          activeId = meeting.id;
+          creatingMeeting = false;
           summaryDraft = null;
           addingDecision = false;
           addingAction = false;

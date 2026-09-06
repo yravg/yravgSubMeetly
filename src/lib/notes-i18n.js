@@ -16,6 +16,8 @@ const en = {
   issue: 'Issue MoM',
   issued: 'Issued',
   startNext: 'Start next meeting',
+  newMeeting: 'New meeting', newMeetingPlaceholder: 'Meeting or project name', create: 'Create', cancelNewMeeting: 'Cancel',
+  newMeetingNeedsTitle: 'Give the meeting a name first.',
   exportStanding: 'Export standing register',
 
   /* project types */
@@ -239,6 +241,8 @@ const id = {
   issue: 'Terbitkan Notulen',
   issued: 'Terbit',
   startNext: 'Mulai rapat berikutnya',
+  newMeeting: 'Rapat baru', newMeetingPlaceholder: 'Nama rapat atau proyek', create: 'Buat', cancelNewMeeting: 'Batal',
+  newMeetingNeedsTitle: 'Beri nama rapatnya dulu.',
   exportStanding: 'Ekspor register berjalan',
 
   date: 'Tanggal', time: 'Waktu', chair: 'Pimpinan', present: 'Hadir', mom: 'Notulen',

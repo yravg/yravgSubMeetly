@@ -203,10 +203,15 @@
 
       <!-- ============ Meeting notes (top-level Notes tab) ============ -->
       <div id="view-notes" class="view-panel hidden">
-      <section class="card reveal" id="notes-card">
-        <div class="card-head reveal reveal-delay-1">
-          <h2 data-i18n="notesTitle">📝 Meeting notes</h2>
+      <section class="card reveal collapsible" id="notes-card" data-collapse-key="notes" data-collapse-default="open">
+        <div class="card-head notes-card-head reveal reveal-delay-1">
+          <button type="button" class="card-toggle" id="notes-card-toggle" aria-expanded="true" aria-controls="notes-body">
+            <h2 data-i18n="notesTitle">📝 Meeting notes</h2>
+            <span class="card-chevron" aria-hidden="true">›</span>
+          </button>
+          <div class="notes-mbar" id="notes-meeting-bar"></div>
         </div>
+        <div id="notes-body">
         <details id="paste-transcript" class="paste-transcript reveal reveal-delay-2" data-density="detail">
           <summary data-i18n="pasteTitle">Paste a Teams transcript → minutes</summary>
           <p class="notes-meta" data-i18n="pasteHelp">
@@ -222,6 +227,7 @@
           <div id="paste-result" class="paste-result"></div>
         </details>
         <div id="notes-mount" class="reveal reveal-delay-2"></div>
+        </div>
       </section>
       </div>
     </main>
