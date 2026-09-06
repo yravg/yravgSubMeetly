@@ -148,7 +148,19 @@ test('penerima segmen: interim sementara, final permanen, arah dua arah, status 
 
     send('error', { message: 'Uji galat' });
     await wait(200);
-    return { statusListening, interimTampil, interimTersisa, baris, statusGalat: status() };
+    const box = document.getElementById('error-box');
+    return {
+      statusListening,
+      interimTampil,
+      interimTersisa,
+      baris,
+      statusGalat: status(),
+      kartuGalat: {
+        tampil: !box.classList.contains('hidden'),
+        judul: document.getElementById('error-title').textContent.trim(),
+        detail: document.getElementById('error-detail').textContent.trim(),
+      },
+    };
   });
 
   assert.match(r.statusListening, /wasm/, 'status pipeline tidak memuat perangkat');
@@ -159,7 +171,12 @@ test('penerima segmen: interim sementara, final permanen, arah dua arah, status 
   const semua = r.baris.join(' | ');
   assert.match(semua, /ID → EN.*Good morning/, `baris ID→EN hilang — isi: ${semua}`);
   assert.match(semua, /EN → ID.*Terima kasih/, `baris EN→ID hilang — isi: ${semua}`);
-  assert.match(r.statusGalat, /Uji galat/, 'galat pipeline tidak sampai ke baris status');
+  // Galat pipeline kini tampil sebagai kartu ramah: baris status memuat judul
+  // kategorinya, sedangkan pesan mentah pindah ke bagian "Detail teknis".
+  assert.equal(r.kartuGalat.tampil, true, 'kartu galat tidak muncul');
+  assert.ok(r.statusGalat.length > 0, 'baris status kosong saat galat');
+  assert.equal(r.kartuGalat.judul, r.statusGalat, 'judul kartu dan baris status tidak sinkron');
+  assert.match(r.kartuGalat.detail, /Uji galat/, 'pesan mentah hilang dari detail teknis');
 });
 
 test('overlay subtitel di-host app.html: sesi membangun panel, final merender baris, sesi selesai membongkar', async () => {

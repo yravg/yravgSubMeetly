@@ -37,6 +37,7 @@ import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
+import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js';
 import { mountPerfPanel } from './perf-panel.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
@@ -547,6 +548,8 @@ function setMode(mode) {
   $('rt-target').classList.toggle('hidden', mode !== 'realtime');
   $('btn-pick').classList.toggle('hidden', mode !== 'realtime');
   $('pick-hint').classList.add('hidden');
+  hideError();
+  if (!state.running) setStartStep(null);
   $('off-drop').classList.toggle('hidden', mode !== 'offline');
   $('off-results').classList.toggle('hidden', mode !== 'offline' || state.offlineLines.length === 0);
   const qaBar = $('qa-sample-bar');
@@ -1749,8 +1752,81 @@ function updateButtons() {
 
 function setStatus(text, cls = '') {
   const el = $('status-line');
-  el.textContent = text;
   el.className = 'status-line ' + cls;
+  $('status-text').textContent = text;
+  const dot = $('status-dot');
+  dot.classList.toggle('hidden', !text);
+  dot.className =
+    'status-dot ' + (!text ? 'hidden' : cls === 'ok' ? 'on' : cls === 'error' ? 'error' : 'busy');
+}
+
+/** Denyut singkat saat satu baris subtitel mendarat — tanda sesi masih hidup. */
+function flashStatusDot() {
+  const dot = $('status-dot');
+  if (!dot || dot.classList.contains('hidden')) return;
+  dot.classList.remove('flash');
+  void dot.offsetWidth;
+  dot.classList.add('flash');
+}
+
+/* ---- Strip langkah mulai realtime -------------------------------------
+ * `key` = langkah yang sedang berjalan; langkah sebelumnya jadi centang.
+ * null menyembunyikan strip; { failed: true } menandai `key` merah. */
+const START_STEPS = ['capture', 'models', 'warmup', 'listening'];
+function setStartStep(key, { failed = false } = {}) {
+  const host = $('start-steps');
+  if (!host) return;
+  if (!key) {
+    host.classList.add('hidden');
+    host.querySelectorAll('li').forEach((li) => (li.className = ''));
+    return;
+  }
+  host.classList.remove('hidden');
+  const idx = START_STEPS.indexOf(key);
+  host.querySelectorAll('li').forEach((li, i) => {
+    li.className = i < idx ? 'done' : i === idx ? (failed ? 'failed' : 'current') : '';
+    if (i === idx && key === 'listening' && !failed) li.className = 'done current';
+  });
+}
+
+/* ---- Kartu kendala -----------------------------------------------------
+ * Pesan mentah dari pipeline diterjemahkan lib/friendly-error.js menjadi
+ * kategori, lalu panel menampilkan judul + langkah pemulihan + satu aksi. */
+function showError(raw, { statusText } = {}) {
+  const { key, action, detail } = classifyError(raw);
+  const title = t(errTitleKey(key));
+  const hint = t(errHintKey(key));
+  setStatus(statusText ?? title, key === 'cancelled' ? '' : 'error');
+  const box = $('error-box');
+  if (!box) return;
+  if (key === 'cancelled') {
+    hideError();
+    return;
+  }
+  $('error-title').textContent = title;
+  $('error-hint').textContent = hint;
+  const showDetail = detail && detail !== title && key !== 'captureBlocked';
+  $('error-detail-wrap').classList.toggle('hidden', !showDetail);
+  $('error-detail-wrap').open = false;
+  $('error-detail').textContent = detail;
+  const btn = $('btn-error-action');
+  btn.classList.toggle('hidden', !action);
+  btn.dataset.action = action || '';
+  btn.textContent =
+    action === 'pick' ? t('errActionPick') : action === 'settings' ? t('errActionSettings') : t('errActionRetry');
+  box.classList.remove('hidden');
+}
+
+function hideError() {
+  $('error-box')?.classList.add('hidden');
+}
+
+function onErrorAction() {
+  const action = $('btn-error-action').dataset.action;
+  hideError();
+  if (action === 'pick') onPickManually();
+  else if (action === 'settings') $('btn-settings').click();
+  else if (action === 'retry') onStart();
 }
 
 // Toast umpan balik: ekspor + notulen. aria-live di #toast-stack agar
@@ -1785,6 +1861,7 @@ if (typeof window !== 'undefined') window.__ltsToast = showToast;
 
 async function startWithStream(streamId, captureType) {
   setStatus(t('loadingModels'));
+  setStartStep('models');
   state.realtimeLines = [];
   clearLivePreview();
   $('live-preview').classList.remove('hidden');
@@ -1808,7 +1885,8 @@ async function startWithStream(streamId, captureType) {
 
 function showCaptureError(message) {
   const blocked = /invoked|activeTab|not been invoked/i.test(message);
-  setStatus(blocked ? t('needInvoke') : message, 'error');
+  showError(message, { statusText: blocked ? t('needInvoke') : undefined });
+  setStartStep('capture', { failed: true });
   if (blocked) {
     $('pick-hint').textContent = t('pickHint');
     $('pick-hint').classList.remove('hidden');
@@ -1873,6 +1951,9 @@ async function onStart() {
       return;
     }
     if (!state.currentTab) return;
+    hideError();
+    setStatus(t('requestingCapture'));
+    setStartStep('capture');
     let streamId = null;
     try {
       streamId = await chrome.tabCapture.getMediaStreamId({
@@ -1924,6 +2005,8 @@ async function onStop() {
     syncCaptureStamp();
     if (isLabHarness()) releaseLabCapture();
     setStatus('');
+    setStartStep(null);
+    hideError();
     updateButtons();
   } else {
     toOffscreen('offline-cancel', {});
@@ -2264,23 +2347,39 @@ chrome.runtime.onMessage.addListener((msg) => {
       state.running = !!msg.data.active;
       syncCaptureStamp();
       updateButtons();
-      if (!state.running && state.mode === 'realtime') setStatus('');
+      if (!state.running && state.mode === 'realtime') {
+        setStatus('');
+        setStartStep(null);
+      }
       break;
     case 'subtitle':
       pushLive(msg.data);
+      if (!msg.data?.interim) flashStatusDot();
       break;
     case 'perf-sample':
       perfPanel?.push(msg.data);
       break;
     case 'pipeline-status': {
       const s = msg.data?.state;
-      if (s === 'loading') setStatus(t('loadingModels'));
-      else if (s === 'listening')
+      if (s === 'loading') {
+        const d = msg.data?.detail;
+        setStatus(d === 'asr' ? t('loadingAsr') : d === 'translator' ? t('loadingTranslator') : t('loadingModels'));
+        setStartStep('models');
+      } else if (s === 'warmup') {
+        setStatus(t('warmingUp'));
+        setStartStep('warmup');
+      } else if (s === 'listening') {
         setStatus(`${t('listening')} — ${activeAsrLabel()} (${msg.data.device || ''})`, 'ok');
+        setStartStep('listening');
+      }
       break;
     }
     case 'error':
-      setStatus(msg.data?.message || 'Error', 'error');
+      showError(msg.data?.message || 'Error');
+      if (state.mode === 'realtime') {
+        const li = $('start-steps')?.querySelector('li.current');
+        setStartStep(li?.dataset?.step || 'models', { failed: true });
+      }
       state.running = false;
       syncCaptureStamp();
       updateButtons();
@@ -2295,7 +2394,7 @@ chrome.runtime.onMessage.addListener((msg) => {
       dlState.delete(msg.data?.key);
       renderDlList();
       renderModelLists();
-      setStatus(`Model: ${msg.data?.message || 'download failed'}`, 'error');
+      showError(`Model: ${msg.data?.message || 'download failed'}`);
       break;
     case 'offline-line':
       pushOfflineLine(msg.data);
@@ -2361,7 +2460,12 @@ chrome.runtime.onMessage.addListener((msg) => {
         };
         redrawHelperStatus?.();
       }
-      setStatus(msg.data?.cancelled ? t('cancelled') : msg.data?.message || 'Error', msg.data?.cancelled ? '' : 'error');
+      if (msg.data?.cancelled) {
+        setStatus(t('cancelled'));
+        hideError();
+      } else {
+        showError(msg.data?.message || 'Error');
+      }
       updateButtons();
       break;
     case 'history-updated':
@@ -2467,6 +2571,8 @@ function wire() {
   $('btn-start').addEventListener('click', onStart);
   $('btn-stop').addEventListener('click', onStop);
   $('btn-pick').addEventListener('click', onPickManually);
+  $('btn-error-action').addEventListener('click', onErrorAction);
+  $('btn-error-dismiss').addEventListener('click', hideError);
   $('btn-paste-generate')?.addEventListener('click', () => void generateMinutesFromPaste());
   $('history-search')?.addEventListener('input', () => {
     void renderHistory();

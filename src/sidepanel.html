@@ -132,7 +132,25 @@
         <div id="model-warning" class="warning hidden reveal reveal-delay-3" data-density="detail"></div>
         <div id="dl-list" class="dl-list hidden reveal reveal-delay-3" data-density="detail"></div>
 
-        <div id="status-line" class="status-line reveal reveal-delay-3"></div>
+        <div id="status-line" class="status-line reveal reveal-delay-3"><span id="status-dot" class="status-dot hidden"></span><span id="status-text"></span></div>
+        <ol id="start-steps" class="start-steps hidden reveal reveal-delay-3" aria-label="Start progress">
+          <li data-step="capture" data-i18n="stepCapture">Capture</li>
+          <li data-step="models" data-i18n="stepModels">Models</li>
+          <li data-step="warmup" data-i18n="stepWarmup">Warm-up</li>
+          <li data-step="listening" data-i18n="stepListening">Listening</li>
+        </ol>
+        <div id="error-box" class="error-box hidden reveal reveal-delay-3" role="alert">
+          <div id="error-title" class="error-title"></div>
+          <div id="error-hint" class="error-hint"></div>
+          <details id="error-detail-wrap" class="error-detail hidden">
+            <summary data-i18n="errShowDetail">Technical detail</summary>
+            <code id="error-detail"></code>
+          </details>
+          <div class="error-actions">
+            <button id="btn-error-action" class="mini-btn hidden"></button>
+            <button id="btn-error-dismiss" class="mini-btn" data-i18n-title="errDismiss">✕</button>
+          </div>
+        </div>
       </section>
 
       <!-- ============ Group 3: Actions & Preview ============ -->
