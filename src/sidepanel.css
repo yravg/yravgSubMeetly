@@ -304,6 +304,17 @@ input[type='range']:hover { cursor: pointer; }
   border: 1px solid var(--border);
   flex-shrink: 1;
   min-width: 0;
+  /* Hug the buttons. inline-flex alone does not survive a stretching parent:
+     in a column flex or grid container the default align-items: stretch blows
+     the group out to the full width and leaves the pill stranded beside a run
+     of empty track. A definite width beats stretch. */
+  width: max-content;
+  max-width: 100%;
+  /* pill palette (MP-04); --pill-inset must match the padding above */
+  position: relative;
+  --pill-bg: var(--accent-strong);
+  --pill-fg: var(--on-accent);
+  --pill-inset: var(--space-1, 2px);
 }
 .view-tabs button {
   border: none;
@@ -319,8 +330,7 @@ input[type='range']:hover { cursor: pointer; }
   transition: all var(--transition-fast);
 }
 .view-tabs button.active {
-  background: var(--accent-strong);
-  color: var(--on-accent);
+  color: var(--pill-fg);
   font-weight: var(--font-semibold);
 }
 .topbar-actions {
@@ -341,6 +351,14 @@ input[type='range']:hover { cursor: pointer; }
   border-radius: var(--radius-full);
   padding: 3px;
   flex-shrink: 0;
+  /* Hug the buttons; a stretching parent would strand the pill (see .seg). */
+  width: max-content;
+  max-width: 100%;
+  /* pill palette (MP-04); --pill-inset must match the padding above */
+  position: relative;
+  --pill-bg: var(--card2);
+  --pill-fg: var(--text);
+  --pill-inset: 3px;
 }
 .density button {
   border: 0;
@@ -359,9 +377,9 @@ input[type='range']:hover { cursor: pointer; }
   transition: all var(--transition-fast);
 }
 .density button:hover { color: var(--text); }
+.density:not(.mo-has-pill) button.active { background: var(--pill-bg); }
 .density button.active {
-  background: var(--card2);
-  color: var(--text);
+  color: var(--pill-fg);
   font-weight: var(--font-semibold);
   box-shadow: var(--shadow-sm);
 }
@@ -412,6 +430,15 @@ main { padding: var(--space-3); display: flex; flex-direction: column; gap: var(
   border-radius: var(--radius-full);
   padding: var(--space-1);
   border: 1px solid var(--border);
+  /* Hug the buttons — see .view-tabs above. `.seg.wide` and `.seg.wrap` set
+     width: 100% further down and deliberately win over this. */
+  width: max-content;
+  max-width: 100%;
+  /* pill palette (MP-04); --pill-inset must match the padding above */
+  position: relative;
+  --pill-bg: var(--accent-strong);
+  --pill-fg: var(--on-accent);
+  --pill-inset: var(--space-1, 3px);
 }
 .seg.wrap {
   flex-wrap: wrap;
@@ -429,13 +456,33 @@ main { padding: var(--space-3); display: flex; flex-direction: column; gap: var(
   font-weight: var(--font-medium);
   transition: all var(--transition-fast);
 }
-.seg button.active { background: var(--accent-strong); color: var(--on-accent); font-weight: var(--font-semibold); }
+.seg button.active { color: var(--pill-fg); font-weight: var(--font-semibold); }
 .seg.wide { display: flex; width: 100%; }
 .seg.wide button { flex: 1; }
-#task-toggle button.active,
-#mirror-toggle button.active,
-#device-toggle button.active { background: var(--card3); color: var(--text); }
-#mode-toggle button.active { background: var(--accent-strong); color: var(--on-accent); }
+#task-toggle,
+#mirror-toggle,
+#device-toggle { --pill-bg: var(--card3); --pill-fg: var(--text); }
+
+/* MP-04 — a spring-driven pill travels behind the selected button, so the
+   active button paints no background of its own. Groups that never get a pill
+   (`.seg.wrap` wraps onto several rows, so one pill cannot track it) keep
+   painting themselves, which is also the pre-JS and JS-failed state. */
+.seg:not(.mo-has-pill) button.active,
+.view-tabs:not(.mo-has-pill) button.active,
+.subtabs:not(.mo-has-pill) button.active { background: var(--pill-bg); }
+.mo-has-pill > button { position: relative; z-index: 1; background: none; }
+.mo-pill {
+  position: absolute;
+  top: var(--pill-inset, 3px);
+  bottom: var(--pill-inset, 3px);
+  left: 0;
+  width: 0;
+  border-radius: var(--radius-full);
+  background: var(--pill-bg);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, width;
+}
 
 .qa-sample-bar {
   margin: 0 0 var(--space-3);
@@ -512,6 +559,12 @@ select {
 }
 select:focus { outline: 1px solid var(--accent); }
 
+/* MP-03 clips these wrappers to animate their height; the panel inside keeps
+   its own margin, which sits within the wrapper and is measured with it.
+   They start closed in CSS and are opened by autoHeight, so a panel whose
+   script never ran stays hidden rather than flashing open. */
+.warning-wrap,
+.mo-reveal { overflow: hidden; height: 0; }
 .warning {
   background: var(--warn-bg);
   border: 1px solid var(--warn-border);
@@ -529,8 +582,16 @@ select:focus { outline: 1px solid var(--accent); }
   display: flex; justify-content: space-between; gap: var(--space-2);
   font-size: var(--text-sm); color: var(--text2); margin-bottom: var(--space-1);
 }
-.dl-row .dl-label .pct { flex-shrink: 0; }
+.dl-row .dl-label .pct { flex-shrink: 0; display: inline-flex; align-items: baseline; gap: 0; }
+.dl-row .dl-label .dl-live { display: inline-flex; align-items: baseline; }
+/* The odometers split this line into flex items, and a flex item drops its
+   trailing space — which would glue the separator to the percentage. */
+.dl-row .dl-label .dl-size { white-space: pre; }
 .dl-row.done .dl-label { color: var(--accent-soft); }
+/* Finished rows collapse the running figures down to a tick. */
+.dl-row .dl-tick { display: none; }
+.dl-row.done .dl-tick { display: inline; }
+.dl-row.done .dl-live { display: none; }
 
 .progress { margin-top: var(--space-3); }
 .bar {
@@ -539,7 +600,10 @@ select:focus { outline: 1px solid var(--accent); }
 .fill {
   height: 100%; width: 0%;
   background: linear-gradient(90deg, var(--accent), var(--accent-soft));
-  border-radius: var(--radius-full); transition: width var(--transition-base);
+  border-radius: var(--radius-full);
+  /* No CSS transition: springProgress (MP-02) drives this width frame by
+     frame. A fixed-duration ease restarted on every burst is exactly the
+     stutter this replaces. */
 }
 .progress-row {
   display: flex; justify-content: space-between; margin-top: var(--space-1);
@@ -1190,9 +1254,22 @@ body.is-running .bottom-nav-item[data-view='captions'] .label::after {
 /* ==========================================================================
    Sub-tab Captions (Live | Performance), kartu collapsible, tab Performance
    ========================================================================== */
-.subtabs { display: inline-flex; gap: 2px; margin: 0 0 10px; padding: 2px; border-radius: var(--radius-full, 999px); background: var(--card2, #262626); border: 1px solid var(--border, #333); }
+.subtabs {
+  display: inline-flex; gap: 2px; margin: 0 0 10px; padding: 2px;
+  border-radius: var(--radius-full, 999px); background: var(--card2, #262626);
+  border: 1px solid var(--border, #333);
+  /* .view-captions is a column flex container, whose default align-items:
+     stretch blew this group out to the full panel width and left the pill
+     stranded beside empty track. A definite width beats stretch. */
+  width: max-content; max-width: 100%;
+  /* pill palette (MP-04); --pill-inset must match the padding above */
+  position: relative;
+  --pill-bg: var(--accent-strong, #14b789);
+  --pill-fg: var(--on-accent, #fff);
+  --pill-inset: 2px;
+}
 .subtabs button { border: 0; background: none; color: var(--muted, #b4b4b4); font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 999px; cursor: pointer; }
-.subtabs button.active { background: var(--accent, #14b789); color: var(--on-accent, #fff); font-weight: 600; }
+.subtabs button.active { color: var(--pill-fg); font-weight: var(--font-semibold, 600); }
 
 .card.collapsible .card-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
 .card.collapsible .card-toggle h2 { margin: 0; }

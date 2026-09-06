@@ -48,6 +48,7 @@ import {
   firstSampleForPair,
   fetchSampleFile,
 } from './lib/qa-samples.js';
+import { springProgress, slidingNumber, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -434,6 +435,7 @@ function setSubview(sub) {
     b.classList.toggle('active', on);
     b.setAttribute('aria-selected', String(on));
   });
+  syncPill('captions-subtabs');
   document.querySelectorAll('#view-captions > section.card').forEach((sec) => sec.classList.toggle('hidden', perf));
   $('view-perf')?.classList.toggle('hidden', !perf);
   if (perf) perfPanel?.render();
@@ -456,6 +458,10 @@ function applyDensity(mode, { persist = true } = {}) {
     b.classList.toggle('active', on);
     b.setAttribute('aria-pressed', String(on));
   });
+  syncPill('density-toggle');
+  // Simple mode takes the Captions subtabs out of the flow entirely, so their
+  // pill is re-placed once Detail puts them back and they can be measured.
+  if (density === 'detail') requestAnimationFrame(() => syncPill('captions-subtabs', false));
   // Performance hanya hidup di Detail — jangan tinggalkan pengguna di tab yang hilang.
   if (density === 'simple') setSubview('live');
   if (persist) {
@@ -581,6 +587,8 @@ function setView(view) {
       });
     });
   }
+  syncPill('view-tabs');
+  syncPill('captions-subtabs');
 }
 
 function syncBottomNav() {
@@ -598,6 +606,84 @@ function syncBottomNav() {
 }
 
 // ---------------------------------------------------------------------------
+// MP-04 — a spring-driven pill travels behind the active button of a segmented
+// group. Each group keeps its own click handlers and its own `.active`
+// stamping; the pill only follows, so `syncPill` is called wherever the active
+// button is actually decided. `.seg.wrap` groups are deliberately left out —
+// they wrap onto several rows and one pill cannot track that.
+const PILL_GROUPS = [
+  'view-tabs', 'density-toggle', 'captions-subtabs', 'mode-toggle', 'task-toggle',
+  'theme-toggle', 'asr-preset-toggle', 'mirror-toggle', 'device-toggle',
+  'native-device-toggle',
+];
+const pills = new Map();
+
+function mountPills() {
+  for (const id of PILL_GROUPS) {
+    const host = $(id);
+    if (!host || pills.has(id)) continue;
+    const pill = document.createElement('span');
+    pill.className = 'mo-pill';
+    host.prepend(pill);
+    host.classList.add('mo-has-pill');
+    pills.set(id, highlight(host, { pill, bind: false, selectedAttr: null, activeClass: 'active' }));
+  }
+}
+
+function syncPill(id, animated = true) {
+  // hl.sync() re-reads the DOM's own idea of which button is active, so the
+  // `.active` convention stays in one place. A host inside the closed settings
+  // modal measures 0 and is skipped there; it is re-synced when it opens.
+  pills.get(id)?.sync(animated);
+}
+
+function resyncPills(animated = false) {
+  for (const id of pills.keys()) syncPill(id, animated);
+}
+
+// MP-03 — panels that appear in place grow and collapse instead of popping in.
+// Only genuine in-place reveals get this: swapping the realtime and offline
+// panels is a layout change, and animating its height would read as a glitch.
+const panels = new Map();
+let warnPanel = null;
+
+function mountPanel(id, wrapId, opts = {}) {
+  const wrap = $(wrapId);
+  const inner = $(id);
+  if (!wrap || !inner || panels.has(id)) return null;
+  const panel = autoHeight(wrap, {
+    inner,
+    open: false,
+    onSettled: (open) => {
+      wrap.setAttribute('aria-hidden', String(!open));
+      if (!open && opts.clearOnClose) inner.innerHTML = '';
+    },
+  });
+  panels.set(id, panel);
+  return panel;
+}
+
+function showPanel(id, open) {
+  const panel = panels.get(id);
+  if (!panel) return;
+  if (open) {
+    panel.open();
+    $(`${id}-wrap`)?.setAttribute('aria-hidden', 'false');
+  } else {
+    panel.close();
+  }
+}
+
+function mountPanels() {
+  warnPanel = mountPanel('model-warning', 'model-warning-wrap', { clearOnClose: true });
+  mountPanel('qa-sample-bar', 'qa-sample-wrap');
+  // #native-block deliberately keeps its .hidden toggle rather than getting
+  // MP-03: test/app-surfaces.test.mjs asserts that class directly, and the
+  // behaviour it guards — the helper card appears only on the Native engine —
+  // matters more than the reveal animating.
+}
+
+// ---------------------------------------------------------------------------
 // mode / task toggles
 function setMode(mode) {
   const modeChanged = state.mode !== mode;
@@ -606,6 +692,7 @@ function setMode(mode) {
   document.querySelectorAll('#mode-toggle button').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === mode);
   });
+  syncPill('mode-toggle');
   $('rt-target').classList.toggle('hidden', mode !== 'realtime');
   $('btn-pick').classList.toggle('hidden', mode !== 'realtime');
   $('pick-hint').classList.add('hidden');
@@ -613,10 +700,7 @@ function setMode(mode) {
   if (!state.running) setStartStep(null);
   $('off-drop').classList.toggle('hidden', mode !== 'offline');
   $('off-results').classList.toggle('hidden', mode !== 'offline' || state.offlineLines.length === 0);
-  const qaBar = $('qa-sample-bar');
-  if (qaBar) {
-    qaBar.classList.toggle('hidden', mode !== 'offline' || !state.qaCatalog?.samples?.length);
-  }
+  showPanel('qa-sample-bar', mode === 'offline' && !!state.qaCatalog?.samples?.length);
   $('live-preview').classList.add('hidden');
   updateButtons();
   updateWarning();
@@ -677,6 +761,7 @@ function setTask(task) {
   document.querySelectorAll('#task-toggle button').forEach((b) => {
     b.classList.toggle('active', b.dataset.task === task);
   });
+  syncPill('task-toggle');
   $('tgt-col').style.opacity = task === 'translate' ? '1' : '0.4';
   $('tgt-lang').disabled = task !== 'translate';
   updateWarning();
@@ -767,8 +852,7 @@ function updateWarning() {
   }
 
   if (issues.length === 0 && !directNote) {
-    el.classList.add('hidden');
-    el.innerHTML = '';
+    warnPanel?.close();
     return;
   }
   const seenKeys = new Set();
@@ -785,7 +869,9 @@ function updateWarning() {
   el.innerHTML = [issues.map((i) => i.msg).join('<br>'), buttons, manage, directNote]
     .filter(Boolean)
     .join('<br>');
-  el.classList.remove('hidden');
+  // Content first, then open: autoHeight measures what is already there.
+  warnPanel?.open();
+  if (warnPanel) $('model-warning-wrap').setAttribute('aria-hidden', 'false');
   el.querySelectorAll('.dl-now').forEach((b) => {
     b.addEventListener('click', () => startDownload(b.dataset.key));
   });
@@ -807,6 +893,11 @@ function openSettings({ about = false } = {}) {
     setTimeout(() => search.focus({ preventScroll: true }), 30);
   }
   $('settings-modal').classList.remove('hidden');
+  // Nothing inside a display:none modal has a width or a height to measure, so
+  // the groups and panels living in here are placed the moment it opens.
+  for (const id of ['theme-toggle', 'asr-preset-toggle', 'mirror-toggle', 'device-toggle', 'native-device-toggle']) {
+    syncPill(id, false);
+  }
   lastNativeAutoStartMs = 0;
   labEnsureAttempted = false;
   checkNative({ allowAutoStart: true });
@@ -869,26 +960,61 @@ function startDownload(key) {
   toOffscreen('model-download', { key });
 }
 
+// Rows are built once per key and then updated in place. Re-rendering the list
+// on every progress event used to throw away the DOM a dozen times a second,
+// which is what made the bars restart their ease and stutter — and it would
+// destroy the springs driving them.
+const dlRows = new Map(); // key -> row handles
+
+const mb = (n) => (n / 1024 / 1024).toFixed(1);
+
+function makeDlRow(key) {
+  const row = document.createElement('div');
+  row.className = 'dl-row';
+  row.innerHTML = `
+    <div class="dl-label">
+      <span class="dl-name"></span>
+      <span class="pct"><span class="dl-live"><span class="dl-size"><span class="dl-loaded"></span> / <span class="dl-total"></span> MB · </span><span class="dl-pct"></span>%</span><span class="dl-tick">✓</span></span>
+    </div>
+    <div class="bar"><div class="fill"></div></div>`;
+
+  const handles = {
+    row,
+    name: row.querySelector('.dl-name'),
+    size: row.querySelector('.dl-size'),
+    total: row.querySelector('.dl-total'),
+    loaded: slidingNumber(row.querySelector('.dl-loaded'), { decimals: 1 }),
+    pct: slidingNumber(row.querySelector('.dl-pct'), { decimals: 0 }),
+    bar: springProgress(row.querySelector('.fill')),
+  };
+  dlRows.set(key, handles);
+  return handles;
+}
+
 function renderDlList() {
   const host = $('dl-list');
-  const entries = [...dlState.entries()];
-  host.classList.toggle('hidden', entries.length === 0);
-  const mb = (n) => (n / 1024 / 1024).toFixed(1);
-  host.innerHTML = '';
-  for (const [key, d] of entries) {
-    const pct = Math.round(d.pct || 0);
-    const row = document.createElement('div');
-    row.className = 'dl-row' + (d.done ? ' done' : '');
-    const detail = d.done
-      ? '✓'
-      : d.total
-        ? `${mb(d.loaded)} / ${mb(d.total)} MB · ${pct}%`
-        : `${pct}%`;
-    row.innerHTML = `
-      <div class="dl-label"><span></span><span class="pct">${detail}</span></div>
-      <div class="bar"><div class="fill" style="width:${d.done ? 100 : pct}%"></div></div>`;
-    row.querySelector('.dl-label span').textContent = `⬇ ${t('downloading')}: ${labelForKey(key)}`;
-    host.appendChild(row);
+  host.classList.toggle('hidden', dlState.size === 0);
+
+  for (const [key, handles] of dlRows) {
+    if (dlState.has(key)) continue;
+    handles.loaded.destroy();
+    handles.pct.destroy();
+    handles.bar.destroy();
+    handles.row.remove();
+    dlRows.delete(key);
+  }
+
+  for (const [key, d] of dlState) {
+    const h = dlRows.get(key) || makeDlRow(key);
+    if (!h.row.isConnected) host.appendChild(h.row);
+
+    h.name.textContent = `⬇ ${t('downloading')}: ${labelForKey(key)}`;
+    h.row.classList.toggle('done', !!d.done);
+    h.size.hidden = d.done || !d.total;
+    if (d.total) h.total.textContent = mb(d.total);
+    h.loaded.to(d.done ? (d.total || 0) / 1024 / 1024 : (d.loaded || 0) / 1024 / 1024);
+    h.pct.to(d.done ? 100 : Math.round(d.pct || 0));
+    h.bar.to(d.done ? 100 : d.pct || 0);
   }
 }
 
@@ -942,6 +1068,7 @@ function renderUiLangToggle() {
       await saveSettings();
       await loadSettings();
       applyI18n();
+      resyncPills(false);
       fillSelects();
       updateWarning();
       renderHistory();
@@ -999,7 +1126,7 @@ function renderQaSampleBar() {
   if (!bar || !sel) return;
   const samples = state.qaCatalog?.samples || [];
   const show = state.mode === 'offline' && samples.length > 0;
-  bar.classList.toggle('hidden', !show);
+  showPanel('qa-sample-bar', show);
   if (!samples.length) return;
   const prev = sel.value;
   sel.innerHTML = samples
@@ -1060,6 +1187,7 @@ function renderAsrPreset() {
   host.querySelectorAll('button').forEach((b) => {
     b.classList.toggle('active', b.dataset.preset === cur);
   });
+  syncPill('asr-preset-toggle');
   const hint = $('asr-preset-hint');
   if (hint) {
     if (cur) {
@@ -1153,6 +1281,7 @@ function applyTheme() {
   document.querySelectorAll('#theme-toggle button').forEach((b) => {
     b.classList.toggle('active', b.dataset.theme === theme);
   });
+  syncPill('theme-toggle');
 }
 
 async function setTheme(theme) {
@@ -1268,7 +1397,11 @@ async function loadSettings() {
   document.querySelectorAll('#device-toggle button').forEach((b) =>
     b.classList.toggle('active', b.dataset.device === state.settings.device),
   );
+  syncPill('mirror-toggle');
+  syncPill('device-toggle');
   $('native-block').classList.toggle('hidden', state.settings.engine !== 'native');
+  // Only measurable once the block is actually shown.
+  syncPill('native-device-toggle', false);
   $('native-url').value = state.settings.nativeUrl || DEFAULT_NATIVE_URL;
   renderNativeDeviceUi();
   syncDualLineCheckboxes();
@@ -2601,6 +2734,10 @@ chrome.runtime.onMessage.addListener((msg) => {
 // ---------------------------------------------------------------------------
 // wiring
 function wire() {
+  mountPills();
+  mountPanels();
+  // Label widths change with the UI language and with the panel width.
+  window.addEventListener('resize', () => resyncPills(false));
   document.querySelectorAll('#view-tabs button').forEach((b) =>
     b.addEventListener('click', () => setView(b.dataset.view)),
   );
@@ -2882,6 +3019,7 @@ async function init() {
   wire();
   applyI18n();
   const uiPrefs = await restoreUiPrefs();
+  resyncPills(false);
   fillSelects();
   setView('captions');
   await restoreDensity();

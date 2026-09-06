@@ -75,7 +75,7 @@
         </div>
 
         <!-- CC0 QA samples (visible when catalog is reachable, e.g. lab :8799) -->
-        <div id="qa-sample-bar" class="qa-sample-bar hidden reveal reveal-delay-4">
+        <div class="mo-reveal" id="qa-sample-wrap" aria-hidden="true"><div id="qa-sample-bar" class="qa-sample-bar reveal reveal-delay-4">
           <div class="qa-sample-head">
             <span class="lbl" data-i18n="qaSamples">CC0 test samples</span>
             <span class="qa-sample-hint" data-i18n="qaSamplesHint"
@@ -86,7 +86,7 @@
             <select id="qa-sample-select" aria-label="CC0 sample"></select>
             <button type="button" id="btn-qa-run" class="mini-btn" data-i18n="qaRunSample">Run sample</button>
           </div>
-        </div>
+        </div></div>
       </section>
 
       <!-- ============ Group 2: Task & Languages ============ -->
@@ -133,7 +133,10 @@
           </div>
         </div>
 
-        <div id="model-warning" class="warning hidden reveal reveal-delay-3" data-density="detail"></div>
+        <!-- data-density sits on the clipping wrapper, not the banner: Simple mode
+             must take the whole thing out of the flow, and the wrapper is what
+             carries the height MP-03 animates. -->
+        <div class="warning-wrap" id="model-warning-wrap" aria-hidden="true" data-density="detail"><div id="model-warning" class="warning reveal reveal-delay-3"></div></div>
         <div id="dl-list" class="dl-list hidden reveal reveal-delay-3" data-density="detail"></div>
 
         <div id="status-line" class="status-line reveal reveal-delay-3"><span id="status-dot" class="status-dot hidden"></span><span id="status-text"></span></div>
