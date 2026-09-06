@@ -96,9 +96,24 @@ export function mountDock(h) {
   const L = loadLayout();
   const body = $('#body');
   const center = $('#center');
-  const panels = { left: $('#nav-panel'), right: $('#drawer'), bottom: $('#src-panel') };
-  const splits = { left: $('[data-split="left"]'), right: $('[data-split="right"]'), bottom: $('[data-split="bottom"]') };
-  const rails = { left: $('#rail-left'), right: $('#rail-right'), bottom: $('#rail-bottom') };
+  // Dicari saat dipakai, bukan ditangkap sekali saat mount: register menggambar
+  // ulang isinya, jadi simpul yang ditangkap di awal bisa lepas dari dokumen
+  // (atau belum ada) dan `el.classList` melempar di tengah paint().
+  const panels = {
+    get left() { return $('#nav-panel'); },
+    get right() { return $('#drawer'); },
+    get bottom() { return $('#src-panel'); },
+  };
+  const splits = {
+    get left() { return $('[data-split="left"]'); },
+    get right() { return $('[data-split="right"]'); },
+    get bottom() { return $('[data-split="bottom"]'); },
+  };
+  const rails = {
+    get left() { return $('#rail-left'); },
+    get right() { return $('#rail-right'); },
+    get bottom() { return $('#rail-bottom'); },
+  };
   const dock = $('#viewdock');
   let T = h.T();
   let gesture = null;
@@ -128,6 +143,7 @@ export function mountDock(h) {
   /* ---------------- panel placement ---------------- */
   function placePanel(key) {
     const el = panels[key], p = L[key], split = splits[key], rail = rails[key];
+    if (!el || !split || !rail) return;
     el.classList.remove('float', 'dragging');
     el.style.left = ''; el.style.top = ''; el.style.width = ''; el.style.height = '';
     // Put the node back in its docked slot if it was floating.
@@ -152,8 +168,10 @@ export function mountDock(h) {
     }
     const head = el.querySelector('.phead');
     if (head) {
-      head.querySelector('[data-act="float"]').hidden = p.mode === 'float';
-      head.querySelector('[data-act="dock"]').hidden = p.mode !== 'float';
+      const bFloat = head.querySelector('[data-act="float"]');
+      const bDock = head.querySelector('[data-act="dock"]');
+      if (bFloat) bFloat.hidden = p.mode === 'float';
+      if (bDock) bDock.hidden = p.mode !== 'float';
     }
   }
   function placeTop() {
@@ -211,7 +229,13 @@ export function mountDock(h) {
     }
     if (e.target.closest('#viewdock .dgrip, #dock-mini')) {
       const r = dock.getBoundingClientRect();
-      beginGesture(e, { kind: 'dockmove', offX: e.clientX - r.left, offY: e.clientY - r.top });
+      beginGesture(e, {
+        kind: 'dockmove',
+        offX: e.clientX - r.left,
+        offY: e.clientY - r.top,
+        startX: e.clientX,
+        startY: e.clientY,
+      });
       return;
     }
     const head = e.target.closest('.panel .phead');
@@ -266,6 +290,11 @@ export function mountDock(h) {
       g.h = Math.max(160, g.startH + (g.last.y - g.startY));
       g.el.style.width = g.w + 'px'; g.el.style.height = g.h + 'px';
     } else if (g.kind === 'dockmove') {
+      // Ambang seret: jitter beberapa piksel saat MENGKLIK tombol mini bukan niat
+      // memindahkan dok. Tanpa ini satu klik biasa sudah menghitung sebagai geser,
+      // dok terlepas dari tepinya, lalu mendarat di koordinat lama — mengambang di
+      // tengah isi halaman. Ambangnya sama semangatnya dengan gestur `undock`.
+      if (!g.moved && Math.hypot(g.last.x - g.startX, g.last.y - g.startY) < 6) return;
       g.moved = true;
       g.x = Math.max(0, Math.min(r.width - 80, lx - g.offX));
       g.y = Math.max(0, Math.min(r.height - 40, ly - g.offY));
@@ -290,8 +319,13 @@ export function mountDock(h) {
       placePanel(g.key);
     } else if (g.kind === 'floatresize' && g.w != null) { L[g.key].w = g.w; L[g.key].h = g.h; }
     else if (g.kind === 'dockmove') {
-      L.dock.pos = hint === 'dock-top' ? 'top' : hint === 'dock-bottom' ? 'bottom' : 'free';
-      if (g.x != null) { L.dock.x = g.x; L.dock.y = g.y; }
+      // HANYA seretan nyata yang boleh memindahkan dok. Sebelum penjagaan ini,
+      // klik diam pun jatuh ke cabang `: 'free'` — dok lepas dari tepi bawah dan
+      // muncul mengambang di koordinat tersimpan yang sudah basi.
+      if (g.moved) {
+        L.dock.pos = hint === 'dock-top' ? 'top' : hint === 'dock-bottom' ? 'bottom' : 'free';
+        if (g.x != null) { L.dock.x = g.x; L.dock.y = g.y; }
+      }
       dockMoved = g.moved;
       placeDock();
     }
@@ -338,9 +372,11 @@ export function mountDock(h) {
   /* ---------------- floating view dock ---------------- */
   function setSearch(open) {
     searchOpen = open;
-    $('#dock-search').hidden = !open;
-    $('#btn-search-open').hidden = open;
-    if (open) $('#q').focus();
+    const box = $('#dock-search');
+    if (box) box.hidden = !open;
+    const btn = $('#btn-search-open');
+    if (btn) btn.hidden = open;
+    if (open) $('#q')?.focus();
   }
   $('#btn-search-open').addEventListener('click', () => { closePops(); setSearch(true); });
   $('#btn-search-close').addEventListener('click', () => {
@@ -355,6 +391,29 @@ export function mountDock(h) {
   }, true);
   $('#btn-dock-mini').addEventListener('click', () => { L.dock.mini = true; closePops(); placeDock(); save(); });
   $('#dock-mini').addEventListener('click', () => { if (dockMoved) { dockMoved = false; return; } L.dock.mini = false; placeDock(); save(); });
+
+  // Membuka dok tanpa klik: arahkan kursor ke tombol mini selama 2 detik.
+  // Sentuh dilewati (tidak punya hover), begitu pula saat sedang menyeret —
+  // menahan jari di atas tombol bukan permintaan membuka.
+  const HOVER_EXPAND_MS = 2000;
+  let hoverTimer = null;
+  function cancelHoverExpand() {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+    dock.classList.remove('hover-arming');
+  }
+  $('#dock-mini').addEventListener('pointerenter', (e) => {
+    if (e.pointerType === 'touch' || !L.dock.mini || gesture) return;
+    dock.classList.add('hover-arming');
+    hoverTimer = setTimeout(() => {
+      cancelHoverExpand();
+      L.dock.mini = false;
+      placeDock();
+      save();
+    }, HOVER_EXPAND_MS);
+  });
+  $('#dock-mini').addEventListener('pointerleave', cancelHoverExpand);
+  $('#dock-mini').addEventListener('pointerdown', cancelHoverExpand);
 
   /* ---------------- popovers (types, translate, settings) ---------------- */
   const POPS = [['#types-pop', '#btn-types'], ['#lang-pop', '#btn-lang'], ['#settings-pop', '#btn-settings']];
@@ -384,16 +443,20 @@ export function mountDock(h) {
     const s = h.state(); const m = h.activeMeeting();
     const tgt = s.tgt; const total = m ? m.items.length : 0; const done = translatedCount(m, tgt);
     const complete = total > 0 && done === total;
-    $('#lang-tgt').textContent = tgt.toUpperCase();
-    $('#lang-tgt-name').textContent = (TARGET_LANGS.find((l) => l[0] === tgt) || [tgt, tgt])[1];
-    $('#lang-src').textContent = (m?.locale || 'auto').toUpperCase();
-    $('#lang-done').hidden = !complete;
-    $('#btn-lang .pend').hidden = complete || !m;
-    $('#btn-lang').title = `${T('translateTitle')} · ${(m?.locale || 'auto').toUpperCase()} → ${tgt.toUpperCase()}`;
+    const set = (sel, prop, val) => { const el = $(sel); if (el) el[prop] = val; };
+    set('#lang-tgt', 'textContent', tgt.toUpperCase());
+    set('#lang-tgt-name', 'textContent', (TARGET_LANGS.find((l) => l[0] === tgt) || [tgt, tgt])[1]);
+    set('#lang-src', 'textContent', (m?.locale || 'auto').toUpperCase());
+    set('#lang-done', 'hidden', !complete);
+    set('#btn-lang .pend', 'hidden', complete || !m);
+    set('#btn-lang', 'title', `${T('translateTitle')} · ${(m?.locale || 'auto').toUpperCase()} → ${tgt.toUpperCase()}`);
     const btn = $('#btn-translate');
-    btn.disabled = complete || !m || translating != null;
-    btn.textContent = translating != null ? T('translating', translating) : complete ? T('translated') : T('translateN', total - done);
-    $('#lang-list').innerHTML = TARGET_LANGS.map(([code, name]) => {
+    if (btn) {
+      btn.disabled = complete || !m || translating != null;
+      btn.textContent = translating != null ? T('translating', translating) : complete ? T('translated') : T('translateN', total - done);
+    }
+    const list = $('#lang-list');
+    if (list) list.innerHTML = TARGET_LANGS.map(([code, name]) => {
       const n = translatedCount(m, code);
       const st = total && n === total ? ['done', T('langDone')] : n ? ['part', T('langPartial', n, total)] : ['', T('langReady')];
       return `<button type="button" class="lp-row" data-tgt="${code}" aria-pressed="${code === tgt}"><span class="mono lp-code">${code.toUpperCase()}</span><span class="lp-name">${esc(name)}</span><span class="lp-state ${st[0]}">${esc(st[1])}</span></button>`;
@@ -458,9 +521,11 @@ export function mountDock(h) {
   function paintSources() {
     const m = h.activeMeeting(); const s = h.state();
     const host = $('#src-body');
-    if (!m) { host.innerHTML = ''; $('#src-count').textContent = ''; return; }
+    const count = $('#src-count');
+    if (!host) return;
+    if (!m) { host.innerHTML = ''; if (count) count.textContent = ''; return; }
     const rows = m.items.filter((it) => it.src).slice().sort((a, b) => (a.src.t0 || 0) - (b.src.t0 || 0));
-    $('#src-count').textContent = rows.length ? T('srcCount', rows.length, m.items.length) : '';
+    if (count) count.textContent = rows.length ? T('srcCount', rows.length, m.items.length) : '';
     if (!rows.length) { host.innerHTML = `<div class="empty" style="padding:18px">${esc(T('noSourcesYet'))}</div>`; return; }
     host.innerHTML = rows.map((it) => {
       const conf = it.confidence == null ? null : Math.round(it.confidence * 100);
@@ -479,12 +544,15 @@ export function mountDock(h) {
 
   /* ---------------- per-paint sync ---------------- */
   function paint() {
+    // Lapisan tata letak tidak boleh menggagalkan render register: register
+    // menggambar ulang DOM-nya, jadi satu simpul yang belum/tidak ada di sini
+    // dulu melempar di tengah paint() dan membatalkan sisa halaman.
     T = h.T();
     const s = h.state();
-    $('#nav-views').querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-current', String(b.dataset.view === s.view)));
-    $('#btn-search-open').setAttribute('aria-pressed', String(!!s.q));
+    $('#nav-views')?.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-current', String(b.dataset.view === s.view)));
+    $('#btn-search-open')?.setAttribute('aria-pressed', String(!!s.q));
     if (s.q && !searchOpen) setSearch(true);
-    $('#btn-types').setAttribute('aria-pressed', String(s.types.size > 0 || s.reviewOnly));
+    $('#btn-types')?.setAttribute('aria-pressed', String(s.types.size > 0 || s.reviewOnly));
     placePanel('right');
     paintSources();
     paintLang();
