@@ -10,20 +10,13 @@
 
 ## Posisi sekarang
 
-**Plan selesai: semua task `done` (`task next` → done: true), gate rilis CLEAR.**
-Keputusan pengguna 2026-09-05 (a): E2E `--native` dan `e2e-file --browser` yang gagal konsisten
-(`Runtime.callFunctionOn timed out`, renderer panel tak merespons CDP) **diterima sebagai residual CWS**
-di `scripts/mark-release-priorities.mjs` (`E2E-e2e-native*`, `E2E-e2e-file*`) dengan alasan yang sama
-seperti REL-03/REL-04: helper bukan artefak store, jalur `--browser` opsional. Penyebab renderer tetap
-dilacak — langkah diagnosis di bagian Verifikasi. Jangan menghapus `test/last-e2e.json` untuk
-"membersihkan" gate.
+**Plan NgodingPakeAI selesai** (semua task `done`), **gate rilis CLEAR**, dan final `sync`
+sudah dijalankan (234 ringkasan, wiki dibangun ulang).
 
-**Final `sync` NgodingPakeAI** menutup siklus + membangun ulang wiki. Ringkasan ditulis per slice oleh
-subagen ke `.ngodingpakeai/summaries.part-*.json` lalu digabung ke `summaries.json` sebelum `sync`.
-Statusnya dicatat di bagian Verifikasi (baris "Sync").
-
-**Task Windows/Linux (`1c23b894-…`)** dipindahkan pengguna lewat web UI sehingga layer backend terbuka;
-panduannya ada di `docs/USER-GUIDE-WINLINUX.md` (diverifikasi dari isi; belum pernah dieksekusi di Windows).
+**Peringatan yang masih berlaku:** `dist/` pernah menjadi satu-satunya tempat fitur dock
+hidup. Sumbernya kini ada di `src/` (lihat butir 27), jadi `npm run build` aman. Kalau kelak
+menemukan fitur yang hanya ada di `dist/`, jangan build sebelum sumbernya dipulihkan —
+build menyalin `src/` menimpa `dist/`.
 
 ## Selesai di sesi ini
 
@@ -142,12 +135,35 @@ Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per ta
 
 Ketiganya dijaga `test/app-surfaces.test.mjs`.
 
+### Pemulihan dock workspace Minutes (permintaan pengguna)
+27. **Dock hanya ada di build lama.** `id="viewdock"` tidak pernah ter-commit di
+    `src/minutes.html` (dibuktikan `git log -S` di semua cabang), `minutes.js` tak pernah
+    memanggil `mountDock()`, CSS-nya nihil, dan `src/minutes-dock.js` menganggur tanpa pemakai.
+    Dipulihkan dari build yang menyimpannya (esbuild menyalin apa adanya): HTML 164→320 baris,
+    CSS 672→913 baris, 102 kunci i18n per bahasa, pemasangan `mountDock()`, dan `state.tgt`
+    (popover terjemahan membacanya lalu melempar `undefined.toUpperCase`).
+28. **Klik diam melepas dock dari tepinya.** Menekan tombol minimize memulai gestur `dockmove`;
+    `endGesture` selalu menulis posisi baru, dan tanpa gerakan tidak ada snap-hint sehingga
+    jatuh ke `'free'` di koordinat basi — dock mengambang di tengah konten. Kini posisi hanya
+    berubah pada seretan nyata (ambang 6 px).
+29. **`$('.main')` null di kerangka workspace** (kelas itu milik tata letak toolbar lama),
+    membuat `paint()` melempar di tengah render dan membatalkan sisa halaman. Kini jatuh ke
+    `#center`. Referensi panel dock juga dibuat lazy + tahan-null: lapisan tata letak tidak
+    boleh sanggup menggagalkan render register.
+30. **`scripts/lab-server.py`: `request_queue_size` 5 → 128.** Modul ES tanpa bundel membuat satu
+    halaman meminta puluhan berkas serentak; koneksi di luar backlog di-reset
+    (`ERR_CONNECTION_RESET`), satu modul gagal dimuat, dan halaman diam-diam kosong tanpa galat
+    jelas. Ini juga menyembuhkan flakiness tes yang sudah lama ada.
+31. **Baru:** hover 2 detik pada dock ter-minimize membukanya sendiri, dengan cincin penanda
+    hitungan. Sentuh dilewati (tidak punya hover); meninggalkan tombol membatalkan.
+
 ## Verifikasi
 
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **242/242 lulus** (satu suite Puppeteer flaky hanya saat dijalankan bersamaan dengan beban lain) (termasuk sample-library 9, learning 19, register-extras 5, mini-markdown 11).
+- `npm test` → **241/242**; satu-satunya kegagalan `export-browser` terbukti lulus sendiri (3 dtk vs timeout 31 dtk saat suite penuh berebut sumber daya)
+- (sebelumnya) `npm test` → **242/242 lulus** (satu suite Puppeteer flaky hanya saat dijalankan bersamaan dengan beban lain) (termasuk sample-library 9, learning 19, register-extras 5, mini-markdown 11).
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
 - `npm run e2e` → PASS (headed, Chrome for Testing). `npm run release:gate` → CLEAR.
 - `npm run smoke -- --crossos` → 26/26 Fase 1 + 9/9 lintas-OS.
