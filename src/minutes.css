@@ -66,11 +66,38 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding: 0 20px; height: 46px; flex-shrink: 0;
   background: var(--bg); border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; font-weight: 600; font-size: 14px; letter-spacing: -0.01em; color: var(--text); }
-.brand svg { color: var(--accent); }
+/* ---- Wordmark yraverageSubMin ----------------------------------------
+ * Sama seperti di panel sisi: dua potong teks, bukan berkas gambar, jadi
+ * ukurannya ikut tipografi appbar dan warnanya ikut token tema — gelap dan
+ * Coretax tidak butuh aset terpisah. Lekuk cekung di sisi kiri pil dibuat
+ * dengan mask lingkaran, seperti gigitan pada logo aslinya. */
+.brand { display: inline-flex; align-items: center; flex-shrink: 0; font-weight: 700; font-size: 15px; letter-spacing: -0.3px; line-height: 1; white-space: nowrap; color: var(--text); }
+.brand-word { color: inherit; }
+.brand-pill {
+  /* SubMin 0.72× dari yraverage, sesuai rasio logonya; semua ukuran di bawah
+   * memakai em pil ini sehingga proporsinya terkunci. */
+  font-size: 0.72em;
+  color: #fff;
+  background: var(--accent);
+  padding: 0.363em 0.36em 0.363em 0.72em;
+  margin-left: -0.236em;
+  /* Pil dipusatkan pada pita x-height "yraverage", bukan kotak baris yang ikut
+   * menghitung ekor huruf y dan g. */
+  position: relative;
+  top: 0.182em;
+  border-radius: 0.2em 0.36em 0.36em 0.2em;
+  -webkit-mask: radial-gradient(circle 0.747em at -0.346em 50%, transparent 0.737em, #000 0.747em);
+  mask: radial-gradient(circle 0.747em at -0.346em 50%, transparent 0.737em, #000 0.747em);
+}
+@supports not (mask: radial-gradient(circle, #000 0, #000 1px)) {
+  .brand-pill { border-radius: 999px; margin-left: 0.2em; padding-left: 0.55em; }
+}
 .crumbs { display: flex; align-items: center; gap: 8px; color: var(--muted2); font-size: 12px; min-width: 0; margin-left: 6px; }
 .crumbs .sep { color: #4a4a4a; }
 .crumbs .now { color: var(--text2); }
+.crumb-home { color: var(--muted2); text-decoration: none; border-radius: 6px; padding: 2px 6px; margin-left: -2px; white-space: nowrap; transition: color 0.12s ease, background 0.12s ease; }
+.crumb-home:hover, .crumb-home:focus-visible { color: var(--text); background: var(--card3); }
+#crumb-trail { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
 .crumbs span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .grow { flex: 1; }
 
@@ -598,7 +625,7 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
 /* ---- narrow ---- */
 @media (max-width: 1100px) {
   .srail { width: 320px; }
-  .crumbs { display: none; }
+  #crumb-trail { display: none; }
   /* Appbar butuh ~1070 px penuh. Di bawah itu ia meluber keluar layar dan
      menyeret seluruh halaman ikut menggulir mendatar — popover yang
      ditambatkan `right: 0` lalu berakhir di luar jendela. Label tombol
@@ -614,7 +641,8 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
   .mswitch { max-width: 130px; }
 }
 @media (max-width: 720px) {
-  .brand span { display: none; }
+  .brand-word { display: none; }
+  .brand-pill { margin-left: 0; padding-left: 0.5em; -webkit-mask: none; mask: none; border-radius: 999px; }
   .appbar .btn.primary > span { display: none; }
   .appbar .btn.primary { padding: 0 9px; gap: 0; }
   #learn-pill { display: none; }

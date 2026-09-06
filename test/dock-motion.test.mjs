@@ -346,6 +346,39 @@ test('halaman tidak meluber mendatar di jendela sempit; appbar dan dok tetap ter
   await page.waitForSelector('#btn-settings');
 });
 
+test('appbar memakai wordmark yraverageSubMin dan "Minutes" membawa kembali ke halaman utama', async () => {
+  const brand = await page.evaluate(() => {
+    const el = document.querySelector('.brand');
+    return { teks: el.textContent.replace(/\s+/g, ''), adaPil: !!el.querySelector('.brand-pill'),
+      adaIkonLama: !!el.querySelector('svg') };
+  });
+  assert.equal(brand.teks, 'yraverageSubMin');
+  assert.equal(brand.adaPil, true, 'pil SubMin tidak terbentuk');
+  assert.equal(brand.adaIkonLama, false, 'ikon generik lama masih ada di sebelah wordmark');
+
+  // Jejak remah ditulis ulang tiap render; tautan pulang tidak boleh ikut hilang.
+  const crumb = await page.evaluate(() => {
+    const home = document.getElementById('crumb-home');
+    return { ada: !!home, teks: home?.textContent.trim(), href: home?.getAttribute('href'),
+      title: home?.title, adaJejak: (document.getElementById('crumb-trail')?.textContent || '').length > 0 };
+  });
+  assert.equal(crumb.ada, true, 'tautan Minutes hilang setelah rapat aktif dirender');
+  assert.equal(crumb.teks, 'Minutes');
+  assert.equal(crumb.href, '/app.html');
+  assert.ok(crumb.title, 'tautan pulang harus punya tooltip');
+  assert.equal(crumb.adaJejak, true, 'jejak remah rapat tidak ikut tampil');
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.click('#crumb-home'),
+  ]);
+  assert.equal(await page.evaluate(() => location.pathname), '/app.html', 'klik Minutes tidak membuka halaman utama');
+
+  await page.goto(`${ORIGIN}/dist/minutes.html`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#btn-settings');
+  await wait(500);
+});
+
 test('tidak ada galat runtime di halaman selama seluruh alur', () => {
   assert.deepEqual(pageErrors, [], `galat halaman: ${pageErrors.join(' | ')}`);
 });

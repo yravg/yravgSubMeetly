@@ -158,6 +158,17 @@ Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per ta
     `paintStaticStrings()` kini juga menerapkan `data-t-title` (atribut itu sudah lama ada di markup
     tapi tidak pernah dipasang), supaya tombol yang tinggal ikon tetap punya tooltip yang diterjemahkan.
     Terukur bersih 1400 → 520 px; tes menjaga 1400/1100/1000/900/800/700/640.
+32. **Wordmark dan jalan pulang di appbar (2026-09-07).** Ikon generik + teks "Local TransSub"
+    diganti wordmark **yraverageSubMin**, memakai markup dan geometri yang sama dengan panel sisi
+    (`.brand-word` + `.brand-pill`, lekuk kiri dari mask lingkaran) tapi dengan token minutes.css;
+    di bawah 720 px hanya pilnya yang tersisa, dan mask dilepas supaya tetap terbaca sebagai kapsul.
+    Remah **"Minutes" kini tautan ke halaman utama.** Perhatikan: `#crumbs` **ditimpa seluruhnya**
+    tiap render rapat (dulu `$('#crumbs').innerHTML = …`), jadi tautannya akan hilang begitu ada
+    rapat aktif — sekarang hanya `#crumb-trail` yang ditulis ulang dan `#crumb-home` bertahan.
+    Media query ≤1100 px juga diubah: yang disembunyikan `#crumb-trail`, bukan `.crumbs`, supaya
+    jalan pulang tetap ada di layar sempit. Tujuannya ditentukan saat boot — `/app.html` di lab,
+    `sidepanel.html` saat `location.protocol === 'chrome-extension:'` karena **app.html tidak ikut
+    dipaket** (`dist/` hanya berisi minutes/offscreen/sidepanel).
 
 ### Penyebab flaky `export-browser` akhirnya ketemu (2026-09-06)
 Bukan beban mesin. Toast umpan balik (`.toast-stack`, fixed, bawah-tengah) memberi
@@ -207,7 +218,7 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **278/278 lulus** (2026-09-07), termasuk `dock-motion` 9 yang baru. Ini run penuh pertama
+- `npm test` → **279/279 lulus** (2026-09-07), termasuk `dock-motion` 10 yang baru. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
 - (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).

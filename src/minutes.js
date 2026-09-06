@@ -770,7 +770,9 @@ function paintHeader() {
   const stats = meetingStats(m, todayUTC());
   const series = seriesOf(m);
   const [project, seriesName] = splitTitle(m.title);
-  $('#crumbs').innerHTML = `<span>${esc(project)}</span>${seriesName ? `<span class="sep">/</span><span>${esc(seriesName)}</span>` : ''}<span class="sep">/</span><span class="now mono">${esc(weekLabel(m))} · ${esc(fmtDate(m.date))}</span>`;
+  // Hanya jejaknya yang ditulis ulang; tautan "Minutes" harus bertahan, kalau
+  // tidak jalan pulang ikut hilang begitu ada rapat aktif.
+  $('#crumb-trail').innerHTML = `<span class="sep">/</span><span>${esc(project)}</span>${seriesName ? `<span class="sep">/</span><span>${esc(seriesName)}</span>` : ''}<span class="sep">/</span><span class="now mono">${esc(weekLabel(m))} · ${esc(fmtDate(m.date))}</span>`;
   $('#m-title').textContent = m.title;
   $('#m-date').textContent = m.date;
   $('#m-time').textContent = [m.start, m.end].filter(Boolean).join('–') + (m.tz && m.tz !== 'local' ? ` ${m.tz}` : '');
@@ -1688,6 +1690,10 @@ function paintStaticStrings() {
   // Tombol yang labelnya dilipat jadi ikon di layar sempit hanya menyisakan
   // tooltip, jadi tooltipnya harus ikut diterjemahkan.
   document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = T(el.dataset.tTitle); });
+  // Halaman utama: di lab itu /app.html di root server; di ekstensi app.html
+  // tidak ikut dipaket, jadi jalan pulangnya panel sisi.
+  const home = $('#crumb-home');
+  if (home) home.href = location.protocol === 'chrome-extension:' ? 'sidepanel.html' : '/app.html';
   $('#q').placeholder = T('search');
 }
 

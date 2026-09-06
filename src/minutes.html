@@ -11,12 +11,10 @@
 
   <!-- ============ app bar ============ -->
   <div class="appbar">
-    <div class="brand">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h13"/><circle cx="19" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>
-      <span>Local TransSub</span>
-    </div>
+    <div class="brand"><span class="brand-word">yraverage</span><span class="brand-pill">SubMin</span></div>
     <div class="crumbs" id="crumbs">
-      <span class="now" data-t="minutes">Minutes</span>
+      <a class="crumb-home" id="crumb-home" href="/app.html" data-t="minutes" data-t-title="backToApp" title="Back to the main page">Minutes</a>
+      <span id="crumb-trail"></span>
     </div>
     <div class="grow"></div>
     <span class="pill ondevice" id="pill-ondevice">
