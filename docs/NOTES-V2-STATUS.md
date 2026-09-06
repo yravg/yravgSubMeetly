@@ -1,8 +1,9 @@
 # Minutes Register v2 — status
 
-Branch: `feat/notes-v2` (off `release/1.1.1`). Design doc: `docs/NOTES-V2-SPEC.md`.
-Cursor context rule: `.cursor/rules/notes-v2-register.mdc` (auto-attaches when
-you open any `notes-*`/`minutes.*` file).
+Shipped on `main` (originally `feat/notes-v2` off `release/1.1.1`). Design
+doc: `docs/NOTES-V2-SPEC.md`. Cursor context rule:
+`.cursor/rules/notes-v2-register.mdc` (auto-attaches when you open any
+`notes-*`/`minutes.*` file).
 
 This file is the "what's actually done vs. what's still a stub" tracker —
 update it as part of the same commit whenever you finish or start a chunk of
@@ -197,17 +198,41 @@ tell in 30 seconds where things stand without reading the whole spec.
   seconds in the panel's existing status pill, because the panel has no toast
   and a silent no-op is a bug.
 
+## Done — after Phase 2.0 (shipped on main)
+
+- **"End & draft" drafts from the session transcript**
+  (`draftFromSession` in `src/notes-panel.js`) — stops the running capture
+  through `onEndCapture()`, then runs `generateNotesFromTranscript`
+  (`src/lib/notes-generate.js`) over the session lines — the same on-device
+  heuristic path as **Paste a Teams transcript**. Existing flags are kept,
+  the chosen `projectType` is applied, items are marked `review: 'ai'`, and
+  the register opens. An empty session still just ends and opens whatever
+  was already stored. This is **not** native mlx_lm extraction (still
+  Phase 2.1).
+- **Project type** — `projectType` on `createMeeting` (14 values,
+  `PROJECT_TYPES` in `notes-schema.js`); picker on the recording card
+  (`#notes-project-type`); last choice persisted (`notesProjectType`);
+  inherited by `startNextMeeting`; shown on MD/TXT export; register filter
+  `#pt-filter`, optgroups on `#m-switch`, badge `#m-ptype`.
+- **Sample library** (`src/lib/sample-library.js`) — 214 deterministic
+  transcripts, 13 domains, 26 weekly series; imported per series through
+  the real notes pipeline. Overlay UI in `src/minutes-extras.js`.
+- **Training overlay** (`src/lib/learning-progress.js`,
+  `learning-tours.js`, `learning-quiz.js`, `src/minutes-extras.js`) —
+  XP / 7 levels / 21 achievements / Watch+Practise tours / quiz from the
+  active meeting. Mounted from `minutes.js`. Local only.
+
 ## Not done yet — later phases (see spec §7 roadmap)
 
-Nothing below is wired up. Don't assume it exists when reading other files.
+The gaps below are still stubbed. Don't assume native extraction, audio
+playback, SQLite, or extra export formats exist when reading other files.
 
 - **Phase 2.1 — real extraction.** `native/server.py` has no `/v2` routes;
-  there's no `native/extract.py` or `native/store.py`. The register only
-  ever gets data from (a) v1→v2 migration or (b) the sample fixture — there
-  is no path yet from a live transcript to a `Meeting`. `src/lib/
-  notes-generate.js` (the old regex extractor) is untouched and unused by
-  the new UI; per spec §8 it should become a clearly-labelled offline
-  fallback, not deleted outright, once real extraction exists.
+  there's no `native/extract.py` or `native/store.py`. Meetings now also
+  arrive via the local heuristic in `notes-generate.js`
+  (`generateNotesFromTranscript`): End & draft, paste-Teams, and Library
+  import. That path is an on-device regex fallback, not constrained mlx_lm
+  extraction. Native `/extract` is still the 2.1 gap.
 - **Phase 2.1 — SQLite backend.** `notes-store.js` still uses
   `chrome.storage.local` / `localStorage`. `setBackend()` is the documented
   seam for swapping in a native-helper SQLite client; nothing calls it yet.
@@ -257,11 +282,6 @@ Nothing below is wired up. Don't assume it exists when reading other files.
   selected meeting is the one being recorded. Binding a capture session to a
   meeting (and with it a single shared timecode clock, so `src.t0` means the
   same thing for flags and extracted items) is Phase 2.1.
-- **Side panel: "End & draft" only ends** — it stops the running task through
-  the existing `onStop()` path and opens the register. Actually *drafting* a
-  register from the live transcript (running the extractor over what was just
-  captured) is Phase 2.1; today the register it opens holds whatever was
-  already stored, plus any flags.
 - **`src/manifest.json`** — not modified. `minutes.html` doesn't need a
   manifest entry to open via `chrome.tabs.create` from inside the
   extension (MV3 doesn't require declaring internal pages), so this was
@@ -282,6 +302,6 @@ were not exercised here beyond static/DOM checks; worth a manual pass.)
 
 ## Branch / commits
 
-`feat/notes-v2`, branched off `release/1.1.1`, commit-as-you-go. Each commit
-is meant to stand alone (buildable, its own tests green) rather than one
-giant diff — `git log feat/notes-v2` for the breakdown.
+The register landed via `feat/notes-v2` (off `release/1.1.1`) and later
+main-line work (project type, End & draft from the session, Library,
+Training). `git log` on those paths is the breakdown.

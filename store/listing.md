@@ -22,7 +22,7 @@ Local TransSub adds live and offline subtitles to Chrome tabs and media files us
 - Shadow DOM overlay + Side Panel controls
 - Export SRT / WebVTT / TXT
 - Optional Windows / Linux / macOS helper for larger files and faster ASR
-- Meeting notes stub panel (schema + local export helpers)
+- Minutes Register: typed on-device notes (decisions, actions, questions, risks, metrics) drafted from a live session or a pasted Teams transcript; full-tab register + sample library; Markdown / CSV / JSON export
 
 **Privacy:** Recognition and translation run on your device. We do not operate cloud inference. Model weights download once when you choose a model (e.g. Hugging Face) and are cached locally afterward. See the Privacy Policy linked on this listing.
 
@@ -37,6 +37,7 @@ Local TransSub menambahkan subtitel langsung pada tab Chrome dan berkas offline 
 - Overlay Shadow DOM + Side Panel
 - Ekspor SRT / WebVTT / TXT
 - Helper opsional Win/Linux/macOS untuk berkas besar & ASR lebih cepat
+- Minutes Register: notulen bertipe di perangkat (keputusan, tindakan, pertanyaan, risiko, metrik) dari sesi atau transkrip Teams; register tab penuh + pustaka contoh; ekspor Markdown / CSV / JSON
 
 Inferensi berjalan di perangkat. Bobot model diunduh sekali atas permintaan Anda, lalu di-cache lokal. Lihat Kebijakan Privasi di listing.
 

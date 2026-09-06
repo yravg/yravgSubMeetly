@@ -2,13 +2,20 @@
 
 ## Identitas dan koordinasi
 
-- Diperbarui: 2026-09-05, Asia/Shanghai.
-- Plan: `908756ef-363c-43d5-8a2b-bb7f2037295b` — UI Interaktif & Rilis Menyeluruh.
+- Diperbarui: 2026-09-06.
+- Plan: `908756ef-363c-43d5-8a2b-bb7f2037295b` — UI Interaktif & Rilis Menyeluruh (tetap selesai).
 - Workspace: `08b7acf5-2182-429d-a223-5b94ea703f8b`.
 - Repo binding: `f8186cc1-132d-4316-8853-600a60adf935`, provider `local`.
 - Binding repo yang ada dipertahankan; jangan `connect` ulang atau pindah workspace.
+- Klaim sesi: `cursor/fix-stale-product-docs-2f27` — `released` 2026-09-06. Docs-only.
 
 ## Posisi sekarang
+
+**Sesi 2026-09-06 — dokumentasi produk diselaraskan dengan perilaku terkirim.**
+`docs/NOTES-V2-STATUS.md` (End & draft + project type + Library + Training = done;
+ekstraksi native / audio / SQLite / XLSX-ICS-DOCX tetap stub), `store/listing.md`
+(bukan lagi “notes stub”), header `docs/NOTES-V2-SPEC.md`. README dan
+`docs/PRODUCT.md` tidak disentuh. Jangan `sync` final — plan sudah ditutup.
 
 **Plan selesai: semua task `done` (`task next` → done: true), gate rilis CLEAR.**
 Keputusan pengguna 2026-09-05 (a): E2E `--native` dan `e2e-file --browser` yang gagal konsisten
