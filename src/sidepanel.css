@@ -248,9 +248,12 @@ select {
 }
 select:focus { outline: 1px solid var(--accent); }
 
-/* MP-03 clips this wrapper to animate the banner's height; the banner keeps
-   its own margin, which sits inside the wrapper and is measured with it. */
-.warning-wrap { overflow: hidden; }
+/* MP-03 clips these wrappers to animate their height; the panel inside keeps
+   its own margin, which sits within the wrapper and is measured with it.
+   They start closed in CSS and are opened by autoHeight, so a panel whose
+   script never ran stays hidden rather than flashing open. */
+.warning-wrap,
+.reveal { overflow: hidden; height: 0; }
 .warning {
   background: var(--warn-bg);
   border: 1px solid var(--warn-border);

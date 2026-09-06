@@ -16,6 +16,21 @@
  *   MP-02  springProgress  radix/progress            burst-tolerant progress bar
  *   MP-03  autoHeight      effects/auto-height       measured height transitions
  *   MP-04  highlight       effects/highlight         moving pill behind a tablist
+ *
+ * Attribution
+ * -----------
+ * The spring constants in SPRING, and the layout strategy each primitive
+ * follows, are taken from Animate UI (https://animate-ui.com,
+ * github.com/imskyleen/animate-ui, (c) 2025 Elliot Sutton). No Animate UI code
+ * is copied here or anywhere else in this repository: every implementation
+ * below is written from scratch against the browser's own APIs.
+ *
+ * That distinction matters. Despite the MIT badge on its README, Animate UI
+ * ships under **MIT + Commons Clause** — source-available, not open source,
+ * which is why GitHub classifies it as NOASSERTION. The Commons Clause forbids
+ * redistributing "the components themselves in their original form", and this
+ * repository is public, so vendoring its sources here would be exactly the
+ * prohibited case. Constants are facts, not expression; the code is ours.
  */
 
 /** Spring constants transcribed from the Animate UI sources. */
@@ -596,14 +611,16 @@ export function autoHeight(panel, opts = {}) {
  * layout bookkeeping to keep in sync and an i18n language swap re-measures for
  * free on the next `remeasure()`.
  *
- * `aria`/`activeClass` cover the two conventions in this codebase: a real
- * tablist marks selection with aria-selected, while the side panel's `.seg`
- * groups are plain buttons that carry an `.active` class.
+ * `selectedAttr`/`activeClass` cover the three conventions in this codebase: a
+ * real tablist marks selection with aria-selected, the language switch is a
+ * button group using aria-pressed, and the side panel's `.seg` groups are plain
+ * buttons carrying an `.active` class.
  *
  * @param {HTMLElement} container  must be positioned (relative/absolute)
  * @param {{pill?: HTMLElement, items?: HTMLElement[], selector?: string,
  *          cfg?: object, onChange?: (el: HTMLElement, i: number) => void,
- *          bind?: boolean, aria?: boolean, activeClass?: string}} [opts]
+ *          bind?: boolean, selectedAttr?: string|null,
+ *          activeClass?: string}} [opts]
  * @returns {{select: (target: HTMLElement|number, animated?: boolean) => void,
  *            selected: () => HTMLElement|null, remeasure: () => void,
  *            destroy: () => void}}
@@ -611,7 +628,8 @@ export function autoHeight(panel, opts = {}) {
 export function highlight(container, opts = {}) {
   const cfg = opts.cfg || SPRING.highlight;
   const onChange = opts.onChange || noop;
-  const aria = opts.aria !== false;
+  const selectedAttr =
+    opts.selectedAttr === undefined ? 'aria-selected' : opts.selectedAttr;
   const activeClass = opts.activeClass || '';
   const selector = opts.selector || '[role="tab"], button';
   const pill = opts.pill || container.querySelector('.mo-pill');
@@ -650,12 +668,17 @@ export function highlight(container, opts = {}) {
     cancelW = spring(w, tw, cfg, paintW);
   }
 
+  const isSelected = (el) =>
+    activeClass
+      ? el.classList.contains(activeClass)
+      : !!selectedAttr && el.getAttribute(selectedAttr) === 'true';
+
   function select(target, animated) {
     const el = typeof target === 'number' ? items[target] : target;
     if (!el) return;
     active = el;
     for (const item of items) {
-      if (aria) item.setAttribute('aria-selected', String(item === el));
+      if (selectedAttr) item.setAttribute(selectedAttr, String(item === el));
       if (activeClass) item.classList.toggle(activeClass, item === el);
     }
     place(el, animated);
@@ -671,12 +694,7 @@ export function highlight(container, opts = {}) {
     }
   }
 
-  const initial =
-    items.find((el) =>
-      activeClass
-        ? el.classList.contains(activeClass)
-        : el.getAttribute('aria-selected') === 'true',
-    ) || items[0];
+  const initial = items.find(isSelected) || items[0];
   if (initial) {
     active = initial;
     place(initial, false);
@@ -688,6 +706,19 @@ export function highlight(container, opts = {}) {
 
   return {
     select,
+    /**
+     * Re-read which item the DOM says is selected and move the pill to it.
+     * Groups that keep their own selection logic call this instead of `select`,
+     * so the attribute or class convention lives in one place. A host that is
+     * not laid out yet (a closed modal, a hidden tab panel) measures zero, and
+     * is skipped rather than parking the pill at zero width.
+     */
+    sync(animated = true) {
+      const el = items.find(isSelected) || items[0];
+      if (!el || !el.offsetWidth) return;
+      active = el;
+      place(el, animated);
+    },
     selected: () => active,
     remeasure,
     destroy() {

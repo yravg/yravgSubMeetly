@@ -54,7 +54,7 @@
         </div>
 
         <!-- CC0 QA samples (visible when catalog is reachable, e.g. lab :8799) -->
-        <div id="qa-sample-bar" class="qa-sample-bar hidden">
+        <div class="reveal" id="qa-sample-wrap" aria-hidden="true"><div id="qa-sample-bar" class="qa-sample-bar">
           <div class="qa-sample-head">
             <span class="lbl" data-i18n="qaSamples">CC0 test samples</span>
             <span class="qa-sample-hint" data-i18n="qaSamplesHint"
@@ -65,7 +65,7 @@
             <select id="qa-sample-select" aria-label="CC0 sample"></select>
             <button type="button" id="btn-qa-run" class="mini-btn" data-i18n="qaRunSample">Run sample</button>
           </div>
-        </div>
+        </div></div>
 
         <div class="task-row">
           <label class="lbl" data-i18n="taskMode">Task Mode</label>
@@ -282,7 +282,7 @@
           <label for="engine-toggle" data-i18n="engine">Engine</label>
           <select id="engine-toggle"></select>
         </div>
-        <div id="native-block" class="native-block hidden">
+        <div class="reveal" id="native-block-wrap" aria-hidden="true"><div id="native-block" class="native-block">
           <div class="native-row">
             <input type="text" id="native-url" value="http://127.0.0.1:17865" spellcheck="false" />
           </div>
@@ -298,7 +298,7 @@
           </div>
           <div id="native-host-hint" class="hint native-host-hint hidden"></div>
           <div class="hint" data-i18n="nativeNote"></div>
-        </div>
+        </div></div>
 
         <div class="setting-row">
           <label data-i18n="dlSource">Download source</label>

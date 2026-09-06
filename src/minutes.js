@@ -26,7 +26,7 @@ import {
 } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
-import { slidingNumber } from './lib/motion.js';
+import { slidingNumber, springProgress, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -779,23 +779,79 @@ function paintHeader() {
   $('#btn-add-item').hidden = !!m.issuedAt;
 
   const v = stats.variance;
-  const cells = [
-    { n: stats.total, l: T('sItems') },
-    { n: `${stats.actionsOpen}<span class="sub">/${stats.actionsTotal}</span>`, l: T('sActions'), raw: true },
-    { n: stats.overdue, l: T('sOverdue'), cls: stats.overdue ? 'is-alert' : '' },
-    { n: stats.questionsOpen, l: T('sQuestions') },
-    { n: stats.unreviewed, l: T('sUnreviewed'), cls: stats.unreviewed ? 'is-warn' : 'is-ok' },
+  paintStrip([
+    { k: 'items', n: stats.total, l: T('sItems') },
+    { k: 'actions', n: stats.actionsOpen, sub: `/${stats.actionsTotal}`, l: T('sActions') },
+    { k: 'overdue', n: stats.overdue, l: T('sOverdue'), cls: stats.overdue ? 'is-alert' : '' },
+    { k: 'questions', n: stats.questionsOpen, l: T('sQuestions') },
+    { k: 'unreviewed', n: stats.unreviewed, l: T('sUnreviewed'), cls: stats.unreviewed ? 'is-warn' : 'is-ok' },
     v != null
-      ? { n: `${sign(v)}${esc(fmtNum(v))}<span class="unit">${esc(stats.varianceUnit)}</span>`, l: T('sVariance'), cls: v >= 0 ? 'is-up' : 'is-alert', raw: true }
-      : { n: stats.decisions, l: T('sDecisions') },
-    { n: `${stats.agendaPct}<span class="unit">%</span>`, l: T('sCoverage'), bar: stats.agendaPct, raw: true },
-  ];
-  $('#strip').innerHTML = cells.map((c) => `
-    <div class="stat ${c.cls || ''}">
-      <span class="n">${c.raw ? c.n : esc(c.n)}</span>
-      <span class="l">${esc(c.l)}</span>
-      ${c.bar != null ? `<span class="bar"><i style="width:${c.bar}%"></i></span>` : ''}
-    </div>`).join('');
+      ? { k: 'sixth', n: v, signed: true, unit: stats.varianceUnit, l: T('sVariance'), cls: v >= 0 ? 'is-up' : 'is-alert' }
+      : { k: 'sixth', n: stats.decisions, l: T('sDecisions') },
+    { k: 'coverage', n: stats.agendaPct, unit: '%', l: T('sCoverage'), bar: stats.agendaPct },
+  ]);
+}
+
+/* --------------------------------------------------------------------------
+   MP-01 + MP-02 — the header figures count up and the coverage bar springs.
+
+   Like the download rows in the side panel, the cells are built once and then
+   updated in place: re-rendering the strip on every paint would destroy the
+   odometers and restart every figure from zero on an unrelated filter change.
+   -------------------------------------------------------------------------- */
+const stripCells = new Map();
+
+function stripCell(spec) {
+  let cell = stripCells.get(spec.k);
+  const decimals = odoDecimals(spec.n);
+  // The odometer's precision is fixed when it is built, and the sixth cell
+  // swaps between a decimal variance and a whole decision count.
+  if (cell && (cell.decimals !== decimals || cell.signed !== !!spec.signed)) {
+    cell.odo.destroy();
+    cell.el.remove();
+    stripCells.delete(spec.k);
+    cell = null;
+  }
+  if (cell) return cell;
+
+  const el = document.createElement('div');
+  el.className = 'stat';
+  el.innerHTML = `
+    <span class="n"><span class="mo-num"></span><span class="sub"></span><span class="unit"></span></span>
+    <span class="l"></span>
+    ${spec.bar != null ? '<span class="bar"><i></i></span>' : ''}`;
+  cell = {
+    el,
+    decimals,
+    signed: !!spec.signed,
+    sub: el.querySelector('.sub'),
+    unit: el.querySelector('.unit'),
+    label: el.querySelector('.l'),
+    odo: slidingNumber(el.querySelector('.mo-num'), {
+      decimals,
+      signed: !!spec.signed,
+      ...odoSeparators(spec.n),
+    }),
+    bar: spec.bar != null ? springProgress(el.querySelector('.bar i')) : null,
+  };
+  stripCells.set(spec.k, cell);
+  return cell;
+}
+
+function paintStrip(specs) {
+  const host = $('#strip');
+  for (const spec of specs) {
+    const cell = stripCell(spec);
+    if (cell.el.parentElement !== host) host.appendChild(cell.el);
+    cell.el.className = `stat ${spec.cls || ''}`;
+    cell.sub.textContent = spec.sub || '';
+    cell.unit.textContent = spec.unit || '';
+    cell.label.textContent = spec.l;
+    cell.odo.to(Number.isFinite(spec.n) ? spec.n : 0);
+    if (cell.bar) cell.bar.to(spec.bar);
+  }
+  // Keep DOM order matching the spec even when a cell was rebuilt.
+  for (const spec of specs) host.appendChild(stripCells.get(spec.k).el);
 }
 
 function paintChips() {
@@ -1115,6 +1171,9 @@ function paint() {
   paintHeader();
   paintChips();
   paintSwitcher();
+  // The workspace was hidden until a meeting loaded, so nothing in the bar had
+  // a width to measure yet. Re-place the pills now that it is laid out.
+  resyncPills(false);
 
   const rows = sortedItems(filteredItems());
   visibleRefs = rows.map((r) => r.ref);
@@ -1334,8 +1393,41 @@ function doExportStanding() {
   downloadText(`${m.seriesId.replace(/[^\w.-]+/g, '_')}-standing-register.csv`, csv);
 }
 
+/* --------------------------------------------------------------------------
+   MP-04 — a spring pill travels behind the selected item, on the same terms as
+   the side panel: each group keeps its own selection logic and the pill only
+   follows. The register tabs use aria-selected, the language switch uses
+   aria-pressed, and hl.sync() reads whichever the group declares.
+   -------------------------------------------------------------------------- */
+const pills = new Map();
+
+function mountPill(sel, selectedAttr) {
+  const host = document.querySelector(sel);
+  if (!host || pills.has(sel)) return;
+  const pill = document.createElement('span');
+  pill.className = 'mo-pill';
+  host.prepend(pill);
+  host.classList.add('mo-has-pill');
+  pills.set(sel, highlight(host, { pill, bind: false, selectedAttr }));
+}
+
+function mountPills() {
+  mountPill('#tabs', 'aria-selected');
+  mountPill('.langsw', 'aria-pressed');
+}
+
+function syncPill(sel, animated = true) {
+  pills.get(sel)?.sync(animated);
+}
+
+function resyncPills(animated = false) {
+  for (const sel of pills.keys()) syncPill(sel, animated);
+}
+
 function syncTabs() {
-  [...$('#tabs').children].forEach((x) => x.setAttribute('aria-selected', String(x.dataset.view === state.view)));
+  // Query the buttons, not every child: the pill is a child too.
+  $('#tabs').querySelectorAll('button').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.view === state.view)));
+  syncPill('#tabs');
 }
 function selectRef(ref, meetingId = null) {
   if (meetingId && meetingId !== state.activeId && state.meetings.some((m) => m.id === meetingId)) {
@@ -1403,8 +1495,12 @@ function wireEvents() {
     state.lang = b.dataset.lang;
     localStorage.setItem(LS_LANG, state.lang);
     T = makeT(state.lang);
-    [...b.parentNode.children].forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    // Buttons only: the pill is a sibling in here too.
+    b.parentNode.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    syncPill('.langsw');
     paintStaticStrings();
+    // Every label just changed length, so the register tabs re-measure.
+    resyncPills(false);
     paint();
   });
 
@@ -1525,8 +1621,12 @@ function paintStaticStrings() {
 async function boot() {
   document.querySelector(`.langsw button[data-lang="${state.lang}"]`)?.setAttribute('aria-pressed', 'true');
   document.querySelector(`.langsw button[data-lang="${state.lang === 'en' ? 'id' : 'en'}"]`)?.setAttribute('aria-pressed', 'false');
+  mountPills();
   wireEvents();
   paintStaticStrings();
+  // Tab labels change width with the language and with the window.
+  resyncPills(false);
+  window.addEventListener('resize', () => resyncPills(false));
   await reloadAll(false);
   paint();
 }

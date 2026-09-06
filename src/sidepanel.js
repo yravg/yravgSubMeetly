@@ -317,42 +317,58 @@ function mountPills() {
     pill.className = 'mo-pill';
     host.prepend(pill);
     host.classList.add('mo-has-pill');
-    pills.set(id, highlight(host, { pill, bind: false, aria: false, activeClass: 'active' }));
+    pills.set(id, highlight(host, { pill, bind: false, selectedAttr: null, activeClass: 'active' }));
   }
 }
 
 function syncPill(id, animated = true) {
-  const hl = pills.get(id);
-  const host = $(id);
-  if (!hl || !host) return;
-  const active = host.querySelector('button.active');
-  // A host inside the closed settings modal measures 0. Skip rather than park
-  // the pill at zero width; it is re-synced when the modal opens.
-  if (!active || !active.offsetWidth) return;
-  hl.select(active, animated);
+  // hl.sync() re-reads the DOM's own idea of which button is active, so the
+  // `.active` convention stays in one place. A host inside the closed settings
+  // modal measures 0 and is skipped there; it is re-synced when it opens.
+  pills.get(id)?.sync(animated);
 }
 
 function resyncPills(animated = false) {
   for (const id of pills.keys()) syncPill(id, animated);
 }
 
-// MP-03 — the model warning grows and collapses instead of appearing whole.
+// MP-03 — panels that appear in place grow and collapse instead of popping in.
+// Only genuine in-place reveals get this: swapping the realtime and offline
+// panels is a layout change, and animating its height would read as a glitch.
+const panels = new Map();
 let warnPanel = null;
 
-function mountWarningPanel() {
-  const wrap = $('model-warning-wrap');
-  const inner = $('model-warning');
-  if (!wrap || !inner || warnPanel) return;
-  warnPanel = autoHeight(wrap, {
+function mountPanel(id, wrapId, opts = {}) {
+  const wrap = $(wrapId);
+  const inner = $(id);
+  if (!wrap || !inner || panels.has(id)) return null;
+  const panel = autoHeight(wrap, {
     inner,
     open: false,
     onSettled: (open) => {
       wrap.setAttribute('aria-hidden', String(!open));
-      // Clear only once it has actually shut, so the text does not blank out
-      // halfway through the collapse.
-      if (!open) inner.innerHTML = '';
+      if (!open && opts.clearOnClose) inner.innerHTML = '';
     },
   });
+  panels.set(id, panel);
+  return panel;
+}
+
+function showPanel(id, open) {
+  const panel = panels.get(id);
+  if (!panel) return;
+  if (open) {
+    panel.open();
+    $(`${id}-wrap`)?.setAttribute('aria-hidden', 'false');
+  } else {
+    panel.close();
+  }
+}
+
+function mountPanels() {
+  warnPanel = mountPanel('model-warning', 'model-warning-wrap', { clearOnClose: true });
+  mountPanel('qa-sample-bar', 'qa-sample-wrap');
+  mountPanel('native-block', 'native-block-wrap');
 }
 
 // ---------------------------------------------------------------------------
@@ -368,10 +384,7 @@ function setMode(mode) {
   $('pick-hint').classList.add('hidden');
   $('off-drop').classList.toggle('hidden', mode !== 'offline');
   $('off-results').classList.toggle('hidden', mode !== 'offline' || state.offlineLines.length === 0);
-  const qaBar = $('qa-sample-bar');
-  if (qaBar) {
-    qaBar.classList.toggle('hidden', mode !== 'offline' || !state.qaCatalog?.samples?.length);
-  }
+  showPanel('qa-sample-bar', mode === 'offline' && !!state.qaCatalog?.samples?.length);
   $('live-preview').classList.add('hidden');
   updateButtons();
   updateWarning();
@@ -759,7 +772,7 @@ function renderQaSampleBar() {
   if (!bar || !sel) return;
   const samples = state.qaCatalog?.samples || [];
   const show = state.mode === 'offline' && samples.length > 0;
-  bar.classList.toggle('hidden', !show);
+  showPanel('qa-sample-bar', show);
   if (!samples.length) return;
   const prev = sel.value;
   sel.innerHTML = samples
@@ -888,7 +901,7 @@ async function loadSettings() {
   );
   syncPill('mirror-toggle');
   syncPill('device-toggle');
-  $('native-block').classList.toggle('hidden', state.settings.engine !== 'native');
+  showPanel('native-block', state.settings.engine === 'native');
   $('native-url').value = state.settings.nativeUrl || DEFAULT_NATIVE_URL;
   syncDualLineCheckboxes();
   syncRefineCheckboxes();
@@ -1656,7 +1669,7 @@ chrome.runtime.onMessage.addListener((msg) => {
 // wiring
 function wire() {
   mountPills();
-  mountWarningPanel();
+  mountPanels();
   // Label widths change with the UI language and with the panel width.
   window.addEventListener('resize', () => resyncPills(false));
   document.querySelectorAll('#view-tabs button').forEach((b) =>
@@ -1734,6 +1747,8 @@ function wire() {
     $('settings-modal').classList.remove('hidden');
     syncPill('mirror-toggle', false);
     syncPill('device-toggle', false);
+    // Nothing inside a display:none modal has a height to measure.
+    panels.get('native-block')?.remeasure();
     lastNativeAutoStartMs = 0;
     labEnsureAttempted = false;
     checkNative({ allowAutoStart: true });
