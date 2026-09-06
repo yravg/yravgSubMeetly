@@ -64,6 +64,12 @@ body {
   border: 1px solid var(--border);
   flex-shrink: 1;
   min-width: 0;
+  /* Hug the buttons. inline-flex alone does not survive a stretching parent:
+     in a column flex or grid container the default align-items: stretch blows
+     the group out to the full width and leaves the pill stranded beside a run
+     of empty track. A definite width beats stretch. */
+  width: max-content;
+  max-width: 100%;
   /* pill palette (MP-04); --pill-inset must match the padding above */
   position: relative;
   --pill-bg: var(--accent);
@@ -127,6 +133,10 @@ main { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
   border-radius: 999px;
   padding: 3px;
   border: 1px solid var(--border);
+  /* Hug the buttons — see .view-tabs above. `.seg.wide` and `.seg.wrap` set
+     width: 100% further down and deliberately win over this. */
+  width: max-content;
+  max-width: 100%;
   /* pill palette (MP-04); --pill-inset must match the padding above */
   position: relative;
   --pill-bg: var(--accent);
