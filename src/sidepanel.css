@@ -266,15 +266,28 @@ input[type='range']:hover { cursor: pointer; }
 .brand-pill {
   color: var(--on-accent);
   background: var(--accent-strong);
-  padding: 4px 9px 4px 12px;
-  margin-left: -2px;
-  border-radius: 3px 8px 8px 3px;
-  -webkit-mask: radial-gradient(circle at 0 50%, transparent 0 8px, #000 8.5px);
-  mask: radial-gradient(circle at 0 50%, transparent 0 8px, #000 8.5px);
+  /* Semua ukuran dalam em: tinggi pil = 1em teks + 0.54em padding = 1.54em,
+   * jadi lekuknya ikut menyesuaikan kalau skala tipografi panel berubah. */
+  padding: 0.27em 0.46em 0.27em 0.82em;
+  /* Huruf "e" hanya menyentuh bibir lekuk, tidak tenggelam ke dalamnya:
+   * pada logo aslinya sisi kanan "e" masuk kira-kira seperdelapan tinggi pil. */
+  margin-left: -0.13em;
+  border-radius: 0 0.4em 0.4em 0;
+  /* Lekuk kiri = potongan lingkaran yang MELALUI kedua sudut kiri pil, bukan
+   * gigitan setengah lingkaran kecil. Kedalamannya s = 0.51em (sepertiga
+   * tinggi), sehingga jari-jarinya R = (s² + (H/2)²) / 2s = 0.836em dan
+   * pusatnya berada 0.326em di kiri tepi. Dengan proporsi ini lengkungnya
+   * sepadan dengan bundaran huruf "e" yang bersarang di dalamnya. */
+  -webkit-mask: radial-gradient(circle 0.836em at -0.326em 50%, transparent 0.826em, #000 0.836em);
+  mask: radial-gradient(circle 0.836em at -0.326em 50%, transparent 0.826em, #000 0.836em);
 }
-/* Kontras cukup di layar tanpa dukungan mask (mask gagal → pil tetap utuh). */
+/* Tanpa dukungan mask, pil tetap utuh sebagai kapsul biasa. */
 @supports not (mask: radial-gradient(circle, #000 0, #000 1px)) {
-  .brand-pill { border-radius: var(--radius-full); margin-left: 4px; padding-left: 10px; }
+  .brand-pill {
+    border-radius: var(--radius-full);
+    margin-left: 0.27em;
+    padding-left: 0.66em;
+  }
 }
 .view-tabs {
   display: inline-flex;
