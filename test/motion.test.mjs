@@ -13,6 +13,7 @@ import {
   spring,
   digitPositions,
   integerDigits,
+  formatNumber,
   prefersReducedMotion,
 } from '../src/lib/motion.js';
 
@@ -108,27 +109,47 @@ test('prefersReducedMotion is false outside a browser rather than throwing', () 
  * odometer maths
  * ---------------------------------------------------------------- */
 
-test('digit columns read the value they are meant to show', () => {
-  // 565.4 across powers [2, 1, 0, -1]
-  const [h, t, u, d] = digitPositions(565.4, [2, 1, 0, -1]);
-  assert.ok(Math.abs(h - 5.654) < 1e-9);
-  assert.ok(Math.abs(t - 6.54) < 1e-9);
-  assert.ok(Math.abs(u - 5.4) < 1e-9);
-  assert.ok(Math.abs(d - 4) < 1e-9);
+test('every column shows its own digit', () => {
+  assert.deepEqual(digitPositions(565.4, [2, 1, 0, -1]), [5, 6, 5, 4]);
 });
 
-test('a carry is continuous — the tens column is already moving at 9.99', () => {
-  // If the tens column snapped on integer boundaries it would sit at exactly 0
-  // here and jump a whole cell when the units column wrapped.
-  const [tens] = digitPositions(9.99, [1]);
-  assert.ok(tens > 0.99 && tens < 1.0, `tens column not mid-carry: ${tens}`);
+test('a column at rest sits exactly on its glyph, not between two', () => {
+  // Regression: reading the raw value per column (351.2 / 100 = 3.512) parks
+  // the hundreds column permanently half-way between 3 and 4, which renders as
+  // two half digits stacked in the clipping window.
+  assert.deepEqual(digitPositions(351.2, [2, 1, 0, -1]), [3, 5, 1, 2]);
+  // Real figures from both surfaces: MB downloaded, percentages, man-hours.
+  const cases = [
+    [565.4, [2, 1, 0, -1]],
+    [62, [1, 0]],
+    [100, [2, 1, 0]],
+    [9.78, [0, -1, -2]],
+    [10.89, [1, 0, -1, -2]],
+    [35000, [4, 3, 2, 1, 0]],
+  ];
+  for (const [v, powers] of cases) {
+    for (const pos of digitPositions(v, powers)) {
+      assert.ok(
+        Math.abs(pos - Math.round(pos)) < 1e-9,
+        `value ${v} rests mid-glyph at ${pos}`,
+      );
+    }
+  }
+});
+
+test('columns cross together during a carry', () => {
+  // Halfway through the units column's roll from 9, the tens column must be
+  // halfway too — that shared movement is what reads as one counter.
+  const [tens, units] = digitPositions(9.95, [1, 0]);
+  assert.ok(Math.abs(units - 9.5) < 1e-9, `units not mid-carry: ${units}`);
+  assert.ok(Math.abs(tens - 0.5) < 1e-9, `tens not mid-carry: ${tens}`);
 });
 
 test('the 9 -> 0 wrap lands on the repeated 0 cell, so the seam is invisible', () => {
   // The rendered column is 0..9 plus a repeated 0 at index 10. Approaching a
   // carry the position must climb toward 10 (that repeated 0), never jump back.
-  const near = digitPositions(9.999, [0])[0];
-  const after = digitPositions(10.001, [0])[0];
+  const near = digitPositions(9.9999, [1, 0])[1];
+  const after = digitPositions(10.0001, [1, 0])[1];
   assert.ok(near > 9.99, `expected to approach the repeat cell, got ${near}`);
   assert.ok(after < 0.01, `expected to resume at 0, got ${after}`);
 });
@@ -152,4 +173,26 @@ test('integerDigits sizes the column count for the model sizes we ship', () => {
   assert.equal(integerDigits(80), 2);      // Whisper Base
   assert.equal(integerDigits(565.4), 3);   // Large v3 Turbo
   assert.equal(integerDigits(2700), 4);    // Voxtral Mini 3B
+});
+
+test('the accessible label spells out exactly what the columns show', () => {
+  // Without it a screen reader reads all eleven cells of every column.
+  assert.equal(formatNumber(565.4, { decimals: 1, unit: ' MB' }), '565.4 MB');
+  assert.equal(formatNumber(62, { decimals: 0, unit: '%' }), '62%');
+  assert.equal(formatNumber(10.89, { decimals: 2, unit: '%' }), '10.89%');
+  assert.equal(formatNumber(1.11, { decimals: 2, unit: '%', signed: true }), '+1.11%');
+  assert.equal(formatNumber(-1.11, { decimals: 2, unit: '%', signed: true }), '-1.11%');
+  // A minus is not optional: an unsigned mount handed a negative value must
+  // still report it, or the figure silently changes meaning.
+  assert.equal(formatNumber(-2.5, { decimals: 1 }), '-2.5');
+  assert.equal(formatNumber(2.5, { decimals: 1 }), '2.5');
+});
+
+test('grouping matches fmtMeasure in both UI languages', () => {
+  // minutes.js prints 35000 as "35,000" in English and "35.000" in Indonesian.
+  assert.equal(formatNumber(35000, { groupSeparator: ',' }), '35,000');
+  assert.equal(formatNumber(35000, { groupSeparator: '.' }), '35.000');
+  assert.equal(formatNumber(1234567, { groupSeparator: ',' }), '1,234,567');
+  // Below 1000 fmtMeasure never groups, and neither does the odometer.
+  assert.equal(formatNumber(999, { groupSeparator: ',' }), '999');
 });

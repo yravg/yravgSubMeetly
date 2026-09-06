@@ -26,6 +26,7 @@ import {
 } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
+import { slidingNumber } from './lib/motion.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -179,6 +180,58 @@ function fmtMeasure(n) {
   if (Math.abs(n) < 1000) return fmtNum(n);
   return new Intl.NumberFormat(state.lang === 'id' ? 'id-ID' : 'en-US').format(Number(n.toFixed(2)));
 }
+/* --------------------------------------------------------------------------
+   MP-01 — the three metric numbers count up instead of appearing whole.
+
+   The odometer has to reproduce fmtMeasure() exactly, digit for digit, or the
+   drawer would start disagreeing with every other place a figure is printed.
+   That means: decimals taken from the formatted string (fmtNum trims trailing
+   zeros, so 9.0 shows as "9" and 9.78 as "9.78"), grouping only above 1000,
+   and the group separator following the locale fmtMeasure itself uses — while
+   the decimal point stays "." in both languages, because fmtNum never went
+   through Intl.
+   -------------------------------------------------------------------------- */
+function odoDecimals(n) {
+  const dot = fmtNum(n).indexOf('.');
+  return dot === -1 ? 0 : fmtNum(n).length - dot - 1;
+}
+/**
+ * fmtMeasure only reaches for Intl above 1000, and id-ID swaps both separators
+ * there ("35.000,5") while fmtNum below 1000 always prints a plain ".". The
+ * odometer has to follow that same split or the drawer stops matching the
+ * register behind it.
+ */
+function odoSeparators(value) {
+  if (Math.abs(value) < 1000) return { groupSeparator: '', decimalSeparator: '.' };
+  return state.lang === 'id'
+    ? { groupSeparator: '.', decimalSeparator: ',' }
+    : { groupSeparator: ',', decimalSeparator: '.' };
+}
+/** Placeholder the drawer renders; mountMetricOdometers turns it into digits. */
+function odoSlot(value, signed = false) {
+  if (!Number.isFinite(value)) return '—';
+  return `<span class="mo-num" data-v="${value}" data-dec="${odoDecimals(value)}"${signed ? ' data-signed="1"' : ''}></span>`;
+}
+
+let metricOdometers = [];
+
+function mountMetricOdometers(root) {
+  for (const o of metricOdometers) o.destroy();
+  metricOdometers = [];
+  if (!root) return;
+  for (const el of root.querySelectorAll('.mo-num')) {
+    const value = Number(el.dataset.v);
+    if (!Number.isFinite(value)) continue;
+    const odo = slidingNumber(el, {
+      decimals: Number(el.dataset.dec) || 0,
+      signed: el.dataset.signed === '1',
+      ...odoSeparators(value),
+    });
+    odo.to(value);
+    metricOdometers.push(odo);
+  }
+}
+
 /** Highlight the extractor's mis-hearing inside the item text (Main artboard). */
 function textWithFlag(it) {
   const t = itemText(it);
@@ -891,9 +944,9 @@ function metricDetail(it, m) {
   const side = `${linkedBlock(it, m, 'card')}${callout}`;
   return `
     <div class="mcards">
-      <div class="mc"><span class="lbl">${esc(T('mActual'))}</span><span class="n">${esc(fmtMeasure(mt.value))}<span class="unit">${esc(mt.unit)}</span></span></div>
-      <div class="mc base"><span class="lbl">${esc(T('mBaseline'))}</span><span class="n">${mt.baseline != null ? `${esc(fmtMeasure(mt.baseline))}<span class="unit">${esc(mt.unit)}</span>` : '—'}</span></div>
-      <div class="mc var ${v != null && v < 0 ? 'down' : ''}"><span class="lbl">${esc(T('mVariance'))}</span><span class="n">${v != null ? `${sign(v)}${esc(fmtMeasure(v))}<span class="unit">${esc(mt.unit)}</span>` : '—'}</span><small>${esc(T(dir))}</small></div>
+      <div class="mc"><span class="lbl">${esc(T('mActual'))}</span><span class="n">${odoSlot(mt.value)}<span class="unit">${esc(mt.unit)}</span></span></div>
+      <div class="mc base"><span class="lbl">${esc(T('mBaseline'))}</span><span class="n">${mt.baseline != null ? `${odoSlot(mt.baseline)}<span class="unit">${esc(mt.unit)}</span>` : '—'}</span></div>
+      <div class="mc var ${v != null && v < 0 ? 'down' : ''}"><span class="lbl">${esc(T('mVariance'))}</span><span class="n">${v != null ? `${odoSlot(v, true)}<span class="unit">${esc(mt.unit)}</span>` : '—'}</span><small>${esc(T(dir))}</small></div>
     </div>
     <div class="chart">
       <div class="ch"><b>${esc(T('mChart'))}</b>
@@ -1026,6 +1079,8 @@ function paintDrawer() {
        ${it.src ? `<button class="btn" id="d-play">${playIcon(12)} ${esc(T('playFrom'))}</button>` : ''}
        <span class="spacer"></span>
        <button class="btn danger" id="d-discard">${esc(T('discard'))}</button>`;
+
+  mountMetricOdometers($('#d-body'));
 }
 
 function paintDrawerAdd() {

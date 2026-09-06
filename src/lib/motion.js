@@ -143,23 +143,42 @@ export function spring(from, to, cfg, onUpdate, onDone) {
  * ------------------------------------------------------------------ */
 
 /**
- * Continuous odometer position for each digit column.
+ * Odometer position for each digit column.
  *
- * Every column rides the raw value rather than a rounded digit, which is what
- * makes a carry read like a mechanical counter: the tens column is already
- * halfway over by the time the units column passes 9. The seam at 9 -> 0 is
- * hidden by rendering an extra 0 cell at index 10, so the wrap lands on an
- * identical glyph.
+ * A column shows its own digit and rests on it — the naive `value / 10^p % 10`
+ * looks right in motion but parks every higher column mid-glyph (at 351.2 the
+ * hundreds column would sit permanently half-way between 3 and 4). So a column
+ * only leaves its digit inside `roll` of a carry, and crosses in that window:
+ * the tens column starts turning as the units column passes 9, which is what
+ * makes the group read as one mechanical counter.
+ *
+ * The seam is hidden by rendering an extra 0 cell at index 10, so a column
+ * arriving at 10 and snapping back to 0 lands on an identical glyph.
  *
  * @param {number} value
  * @param {number[]} powers  e.g. [2, 1, 0, -1] for `123.4`
+ * @param {number} [roll]    share of a step spent carrying, 0..1
  * @returns {number[]} positions in [0, 10)
  */
-export function digitPositions(value, powers) {
+export function digitPositions(value, powers, roll = 0.1) {
   const v = Math.max(0, value);
+  const least = Math.min(...powers);
   return powers.map((p) => {
-    const scaled = v / Math.pow(10, p);
-    return ((scaled % 10) + 10) % 10;
+    let scaled = v / Math.pow(10, p);
+    // 565.4 / 0.1 is 5653.999999999999, and flooring that shows a 3 where a 4
+    // belongs. Snap values that are an integer to within float noise.
+    const nearest = Math.round(scaled);
+    if (Math.abs(scaled - nearest) < 1e-9 * Math.max(1, Math.abs(scaled))) {
+      scaled = nearest;
+    }
+    const whole = Math.floor(scaled);
+    const frac = scaled - whole;
+    // Every column carries over the same slice of real value — the last `roll`
+    // of the smallest displayed step — so a tens column only starts turning
+    // once the units column is itself rolling off 9.
+    const win = roll * Math.pow(10, least - p);
+    const carry = frac > 1 - win ? (frac - (1 - win)) / win : 0;
+    return (whole % 10) + carry;
   });
 }
 
@@ -167,6 +186,34 @@ export function digitPositions(value, powers) {
 export function integerDigits(value) {
   const v = Math.floor(Math.abs(value));
   return v < 1 ? 1 : Math.floor(Math.log10(v)) + 1;
+}
+
+/**
+ * What a column stack spells out, as text.
+ *
+ * The clipped cells are all still in the DOM, so without an accessible name a
+ * screen reader reads eleven digits per column. `slidingNumber` puts this on
+ * the host as `role="img"` + `aria-label`, which makes it a leaf that announces
+ * the figure instead.
+ *
+ * @param {number} value
+ * @param {{decimals?: number, groupSeparator?: string,
+ *          decimalSeparator?: string, unit?: string, signed?: boolean}} [opts]
+ * @returns {string}
+ */
+export function formatNumber(value, opts = {}) {
+  const decimals = opts.decimals || 0;
+  const groupSep = opts.groupSeparator || '';
+  const sep = opts.decimalSeparator || '.';
+  const fixed = Math.abs(value).toFixed(decimals);
+  const dot = fixed.indexOf('.');
+  let int = dot === -1 ? fixed : fixed.slice(0, dot);
+  const frac = dot === -1 ? '' : fixed.slice(dot + 1);
+  if (groupSep) int = int.replace(/\B(?=(\d{3})+(?!\d))/g, groupSep);
+  // A minus is never optional; the plus is, and only for a signed mount. Plain
+  // ASCII, because that is what fmtNum/fmtMeasure print everywhere else.
+  const sign = value < 0 ? '-' : opts.signed ? '+' : '';
+  return sign + int + (frac ? sep + frac : '') + (opts.unit || '');
 }
 
 /**
@@ -178,7 +225,8 @@ export function integerDigits(value) {
  * @param {HTMLElement} el
  * @param {{decimals?: number, intDigits?: number, unit?: string,
  *          signed?: boolean, pad?: boolean, lineHeight?: number,
- *          decimalSeparator?: string, cfg?: object}} [opts]
+ *          decimalSeparator?: string, groupSeparator?: string,
+ *          cfg?: object, display?: string}} [opts]
  * @returns {{to: (n: number) => void, set: (n: number) => void,
  *            value: () => number, destroy: () => void}}
  */
@@ -189,26 +237,49 @@ export function slidingNumber(el, opts = {}) {
   const pad = !!opts.pad;
   const lineHeight = opts.lineHeight || 1.1;
   const sep = opts.decimalSeparator || '.';
+  const groupSep = opts.groupSeparator || '';
   const cfg = opts.cfg || SPRING.number;
 
   let intDigits = Math.max(1, opts.intDigits || 1);
   let cells = [];
+  let groups = [];
   let signEl = null;
   let current = 0;
   let cancel = noop;
   let lastVisible = -1;
 
+  const format = (value) =>
+    formatNumber(value, {
+      decimals,
+      groupSeparator: groupSep,
+      decimalSeparator: sep,
+      unit,
+      signed,
+    });
+
+  function label(value) {
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', format(value));
+  }
+
   function build() {
     el.textContent = '';
     cells = [];
+    groups = [];
     signEl = null;
 
-    if (signed) {
-      signEl = document.createElement('span');
-      signEl.className = 'mo-sign';
-      signEl.textContent = '+';
-      el.appendChild(signEl);
-    }
+    // The digit cells are sized in em, so the host has to stop inheriting a
+    // line-height that would push them off the surrounding text baseline.
+    el.style.display = opts.display || 'inline-flex';
+    el.style.alignItems = 'baseline';
+    el.style.lineHeight = String(lineHeight);
+
+    // Always present: a mount that is not declared `signed` can still be handed
+    // a negative value, and dropping the minus would misreport the figure.
+    signEl = document.createElement('span');
+    signEl.className = 'mo-sign';
+    signEl.textContent = signed ? '+' : '';
+    el.appendChild(signEl);
 
     for (let i = 0; i < intDigits + decimals; i++) {
       const power = intDigits - 1 - i;
@@ -235,6 +306,15 @@ export function slidingNumber(el, opts = {}) {
       wrap.appendChild(col);
       el.appendChild(wrap);
       cells.push({ wrap, col, power });
+
+      // Thousands separator after this column, e.g. 35|,|000.
+      if (groupSep && power > 0 && power % 3 === 0) {
+        const g = document.createElement('span');
+        g.className = 'mo-group';
+        g.textContent = groupSep;
+        el.appendChild(g);
+        groups.push({ el: g, power });
+      }
     }
 
     if (unit) {
@@ -255,12 +335,14 @@ export function slidingNumber(el, opts = {}) {
   }
 
   function render(value) {
-    const positions = digitPositions(value, cells.map((c) => c.power));
+    // The columns carry the magnitude; the sign cell carries the sign. Without
+    // the abs a negative variance would roll every column down to zero.
+    const positions = digitPositions(Math.abs(value), cells.map((c) => c.power));
     for (let i = 0; i < cells.length; i++) {
       cells[i].col.style.transform =
         'translateY(' + -(positions[i] * lineHeight) + 'em)';
     }
-    if (signEl) signEl.textContent = value < 0 ? '−' : '+';
+    if (signEl) signEl.textContent = value < 0 ? '-' : signed ? '+' : '';
 
     if (pad) return;
     // Hide leading zeros, but only when the count changes — toggling display
@@ -272,15 +354,23 @@ export function slidingNumber(el, opts = {}) {
       if (c.power < 0) continue;
       c.wrap.style.display = c.power >= visible ? 'none' : 'inline-block';
     }
+    // A separator only earns its place while a digit still sits to its left.
+    for (const g of groups) {
+      g.el.style.display = g.power >= visible ? 'none' : 'inline';
+    }
   }
 
   build();
+  label(0);
   render(0);
 
   return {
     to(value) {
       cancel();
       ensureWidth(value);
+      // Label the destination, not each frame: a screen reader should hear the
+      // figure once, not a stream of intermediate values.
+      label(value);
       cancel = spring(
         current,
         value,
@@ -299,13 +389,17 @@ export function slidingNumber(el, opts = {}) {
       cancel();
       cancel = noop;
       ensureWidth(value);
+      label(value);
       current = value;
       render(value);
     },
     value: () => current,
+    text: format,
     destroy() {
       cancel();
       cancel = noop;
+      el.removeAttribute('role');
+      el.removeAttribute('aria-label');
       el.textContent = '';
     },
   };
@@ -385,7 +479,8 @@ export function springProgress(fill, opts = {}) {
  *
  * @param {HTMLElement} panel
  * @param {{inner?: HTMLElement, open?: boolean, cfg?: object,
- *          onChange?: (open: boolean) => void}} [opts]
+ *          onChange?: (open: boolean) => void,
+ *          onSettled?: (open: boolean) => void}} [opts]
  * @returns {{open: (a?: boolean) => void, close: (a?: boolean) => void,
  *            toggle: () => void, isOpen: () => boolean,
  *            remeasure: () => void, destroy: () => void}}
@@ -394,6 +489,7 @@ export function autoHeight(panel, opts = {}) {
   const inner = opts.inner || panel.firstElementChild;
   const cfg = opts.cfg || SPRING.height;
   const onChange = opts.onChange || noop;
+  const onSettled = opts.onSettled || noop;
   let open = opts.open !== false;
   let measured = 0;
   let cancel = noop;
@@ -405,8 +501,17 @@ export function autoHeight(panel, opts = {}) {
   function measure() {
     if (!inner) return 0;
     // scrollHeight rather than getBoundingClientRect: the panel may currently be
-    // clipped to 0, and scrollHeight reports the content regardless.
-    return inner.scrollHeight;
+    // clipped to 0, and scrollHeight reports the content regardless. Its own
+    // margins sit inside the clipping wrapper, so they count toward the height
+    // the panel has to open to — otherwise a panel whose content carries a
+    // margin-top opens short and clips its last line.
+    let margins = 0;
+    if (typeof getComputedStyle === 'function') {
+      const cs = getComputedStyle(inner);
+      const m = parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+      if (Number.isFinite(m)) margins = m;
+    }
+    return inner.scrollHeight + margins;
   }
 
   function apply(h) {
@@ -436,6 +541,7 @@ export function autoHeight(panel, opts = {}) {
     if (animated === false) {
       animating = false;
       apply(target);
+      onSettled(open);
       return;
     }
     const from = parseFloat(panel.style.height) || 0;
@@ -451,6 +557,9 @@ export function autoHeight(panel, opts = {}) {
         // Re-measure on landing: the content may have grown mid-animation, and
         // from here the ResizeObserver keeps the open height honest.
         apply(open ? measure() : 0);
+        // Callers clear or hide the collapsed content here — doing it when the
+        // close is *requested* would blank the panel before it has shut.
+        onSettled(open);
       },
     );
   }
@@ -487,10 +596,14 @@ export function autoHeight(panel, opts = {}) {
  * layout bookkeeping to keep in sync and an i18n language swap re-measures for
  * free on the next `remeasure()`.
  *
+ * `aria`/`activeClass` cover the two conventions in this codebase: a real
+ * tablist marks selection with aria-selected, while the side panel's `.seg`
+ * groups are plain buttons that carry an `.active` class.
+ *
  * @param {HTMLElement} container  must be positioned (relative/absolute)
  * @param {{pill?: HTMLElement, items?: HTMLElement[], selector?: string,
  *          cfg?: object, onChange?: (el: HTMLElement, i: number) => void,
- *          bind?: boolean}} [opts]
+ *          bind?: boolean, aria?: boolean, activeClass?: string}} [opts]
  * @returns {{select: (target: HTMLElement|number, animated?: boolean) => void,
  *            selected: () => HTMLElement|null, remeasure: () => void,
  *            destroy: () => void}}
@@ -498,6 +611,8 @@ export function autoHeight(panel, opts = {}) {
 export function highlight(container, opts = {}) {
   const cfg = opts.cfg || SPRING.highlight;
   const onChange = opts.onChange || noop;
+  const aria = opts.aria !== false;
+  const activeClass = opts.activeClass || '';
   const selector = opts.selector || '[role="tab"], button';
   const pill = opts.pill || container.querySelector('.mo-pill');
   const items = opts.items || Array.from(container.querySelectorAll(selector))
@@ -540,7 +655,8 @@ export function highlight(container, opts = {}) {
     if (!el) return;
     active = el;
     for (const item of items) {
-      item.setAttribute('aria-selected', String(item === el));
+      if (aria) item.setAttribute('aria-selected', String(item === el));
+      if (activeClass) item.classList.toggle(activeClass, item === el);
     }
     place(el, animated);
     onChange(el, items.indexOf(el));
@@ -556,7 +672,11 @@ export function highlight(container, opts = {}) {
   }
 
   const initial =
-    items.find((el) => el.getAttribute('aria-selected') === 'true') || items[0];
+    items.find((el) =>
+      activeClass
+        ? el.classList.contains(activeClass)
+        : el.getAttribute('aria-selected') === 'true',
+    ) || items[0];
   if (initial) {
     active = initial;
     place(initial, false);

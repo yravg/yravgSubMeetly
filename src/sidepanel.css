@@ -64,6 +64,11 @@ body {
   border: 1px solid var(--border);
   flex-shrink: 1;
   min-width: 0;
+  /* pill palette (MP-04); --pill-inset must match the padding above */
+  position: relative;
+  --pill-bg: var(--accent);
+  --pill-fg: #ffffff;
+  --pill-inset: 2px;
 }
 .view-tabs button {
   border: none;
@@ -77,8 +82,7 @@ body {
   font-family: inherit;
 }
 .view-tabs button.active {
-  background: var(--accent);
-  color: #ffffff;
+  color: var(--pill-fg);
   font-weight: 600;
 }
 .topbar-actions {
@@ -123,6 +127,11 @@ main { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
   border-radius: 999px;
   padding: 3px;
   border: 1px solid var(--border);
+  /* pill palette (MP-04); --pill-inset must match the padding above */
+  position: relative;
+  --pill-bg: var(--accent);
+  --pill-fg: #ffffff;
+  --pill-inset: 3px;
 }
 .seg.wrap {
   flex-wrap: wrap;
@@ -138,13 +147,31 @@ main { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
   white-space: nowrap;
   font-family: inherit;
 }
-.seg button.active { background: var(--accent); color: #ffffff; font-weight: 600; }
+.seg button.active { color: var(--pill-fg); font-weight: 600; }
 .seg.wide { display: flex; width: 100%; }
 .seg.wide button { flex: 1; }
-#task-toggle button.active,
-#mirror-toggle button.active,
-#device-toggle button.active { background: #3a3a3a; color: var(--text); }
-#mode-toggle button.active { background: var(--accent); }
+#task-toggle,
+#mirror-toggle,
+#device-toggle { --pill-bg: #3a3a3a; --pill-fg: var(--text); }
+
+/* MP-04 — a spring-driven pill travels behind the selected button. Groups that
+   never get one (`.seg.wrap` wraps onto several rows, so a single pill cannot
+   track it) keep painting the active button directly. */
+.seg:not(.mo-has-pill) button.active,
+.view-tabs:not(.mo-has-pill) button.active { background: var(--pill-bg); }
+.mo-has-pill > button { position: relative; z-index: 1; background: none; }
+.mo-pill {
+  position: absolute;
+  top: var(--pill-inset, 3px);
+  bottom: var(--pill-inset, 3px);
+  left: 0;
+  width: 0;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, width;
+}
 
 .qa-sample-bar {
   margin: 0 0 12px;
@@ -221,6 +248,9 @@ select {
 }
 select:focus { outline: 1px solid var(--accent); }
 
+/* MP-03 clips this wrapper to animate the banner's height; the banner keeps
+   its own margin, which sits inside the wrapper and is measured with it. */
+.warning-wrap { overflow: hidden; }
 .warning {
   background: var(--warn-bg);
   border: 1px solid var(--warn-border);
@@ -238,8 +268,16 @@ select:focus { outline: 1px solid var(--accent); }
   display: flex; justify-content: space-between; gap: 8px;
   font-size: 12px; color: var(--text2); margin-bottom: 4px;
 }
-.dl-row .dl-label .pct { flex-shrink: 0; }
+.dl-row .dl-label .pct { flex-shrink: 0; display: inline-flex; align-items: baseline; gap: 0; }
+.dl-row .dl-label .dl-live { display: inline-flex; align-items: baseline; }
+/* The odometers split this line into flex items, and a flex item drops its
+   trailing space — which would glue the separator to the percentage. */
+.dl-row .dl-label .dl-size { white-space: pre; }
 .dl-row.done .dl-label { color: var(--accent-soft); }
+/* Finished rows collapse the running figures down to a tick. */
+.dl-row .dl-tick { display: none; }
+.dl-row.done .dl-tick { display: inline; }
+.dl-row.done .dl-live { display: none; }
 
 .progress { margin-top: 12px; }
 .bar {
@@ -248,7 +286,10 @@ select:focus { outline: 1px solid var(--accent); }
 .fill {
   height: 100%; width: 0%;
   background: linear-gradient(90deg, var(--accent), var(--accent-soft));
-  border-radius: 999px; transition: width .3s;
+  border-radius: 999px;
+  /* No CSS transition: springProgress (MP-02) drives this width frame by
+     frame. A fixed-duration ease restarted on every burst is exactly the
+     stutter this replaces. */
 }
 .progress-row {
   display: flex; justify-content: space-between; margin-top: 5px;
@@ -519,3 +560,10 @@ input[type="range"] { accent-color: var(--accent); width: 130px; }
   margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted);
 }
 .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* The side panel had no reduced-motion guard at all, while minutes.css has
+   carried one since the register shipped. The motion primitives resolve to
+   their target synchronously under this query, so the two agree. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
