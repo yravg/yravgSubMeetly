@@ -5,6 +5,7 @@ import {
   translationText,
   cueToLine,
 } from './lib/translation-utils.js';
+import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
 
 (() => {
   if (window.__localTransSubInjected) return;
@@ -869,7 +870,45 @@ import {
       .panel.locked .toolbar-title { cursor: default; }
       .panel.locked .resize-handle, .panel.locked .resize-edge { display: none; }
       .hidden { display: none !important; }
-    `;
+    
+      /* ---- Keterbacaan di segala tema halaman induk ----------------------
+         Aturan di bawah menang karena datang belakangan: kontras dinaikkan
+         tanpa mengubah tata letak, dan tipografi halaman induk tidak bocor. */
+      :host {
+        color: #fff; font-size: 16px; line-height: normal; letter-spacing: normal;
+        word-spacing: normal; text-transform: none; text-indent: 0; text-align: left;
+        direction: ltr; font-style: normal; font-variant: normal; text-shadow: none; filter: none;
+      }
+      .panel, .reopen-fab, .status-bar { color-scheme: dark; }
+      .panel {
+        background: rgba(8, 8, 8, 0.9);
+        -webkit-backdrop-filter: blur(10px) saturate(1.1);
+        backdrop-filter: blur(10px) saturate(1.1);
+        border-color: rgba(255, 255, 255, 0.22);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.5);
+      }
+      .block { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.6); }
+      .block.src { color: rgba(255, 255, 255, 0.88); }
+      .block.tgt { color: #fff; }
+      .block.untranslated { color: rgba(255, 255, 255, 0.82); }
+      .row.interim .block.loading { color: rgba(255, 255, 255, 0.72); }
+      .time-btn { color: rgba(255, 255, 255, 0.72); }
+      .status-bar { color: rgba(255, 255, 255, 0.82); }
+      .reopen-fab { background: rgba(8, 8, 8, 0.9); border-color: rgba(255, 255, 255, 0.35); }
+
+      @media (prefers-contrast: more) {
+        .panel, .reopen-fab { background: rgba(0, 0, 0, 0.98); border-color: #fff; backdrop-filter: none; }
+        .block { background: rgba(255, 255, 255, 0.14); }
+        .row.active .block { background: rgba(255, 255, 255, 0.22); box-shadow: inset 0 0 0 1px #fff; }
+        .block.src, .block.untranslated, .time-btn, .status-bar { color: #fff; }
+      }
+      @media (forced-colors: active) {
+        .panel, .reopen-fab { background: Canvas; color: CanvasText; border: 2px solid CanvasText; backdrop-filter: none; }
+        .block { background: Canvas; color: CanvasText; border: 1px solid CanvasText; text-shadow: none; }
+        .block.src, .block.tgt, .block.untranslated, .time-btn, .status-bar { color: CanvasText; }
+        .row.active .block { border-color: Highlight; box-shadow: none; }
+      }
+`;
 
     panel = document.createElement('div');
     panel.className = 'panel';
@@ -1148,10 +1187,7 @@ import {
       const onMove = (ev) => {
         const nx = origLeft + (ev.clientX - startX);
         const nb = origBottom - (ev.clientY - startY);
-        pos = {
-          xPct: Math.min(95, Math.max(5, (nx / window.innerWidth) * 100)),
-          yPct: Math.min(90, Math.max(2, (nb / window.innerHeight) * 100)),
-        };
+        pos = clampPos({ xPct: (nx / window.innerWidth) * 100, yPct: (nb / window.innerHeight) * 100 });
         applyPos();
       };
       const onUp = () => {
@@ -1166,15 +1202,54 @@ import {
     });
   }
 
+  const EDGE_MARGIN = 8; // px yang disisakan antara overlay dan tepi viewport
+
+  // Muat panel ke dalam viewport (jendela kecil / halaman di-zoom) tanpa
+  // mengubah preferensi ukuran pengguna kecuali memang sudah tidak muat.
+  function fitPanelSizeToViewport() {
+    return fitSizeToViewport(panelSize, {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      min: PANEL_MIN,
+      margin: EDGE_MARGIN,
+    });
+  }
+
+  // Klem posisi memakai ukuran panel yang benar-benar terender, sehingga yang
+  // dijaga di layar adalah SELURUH panel, bukan sekadar titik tengahnya.
+  function clampPos(p) {
+    if (!p) return p;
+    const fit = fitPanelSizeToViewport();
+    return clampOverlayPos(p, {
+      vw: window.innerWidth || 1,
+      vh: window.innerHeight || 1,
+      w: panel?.offsetWidth || fit.w,
+      h: panel?.offsetHeight || fit.h,
+      margin: EDGE_MARGIN,
+    });
+  }
+
+  let viewportResizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (!panel) return;
+    clearTimeout(viewportResizeTimer);
+    viewportResizeTimer = setTimeout(() => {
+      applyPanelSize();
+      applyPos();
+    }, 80);
+  });
+
   function applyPanelSize() {
     if (!panel) return;
-    panel.style.setProperty('--panel-w', `${panelSize.w}px`);
-    panel.style.setProperty('--panel-h', `${panelSize.h}px`);
-    panel.style.width = `${panelSize.w}px`;
-    panel.style.height = `${panelSize.h}px`;
+    const fit = fitPanelSizeToViewport();
+    panel.style.setProperty('--panel-w', `${fit.w}px`);
+    panel.style.setProperty('--panel-h', `${fit.h}px`);
+    panel.style.width = `${fit.w}px`;
+    panel.style.height = `${fit.h}px`;
     if (shouldAutoScroll() && activeRowEl()) {
       scrollActiveRowIntoView({ instant: true });
     }
+    if (pos) applyPos();
   }
 
   function makeVerticalResize(handle, edge) {
@@ -1235,6 +1310,7 @@ import {
 
   function applyPos() {
     if (!panel || !pos) return;
+    pos = clampPos(pos);
     panel.style.left = pos.xPct + '%';
     panel.style.bottom = pos.yPct + '%';
     panel.style.transform = 'translateX(-50%)';
@@ -1511,25 +1587,104 @@ import {
     }
   });
 
+  function applyPipelineStatus(pstate) {
+    if (!sessionActive) return;
+    if (pstate === 'loading') setStatus('Loading local AI models…');
+    else if (pstate === 'warmup') setStatus('Warming up…');
+    else if (pstate === 'listening') setStatus('Listening — live translation active');
+  }
+
+  function activateSession(data) {
+    sessionActive = true;
+    sessionConfig = data.config || null;
+    dualLine = !!data.config?.dualLine;
+    refineTranslation = !!data.config?.refineTranslation;
+    overlayDismissed = false;
+    cacheMaxTime = data.cacheMaxTime || 0;
+    buildOverlay();
+    syncOverlayToggles();
+    setPanelVisible(panelVisible);
+    loadInitialCues(data.cacheCues || []);
+    startVideoTracking();
+    const resume = cacheMaxTime > 0 ? ` — cached to ${fmtClock(cacheMaxTime)}` : '';
+    setStatus(`Loading models…${resume}`);
+  }
+
+  // Gabungkan cue yang mungkin terlewat (tab sempat dibuang, dipulihkan dari
+  // bfcache, atau skrip disuntik di tengah sesi) tanpa membuang yang sudah ada.
+  function mergeCues(list) {
+    let added = 0;
+    for (const cue of list || []) {
+      const key = cueKey(cue.t0 ?? 0);
+      if (cues.has(key)) continue;
+      upsertCue({
+        t0: cue.t0 ?? 0,
+        t1: cue.t1,
+        rawSrc: cue.src || cue.source || '',
+        rawTgt: cue.tgt || cue.translation || '',
+      });
+      added += 1;
+      cacheMaxTime = Math.max(cacheMaxTime, cue.t1 ?? 0);
+    }
+    if (added) renderRows();
+    return added;
+  }
+
+  let syncInFlight = null;
+  async function syncFromBackground(reason) {
+    if (syncInFlight) return syncInFlight;
+    syncInFlight = (async () => {
+      let res = null;
+      try {
+        res = await chrome.runtime.sendMessage({ target: 'bg', type: 'content-sync', data: { reason } });
+      } catch {
+        return; // ekstensi dimuat ulang / background belum ada
+      }
+      // Hanya jawaban asli background yang membawa `active` boolean; apa pun
+      // selain itu diabaikan supaya overlay tidak dibongkar tanpa alasan.
+      if (!res || typeof res.active !== 'boolean') return;
+      if (res.active && !sessionActive) {
+        activateSession(res);
+        applyPipelineStatus(res.pipelineState);
+      } else if (res.active && sessionActive) {
+        if (res.config) {
+          sessionConfig = res.config;
+          dualLine = !!res.config.dualLine;
+          refineTranslation = !!res.config.refineTranslation;
+          syncOverlayToggles();
+        }
+        if (!host) {
+          buildOverlay();
+          setPanelVisible(panelVisible);
+        }
+        mergeCues(res.cacheCues);
+        applyPipelineStatus(res.pipelineState);
+      } else if (!res.active && sessionActive) {
+        sessionActive = false;
+        teardown();
+      }
+    })().finally(() => {
+      syncInFlight = null;
+    });
+    return syncInFlight;
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncFromBackground('visible');
+  });
+  window.addEventListener('pageshow', (ev) => {
+    if (ev.persisted) syncFromBackground('pageshow');
+  });
+  syncFromBackground('boot');
+
   chrome.runtime.onMessage.addListener((msg) => {
     if (!msg || msg.target !== 'content') return;
     switch (msg.type) {
       case 'session':
-        sessionActive = !!msg.data.active;
-        if (sessionActive) {
-          sessionConfig = msg.data.config || null;
-          dualLine = !!msg.data.config?.dualLine;
-          refineTranslation = !!msg.data.config?.refineTranslation;
-          overlayDismissed = false;
-          cacheMaxTime = msg.data.cacheMaxTime || 0;
-          buildOverlay();
-          syncOverlayToggles();
-          setPanelVisible(panelVisible);
-          loadInitialCues(msg.data.cacheCues || []);
-          startVideoTracking();
-          const resume = cacheMaxTime > 0 ? ` — cached to ${fmtClock(cacheMaxTime)}` : '';
-          setStatus(`Loading models…${resume}`);
+        if (msg.data.active) {
+          activateSession(msg.data);
         } else {
+          sessionActive = false;
           teardown();
         }
         break;
@@ -1578,16 +1733,9 @@ import {
       case 'subtitle':
         if (sessionActive) ingestSubtitle(msg.data);
         break;
-      case 'pipeline-status': {
-        if (!sessionActive) break;
-        const s = msg.data?.state;
-        if (s === 'loading') setStatus('Loading local AI models…');
-        else if (s === 'warmup') setStatus('Warming up…');
-        else if (s === 'listening') {
-          setStatus('Listening — live translation active');
-        }
+      case 'pipeline-status':
+        applyPipelineStatus(msg.data?.state);
         break;
-      }
     }
   });
 })();

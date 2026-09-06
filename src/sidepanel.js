@@ -37,6 +37,8 @@ import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
+import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js';
+import { makeResizable } from './lib/resizable.js';
 import { mountPerfPanel } from './perf-panel.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
@@ -51,6 +53,7 @@ import { springProgress, slidingNumber, autoHeight, highlight } from './lib/moti
 const $ = (id) => document.getElementById(id);
 
 const state = {
+  sessionTab: null, // tab yang sedang disubtitle selagi sesi realtime hidup
   mode: 'realtime', // 'realtime' | 'offline'
   task: 'translate', // 'transcribe' | 'translate'
   view: 'captions', // 'captions' | 'notes'
@@ -105,6 +108,12 @@ function applyI18n() {
   document.documentElement.lang = state.settings.uiLang || 'en';
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel));
   });
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
@@ -433,13 +442,54 @@ function setSubview(sub) {
   try { localStorage.setItem('captionsSubview', perf ? 'perf' : 'live'); } catch { /* opsional */ }
 }
 
+/** Kepadatan panel: 'simple' (bawaan) atau 'detail'.
+ * Simple menyembunyikan setiap elemen bertanda data-density="detail":
+ * subtab Performance, Refine/Dual line, Interpreter mode, peringatan model,
+ * pilih tab manual, kartu Native Helper, dan tambahan di panel Notulen.
+ * Pilihan terakhir tersimpan di chrome.storage.local sebagai `panelDensity`. */
+const DENSITY_KEY = 'panelDensity';
+let density = 'simple';
+
+function applyDensity(mode, { persist = true } = {}) {
+  density = mode === 'detail' ? 'detail' : 'simple';
+  document.body.dataset.density = density;
+  document.querySelectorAll('#density-toggle [data-density-mode]').forEach((b) => {
+    const on = b.dataset.densityMode === density;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  syncPill('density-toggle');
+  // Simple mode takes the Captions subtabs out of the flow entirely, so their
+  // pill is re-placed once Detail puts them back and they can be measured.
+  if (density === 'detail') requestAnimationFrame(() => syncPill('captions-subtabs', false));
+  // Performance hanya hidup di Detail — jangan tinggalkan pengguna di tab yang hilang.
+  if (density === 'simple') setSubview('live');
+  if (persist) {
+    try {
+      chrome.storage.local.set({ [DENSITY_KEY]: density });
+    } catch { /* storage opsional (harness) */ }
+  }
+}
+
+async function restoreDensity() {
+  let saved = null;
+  try {
+    const got = await chrome.storage.local.get(DENSITY_KEY);
+    saved = got?.[DENSITY_KEY] ?? null;
+  } catch { /* storage opsional */ }
+  applyDensity(saved === 'detail' ? 'detail' : 'simple', { persist: false });
+}
+
 /** Kartu yang bisa dilipat (Native Helper) — tertutup default, status diingat. */
 function initCollapsibles() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('uiCollapsed') || '{}'); } catch { saved = {}; }
   document.querySelectorAll('.card.collapsible[data-collapse-key]').forEach((card) => {
     const key = card.dataset.collapseKey;
-    const open = saved[key] === true; // bawaan: tertutup
+    // Bawaan tertutup, kecuali kartu menyatakan data-collapse-default="open"
+    // (kartu Notulen harus terbuka saat panel pertama dibuka).
+    const openByDefault = card.dataset.collapseDefault === 'open';
+    const open = saved[key] === undefined ? openByDefault : saved[key] === true;
     card.classList.toggle('collapsed', !open);
     const btn = card.querySelector('.card-toggle');
     btn?.setAttribute('aria-expanded', String(open));
@@ -451,6 +501,63 @@ function initCollapsibles() {
       try { localStorage.setItem('uiCollapsed', JSON.stringify(saved)); } catch { /* opsional */ }
     });
   });
+}
+
+/* ---- Pencarian cepat di Pengaturan -------------------------------------
+ * Menyaring berdasarkan teks yang terlihat (label + kendali + deskripsi).
+ * Kueri kosong menampilkan semuanya kembali. */
+function filterSettings(query) {
+  const q = String(query || '').trim().toLowerCase();
+  const modal = $('settings-modal');
+  if (!modal) return;
+  let visible = 0;
+  modal.querySelectorAll('.setting-row, .m-item').forEach((el) => {
+    const hit = !q || el.textContent.toLowerCase().includes(q);
+    el.classList.toggle('search-hidden', !hit);
+    if (hit) visible += 1;
+  });
+  // Blok Native Helper menempel pada baris Engine: ikut tampil selama baris
+  // itu tampil, atau kalau isinya sendiri cocok.
+  const nativeBlock = $('native-block');
+  if (nativeBlock) {
+    const engineRow = $('engine-toggle')?.closest('.setting-row');
+    const show =
+      !q ||
+      nativeBlock.textContent.toLowerCase().includes(q) ||
+      (engineRow && !engineRow.classList.contains('search-hidden'));
+    nativeBlock.classList.toggle('search-hidden', !show);
+  }
+  // Judul daftar model hanya muncul kalau ada model yang lolos saringan.
+  modal.querySelectorAll('.models-title').forEach((title) => {
+    let el = title.nextElementSibling;
+    while (el && !el.classList.contains('model-list')) el = el.nextElementSibling;
+    const any = !q || (el && [...el.querySelectorAll('.m-item')].some((m) => !m.classList.contains('search-hidden')));
+    title.classList.toggle('search-hidden', !any);
+  });
+  modal.querySelectorAll('.hint').forEach((h) => {
+    if (h.id === 'settings-no-match') return;
+    h.classList.toggle('search-hidden', !!q);
+  });
+  const none = $('settings-no-match');
+  none.classList.toggle('hidden', !q || visible > 0);
+  if (q && visible === 0) none.textContent = t('settingsNoMatch', query.trim());
+}
+
+/* ---- Preferensi antar sesi --------------------------------------------
+ * lastConfig sudah lama ditulis tapi tidak pernah dibaca lagi, jadi panel
+ * selalu terbuka di Realtime + Translate. Sekarang dipulihkan. */
+async function restoreUiPrefs() {
+  try {
+    const { lastConfig, panelPrefs } = await chrome.storage.local.get(['lastConfig', 'panelPrefs']);
+    if (lastConfig?.srcLang) state.srcLang = lastConfig.srcLang;
+    if (lastConfig?.tgtLang) state.tgtLang = lastConfig.tgtLang;
+    return {
+      task: lastConfig?.taskMode === 'transcribe' ? 'transcribe' : 'translate',
+      mode: panelPrefs?.mode === 'offline' ? 'offline' : 'realtime',
+    };
+  } catch {
+    return { task: 'translate', mode: 'realtime' };
+  }
 }
 
 function setView(view) {
@@ -505,7 +612,7 @@ function syncBottomNav() {
 // button is actually decided. `.seg.wrap` groups are deliberately left out —
 // they wrap onto several rows and one pill cannot track that.
 const PILL_GROUPS = [
-  'view-tabs', 'captions-subtabs', 'mode-toggle', 'task-toggle',
+  'view-tabs', 'density-toggle', 'captions-subtabs', 'mode-toggle', 'task-toggle',
   'theme-toggle', 'asr-preset-toggle', 'mirror-toggle', 'device-toggle',
   'native-device-toggle',
 ];
@@ -579,7 +686,9 @@ function mountPanels() {
 // ---------------------------------------------------------------------------
 // mode / task toggles
 function setMode(mode) {
+  const modeChanged = state.mode !== mode;
   state.mode = mode;
+  if (modeChanged) chrome.storage.local.set({ panelPrefs: { mode } }).catch(() => {});
   document.querySelectorAll('#mode-toggle button').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === mode);
   });
@@ -587,6 +696,8 @@ function setMode(mode) {
   $('rt-target').classList.toggle('hidden', mode !== 'realtime');
   $('btn-pick').classList.toggle('hidden', mode !== 'realtime');
   $('pick-hint').classList.add('hidden');
+  hideError();
+  if (!state.running) setStartStep(null);
   $('off-drop').classList.toggle('hidden', mode !== 'offline');
   $('off-results').classList.toggle('hidden', mode !== 'offline' || state.offlineLines.length === 0);
   showPanel('qa-sample-bar', mode === 'offline' && !!state.qaCatalog?.samples?.length);
@@ -775,6 +886,12 @@ function updateWarning() {
 // Satu pintu membuka Settings agar banner, topbar, nav bawah, dan tombol
 // About selalu sinkron (lihat syncBottomNav).
 function openSettings({ about = false } = {}) {
+  const search = $('settings-search');
+  if (search) {
+    search.value = '';
+    filterSettings('');
+    setTimeout(() => search.focus({ preventScroll: true }), 30);
+  }
   $('settings-modal').classList.remove('hidden');
   // Nothing inside a display:none modal has a width or a height to measure, so
   // the groups and panels living in here are placed the moment it opens.
@@ -1096,6 +1213,8 @@ function renderModelLists() {
   for (const [key, p] of Object.entries(MT_PAIRS)) {
     mtHost.appendChild(modelRow(key, pairLabel(key), `${key} · Opus-MT · ${p.size}`, { mtPair: key }));
   }
+  const q = $('settings-search')?.value;
+  if (q) filterSettings(q);
 }
 
 function modelRow(key, name, sub, { mtPair = null } = {}) {
@@ -1806,21 +1925,61 @@ async function acquireLabDisplayStream() {
   return stream;
 }
 
-async function refreshTab() {
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+function renderTargetCard(tab, { live = false, elsewhere = false } = {}) {
   const fallbackIcon = chrome.runtime.getURL('icons/icon16.png');
-  if (tab && /^https?:/.test(tab.url || '')) {
-    state.currentTab = tab;
+  if (tab) {
     $('tab-title').textContent = tab.title || tab.url;
-    $('tab-url').textContent = tab.url;
+    $('tab-url').textContent = tab.url || '';
     $('tab-favicon').src = tab.favIconUrl || fallbackIcon;
   } else {
-    state.currentTab = null;
     $('tab-title').textContent = t('noTab');
     $('tab-url').textContent = '';
     $('tab-favicon').src = fallbackIcon;
   }
+  const card = $('rt-target');
+  card.classList.toggle('live', live);
+  card.classList.toggle('elsewhere', live && elsewhere);
+  const tag = $('target-tag');
+  tag.classList.toggle('live', live);
+  tag.textContent = live ? (elsewhere ? t('liveOtherTab') : t('liveThisTab')) : t('currentPage');
+  $('btn-goto-session-tab').classList.toggle('hidden', !(live && elsewhere));
+  $('session-tab-hint').classList.toggle('hidden', !(live && elsewhere));
+}
+
+// Sesi realtime TIDAK ikut berpindah saat pengguna ganti tab, jadi kartu
+// target tidak boleh berpura-pura ikut pindah: selama sesi hidup ia tetap
+// menunjuk state.sessionTab.
+async function refreshTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const usable = tab && /^https?:/.test(tab.url || '') ? tab : null;
+  state.currentTab = usable;
+  if (state.mode === 'realtime' && state.running && state.sessionTab) {
+    const elsewhere = !tab || tab.id !== state.sessionTab.id;
+    if (!elsewhere && usable) state.sessionTab = { ...state.sessionTab, ...usable };
+    renderTargetCard(state.sessionTab, { live: true, elsewhere });
+  } else {
+    renderTargetCard(usable);
+  }
   updateButtons();
+}
+
+async function rememberSessionTab(tabId) {
+  if (tabId == null) {
+    state.sessionTab = state.currentTab;
+    return;
+  }
+  try {
+    state.sessionTab = await chrome.tabs.get(tabId);
+  } catch {
+    state.sessionTab = state.currentTab;
+  }
+}
+
+function gotoSessionTab() {
+  const tab = state.sessionTab;
+  if (!tab) return;
+  chrome.tabs.update?.(tab.id, { active: true })?.catch?.(() => {});
+  if (tab.windowId != null) chrome.windows?.update?.(tab.windowId, { focused: true })?.catch?.(() => {});
 }
 
 function updateButtons() {
@@ -1835,8 +1994,81 @@ function updateButtons() {
 
 function setStatus(text, cls = '') {
   const el = $('status-line');
-  el.textContent = text;
   el.className = 'status-line ' + cls;
+  $('status-text').textContent = text;
+  const dot = $('status-dot');
+  dot.classList.toggle('hidden', !text);
+  dot.className =
+    'status-dot ' + (!text ? 'hidden' : cls === 'ok' ? 'on' : cls === 'error' ? 'error' : 'busy');
+}
+
+/** Denyut singkat saat satu baris subtitel mendarat — tanda sesi masih hidup. */
+function flashStatusDot() {
+  const dot = $('status-dot');
+  if (!dot || dot.classList.contains('hidden')) return;
+  dot.classList.remove('flash');
+  void dot.offsetWidth;
+  dot.classList.add('flash');
+}
+
+/* ---- Strip langkah mulai realtime -------------------------------------
+ * `key` = langkah yang sedang berjalan; langkah sebelumnya jadi centang.
+ * null menyembunyikan strip; { failed: true } menandai `key` merah. */
+const START_STEPS = ['capture', 'models', 'warmup', 'listening'];
+function setStartStep(key, { failed = false } = {}) {
+  const host = $('start-steps');
+  if (!host) return;
+  if (!key) {
+    host.classList.add('hidden');
+    host.querySelectorAll('li').forEach((li) => (li.className = ''));
+    return;
+  }
+  host.classList.remove('hidden');
+  const idx = START_STEPS.indexOf(key);
+  host.querySelectorAll('li').forEach((li, i) => {
+    li.className = i < idx ? 'done' : i === idx ? (failed ? 'failed' : 'current') : '';
+    if (i === idx && key === 'listening' && !failed) li.className = 'done current';
+  });
+}
+
+/* ---- Kartu kendala -----------------------------------------------------
+ * Pesan mentah dari pipeline diterjemahkan lib/friendly-error.js menjadi
+ * kategori, lalu panel menampilkan judul + langkah pemulihan + satu aksi. */
+function showError(raw, { statusText } = {}) {
+  const { key, action, detail } = classifyError(raw);
+  const title = t(errTitleKey(key));
+  const hint = t(errHintKey(key));
+  setStatus(statusText ?? title, key === 'cancelled' ? '' : 'error');
+  const box = $('error-box');
+  if (!box) return;
+  if (key === 'cancelled') {
+    hideError();
+    return;
+  }
+  $('error-title').textContent = title;
+  $('error-hint').textContent = hint;
+  const showDetail = detail && detail !== title && key !== 'captureBlocked';
+  $('error-detail-wrap').classList.toggle('hidden', !showDetail);
+  $('error-detail-wrap').open = false;
+  $('error-detail').textContent = detail;
+  const btn = $('btn-error-action');
+  btn.classList.toggle('hidden', !action);
+  btn.dataset.action = action || '';
+  btn.textContent =
+    action === 'pick' ? t('errActionPick') : action === 'settings' ? t('errActionSettings') : t('errActionRetry');
+  box.classList.remove('hidden');
+}
+
+function hideError() {
+  $('error-box')?.classList.add('hidden');
+}
+
+function onErrorAction() {
+  const action = $('btn-error-action').dataset.action;
+  hideError();
+  if (action === 'pick') onPickManually();
+  else if (action === 'settings') $('btn-settings').click();
+  else if (action === 'retry') onStart();
 }
 
 // Toast umpan balik: ekspor + notulen. aria-live di #toast-stack agar
@@ -1871,6 +2103,7 @@ if (typeof window !== 'undefined') window.__ltsToast = showToast;
 
 async function startWithStream(streamId, captureType) {
   setStatus(t('loadingModels'));
+  setStartStep('models');
   state.realtimeLines = [];
   clearLivePreview();
   $('live-preview').classList.remove('hidden');
@@ -1883,9 +2116,11 @@ async function startWithStream(streamId, captureType) {
   });
   if (res?.ok) {
     state.running = true;
+    state.sessionTab = state.currentTab;
     syncCaptureStamp();
     $('pick-hint').classList.add('hidden');
     updateButtons();
+    refreshTab();
   } else if (res?.error) {
     if (isLabHarness()) releaseLabCapture();
     showCaptureError(res.error);
@@ -1894,7 +2129,8 @@ async function startWithStream(streamId, captureType) {
 
 function showCaptureError(message) {
   const blocked = /invoked|activeTab|not been invoked/i.test(message);
-  setStatus(blocked ? t('needInvoke') : message, 'error');
+  showError(message, { statusText: blocked ? t('needInvoke') : undefined });
+  setStartStep('capture', { failed: true });
   if (blocked) {
     $('pick-hint').textContent = t('pickHint');
     $('pick-hint').classList.remove('hidden');
@@ -1959,6 +2195,9 @@ async function onStart() {
       return;
     }
     if (!state.currentTab) return;
+    hideError();
+    setStatus(t('requestingCapture'));
+    setStartStep('capture');
     let streamId = null;
     try {
       streamId = await chrome.tabCapture.getMediaStreamId({
@@ -2007,10 +2246,14 @@ async function onStop() {
   if (state.mode === 'realtime') {
     await toBG('panel-stop', {});
     state.running = false;
+    state.sessionTab = null;
     syncCaptureStamp();
     if (isLabHarness()) releaseLabCapture();
     setStatus('');
+    setStartStep(null);
+    hideError();
     updateButtons();
+    refreshTab();
   } else {
     toOffscreen('offline-cancel', {});
   }
@@ -2338,6 +2581,10 @@ async function refreshExportFolderUi() {
   const label = exportDirLabel();
   $('export-folder-label').textContent = label ? `${t('exportFolderSet')}: ${label}` : t('exportFolderNone');
   $('btn-clear-export-folder').classList.toggle('hidden', !label);
+  // Tujuan yang sama, dieja di sebelah tombol ekspor supaya pengguna tahu
+  // berkasnya mendarat di mana SEBELUM menekan.
+  const dest = $('export-dest-text');
+  if (dest) dest.textContent = label ? t('exportDestFolder', label) : t('exportDestDownloads');
   redrawHelperStatus?.();
 }
 
@@ -2350,23 +2597,43 @@ chrome.runtime.onMessage.addListener((msg) => {
       state.running = !!msg.data.active;
       syncCaptureStamp();
       updateButtons();
-      if (!state.running && state.mode === 'realtime') setStatus('');
+      if (!state.running && state.mode === 'realtime') {
+        state.sessionTab = null;
+        setStatus('');
+        setStartStep(null);
+        refreshTab();
+      } else if (state.running && msg.data.tabId != null && state.sessionTab?.id !== msg.data.tabId) {
+        rememberSessionTab(msg.data.tabId).then(refreshTab);
+      }
       break;
     case 'subtitle':
       pushLive(msg.data);
+      if (!msg.data?.interim) flashStatusDot();
       break;
     case 'perf-sample':
       perfPanel?.push(msg.data);
       break;
     case 'pipeline-status': {
       const s = msg.data?.state;
-      if (s === 'loading') setStatus(t('loadingModels'));
-      else if (s === 'listening')
+      if (s === 'loading') {
+        const d = msg.data?.detail;
+        setStatus(d === 'asr' ? t('loadingAsr') : d === 'translator' ? t('loadingTranslator') : t('loadingModels'));
+        setStartStep('models');
+      } else if (s === 'warmup') {
+        setStatus(t('warmingUp'));
+        setStartStep('warmup');
+      } else if (s === 'listening') {
         setStatus(`${t('listening')} — ${activeAsrLabel()} (${msg.data.device || ''})`, 'ok');
+        setStartStep('listening');
+      }
       break;
     }
     case 'error':
-      setStatus(msg.data?.message || 'Error', 'error');
+      showError(msg.data?.message || 'Error');
+      if (state.mode === 'realtime') {
+        const li = $('start-steps')?.querySelector('li.current');
+        setStartStep(li?.dataset?.step || 'models', { failed: true });
+      }
       state.running = false;
       syncCaptureStamp();
       updateButtons();
@@ -2381,7 +2648,7 @@ chrome.runtime.onMessage.addListener((msg) => {
       dlState.delete(msg.data?.key);
       renderDlList();
       renderModelLists();
-      setStatus(`Model: ${msg.data?.message || 'download failed'}`, 'error');
+      showError(`Model: ${msg.data?.message || 'download failed'}`);
       break;
     case 'offline-line':
       pushOfflineLine(msg.data);
@@ -2447,7 +2714,12 @@ chrome.runtime.onMessage.addListener((msg) => {
         };
         redrawHelperStatus?.();
       }
-      setStatus(msg.data?.cancelled ? t('cancelled') : msg.data?.message || 'Error', msg.data?.cancelled ? '' : 'error');
+      if (msg.data?.cancelled) {
+        setStatus(t('cancelled'));
+        hideError();
+      } else {
+        showError(msg.data?.message || 'Error');
+      }
       updateButtons();
       break;
     case 'history-updated':
@@ -2468,6 +2740,9 @@ function wire() {
   window.addEventListener('resize', () => resyncPills(false));
   document.querySelectorAll('#view-tabs button').forEach((b) =>
     b.addEventListener('click', () => setView(b.dataset.view)),
+  );
+  document.querySelectorAll('#density-toggle [data-density-mode]').forEach((b) =>
+    b.addEventListener('click', () => applyDensity(b.dataset.densityMode)),
   );
   document.querySelectorAll('.bottom-nav-item').forEach((b) =>
     b.addEventListener('click', () => {
@@ -2554,6 +2829,19 @@ function wire() {
   $('btn-start').addEventListener('click', onStart);
   $('btn-stop').addEventListener('click', onStop);
   $('btn-pick').addEventListener('click', onPickManually);
+  $('btn-error-action').addEventListener('click', onErrorAction);
+  $('btn-export-dest-change').addEventListener('click', () => $('btn-settings').click());
+  $('btn-goto-session-tab').addEventListener('click', gotoSessionTab);
+  const settingsSearch = $('settings-search');
+  settingsSearch.addEventListener('input', () => filterSettings(settingsSearch.value));
+  settingsSearch.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && settingsSearch.value) {
+      ev.stopPropagation();
+      settingsSearch.value = '';
+      filterSettings('');
+    }
+  });
+  $('btn-error-dismiss').addEventListener('click', hideError);
   $('btn-paste-generate')?.addEventListener('click', () => void generateMinutesFromPaste());
   $('history-search')?.addEventListener('input', () => {
     void renderHistory();
@@ -2730,13 +3018,15 @@ async function init() {
   await loadSettings();
   wire();
   applyI18n();
+  const uiPrefs = await restoreUiPrefs();
   resyncPills(false);
   fillSelects();
   setView('captions');
+  await restoreDensity();
   state.qaCatalog = await loadSampleCatalog();
   renderQaSampleBar();
-  setMode('realtime');
-  setTask('translate');
+  setMode(uiPrefs.mode);
+  setTask(uiPrefs.task);
   await refreshDownloaded();
   renderModelLists();
   populateMockData();
@@ -2753,6 +3043,17 @@ async function init() {
   if (notesMount) {
     await mountNotesPanel(notesMount, notesMountOptions());
     notesMount.dataset.mounted = '1';
+    // Tinggi isi kartu Notulen bisa diseret dan diingat antar sesi.
+    const notesBody = $('notes-body');
+    if (notesBody && !notesBody.dataset.resizable) {
+      notesBody.dataset.resizable = '1';
+      await makeResizable(notesBody, {
+        storageKey: 'notesPanelSize',
+        min: 180,
+        max: 1400,
+        label: t('notesResize'),
+      });
+    }
   }
   const helperMount = $('helper-status-mount');
   if (helperMount) {

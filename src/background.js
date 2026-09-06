@@ -606,10 +606,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       case 'pipeline-status':
+        session.pipelineState = msg.data?.state || null;
+        session.pipelineDevice = msg.data?.device || null;
         toPanel('pipeline-status', msg.data);
         toContent('pipeline-status', msg.data);
         sendResponse({ ok: true });
         break;
+
+      // Content script menanyakan keadaan overlay saat ini — ketika baru
+      // disuntikkan, dipulihkan dari bfcache, atau tabnya terlihat lagi —
+      // supaya overlay tidak tertinggal kosong atau basi setelah ganti tab.
+      // Hanya tab yang sedang disubtitle yang dijawab aktif.
+      case 'content-sync': {
+        const mine = session.active && sender?.tab?.id != null && sender.tab.id === session.tabId;
+        sendResponse({
+          active: mine,
+          config: mine ? session.config : null,
+          cacheCues: mine ? session.lines : [],
+          cacheMaxTime: mine ? session.cacheMaxTime : 0,
+          pipelineState: mine ? session.pipelineState || null : null,
+          pipelineDevice: mine ? session.pipelineDevice || null : null,
+        });
+        break;
+      }
 
       case 'pipeline-error':
         toPanel('error', msg.data);

@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Local TransSub</title>
+    <title>yraverageSubMin</title>
     <link rel="stylesheet" href="sidepanel.css" />
     <link rel="stylesheet" href="notes-panel.css" />
   </head>
@@ -10,7 +10,9 @@
     <header class="topbar">
       <div class="topbar-brand">
         <span id="topbar-rec" class="topbar-rec hidden" aria-hidden="true"></span>
-        <span class="brand">Local TransSub</span>
+        <span class="brand">
+          <span class="brand-word">yraverage</span><span class="brand-pill">SubMin</span>
+        </span>
         <nav class="view-tabs" id="view-tabs" aria-label="Main views">
           <button type="button" data-view="captions" class="active" data-i18n="tabCaptions">
             Captions
@@ -19,6 +21,16 @@
         </nav>
       </div>
       <div class="topbar-actions">
+        <div class="density" id="density-toggle" role="group" data-i18n-aria-label="densityGroup" aria-label="Panel density">
+          <button type="button" data-density-mode="simple" class="active" aria-pressed="true" data-i18n-title="densitySimpleHint">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5h11M2.5 11h11"/></svg>
+            <span data-i18n="densitySimple">Simple</span>
+          </button>
+          <button type="button" data-density-mode="detail" aria-pressed="false" data-i18n-title="densityDetailHint">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M2.5 3.5h11M2.5 6.5h11M2.5 9.5h11M2.5 12.5h11"/></svg>
+            <span data-i18n="densityDetail">Detail</span>
+          </button>
+        </div>
         <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
       </div>
     </header>
@@ -26,7 +38,7 @@
     <main>
       <div id="view-captions" class="view-panel">
       <!-- Child tabs of Captions: Live (kartu-kartu di bawah) dan Performance (analitik kecepatan). -->
-      <div class="subtabs" id="captions-subtabs" role="tablist" aria-label="Captions views">
+      <div class="subtabs" id="captions-subtabs" data-density="detail" role="tablist" aria-label="Captions views">
         <button type="button" role="tab" data-subview="live" class="active" aria-selected="true">Live</button>
         <button type="button" role="tab" data-subview="perf" aria-selected="false">Performance</button>
       </div>
@@ -48,8 +60,10 @@
             <div id="tab-title" class="target-title">—</div>
             <div id="tab-url" class="target-url"></div>
           </div>
-          <span class="target-tag" data-i18n="currentPage">Current page</span>
+          <span id="target-tag" class="target-tag" data-i18n="currentPage">Current page</span>
+          <button id="btn-goto-session-tab" class="mini-btn hidden" data-i18n="gotoSessionTab">Go to tab</button>
         </div>
+        <div id="session-tab-hint" class="hint hidden reveal reveal-delay-3" data-i18n="sessionKeepsRunning"></div>
 
         <!-- Offline: file drop -->
         <div id="off-drop" class="dropzone hidden reveal reveal-delay-3">
@@ -83,7 +97,7 @@
 
         <div class="task-row reveal reveal-delay-3">
           <label class="lbl" data-i18n="taskMode">Task Mode</label>
-          <div class="task-toggles">
+          <div class="task-toggles" data-density="detail">
             <label class="dual-inline" title="Live draft + semantic refinement when sentence ends">
               <span data-i18n="refineShort">Refine</span>
               <input type="checkbox" id="refine-main" class="switch" />
@@ -99,7 +113,7 @@
           <button data-task="translate" class="active" data-i18n="plusTranslate">+ Translate</button>
         </div>
 
-        <div class="interp-row reveal reveal-delay-3" id="interpreter-row">
+        <div class="interp-row reveal reveal-delay-3" id="interpreter-row" data-density="detail">
           <span class="interp-row-title" data-i18n="interpreterMode">Interpreter mode</span>
           <span class="interp-row-sep">·</span>
           <span class="interp-row-summary" id="interpreter-summary"></span>
@@ -119,10 +133,31 @@
           </div>
         </div>
 
-        <div class="warning-wrap" id="model-warning-wrap" aria-hidden="true"><div id="model-warning" class="warning reveal reveal-delay-3"></div></div>
-        <div id="dl-list" class="dl-list hidden reveal reveal-delay-3"></div>
+        <!-- data-density sits on the clipping wrapper, not the banner: Simple mode
+             must take the whole thing out of the flow, and the wrapper is what
+             carries the height MP-03 animates. -->
+        <div class="warning-wrap" id="model-warning-wrap" aria-hidden="true" data-density="detail"><div id="model-warning" class="warning reveal reveal-delay-3"></div></div>
+        <div id="dl-list" class="dl-list hidden reveal reveal-delay-3" data-density="detail"></div>
 
-        <div id="status-line" class="status-line reveal reveal-delay-3"></div>
+        <div id="status-line" class="status-line reveal reveal-delay-3"><span id="status-dot" class="status-dot hidden"></span><span id="status-text"></span></div>
+        <ol id="start-steps" class="start-steps hidden reveal reveal-delay-3" aria-label="Start progress">
+          <li data-step="capture" data-i18n="stepCapture">Capture</li>
+          <li data-step="models" data-i18n="stepModels">Models</li>
+          <li data-step="warmup" data-i18n="stepWarmup">Warm-up</li>
+          <li data-step="listening" data-i18n="stepListening">Listening</li>
+        </ol>
+        <div id="error-box" class="error-box hidden reveal reveal-delay-3" role="alert">
+          <div id="error-title" class="error-title"></div>
+          <div id="error-hint" class="error-hint"></div>
+          <details id="error-detail-wrap" class="error-detail hidden">
+            <summary data-i18n="errShowDetail">Technical detail</summary>
+            <code id="error-detail"></code>
+          </details>
+          <div class="error-actions">
+            <button id="btn-error-action" class="mini-btn hidden"></button>
+            <button id="btn-error-dismiss" class="mini-btn" data-i18n-title="errDismiss">✕</button>
+          </div>
+        </div>
       </section>
 
       <!-- ============ Group 3: Actions & Preview ============ -->
@@ -135,7 +170,7 @@
           <button id="btn-start" data-tour="btn-start" class="btn primary" data-i18n="startTask">Start Task</button>
           <button id="btn-stop" class="btn" disabled data-i18n="endTask">End Task</button>
         </div>
-        <button id="btn-pick" class="btn ghost reveal reveal-delay-3" data-i18n="pickManually">🖥 Pick tab / window manually</button>
+        <button id="btn-pick" class="btn ghost reveal reveal-delay-3" data-density="detail" data-i18n="pickManually">🖥 Pick tab / window manually</button>
         <div id="pick-hint" class="pick-hint hidden reveal reveal-delay-3"></div>
 
         <!-- Live preview: one box (translation only) or two (original + translation) -->
@@ -155,10 +190,14 @@
           <div class="results-head">
             <span id="off-progress-text"></span>
             <div class="results-actions">
-              <button id="btn-srt" class="mini-btn">SRT</button>
-              <button id="btn-vtt" class="mini-btn">VTT</button>
-              <button id="btn-txt" class="mini-btn">TXT</button>
+              <button id="btn-srt" class="mini-btn" data-i18n-title="fmtSrtHint">SRT</button>
+              <button id="btn-vtt" class="mini-btn" data-i18n-title="fmtVttHint">VTT</button>
+              <button id="btn-txt" class="mini-btn" data-i18n-title="fmtTxtHint">TXT</button>
             </div>
+          </div>
+          <div id="export-dest-hint" class="export-dest-hint">
+            <span id="export-dest-text"></span>
+            <button id="btn-export-dest-change" class="link-btn" data-i18n="exportDestChange">Change…</button>
           </div>
           <div id="off-lines" class="lines"></div>
         </div>
@@ -179,7 +218,7 @@
       </section>
 
       <!-- ============ Native helper status (Win/Linux/mac) ============ -->
-      <section class="card reveal reveal-delay-1 collapsible collapsed" id="helper-status-card" data-collapse-key="helper">
+      <section class="card reveal reveal-delay-1 collapsible collapsed" id="helper-status-card" data-density="detail" data-collapse-key="helper">
         <div class="card-head reveal reveal-delay-2">
           <button type="button" class="card-toggle" id="helper-card-toggle" aria-expanded="false" aria-controls="helper-status-mount">
             <h2>🖥️ Native Helper</h2>
@@ -193,11 +232,16 @@
 
       <!-- ============ Meeting notes (top-level Notes tab) ============ -->
       <div id="view-notes" class="view-panel hidden">
-      <section class="card reveal" id="notes-card">
-        <div class="card-head reveal reveal-delay-1">
-          <h2 data-i18n="notesTitle">📝 Meeting notes</h2>
+      <section class="card reveal collapsible" id="notes-card" data-collapse-key="notes" data-collapse-default="open">
+        <div class="card-head notes-card-head reveal reveal-delay-1">
+          <button type="button" class="card-toggle" id="notes-card-toggle" aria-expanded="true" aria-controls="notes-body">
+            <h2 data-i18n="notesTitle">📝 Meeting notes</h2>
+            <span class="card-chevron" aria-hidden="true">›</span>
+          </button>
+          <div class="notes-mbar" id="notes-meeting-bar"></div>
         </div>
-        <details id="paste-transcript" class="paste-transcript reveal reveal-delay-2">
+        <div id="notes-body">
+        <details id="paste-transcript" class="paste-transcript reveal reveal-delay-2" data-density="detail">
           <summary data-i18n="pasteTitle">Paste a Teams transcript → minutes</summary>
           <p class="notes-meta" data-i18n="pasteHelp">
             Open the Teams meeting transcript, select all, copy, and paste it here.
@@ -212,6 +256,7 @@
           <div id="paste-result" class="paste-result"></div>
         </details>
         <div id="notes-mount" class="reveal reveal-delay-2"></div>
+        </div>
       </section>
       </div>
     </main>
@@ -219,7 +264,7 @@
     <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
 
     <footer class="footer">
-      <span>© 2026 Local TransSub</span>
+      <span>© 2026 yraverageSubMin</span>
       <span class="ver">v1.1.1 <button id="btn-about" class="link-btn">ⓘ</button></span>
     </footer>
 
@@ -335,6 +380,12 @@
           <h2>⚙️ <span data-i18n="settings">Settings</span></h2>
           <button id="btn-close-settings" class="icon-btn">✕</button>
         </div>
+        <div class="settings-search-row">
+          <input type="search" id="settings-search" class="settings-search" autocomplete="off" spellcheck="false"
+                 placeholder="Search settings…" data-i18n-placeholder="settingsSearch"
+                 data-i18n-aria-label="settingsSearch" aria-label="Search settings" />
+        </div>
+        <div id="settings-no-match" class="hint hidden"></div>
 
         <div class="setting-row">
           <label for="ui-lang-toggle" data-i18n="uiLang">UI language</label>
@@ -430,6 +481,7 @@
             <button id="btn-pick-export-folder" class="mini-btn" data-i18n="exportFolderPick">Choose…</button>
             <button id="btn-clear-export-folder" class="mini-btn hidden" data-i18n="exportFolderClear">Clear</button>
           </div>
+          <div class="hint" data-i18n="exportFolderHint"></div>
         </div>
 
         <div class="setting-row">
