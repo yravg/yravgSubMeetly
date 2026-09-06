@@ -123,6 +123,33 @@ Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per ta
     oleh `mountHelperStatusCard`; default `srcLang` **zh** (sidepanel, interpreter, chrome-mock; tes export-browser
     mengharap `zh-en`).
 
+### Animasi dok tampilan (2026-09-06, permintaan pengguna)
+27. **Cincin tunggu menggantikan spinner.** Hover di tombol dok mini mengisi lingkaran SVG
+    (`.viewdock-arm`, `stroke-dashoffset` 125,7 → 0) sampai penuh lalu dok membuka, jadi sisa
+    waktunya terlihat. Durasi animasi dan timer memakai angka yang sama: JS memasang
+    `--dock-arm-ms` di elemen dok, CSS membacanya.
+28. **Buka/tutup dianimasikan dan berarah.** Menutup menyapu **kanan → kiri** menuju ikon,
+    membuka **kiri → kanan**; sapuannya `clip-path` (bukan `scale`) supaya teks tidak gepeng.
+    Setelah mengecil, outline hijau menelusuri keliling ikon sekali — dicerminkan
+    (`rotate(-90deg) scaleX(-1)`) agar arah tempuhnya ikut kanan → kiri.
+29. **Bisa diatur di panel Pengaturan (gigi kanan atas):** lama hover (Off/1s/**1,5s**/2s/3s,
+    `dockArmMs`), gaya animasi (**Wipe**/Slide/Fade/Scale, `dockAnim` → atribut `data-anim`),
+    dan kecepatan (Slow 1,6× / **Normal** / Fast 0,6× → `dockSpeed`, memasang `--dock-out-ms`
+    dan `--dock-in-ms` yang juga dipakai `setTimeout`). Semua tersimpan di `ltsMinutesLayout`.
+    `.settings-pop .seg2` kini membagi lebar rata (Density ikut rapi).
+    Dijaga `test/dock-motion.test.mjs` (7 tes, Puppeteer di `dist/minutes.html`).
+    Catatan: dok hidup di dalam `#workspace` yang **tersembunyi saat register kosong** —
+    tes apa pun harus mengisi register dulu, kalau tidak `#dock-mini` berukuran 0×0.
+
+### Penyebab flaky `export-browser` akhirnya ketemu (2026-09-06)
+Bukan beban mesin. Toast umpan balik (`.toast-stack`, fixed, bawah-tengah) memberi
+`pointer-events: auto` pada **seluruh badan toast**, sehingga toast dari toggle pertama
+menutupi checkbox opsi kedua: klik `bom` mendarat di `BUTTON.toast-close`. Diagnosis:
+`elementFromPoint` pada titik klik saat waitForFunction habis waktu. Perbaikan di
+`src/sidepanel.css` — badan toast `pointer-events: none`, hanya `.toast-close` yang `auto`.
+Ini bug produk nyata: pengguna yang menyalakan dua opsi beruntun kehilangan klik kedua.
+Setelah itu suite lulus 3/3 berturut-turut dalam ~2,5 dtk (dulu 5–32 dtk).
+
 ### Bug UI nyata yang ditemukan lewat app.html dan diperbaiki
 - **Modal Pengaturan rusak total.** Satu `</div>` berlebih di `src/sidepanel.html` menutup
   `.modal-card` terlalu awal → `#settings-modal` punya 17 anak langsung; karena `.modal` adalah
@@ -162,8 +189,9 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **241/242**; satu-satunya kegagalan `export-browser` terbukti lulus sendiri (3 dtk vs timeout 31 dtk saat suite penuh berebut sumber daya)
-- (sebelumnya) `npm test` → **242/242 lulus** (satu suite Puppeteer flaky hanya saat dijalankan bersamaan dengan beban lain) (termasuk sample-library 9, learning 19, register-extras 5, mini-markdown 11).
+- `npm test` → **276/276 lulus** (2026-09-06), termasuk `dock-motion` 7 yang baru. Ini run penuh pertama
+  tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
+- (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
 - `npm run e2e` → PASS (headed, Chrome for Testing). `npm run release:gate` → CLEAR.
 - `npm run smoke -- --crossos` → 26/26 Fase 1 + 9/9 lintas-OS.

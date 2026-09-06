@@ -1185,7 +1185,10 @@ body.is-running .bottom-nav-item[data-view='captions'] .label::after {
   line-height: 1.45;
   color: var(--text);
   box-shadow: var(--shadow-lg);
-  pointer-events: auto;
+  /* Toast melayang di atas panel; badannya tidak boleh menelan klik pada
+     kontrol di bawahnya (dulu menyalakan dua opsi ekspor beruntun gagal
+     karena klik kedua mendarat di toast). Hanya tombol tutup yang aktif. */
+  pointer-events: none;
   animation: toastIn var(--transition-slow) backwards;
 }
 .toast.ok { border-left-color: var(--accent); }
@@ -1195,6 +1198,7 @@ body.is-running .bottom-nav-item[data-view='captions'] .label::after {
   background: none; border: none; color: var(--muted);
   cursor: pointer; font-size: var(--text-base); line-height: 1;
   padding: 0 var(--space-1);
+  pointer-events: auto;
 }
 .toast .toast-close:hover { color: var(--text); }
 .toast.leaving { opacity: 0; transform: translateY(6px); transition: all var(--transition-base); }

@@ -875,6 +875,10 @@ html.gesturing .panel, html.gesturing .viewdock, html.gesturing [data-split] { t
 .seg2 { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
 .seg2 button { border: none; background: var(--card2); color: var(--muted); padding: 5px 12px; cursor: pointer; font-size: 11.5px; }
 .seg2 button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+/* Di panel Pengaturan tiap .sec adalah kolom flex, jadi pil segmen ikut
+   melebar. Bagi ruangnya rata supaya tidak ada sisa kosong di kanan. */
+.settings-pop .seg2 { display: flex; }
+.settings-pop .seg2 button { flex: 1; text-align: center; }
 .settings-pop .langsw { height: auto; }
 .settings-pop .langsw button { padding: 5px 12px; }
 .pop-note { font-size: 10.5px; color: var(--muted2); line-height: 1.5; }
@@ -948,16 +952,107 @@ html[data-theme="coretax"] :focus-visible { outline-color: #FFC91B; }
 /* Hover 2 detik pada tombol mini membuka dok (minutes-dock.js). Cincin ini
    memberi tahu bahwa hitungan sedang berjalan, supaya dok tidak terasa
    membuka sendiri tanpa sebab. Dimatikan saat pengguna memilih tanpa animasi. */
+
+/* ---- Dok mini: cincin tunggu, menutup, dan outline bergerak ----------------
+ * Hover di tombol mini mengisi cincin sampai penuh, lalu dok membuka — jadi
+ * penantiannya terlihat, bukan jeda diam. Lamanya datang dari --dock-arm-ms
+ * (dipasang minutes-dock.js dari Pengaturan), sehingga animasi dan timer
+ * selalu berhenti bersamaan.
+ */
 .viewdock-mini { position: relative; }
-.viewdock.hover-arming .viewdock-mini::after {
-  content: '';
+.viewdock-arm {
   position: absolute;
-  inset: -5px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  border-top-color: var(--accent, #14b789);
-  animation: dock-arming 0.9s linear infinite;
+  inset: -6px;
+  width: auto;
+  height: auto;
   pointer-events: none;
+  opacity: 0;
+  /* Mulai dari jam 12, bukan jam 3. */
+  transform: rotate(-90deg);
+  transition: opacity 0.14s ease;
+  z-index: 2;
 }
-@keyframes dock-arming { to { transform: rotate(1turn); } }
-.no-motion .viewdock.hover-arming .viewdock-mini::after { animation: none; opacity: 0.6; }
+.viewdock:not(.mini) .viewdock-arm { display: none; }
+.viewdock-arm circle { fill: none; stroke-linecap: round; }
+.viewdock-arm .arm-track { stroke: var(--border); stroke-width: 2; opacity: 0.8; }
+.viewdock-arm .arm-fill {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  /* keliling 2πr, r=20 */
+  stroke-dasharray: 125.7;
+  stroke-dashoffset: 125.7;
+}
+.viewdock.hover-arming .viewdock-arm,
+.viewdock.dock-traced .viewdock-arm { opacity: 1; }
+.viewdock.hover-arming .viewdock-mini {
+  border-color: var(--accent);
+}
+.viewdock.hover-arming .viewdock-arm .arm-fill {
+  animation: dock-arm-fill var(--dock-arm-ms, 1500ms) linear forwards;
+}
+@keyframes dock-arm-fill { to { stroke-dashoffset: 0; } }
+
+/* Outline menelusuri keliling ikon sekali setelah dok mengecil. Cerminnya
+ * membalik arah tempuh menjadi kanan → kiri, sama seperti sapuan menutup;
+ * cincin tunggu (membuka) tetap kiri → kanan. */
+.viewdock.dock-traced .viewdock-arm { transform: rotate(-90deg) scaleX(-1); }
+.viewdock.dock-traced .viewdock-arm .arm-track { opacity: 0; }
+.viewdock.dock-traced .viewdock-arm .arm-fill {
+  animation: dock-arm-trace 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes dock-arm-trace {
+  0%   { stroke-dashoffset: 125.7; opacity: 1; }
+  70%  { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
+/* Menutup dan membuka menyapu satu arah, mengikuti tempat ikon berada (kiri):
+ * menutup berjalan kanan → kiri sampai menu habis, membuka kiri → kanan.
+ * Sapuannya memakai clip-path, bukan scale, supaya teksnya tidak ikut gepeng.
+ */
+.viewdock.dock-collapsing { pointer-events: none; }
+.viewdock.dock-collapsing .viewdock-inner {
+  animation: dock-wipe-out var(--dock-out-ms, 200ms) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.viewdock.dock-expanding .viewdock-inner {
+  animation: dock-wipe-in var(--dock-in-ms, 300ms) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.viewdock:not(.dock-collapsing) .viewdock-mini {
+  animation: dock-icon-pop var(--dock-in-ms, 300ms) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes dock-wipe-out {
+  from { clip-path: inset(0 0 0 0); opacity: 1; }
+  to   { clip-path: inset(0 100% 0 0); opacity: 0.3; }
+}
+@keyframes dock-wipe-in {
+  from { clip-path: inset(0 100% 0 0); opacity: 0.3; }
+  to   { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+@keyframes dock-icon-pop {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+/* Gaya lain yang bisa dipilih di Pengaturan. Semuanya menjaga arah yang sama:
+ * menutup bergerak ke kiri (tempat ikon), membuka datang dari kiri. */
+.viewdock[data-anim='slide'].dock-collapsing .viewdock-inner { animation-name: dock-slide-out; }
+.viewdock[data-anim='slide'].dock-expanding .viewdock-inner { animation-name: dock-slide-in; }
+@keyframes dock-slide-out { to { opacity: 0; transform: translateX(-18px); } }
+@keyframes dock-slide-in { from { opacity: 0; transform: translateX(-18px); } }
+
+.viewdock[data-anim='fade'].dock-collapsing .viewdock-inner { animation-name: dock-fade-out; }
+.viewdock[data-anim='fade'].dock-expanding .viewdock-inner { animation-name: dock-fade-in; }
+@keyframes dock-fade-out { to { opacity: 0; } }
+@keyframes dock-fade-in { from { opacity: 0; } }
+
+.viewdock[data-anim='scale'].dock-collapsing .viewdock-inner,
+.viewdock[data-anim='scale'].dock-expanding .viewdock-inner { transform-origin: left center; }
+.viewdock[data-anim='scale'].dock-collapsing .viewdock-inner { animation-name: dock-scale-out; }
+.viewdock[data-anim='scale'].dock-expanding .viewdock-inner { animation-name: dock-scale-in; }
+@keyframes dock-scale-out { to { opacity: 0; transform: scaleX(0.3); } }
+@keyframes dock-scale-in { from { opacity: 0; transform: scaleX(0.3); } }
+
+.no-motion .viewdock-arm,
+.no-motion .viewdock-arm .arm-fill,
+.no-motion .viewdock .viewdock-inner,
+.no-motion .viewdock .viewdock-mini { animation: none !important; }
+.no-motion .viewdock-arm { display: none; }

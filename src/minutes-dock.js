@@ -37,7 +37,10 @@ const PANEL_LIMITS = {
 export function defaultLayout() {
   return {
     v: 1,
-    theme: 'dark',        // 'dark' | 'coretax'
+    theme: 'dark',
+    dockArmMs: 1500,      // hover di dok mini selama ini → membuka sendiri (0 = mati)
+    dockAnim: 'wipe',     // 'wipe' | 'slide' | 'fade' | 'scale'
+    dockSpeed: 1,         // pengali durasi buka/tutup        // 'dark' | 'coretax'
     density: 'comfortable',
     motion: true,
     remember: true,
@@ -131,9 +134,56 @@ export function mountDock(h) {
     document.documentElement.dataset.theme = L.theme;
     document.documentElement.dataset.density = L.density;
     document.documentElement.classList.toggle('no-motion', !L.motion);
+    // Cincin tunggu dan timer harus sepanjang yang sama, jadi CSS membacanya dari sini.
+    dock.style.setProperty('--dock-arm-ms', `${armMs()}ms`);
+    dock.dataset.anim = ANIMS.includes(L.dockAnim) ? L.dockAnim : 'wipe';
+    dock.style.setProperty('--dock-out-ms', `${outMs()}ms`);
+    dock.style.setProperty('--dock-in-ms', `${inMs()}ms`);
     const foot = $('#foot-layout');
     if (foot) foot.textContent = T('layoutLine', layoutName(), L.remember ? T('layoutRemembered') : T('layoutNotRemembered'));
   }
+  const ANIMS = ['wipe', 'slide', 'fade', 'scale'];
+  const OUT_MS = 200;
+  const IN_MS = 300;
+  /** Pengali kecepatan dari Pengaturan, dibatasi supaya tidak jadi nol. */
+  function speed() {
+    const v = Number(L.dockSpeed);
+    return Number.isFinite(v) && v >= 0.3 && v <= 3 ? v : 1;
+  }
+  const outMs = () => Math.round(OUT_MS * speed());
+  const inMs = () => Math.round(IN_MS * speed());
+
+  /** Lama hover sebelum dok membuka sendiri; 0 mematikan fiturnya. */
+  function armMs() {
+    const v = Number(L.dockArmMs);
+    return Number.isFinite(v) && v >= 0 ? v : 1500;
+  }
+
+  /**
+   * Ganti antara menu penuh dan ikon dengan animasi. Berpindah mendadak membuat
+   * dok terasa hilang: saat mengecil menu diberi waktu keluar dulu, lalu outline
+   * menelusuri keliling ikon sekali; saat membuka menu dipasang lalu masuk.
+   */
+  function setMini(next) {
+    next = !!next;
+    if (!!L.dock.mini === next) return;
+    const commit = () => { L.dock.mini = next; placeDock(); save(); };
+    if (!L.motion) return commit();
+    if (next) {
+      dock.classList.add('dock-collapsing');
+      setTimeout(() => {
+        dock.classList.remove('dock-collapsing');
+        commit();
+        dock.classList.add('dock-traced');
+        setTimeout(() => dock.classList.remove('dock-traced'), 600);
+      }, outMs());
+    } else {
+      commit();
+      dock.classList.add('dock-expanding');
+      setTimeout(() => dock.classList.remove('dock-expanding'), inMs() + 20);
+    }
+  }
+
   function layoutName() {
     const d = defaultLayout();
     const same = L.top === d.top && ['left', 'right', 'bottom'].every((k) => L[k].mode === d[k].mode && L[k].size === d[k].size);
@@ -386,16 +436,16 @@ export function mountDock(h) {
   document.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) || '';
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag) || e.target?.isContentEditable;
-    if (e.key === '/' && !typing) { if (L.dock.mini) { L.dock.mini = false; placeDock(); } setSearch(true); }
+    if (e.key === '/' && !typing) { setMini(false); setSearch(true); }
     if (e.key === 'Escape') { if (e.target === $('#q') && !$('#q').value) setSearch(false); closePops(); }
   }, true);
-  $('#btn-dock-mini').addEventListener('click', () => { L.dock.mini = true; closePops(); placeDock(); save(); });
-  $('#dock-mini').addEventListener('click', () => { if (dockMoved) { dockMoved = false; return; } L.dock.mini = false; placeDock(); save(); });
+  $('#btn-dock-mini').addEventListener('click', () => { closePops(); setMini(true); });
+  $('#dock-mini').addEventListener('click', () => { if (dockMoved) { dockMoved = false; return; } setMini(false); });
 
-  // Membuka dok tanpa klik: arahkan kursor ke tombol mini selama 2 detik.
-  // Sentuh dilewati (tidak punya hover), begitu pula saat sedang menyeret —
-  // menahan jari di atas tombol bukan permintaan membuka.
-  const HOVER_EXPAND_MS = 2000;
+  // Membuka dok tanpa klik: arahkan kursor ke tombol mini sampai cincin penuh
+  // (lamanya diatur di panel Pengaturan). Sentuh dilewati (tidak punya hover),
+  // begitu pula saat sedang menyeret — menahan jari di atas tombol bukan
+  // permintaan membuka.
   let hoverTimer = null;
   function cancelHoverExpand() {
     clearTimeout(hoverTimer);
@@ -403,14 +453,16 @@ export function mountDock(h) {
     dock.classList.remove('hover-arming');
   }
   $('#dock-mini').addEventListener('pointerenter', (e) => {
-    if (e.pointerType === 'touch' || !L.dock.mini || gesture) return;
+    const ms = armMs();
+    if (!ms || e.pointerType === 'touch' || !L.dock.mini || gesture) return;
+    // Jejak outline memakai lingkaran yang sama; kalau dibiarkan, isian cincin
+    // ikut mengulang dari nol dan tidak lagi sejalan dengan timer.
+    dock.classList.remove('dock-traced');
     dock.classList.add('hover-arming');
     hoverTimer = setTimeout(() => {
       cancelHoverExpand();
-      L.dock.mini = false;
-      placeDock();
-      save();
-    }, HOVER_EXPAND_MS);
+      setMini(false);
+    }, ms);
   });
   $('#dock-mini').addEventListener('pointerleave', cancelHoverExpand);
   $('#dock-mini').addEventListener('pointerdown', cancelHoverExpand);
@@ -490,12 +542,21 @@ export function mountDock(h) {
     const pop = $('#settings-pop');
     pop.querySelectorAll('[data-theme-pick]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themePick === L.theme)));
     pop.querySelectorAll('[data-density]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.density === L.density)));
+    pop.querySelectorAll('[data-armms]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.armms) === armMs())));
+    pop.querySelectorAll('[data-anim]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.anim === dock.dataset.anim)));
+    pop.querySelectorAll('[data-animspeed]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.animspeed) === speed())));
     $('#sw-remember').setAttribute('aria-pressed', String(L.remember));
     $('#sw-motion').setAttribute('aria-pressed', String(!L.motion));
   }
   $('#settings-pop').addEventListener('click', (e) => {
     const th = e.target.closest('[data-theme-pick]');
     if (th) { L.theme = th.dataset.themePick; applyAppearance(); paintSettings(); save(); return; }
+    const an = e.target.closest('[data-anim]');
+    if (an) { L.dockAnim = an.dataset.anim; applyAppearance(); paintSettings(); save(); return; }
+    const sp = e.target.closest('[data-animspeed]');
+    if (sp) { L.dockSpeed = Number(sp.dataset.animspeed); applyAppearance(); paintSettings(); save(); return; }
+    const arm = e.target.closest('[data-armms]');
+    if (arm) { L.dockArmMs = Number(arm.dataset.armms); applyAppearance(); paintSettings(); save(); return; }
     const dn = e.target.closest('[data-density]');
     if (dn) { L.density = dn.dataset.density; applyAppearance(); paintSettings(); save(); return; }
     if (e.target.closest('#sw-remember')) {
