@@ -475,7 +475,7 @@
   "summary": "Skrip Swift mandiri yang merender ikon aplikasi 1024px dari palet merek yraverage lewat AppKit: latar cream, gelembung caption teal bergradien dengan ekor di kiri bawah, dua bilah subtitel putih; menulis PNG ke path argumen (default branding/logo.png). Dipanggil build-app.sh saat logo belum ada."
  },
  "mac/build-app.sh": {
-  "summary": "Skrip build yraverageSub.app: menghentikan salinan yang berjalan (codesign tak bisa menandatangani binary aktif), swift build produk LocalTransSub, merakit bundle di direktori staging dengan Info.plist (bundle id stabil com.localtranssub.app, deskripsi izin mikrofon/speech), membuat AppIcon.icns dari branding/logo.png via sips+iconutil, menandatangani dengan sertifikat lokal stabil (menolak build bila tidak ada karena izin TCC akan ter-reset), memverifikasi tanda tangan/identifier/ikon, lalu menukar ke build/ secara atomik dan mendaftarkan ulang ke Launch Services."
+  "summary": "Skrip build yraverageSub.app: menghentikan salinan yang berjalan (codesign tak bisa menandatangani binary aktif), swift build produk LocalTransSub, merakit bundle di direktori staging dengan Info.plist (bundle id stabil com.yraveragesubmin.app, deskripsi izin mikrofon/speech), membuat AppIcon.icns dari branding/logo.png via sips+iconutil, menandatangani dengan sertifikat lokal stabil (menolak build bila tidak ada karena izin TCC akan ter-reset), memverifikasi tanda tangan/identifier/ikon, lalu menukar ke build/ secara atomik dan mendaftarkan ulang ke Launch Services."
  },
  "mac/doctor.sh": {
   "summary": "Skrip diagnosa yraverageSub: memeriksa toolchain (macOS 26+, swift), keberadaan sertifikat penandatangan, bundle build/ (tanda tangan stabil vs ad-hoc, identifier, ikon, verifikasi codesign), lalu meluncurkan aplikasi dengan --check-perms dan membaca /tmp/transsub-perms.txt untuk melaporkan Screen Recording, capture audio, Accessibility, jumlah pasangan terjemahan Apple terpasang, dan ketersediaan model on-device secara tri-state; setiap kegagalan disertai petunjuk perbaikan."
@@ -484,7 +484,7 @@
   "summary": "Skrip sekali jalan yang membuat sertifikat code-signing self-signed lokal 'Local TransSub Dev' (openssl x509 10 tahun, ekspor PKCS12 dengan algoritma lawas yang diterima keychain macOS) dan mengimpornya ke login keychain dengan pra-otorisasi codesign, agar identitas aplikasi stabil dan izin TCC (Screen Recording, Accessibility, Input Monitoring) tidak dicabut pada setiap rebuild seperti pada tanda tangan ad-hoc."
  },
  "native/install-host.sh": {
-  "summary": "Installer macOS/Linux untuk host Native Messaging `com.localtranssub.helper`: menerima ID ekstensi, memberi bit executable pada `messaging_host.py`, menulis manifes stdio dengan `allowed_origins` ke direktori NativeMessagingHosts Chrome/Edge/Chromium (termasuk varian Flatpak di Linux)."
+  "summary": "Installer macOS/Linux untuk host Native Messaging `com.yraveragesubmin.helper`: menerima ID ekstensi, memberi bit executable pada `messaging_host.py`, menulis manifes stdio dengan `allowed_origins` ke direktori NativeMessagingHosts Chrome/Edge/Chromium (termasuk varian Flatpak di Linux)."
  },
  "native/messaging_host.py": {
   "summary": "Komponen Native Helper Python (server/host lokal). Berkas `messaging_host.py` (python). Ringkasan dari komentar/header: !/usr/bin/env python3 Simbol penting: read_msg, write_msg, health, shutdown, port_open, wait_port_free, kill_port_listeners, force_stop.",
@@ -890,7 +890,7 @@
   "summary": "Manajemen unduh/hapus model di AI worker: resolveModel memetakan kunci ASR (ASR_MODELS) atau pasangan MT (MT_PAIRS) ke id; downloadModel memuat model lewat loadASR/preloadPair agar berkas masuk Cache API sambil mengagregasi progres dan mengembalikan total byte; deleteModel menghapus entri Cache API yang mengandung id model dan membuang ASR aktif."
  },
  "src/lib/native-host.js": {
-  "summary": "Bridge Chrome Native Messaging ke host com.localtranssub.helper (NATIVE_HOST_NAME): nativeHostAction membuka port connectNative, mengirim {action}, dan menyelesaikan promise pada pesan pertama atau timeout; nativeHostConnection memakai aksi ping untuk menghasilkan state connected/unsupported/not-installed/forbidden/crashed/timeout tanpa melempar; nativeHostSupported memeriksa ketersediaan connectNative."
+  "summary": "Bridge Chrome Native Messaging ke host com.yraveragesubmin.helper (NATIVE_HOST_NAME): nativeHostAction membuka port connectNative, mengirim {action}, dan menyelesaikan promise pada pesan pertama atau timeout; nativeHostConnection memakai aksi ping untuk menghasilkan state connected/unsupported/not-installed/forbidden/crashed/timeout tanpa melempar; nativeHostSupported memeriksa ketersediaan connectNative."
  },
  "src/lib/native.js": {
   "summary": "Modul JavaScript aplikasi atau skrip alat. Berkas `native.js` (javascript). Ringkasan dari komentar/header: Client for the local native helper server (native/server.py). Everything stays on the machine — the extension just talks to 127.0.0.1. Simbol penting: nativeHealth, nativeTranscribe, nativeTranscribeFile, nativeDraft, nativeTranslate, nativeTranslateRefine, nativeShutdown.",
@@ -1374,7 +1374,7 @@
   "summary": "Pembungkus khusus Linux untuk memasang host Native Messaging: menolak berjalan di OS lain lalu meneruskan `<chrome-extension-id>` ke `install-host.sh`."
  },
  "native/install-host.bat": {
-  "summary": "Installer Windows untuk host Native Messaging `com.localtranssub.helper`: mencari Python (`py -3` atau `python`), membuat pembungkus `messaging_host.bat` karena Chrome tak bisa mengeksekusi `.py`, menulis manifes JSON ke `%LOCALAPPDATA%\\yraverageSub`, dan mendaftarkan kunci registri HKCU untuk Chrome, Edge, dan Chromium."
+  "summary": "Installer Windows untuk host Native Messaging `com.yraveragesubmin.helper`: mencari Python (`py -3` atau `python`), membuat pembungkus `messaging_host.bat` karena Chrome tak bisa mengeksekusi `.py`, menulis manifes JSON ke `%LOCALAPPDATA%\\yraverageSub`, dan mendaftarkan kunci registri HKCU untuk Chrome, Edge, dan Chromium."
  },
  "scripts/bench-models.mjs": {
   "summary": "Benchmark model lokal (`npm run bench:models`, flag `--browser`, `--native`, `--catalog-only`): menggabungkan `test/last-bench.json`, opsional mengukur Whisper Tiny q8 dan Opus-MT via transformers.js di Node, menjalankan `scripts/bench-lab.py` bila helper hidup, memberi status terhadap target draft 500 ms, dan menulis `test/last-models-bench.json`.",
@@ -1553,7 +1553,7 @@
   ]
  },
  "src/lib/native-host-registry.js": {
-  "summary": "Konstanta registrasi host Native Messaging: REGISTERED_NATIVE_HOST com.localtranssub.helper dan NATIVE_MESSAGING_PERMISSION nativeMessaging, merujuk ke installer native/install-host.sh, install-host.bat, install-host-linux.sh."
+  "summary": "Konstanta registrasi host Native Messaging: REGISTERED_NATIVE_HOST com.yraveragesubmin.helper dan NATIVE_MESSAGING_PERMISSION nativeMessaging, merujuk ke installer native/install-host.sh, install-host.bat, install-host-linux.sh."
  },
  "src/lib/native-protocol.js": {
   "summary": "Kontrak protokol ekstensi ↔ Native Helper: NATIVE_MESSAGING_HOST, LOCAL_HELPER_ORIGIN loopback port 17865, NATIVE_HOST_ACTIONS (ping, start, stop, restart, status, ensure_lab), NATIVE_CONNECTION_STATES, classifyNativeHostError yang memetakan pesan chrome.runtime.lastError ke satu keadaan, hostInstalledFromState, assertLocalUrl (hanya 127.0.0.1/localhost), dan wrapTranscriptPayload untuk payload cue {t0,t1,src,tgt} versi 1."
@@ -2061,7 +2061,7 @@
   "summary": "Pencabut pendaftaran host Native Messaging di Windows: menghapus kunci registri HKCU Chrome/Edge/Chromium, manifes di `%LOCALAPPDATA%\\yraverageSub`, dan pembungkus `messaging_host.bat`."
  },
  "native/uninstall-host.sh": {
-  "summary": "Pencabut pendaftaran host Native Messaging di macOS/Linux: menghapus `com.localtranssub.helper.json` dari semua direktori NativeMessagingHosts Chrome/Edge/Chromium termasuk lokasi Flatpak, melaporkan jumlah yang dihapus."
+  "summary": "Pencabut pendaftaran host Native Messaging di macOS/Linux: menghapus `com.yraveragesubmin.helper.json` dari semua direktori NativeMessagingHosts Chrome/Edge/Chromium termasuk lokasi Flatpak, melaporkan jumlah yang dihapus."
  },
  "scripts/bench-bigfile-probe.py": {
   "summary": "Probe Python yang dipanggil `scripts/bench-bigfile.mjs`: men-stub modul `faster_whisper`/`ctranslate2`, mengimpor `native/server.py` dengan `ENGINE=faster-whisper`, menjalankan `server._stream_windows` pada satu berkas media, dan mencetak satu baris JSON (audio_seconds, windows, max_window_samples, chunk/overlap, elapsed_s, peak_rss_mb, file_bytes) untuk membuktikan memori O(jendela)."
@@ -2337,7 +2337,7 @@
   "summary": "Halaman mock pengelola model bahasa: tabel #asr-table (Whisper tiny/base/small/medium) dan #mt-table (pasangan Opus-MT) dengan ukuran MB, status unduh, simulasi unduh/hapus, dan indikator penyimpanan #storage-fill terhadap kapasitas tiruan; seluruh data ada di skrip inline tanpa inferensi nyata."
  },
  "test/native-connection.test.mjs": {
-  "summary": "Uji status Native Messaging dari dua sisi: classifyNativeHostError dan hostInstalledFromState di src/lib/native-protocol.js (pemetaan pesan Chrome ke not-installed/forbidden/crashed/timeout/unsupported/error), nativeHostConnection di src/lib/native-host.js dengan chrome.runtime.connectNative palsu (memakai aksi ping, host lama tetap dianggap terhubung), dan host Python sungguhan native/messaging_host.py lewat framing 4-byte little-endian (ping menjawab identitas com.localtranssub.helper tanpa /health, status membawa health, aksi tak dikenal ditolak).",
+  "summary": "Uji status Native Messaging dari dua sisi: classifyNativeHostError dan hostInstalledFromState di src/lib/native-protocol.js (pemetaan pesan Chrome ke not-installed/forbidden/crashed/timeout/unsupported/error), nativeHostConnection di src/lib/native-host.js dengan chrome.runtime.connectNative palsu (memakai aksi ping, host lama tetap dianggap terhubung), dan host Python sungguhan native/messaging_host.py lewat framing 4-byte little-endian (ping menjawab identitas com.yraveragesubmin.helper tanpa /health, status membawa health, aksi tak dikenal ditolak).",
   "sections": [
    {
     "symbol": "klasifikasi galat & hostInstalled",
