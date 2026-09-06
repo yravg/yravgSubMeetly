@@ -140,6 +140,12 @@ Dibuka setelah pengguna mengubah status task Windows di web UI. Penutupan per ta
     Dijaga `test/dock-motion.test.mjs` (7 tes, Puppeteer di `dist/minutes.html`).
     Catatan: dok hidup di dalam `#workspace` yang **tersembunyi saat register kosong** —
     tes apa pun harus mengisi register dulu, kalau tidak `#dock-mini` berukuran 0×0.
+30. **Panel Pengaturan terpotong di layar pendek.** Setelah tiga baris baru tingginya 803 px
+    dengan `top: 38px` tetap, jadi di jendela lebih pendek dari ~860 px baris terakhir
+    (kecepatan animasi, Reset layout) jatuh di luar layar dan **tidak bisa diklik sama sekali**.
+    `.settings-pop` kini `max-height: calc(100vh - 58px)` + `overflow-y: auto`
+    (`overscroll-behavior: contain`, scrollbar tipis). Dijaga tes pada tinggi 950/800/700/650:
+    panel harus muat dan `#btn-layout-reset` harus lolos `elementFromPoint` setelah digulir.
 
 ### Penyebab flaky `export-browser` akhirnya ketemu (2026-09-06)
 Bukan beban mesin. Toast umpan balik (`.toast-stack`, fixed, bawah-tengah) memberi
@@ -189,7 +195,7 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **276/276 lulus** (2026-09-06), termasuk `dock-motion` 7 yang baru. Ini run penuh pertama
+- `npm test` → **277/277 lulus** (2026-09-06), termasuk `dock-motion` 8 yang baru. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
 - (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
@@ -216,6 +222,9 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - Paket CWS (`store/releases/local-transsub-1.1.1.zip`, 31 MB / 114 MB tak terkompresi) mengirim
   ONNX Runtime **dua kali**: `ort/` (20 MB) dan `vad/ort/` (5 varian WASM, ~75 MB). Bukan blocker
   rilis, tapi peluang pemangkasan ±60 MB bila VAD dibuat memakai runtime yang sama.
+- Halaman register **meluber horizontal di bawah ~1070 px** (`scrollWidth` 1070 tetap): appbar
+  ikut tergeser sehingga popover yang ditambatkan `right: 0` bisa jatuh di luar layar. Sudah ada
+  sebelum pekerjaan dok; belum diperbaiki karena butuh keputusan tata letak, bukan tambalan CSS.
 - `store/local-transsub-1.0.0.zip` dan `1.1.0.zip` masih ada di root `store/` — jangan diunggah;
   `SUBMIT.md` sudah memperingatkan. Belum dihapus karena itu artefak rilis.
 

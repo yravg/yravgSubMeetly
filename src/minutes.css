@@ -861,7 +861,22 @@ html.gesturing .panel, html.gesturing .viewdock, html.gesturing [data-split] { t
 .lp-foot { font-size: 10.5px; color: var(--muted2); line-height: 1.5; padding: 6px 8px 2px; border-top: 1px solid var(--border); margin-top: 4px; }
 #btn-translate:disabled { opacity: 0.5; background: var(--card3); border-color: var(--border); color: var(--muted); }
 
-.settings-pop { right: 0; top: 38px; width: 320px; padding: 12px 14px 14px; }
+/* Panel ini tumbuh setiap kali ada pilihan baru. Tanpa batas tinggi, isi paling
+   bawah (kecepatan animasi, Reset layout) jatuh di luar layar pada jendela yang
+   lebih pendek — tidak terpotong saja, tapi benar-benar tidak bisa diraih. */
+.settings-pop {
+  right: 0;
+  top: 38px;
+  width: 320px;
+  padding: 12px 14px 14px;
+  max-height: calc(100vh - 58px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.settings-pop::-webkit-scrollbar { width: 8px; }
+.settings-pop::-webkit-scrollbar-track { background: transparent; }
+.settings-pop::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+.settings-pop::-webkit-scrollbar-thumb:hover { background: var(--muted2); }
 .settings-pop h3 { font-size: 13px; font-weight: 600; margin: 0 0 10px; }
 .settings-pop .sec { padding: 10px 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
 .settings-pop h4 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted2); font-weight: 600; margin: 0; }

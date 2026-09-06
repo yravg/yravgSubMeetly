@@ -261,6 +261,35 @@ test('gaya dan kecepatan animasi bisa dipilih di Pengaturan', async () => {
   }
 });
 
+test('panel Pengaturan tetap muat di layar pendek dan isi terbawahnya bisa diraih', async () => {
+  // Panel ini tumbuh tiap kali ada pilihan baru; tanpa batas tinggi, baris
+  // terakhir jatuh di luar jendela dan tidak bisa diklik sama sekali.
+  for (const height of [950, 800, 700, 650]) {
+    await page.setViewport({ width: 1400, height });
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('#btn-settings');
+    await page.evaluate(() => document.getElementById('btn-settings').click());
+    await wait(350);
+    const r = await page.evaluate(async () => {
+      const el = document.getElementById('settings-pop');
+      const box = el.getBoundingClientRect();
+      const muat = box.bottom <= window.innerHeight && box.top >= 0;
+      el.scrollTop = el.scrollHeight;
+      await new Promise((res) => requestAnimationFrame(res));
+      const btn = document.getElementById('btn-layout-reset');
+      const rb = btn.getBoundingClientRect();
+      const hit = document.elementFromPoint(rb.x + rb.width / 2, rb.y + rb.height / 2);
+      return { muat, terjangkau: !!hit && (hit === btn || btn.contains(hit)) };
+    });
+    assert.equal(r.muat, true, `panel Pengaturan meluber keluar layar pada tinggi ${height}`);
+    assert.equal(r.terjangkau, true, `tombol Reset layout tidak bisa diklik pada tinggi ${height}`);
+    await page.evaluate(() => { document.body.click(); });
+  }
+  await page.setViewport({ width: 1400, height: 900 });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForSelector('#btn-settings');
+});
+
 test('tidak ada galat runtime di halaman selama seluruh alur', () => {
   assert.deepEqual(pageErrors, [], `galat halaman: ${pageErrors.join(' | ')}`);
 });
