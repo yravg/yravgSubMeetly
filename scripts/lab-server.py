@@ -288,6 +288,21 @@ MIME = {
 }
 
 
+class LabServer(ThreadingHTTPServer):
+    """Server lab dengan antrean koneksi yang lapang.
+
+    Halaman di sini memuat modul ES tanpa bundel — satu halaman bisa meminta
+    puluhan berkas sekaligus. Dengan `request_queue_size` bawaan (5), koneksi
+    yang melebihi backlog ditolak kernel dan browser melaporkan
+    ERR_CONNECTION_RESET: satu modul gagal dimuat, seluruh grafik impor batal,
+    dan halaman tampak "kosong" tanpa galat yang jelas.
+    """
+
+    daemon_threads = True
+    allow_reuse_address = True
+    request_queue_size = 128
+
+
 class LabHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(TEST_DIR), **kwargs)
@@ -424,7 +439,7 @@ def main():
         print("yt-dlp: OK")
     except RuntimeError as e:
         print(f"WARN: {e}", file=sys.stderr)
-    srv = ThreadingHTTPServer((HOST, PORT), LabHandler)
+    srv = LabServer((HOST, PORT), LabHandler)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

@@ -42,6 +42,39 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"/></svg>
       <span data-t="issue">Issue MoM</span>
     </button>
+    <div class="menuwrap">
+      <button type="button" class="iconbtn" id="btn-settings" data-t-title="settingsTitle" title="Layout &amp; appearance" aria-expanded="false" aria-haspopup="dialog">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+      <!-- Settings popover: theme, interface language, density, layout -->
+      <div class="pop settings-pop" id="settings-pop" hidden role="dialog" aria-label="Layout and appearance">
+        <h3 data-t="settingsTitle">Layout &amp; appearance</h3>
+        <div class="sec">
+          <h4 data-t="theme">Theme</h4>
+          <div class="themes">
+            <button type="button" class="theme" data-theme-pick="dark" aria-pressed="true"><span class="sw" style="background:#181818;border:1px solid #3a3a3a"><i style="background:#14b789"></i><i style="background:#292929"></i><i style="background:#1f1f1f"></i></span><b data-t="themeDark">Local · dark</b><small data-t="themeDarkSub">Charcoal, emerald accent</small></button>
+            <button type="button" class="theme" data-theme-pick="coretax" aria-pressed="false"><span class="sw" style="background:#F5F4EF;border:1px solid #DADADA"><i style="background:#212C5F"></i><i style="background:#FFC91B"></i><i style="background:#FFFFFF"></i></span><b data-t="themeCoretax">Coretax · paper</b><small data-t="themeCoretaxSub">Navy, gold, glass bars</small></button>
+          </div>
+        </div>
+        <div class="sec">
+          <h4 data-t="uiLanguage">Interface language</h4>
+          <div class="langsw" role="group" aria-label="Interface language">
+            <button type="button" data-lang="en" aria-pressed="true">English</button>
+            <button type="button" data-lang="id" aria-pressed="false">Bahasa Indonesia</button>
+          </div>
+          <span class="pop-note" data-t="uiLanguageNote">Labels and menus only. Item text follows the language pair in the view dock.</span>
+        </div>
+        <div class="sec">
+          <h4 data-t="density">Density</h4>
+          <div class="seg2"><button type="button" data-density="comfortable" aria-pressed="true" data-t="densityComfortable">Comfortable</button><button type="button" data-density="compact" aria-pressed="false" data-t="densityCompact">Compact</button></div>
+        </div>
+        <div class="sec">
+          <div class="toggle-row"><span data-t="rememberLayout">Remember panel sizes on this Mac</span><button type="button" class="sw2" id="sw-remember" aria-pressed="true" aria-label="Remember layout"></button></div>
+          <div class="toggle-row"><span data-t="reduceMotion">Reduce motion</span><button type="button" class="sw2" id="sw-motion" aria-pressed="false" aria-label="Reduce motion"></button></div>
+        </div>
+        <div class="sec"><button type="button" class="btn sm" id="btn-layout-reset" data-t="resetLayout">Reset layout to default</button></div>
+      </div>
+    </div>
   </div>
 
   <!-- ============ empty state (no meetings yet) ============ -->
@@ -56,7 +89,8 @@
   <!-- ============ workspace ============ -->
   <div id="workspace" class="workspace" style="display:contents" hidden>
 
-    <header class="mhead">
+    <!-- top panel: meeting header (collapsible) -->
+    <header class="mhead top" id="top-panel">
       <div class="mhead-top">
         <div class="mtitle-wrap">
           <h1 id="m-title">—</h1>
@@ -72,6 +106,7 @@
         </div>
         <div class="head-actions">
           <span class="sample-badge hidden" id="issued-badge"></span>
+          <button type="button" class="iconbtn" id="top-toggle" aria-label="Collapse header"></button>
         </div>
       </div>
 
@@ -91,50 +126,97 @@
       <div class="strip" id="strip"></div>
     </header>
 
-    <!-- ============ view tabs + toolbar ============ -->
-    <div class="bar">
-      <div class="tabs" role="tablist" id="tabs">
-        <button role="tab" aria-selected="true" data-view="table" data-t="vRegister">Register</button>
-        <button role="tab" aria-selected="false" data-view="topic" data-t="vTopic" data-tour="view-topic">By topic</button>
-        <button role="tab" aria-selected="false" data-view="doc" data-t="vDoc">Minutes</button>
-        <button role="tab" aria-selected="false" data-view="carry" data-t="vCarry" data-tour="view-carry">Carry-forward</button>
-        <button role="tab" aria-selected="false" data-view="series" data-t="vSeries" data-tour="view-series">Series</button>
+    <!-- ============ dock body ============ -->
+    <div class="body" id="body">
+
+      <!-- left: navigator -->
+      <aside class="panel left" id="nav-panel" data-panel="left" aria-label="Navigator">
+        <div class="phead">
+          <span class="ttl" data-t="navigator">Navigator</span>
+          <button type="button" class="pbtn" data-act="float" data-t-title="floatPanel" title="Float this panel"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="14" rx="2"/><path d="M9 3h12v12"/></svg></button>
+          <button type="button" class="pbtn" data-act="dock" data-t-title="dockPanel" title="Dock back" hidden><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
+          <button type="button" class="pbtn" data-act="collapse" data-t-title="collapsePanel" title="Collapse to rail"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button>
+        </div>
+        <div class="pbody nav">
+          <div>
+            <h4 data-t="navViews">Views</h4>
+            <div class="navlist" id="nav-views">
+              <button type="button" class="navitem" data-view="table" data-t="vRegister">Register</button>
+              <button type="button" class="navitem" data-view="topic" data-t="vTopic" data-tour="view-topic">By topic</button>
+              <button type="button" class="navitem" data-view="doc" data-t="vDoc">Minutes</button>
+              <button type="button" class="navitem" data-view="carry" data-t="vCarry" data-tour="view-carry">Carry-forward</button>
+              <button type="button" class="navitem" data-view="series" data-t="vSeries" data-tour="view-series">Series</button>
+            </div>
+          </div>
+          <div>
+            <h4 data-t="navTypes">Item type</h4>
+            <div class="navlist chips-types" data-tour="chips" id="chips"></div>
+            <button type="button" class="chip review review-toggle" id="btn-review-only" aria-pressed="false">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5"/><path d="M12 16.5h.01"/><circle cx="12" cy="12" r="8.5"/></svg>
+              <span data-t="needsReviewOnly">Needs review only</span>
+            </button>
+          </div>
+          <div>
+            <h4 data-t="navFilters">Filters</h4>
+            <label class="grpsel"><span data-t="groupBy">Group</span>
+              <select id="group-by">
+                <option value="none" data-t="groupNone">none</option>
+                <option value="topic" data-t="cTopic">Topic</option>
+                <option value="owner" data-t="cOwner">Owner</option>
+                <option value="status" data-t="cStatus">Status</option>
+              </select>
+            </label>
+            <label class="grpsel"><span data-t="projectType">Type</span>
+              <select id="pt-filter" data-tour="pt-filter"><option value="all" data-t="allTypes">All types</option></select>
+            </label>
+            <button type="button" class="btn sm" id="btn-mine" aria-pressed="false">◑ <span data-t="mine">Mine</span></button>
+          </div>
+          <div>
+            <h4 data-t="navPresets">Layout presets</h4>
+            <div class="navlist" id="nav-presets" style="gap:6px">
+              <button type="button" class="preset" data-preset="review"><span class="ico"><i style="left:12px;top:1px;right:1px;bottom:1px"></i></span><span><span data-t="preset_review">Review</span><small data-t="preset_review_sub">Wide detail, sources below</small></span></button>
+              <button type="button" class="preset" data-preset="reading"><span class="ico"><i style="left:1px;top:1px;right:1px;height:5px"></i></span><span><span data-t="preset_reading">Reading</span><small data-t="preset_reading_sub">Header open, no side panels</small></span></button>
+              <button type="button" class="preset" data-preset="compact"><span class="ico"><i style="left:1px;top:1px;width:4px;bottom:1px"></i><i style="right:1px;top:1px;width:4px;bottom:1px"></i></span><span><span data-t="preset_compact">Compact</span><small data-t="preset_compact_sub">Rails only, dense rows</small></span></button>
+              <button type="button" class="navitem" data-preset="reset"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span data-t="resetLayoutShort">Reset layout</span></button>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <div class="split v" data-split="left" role="separator" aria-orientation="vertical"></div>
+      <div class="rail left" id="rail-left" hidden>
+        <button type="button" class="rb" data-act="expand" data-panel="left" data-t-title="expandPanel" title="Expand navigator"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button>
+        <button type="button" class="rb" data-act="expand" data-panel="left" data-t-title="navTypes" title="Item type"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg></button>
       </div>
-      <div class="grow"></div>
-      <label class="srch"><span aria-hidden="true">⌕</span><input id="q" type="search" /></label>
-      <label class="grpsel"><span data-t="groupBy">Group</span>
-        <select id="group-by">
-          <option value="none" data-t="groupNone">none</option>
-          <option value="topic" data-t="cTopic">Topic</option>
-          <option value="owner" data-t="cOwner">Owner</option>
-          <option value="status" data-t="cStatus">Status</option>
-        </select>
-      </label>
-      <label class="grpsel"><span data-t="projectType">Type</span>
-        <select id="pt-filter" data-tour="pt-filter"><option value="all" data-t="allTypes">All types</option></select>
-      </label>
-      <button class="btn sm" id="btn-mine" aria-pressed="false">◑ <span data-t="mine">Mine</span></button>
-      <button class="btn sm" id="btn-dual" aria-pressed="false">⇄ <span data-t="dual">Dual text</span></button>
-      <div class="langsw" role="group" aria-label="Interface language">
-        <button data-lang="en" aria-pressed="true">EN</button>
-        <button data-lang="id" aria-pressed="false">ID</button>
+
+      <!-- center: register + bottom source panel -->
+      <div class="center" id="center">
+        <div class="pane" id="pane"></div>
+        <div class="split h" data-split="bottom" role="separator" aria-orientation="horizontal"></div>
+        <section class="panel bottom" id="src-panel" data-panel="bottom" aria-label="Source segments">
+          <div class="phead">
+            <span class="ttl"><span data-t="srcPanel">Where this came from</span> <b id="src-count"></b></span>
+            <button type="button" class="pbtn" data-act="float" data-t-title="floatPanel" title="Float this panel"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="14" rx="2"/><path d="M9 3h12v12"/></svg></button>
+            <button type="button" class="pbtn" data-act="dock" data-t-title="dockPanel" title="Dock back" hidden><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h18"/></svg></button>
+            <button type="button" class="pbtn" data-act="collapse" data-t-title="hidePanel" title="Hide"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+          </div>
+          <div class="pbody" id="src-body"></div>
+          <span class="grip" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="8" cy="8" r="1.2"/><circle cx="4" cy="8" r="1.2"/><circle cx="8" cy="4" r="1.2"/></svg></span>
+        </section>
+        <div class="rail-bottom" id="rail-bottom" hidden>
+          <span data-t="srcHidden">Sources hidden</span><span class="grow"></span>
+          <button type="button" data-act="expand" data-panel="bottom"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg><span data-t="srcShow">Show where items came from</span></button>
+        </div>
       </div>
-    </div>
 
-    <div class="chips">
-      <div id="chips" data-tour="chips" class="chips-types"></div>
-      <div class="grow"></div>
-      <button class="chip review" id="btn-review-only" aria-pressed="false">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5"/><path d="M12 16.5h.01"/><circle cx="12" cy="12" r="8.5"/></svg>
-        <span data-t="needsReviewOnly">Needs review only</span>
-      </button>
-    </div>
-
-    <!-- ============ main ============ -->
-    <div class="main">
-      <div class="pane" id="pane"></div>
-
-      <aside class="drawer" id="drawer" hidden aria-label="Item detail">
+      <!-- right: item detail drawer -->
+      <div class="split v" data-split="right" role="separator" aria-orientation="vertical" hidden></div>
+      <aside class="drawer panel right" id="drawer" data-panel="right" hidden aria-label="Item detail">
+        <div class="phead">
+          <span class="ttl" data-t="panel_right">Item detail</span>
+          <button type="button" class="pbtn" data-act="float" data-t-title="floatPanel" title="Float this panel"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="14" rx="2"/><path d="M9 3h12v12"/></svg></button>
+          <button type="button" class="pbtn" data-act="dock" data-t-title="dockPanel" title="Dock back" hidden><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+          <button type="button" class="pbtn" data-act="collapse" data-t-title="collapsePanel" title="Collapse to rail"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button>
+        </div>
         <div class="dhead">
           <div style="flex:1;min-width:0">
             <div class="ref" id="d-id">—</div>
@@ -144,7 +226,79 @@
         </div>
         <div class="dbody" id="d-body"></div>
         <div class="dfoot" id="d-foot"></div>
+        <span class="grip" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="8" cy="8" r="1.2"/><circle cx="4" cy="8" r="1.2"/><circle cx="8" cy="4" r="1.2"/></svg></span>
       </aside>
+      <div class="rail right" id="rail-right" hidden>
+        <button type="button" class="rb" data-act="expand" data-panel="right" data-t-title="expandPanel" title="Expand item detail"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button>
+        <button type="button" class="rb" data-act="expand" data-panel="right" data-t-title="panel_right" title="Item detail"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8"/><path d="M8 13h6"/></svg></button>
+      </div>
+
+      <!-- dock targets while dragging -->
+      <div class="dock-hint" aria-hidden="true">
+        <i data-hint="left" style="left:6px;top:6px;bottom:6px;width:180px"></i>
+        <i data-hint="right" style="right:6px;top:6px;bottom:6px;width:260px"></i>
+        <i data-hint="bottom" style="left:200px;right:280px;bottom:6px;height:120px"></i>
+      </div>
+      <div class="dock-snap" data-hint="dock-top" style="top:6px" aria-hidden="true"></div>
+      <div class="dock-snap" data-hint="dock-bottom" style="bottom:6px" aria-hidden="true"></div>
+
+      <!-- floating view dock -->
+      <div class="viewdock pos-bottom" id="viewdock" role="toolbar" aria-label="Views and filters">
+        <button type="button" class="viewdock-mini" id="dock-mini" hidden data-t-title="expandDock" title="Expand view dock">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 5v14"/><path d="M16 5v14"/></svg>
+        </button>
+        <div class="viewdock-inner" id="dock-full">
+          <span class="dgrip" data-t-title="dockGrip" title="Drag to move · drop near the top or bottom edge to snap"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="3" cy="2" r="1.3"/><circle cx="7" cy="2" r="1.3"/><circle cx="3" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="3" cy="12" r="1.3"/><circle cx="7" cy="12" r="1.3"/></svg></span>
+
+          <button type="button" class="iconbtn" id="btn-search-open" data-t-title="kbdSearchTitle" title="Search (/)" aria-pressed="false">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+          </button>
+          <label class="srch" id="dock-search" hidden><span aria-hidden="true">⌕</span><input id="q" type="search" /><button type="button" class="pbtn" id="btn-search-close" aria-label="Close search"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg></button></label>
+
+          <div class="menuwrap">
+            <button type="button" class="iconbtn" id="btn-types" data-t-title="navTypes" title="Item type" aria-pressed="false" aria-expanded="false" aria-haspopup="dialog">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+            </button>
+            <div class="pop dock-pop" id="types-pop" hidden role="dialog" aria-label="Item type">
+              <div class="lp-h" data-t="navTypes">Item type</div>
+              <div class="navlist chips-types" id="chips-dock"></div>
+              <button type="button" class="chip review review-toggle" id="btn-review-only-dock" aria-pressed="false">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5"/><path d="M12 16.5h.01"/><circle cx="12" cy="12" r="8.5"/></svg>
+                <span data-t="needsReviewOnly">Needs review only</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist" id="tabs">
+            <button role="tab" aria-selected="true" data-view="table" data-t="vRegister">Register</button>
+            <button role="tab" aria-selected="false" data-view="topic" data-t="vTopic">By topic</button>
+            <button role="tab" aria-selected="false" data-view="doc" data-t="vDoc">Minutes</button>
+            <button role="tab" aria-selected="false" data-view="carry" data-t="vCarry">Carry-forward</button>
+            <button role="tab" aria-selected="false" data-view="series" data-t="vSeries">Series</button>
+          </div>
+
+          <button type="button" class="btn sm" id="btn-dual" aria-pressed="false">⇄ <span data-t="dual">Dual text</span></button>
+
+          <div class="menuwrap">
+            <button type="button" class="iconbtn langbtn" id="btn-lang" title="Translation" aria-expanded="false" aria-haspopup="dialog">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h8"/><path d="M8 3v2c0 4-2.5 7.5-5 9"/><path d="M6 9c1 2.5 3 4.5 6 6"/><path d="m13 21 4-9 4 9"/><path d="M14.5 17.5h5"/></svg>
+              <i class="pend" hidden></i>
+            </button>
+            <div class="pop dock-pop langpop" id="lang-pop" hidden role="dialog" aria-label="Translation">
+              <div class="lp-pair">
+                <span class="lp-pairlbl" data-t="registerLanguage">Register language</span>
+                <span class="lp-pairval"><span class="mono" id="lang-src">ID</span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg><span class="mono" id="lang-tgt">EN</span><span class="tgtname" id="lang-tgt-name">English</span><i class="okdot" id="lang-done" hidden></i></span>
+                <button type="button" class="btn sm primary" id="btn-translate">Translate</button>
+              </div>
+              <div class="lp-h"><span data-t="translateInto">Translate into</span><span class="grow"></span><span class="mono muted2" data-t="onDeviceMt">on-device MT</span></div>
+              <div id="lang-list"></div>
+              <div class="lp-foot" data-t="translateFoot">Source is detected per item. Missing models are fetched once by the native helper.</div>
+            </div>
+          </div>
+
+          <button type="button" class="pbtn" id="btn-dock-mini" data-t-title="shrinkDock" title="Shrink dock to an icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h6v6"/><path d="m10 14-6 6"/><path d="M20 10h-6V4"/><path d="m14 10 6-6"/></svg></button>
+        </div>
+      </div>
     </div>
 
     <div class="foot">
@@ -152,6 +306,8 @@
       <span class="sep">|</span>
       <span id="kbd-hints"></span>
       <span class="grow"></span>
+      <span id="foot-layout"></span>
+      <span class="sep">|</span>
       <span id="saved-line"></span>
     </div>
   </div>

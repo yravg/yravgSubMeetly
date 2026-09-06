@@ -27,6 +27,10 @@ import {
 import { seedSampleData } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
 import { mountExtras } from './minutes-extras.js';
+import { mountDock } from './minutes-dock.js';
+
+/** Lapisan tata letak: panel kiri/kanan/bawah, rel, dan dok tampilan. */
+let dock = null;
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -51,6 +55,8 @@ const state = {
   sort: { key: 'ref', dir: 1 },
   group: 'none',
   ptFilter: 'all',
+  // Bahasa tujuan popover terjemahan di dok: bawaan = lawan dari bahasa antarmuka.
+  tgt: localStorage.getItem('ltsMinutesTgt') || ((localStorage.getItem(LS_LANG) || 'en') === 'en' ? 'id' : 'en'),
   sel: /** @type {string|null} */ (null),
   adding: false,
   // ?lang= from the side panel wins once, then the toggle is remembered.
@@ -1087,7 +1093,9 @@ function paint() {
 
   const rows = sortedItems(filteredItems());
   visibleRefs = rows.map((r) => r.ref);
-  $('.main').classList.toggle('overlay', state.view === 'series' || state.view === 'doc');
+  // Kerangka workspace memakai #center sebagai wadah tengah; tata letak toolbar
+  // lama memakai .main. Cari keduanya supaya render tidak batal di tengah jalan.
+  ($('.main') || $('#center'))?.classList.toggle('overlay', state.view === 'series' || state.view === 'doc');
   const pane = $('#pane');
   pane.innerHTML = state.view === 'table' ? viewTable(rows)
     : state.view === 'topic' ? viewTopic(rows)
@@ -1100,6 +1108,7 @@ function paint() {
   paintDrawer();
   const selRow = state.sel ? pane.querySelector(`[data-ref="${cssEscape(state.sel)}"]`) : null;
   if (selRow && typeof selRow.scrollIntoView === 'function') selRow.scrollIntoView({ block: 'nearest' });
+  dock?.paint();
 }
 
 /* ==========================================================================
@@ -1393,6 +1402,21 @@ function wireEvents() {
     setActive: (id) => { state.activeId = id; state.sel = null; },
     paint,
     toast,
+  });
+
+  dock = mountDock({
+    state: () => state,
+    T: () => T,
+    paint,
+    selectRef,
+    activeMeeting,
+    activeItem,
+    toast,
+    setView: (view) => { state.view = view; syncTabs(); paint(); },
+    editItem: async (ref, patch) => {
+      const meeting = await editItemAndSave(activeMeeting(), ref, patch, { by: state.me || 'local' });
+      replaceActive(meeting);
+    },
   });
 
   $('#m-switch').addEventListener('change', (e) => {
