@@ -1309,3 +1309,47 @@ body.is-running .bottom-nav-item[data-view='captions'] .label::after {
 .target-card.live.elsewhere { border-style: dashed; }
 .target-tag.live { animation: pulse 1.4s infinite; }
 #session-tab-hint { margin: calc(var(--space-2) * -1) 0 var(--space-2); }
+
+/* Pencarian cepat di Pengaturan: menyaring baris, blok helper, dan model. */
+.settings-search-row { margin: calc(var(--space-1) * -1) 0 var(--space-3); }
+.settings-search {
+  width: 100%;
+  background: var(--card2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 8px 14px;
+  font: inherit;
+  font-size: var(--text-base);
+}
+.settings-search:focus { outline: none; border-color: var(--accent); }
+.search-hidden { display: none !important; }
+
+/* Pegangan seret untuk tinggi kartu Notulen (lihat lib/resizable.js). */
+.resizable-target.resized { overflow: auto; }
+.resize-handle {
+  position: relative;
+  height: 14px;
+  margin: var(--space-1) calc(var(--space-1) * -1) calc(var(--space-2) * -1);
+  cursor: row-resize;
+  border-radius: var(--radius-md);
+  touch-action: none;
+  user-select: none;
+}
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  transition: background var(--transition-base), width var(--transition-base);
+}
+.resize-handle:hover::before,
+.resize-handle.dragging::before,
+.resize-handle:focus-visible::before { background: var(--accent); width: 64px; }
+.resize-handle:focus-visible { outline: none; }
+body.is-resizing { cursor: row-resize; user-select: none; }

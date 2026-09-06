@@ -1,4 +1,7 @@
 const en = {
+  settingsSearch: 'Search settings… (e.g. font, model, folder)',
+  settingsNoMatch: (q) => `No setting matches “${q}”.`,
+  notesResize: 'Drag to resize the notes panel',
   liveThisTab: '🔴 Live',
   liveOtherTab: '🔴 Live on another tab',
   gotoSessionTab: 'Go to tab',
@@ -258,6 +261,9 @@ const en = {
 };
 
 const zh = {
+  settingsSearch: '搜索设置…（如：字号、模型、文件夹）',
+  settingsNoMatch: (q) => `没有与“${q}”匹配的设置。`,
+  notesResize: '拖动以调整纪要面板高度',
   liveThisTab: '🔴 进行中',
   liveOtherTab: '🔴 在另一个标签页进行中',
   gotoSessionTab: '前往该标签页',
@@ -501,6 +507,9 @@ export const I18N = {
   vi: { ...en, uiLang: 'Ngôn ngữ UI', offline: 'Ngoại tuyến', realtime: 'Thời gian thực', startTask: 'Bắt đầu', endTask: 'Kết thúc', settings: 'Cài đặt', qaTest: 'Thử', qaRunSample: 'Chạy mẫu', qaSamples: 'Mẫu CC0', theme: 'Chủ đề', themeAuto: 'Tự động', themeLight: 'Sáng', themeDark: 'Tối' },
   id: {
     ...en,
+    settingsSearch: 'Cari pengaturan… (mis. font, model, folder)',
+    settingsNoMatch: (q) => `Tidak ada pengaturan yang cocok dengan “${q}”.`,
+    notesResize: 'Seret untuk mengubah tinggi panel notulen',
     liveThisTab: '🔴 Berjalan',
     liveOtherTab: '🔴 Berjalan di tab lain',
     gotoSessionTab: 'Ke tab itu',

@@ -38,6 +38,7 @@ import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
 import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js';
+import { makeResizable } from './lib/resizable.js';
 import { mountPerfPanel } from './perf-panel.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
@@ -496,6 +497,63 @@ function initCollapsibles() {
   });
 }
 
+/* ---- Pencarian cepat di Pengaturan -------------------------------------
+ * Menyaring berdasarkan teks yang terlihat (label + kendali + deskripsi).
+ * Kueri kosong menampilkan semuanya kembali. */
+function filterSettings(query) {
+  const q = String(query || '').trim().toLowerCase();
+  const modal = $('settings-modal');
+  if (!modal) return;
+  let visible = 0;
+  modal.querySelectorAll('.setting-row, .m-item').forEach((el) => {
+    const hit = !q || el.textContent.toLowerCase().includes(q);
+    el.classList.toggle('search-hidden', !hit);
+    if (hit) visible += 1;
+  });
+  // Blok Native Helper menempel pada baris Engine: ikut tampil selama baris
+  // itu tampil, atau kalau isinya sendiri cocok.
+  const nativeBlock = $('native-block');
+  if (nativeBlock) {
+    const engineRow = $('engine-toggle')?.closest('.setting-row');
+    const show =
+      !q ||
+      nativeBlock.textContent.toLowerCase().includes(q) ||
+      (engineRow && !engineRow.classList.contains('search-hidden'));
+    nativeBlock.classList.toggle('search-hidden', !show);
+  }
+  // Judul daftar model hanya muncul kalau ada model yang lolos saringan.
+  modal.querySelectorAll('.models-title').forEach((title) => {
+    let el = title.nextElementSibling;
+    while (el && !el.classList.contains('model-list')) el = el.nextElementSibling;
+    const any = !q || (el && [...el.querySelectorAll('.m-item')].some((m) => !m.classList.contains('search-hidden')));
+    title.classList.toggle('search-hidden', !any);
+  });
+  modal.querySelectorAll('.hint').forEach((h) => {
+    if (h.id === 'settings-no-match') return;
+    h.classList.toggle('search-hidden', !!q);
+  });
+  const none = $('settings-no-match');
+  none.classList.toggle('hidden', !q || visible > 0);
+  if (q && visible === 0) none.textContent = t('settingsNoMatch', query.trim());
+}
+
+/* ---- Preferensi antar sesi --------------------------------------------
+ * lastConfig sudah lama ditulis tapi tidak pernah dibaca lagi, jadi panel
+ * selalu terbuka di Realtime + Translate. Sekarang dipulihkan. */
+async function restoreUiPrefs() {
+  try {
+    const { lastConfig, panelPrefs } = await chrome.storage.local.get(['lastConfig', 'panelPrefs']);
+    if (lastConfig?.srcLang) state.srcLang = lastConfig.srcLang;
+    if (lastConfig?.tgtLang) state.tgtLang = lastConfig.tgtLang;
+    return {
+      task: lastConfig?.taskMode === 'transcribe' ? 'transcribe' : 'translate',
+      mode: panelPrefs?.mode === 'offline' ? 'offline' : 'realtime',
+    };
+  } catch {
+    return { task: 'translate', mode: 'realtime' };
+  }
+}
+
 function setView(view) {
   state.view = view === 'notes' ? 'notes' : view === 'settings' ? 'settings' : 'captions';
   document.querySelectorAll('#view-tabs button').forEach((b) => {
@@ -542,7 +600,9 @@ function syncBottomNav() {
 // ---------------------------------------------------------------------------
 // mode / task toggles
 function setMode(mode) {
+  const modeChanged = state.mode !== mode;
   state.mode = mode;
+  if (modeChanged) chrome.storage.local.set({ panelPrefs: { mode } }).catch(() => {});
   document.querySelectorAll('#mode-toggle button').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === mode);
   });
@@ -740,6 +800,12 @@ function updateWarning() {
 // Satu pintu membuka Settings agar banner, topbar, nav bawah, dan tombol
 // About selalu sinkron (lihat syncBottomNav).
 function openSettings({ about = false } = {}) {
+  const search = $('settings-search');
+  if (search) {
+    search.value = '';
+    filterSettings('');
+    setTimeout(() => search.focus({ preventScroll: true }), 30);
+  }
   $('settings-modal').classList.remove('hidden');
   lastNativeAutoStartMs = 0;
   labEnsureAttempted = false;
@@ -1019,6 +1085,8 @@ function renderModelLists() {
   for (const [key, p] of Object.entries(MT_PAIRS)) {
     mtHost.appendChild(modelRow(key, pairLabel(key), `${key} · Opus-MT · ${p.size}`, { mtPair: key }));
   }
+  const q = $('settings-search')?.value;
+  if (q) filterSettings(q);
 }
 
 function modelRow(key, name, sub, { mtPair = null } = {}) {
@@ -2627,6 +2695,15 @@ function wire() {
   $('btn-error-action').addEventListener('click', onErrorAction);
   $('btn-export-dest-change').addEventListener('click', () => $('btn-settings').click());
   $('btn-goto-session-tab').addEventListener('click', gotoSessionTab);
+  const settingsSearch = $('settings-search');
+  settingsSearch.addEventListener('input', () => filterSettings(settingsSearch.value));
+  settingsSearch.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && settingsSearch.value) {
+      ev.stopPropagation();
+      settingsSearch.value = '';
+      filterSettings('');
+    }
+  });
   $('btn-error-dismiss').addEventListener('click', hideError);
   $('btn-paste-generate')?.addEventListener('click', () => void generateMinutesFromPaste());
   $('history-search')?.addEventListener('input', () => {
@@ -2804,13 +2881,14 @@ async function init() {
   await loadSettings();
   wire();
   applyI18n();
+  const uiPrefs = await restoreUiPrefs();
   fillSelects();
   setView('captions');
   await restoreDensity();
   state.qaCatalog = await loadSampleCatalog();
   renderQaSampleBar();
-  setMode('realtime');
-  setTask('translate');
+  setMode(uiPrefs.mode);
+  setTask(uiPrefs.task);
   await refreshDownloaded();
   renderModelLists();
   populateMockData();
@@ -2827,6 +2905,17 @@ async function init() {
   if (notesMount) {
     await mountNotesPanel(notesMount, notesMountOptions());
     notesMount.dataset.mounted = '1';
+    // Tinggi isi kartu Notulen bisa diseret dan diingat antar sesi.
+    const notesBody = $('notes-body');
+    if (notesBody && !notesBody.dataset.resizable) {
+      notesBody.dataset.resizable = '1';
+      await makeResizable(notesBody, {
+        storageKey: 'notesPanelSize',
+        min: 180,
+        max: 1400,
+        label: t('notesResize'),
+      });
+    }
   }
   const helperMount = $('helper-status-mount');
   if (helperMount) {

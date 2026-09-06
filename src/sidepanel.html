@@ -375,6 +375,12 @@
           <h2>⚙️ <span data-i18n="settings">Settings</span></h2>
           <button id="btn-close-settings" class="icon-btn">✕</button>
         </div>
+        <div class="settings-search-row">
+          <input type="search" id="settings-search" class="settings-search" autocomplete="off" spellcheck="false"
+                 placeholder="Search settings…" data-i18n-placeholder="settingsSearch"
+                 data-i18n-aria-label="settingsSearch" aria-label="Search settings" />
+        </div>
+        <div id="settings-no-match" class="hint hidden"></div>
 
         <div class="setting-row">
           <label for="ui-lang-toggle" data-i18n="uiLang">UI language</label>
