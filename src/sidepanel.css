@@ -246,13 +246,35 @@ input[type='range']:hover { cursor: pointer; }
   min-width: 0;
   flex: 1;
 }
+/* ---- Wordmark yraverageSubMin ----------------------------------------
+ * Dua potong teks, bukan berkas gambar: ukurannya ikut skala tipografi
+ * panel dan warnanya ikut token tema, jadi mode gelap dan terang tidak
+ * butuh aset terpisah. Lekuk cekung di sisi kiri pil dibuat dengan mask
+ * lingkaran, sama seperti gigitan pada logo aslinya. */
 .brand {
-  font-weight: var(--font-semibold);
+  display: inline-flex;
+  align-items: center;
+  font-weight: var(--font-bold);
   font-size: var(--text-lg);
   color: var(--text);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.3px;
+  line-height: 1;
   white-space: nowrap;
   flex-shrink: 0;
+}
+.brand-word { color: inherit; }
+.brand-pill {
+  color: var(--on-accent);
+  background: var(--accent-strong);
+  padding: 4px 9px 4px 12px;
+  margin-left: -2px;
+  border-radius: 3px 8px 8px 3px;
+  -webkit-mask: radial-gradient(circle at 0 50%, transparent 0 8px, #000 8.5px);
+  mask: radial-gradient(circle at 0 50%, transparent 0 8px, #000 8.5px);
+}
+/* Kontras cukup di layar tanpa dukungan mask (mask gagal → pil tetap utuh). */
+@supports not (mask: radial-gradient(circle, #000 0, #000 1px)) {
+  .brand-pill { border-radius: var(--radius-full); margin-left: 4px; padding-left: 10px; }
 }
 .view-tabs {
   display: inline-flex;
