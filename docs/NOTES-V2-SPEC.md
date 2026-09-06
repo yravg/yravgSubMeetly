@@ -4,7 +4,7 @@
 
 **Reference points:** Microsoft Loop Facilitator (`CPOC Phase 7 — GZS Weekly Progress Meeting`) and the TeamsMaestro / AI-Meeting-Notes class of bots.
 
-**Status of this doc:** design spec + working prototype (`test/notes-register.html`). Nothing in `src/` has been changed yet.
+**Status of this doc:** design spec. Phase 2.0+ is shipped in `src/` (`minutes.html`, `notes-*`); `test/notes-register.html` is the static prototype. See `docs/NOTES-V2-STATUS.md` for done vs stub.
 
 ---
 

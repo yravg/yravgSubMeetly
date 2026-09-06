@@ -73,7 +73,8 @@ directly.
 
 ## What's still stubbed (see roadmap in the spec, §7)
 
-Native extraction (mlx_lm), SQLite storage, provenance audio playback (the
-"▶ Play from here" action currently just toasts), diarization, and
-XLSX/ICS/DOCX export are Phase 2.1+ and not implemented yet — don't assume
-they exist when reading `native/server.py`.
+Heuristic `generateNotesFromTranscript` (End & draft, paste-Teams, Library)
+is shipped. Native extraction (mlx_lm), SQLite storage, provenance audio
+playback (the "▶ Play from here" action currently just toasts), diarization,
+and XLSX/ICS/DOCX export are Phase 2.1+ and not implemented yet — don't
+assume they exist when reading `native/server.py`.
