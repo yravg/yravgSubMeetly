@@ -283,6 +283,52 @@ input[type='range']:hover { cursor: pointer; }
 }
 .topbar-actions {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Kepadatan panel: Simple (bawaan) menyembunyikan kendali lanjutan,
+ * Detail membukanya kembali. Satu aturan menggerakkan seluruh panel —
+ * elemen lanjutan cukup ditandai data-density="detail". */
+.density {
+  display: inline-flex;
+  align-items: center;
+  background: var(--card3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 3px;
+  flex-shrink: 0;
+}
+.density button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 4px 9px;
+  border-radius: var(--radius-full);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+.density button:hover { color: var(--text); }
+.density button.active {
+  background: var(--card2);
+  color: var(--text);
+  font-weight: var(--font-semibold);
+  box-shadow: var(--shadow-sm);
+}
+.density svg { width: 14px; height: 14px; display: block; flex-shrink: 0; }
+body[data-density='simple'] [data-density='detail'] { display: none !important; }
+/* Panel sempit: sisakan ikonnya saja agar tab Captions/Notes tidak terdesak. */
+@media (max-width: 379px) {
+  .density button span { display: none; }
+  .density button { padding: 5px 7px; }
 }
 .view-panel {
   display: flex;

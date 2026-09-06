@@ -162,7 +162,7 @@ function captureRailHtml(capture, T, { issued = false, projectType = 'general' }
           <span class="notes-rec-label">${escapeHtml(T(running ? 'recording' : 'idle'))}</span>
           <span class="notes-rec-clock mono" id="notes-elapsed">${toTimecode(elapsedSeconds(capture))}</span>
           <span class="notes-rec-spacer"></span>
-          <span class="notes-engine mono">${escapeHtml(capture.engine || '')}</span>
+          <span class="notes-engine mono" data-density="detail">${escapeHtml(capture.engine || '')}</span>
         </div>
         ${waveHtml(running)}
         ${projectTypeSelectHtml(T, projectType)}
@@ -173,7 +173,7 @@ function captureRailHtml(capture, T, { issued = false, projectType = 'general' }
         </div>
       </div>
 
-      <button type="button" class="notes-flag" id="btn-flag-moment" data-tour="notes-flag"${blocked ? ` disabled title="${escapeHtml(why)}"` : ''}>
+      <button type="button" class="notes-flag" id="btn-flag-moment" data-density="detail" data-tour="notes-flag"${blocked ? ` disabled title="${escapeHtml(why)}"` : ''}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0b05c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h12l-2.2 3.6L17 12H5"/></svg>
         ${escapeHtml(T('flagMoment'))}
         <span class="notes-flag-key mono">${escapeHtml(flagShortcutHint())}</span>
@@ -200,7 +200,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
           <span aria-hidden="true">●</span>
           ${notice ? escapeHtml(notice) : active ? escapeHtml(T('onDevice')) : escapeHtml(T('msgNoMeeting'))}
         </span>
-        <span class="notes-meta">${escapeHtml(backendName())}</span>
+        <span class="notes-meta" data-density="detail">${escapeHtml(backendName())}</span>
       </div>
 
       <div class="notes-block" id="notes-active-block">
@@ -210,7 +210,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
         </div>
         ${active
           ? `<p class="notes-meta notes-title-line">${escapeHtml(active.title)} · ${escapeHtml(active.date)}${active.projectType && active.projectType !== 'general' ? ` · <span class="notes-pt-badge">${escapeHtml(T(ptKey(active.projectType)))}</span>` : ''}${stats.unreviewed ? ` · <span class="warn">${stats.unreviewed} ${escapeHtml(T('needReview'))}</span>` : ''}</p>
-             ${counts.length ? `<div class="notes-chips">${counts.map(([t, n]) => `<span class="notes-chip"><i style="background:${TYPE_COLOR[t]}"></i>${escapeHtml(T(t))}<b>${n}</b></span>`).join('')}</div>` : ''}
+             ${counts.length ? `<div class="notes-chips" data-density="detail">${counts.map(([t, n]) => `<span class="notes-chip"><i style="background:${TYPE_COLOR[t]}"></i>${escapeHtml(T(t))}<b>${n}</b></span>`).join('')}</div>` : ''}
               <div class="notes-sec">
                 <div class="notes-sec-head"><h4>${escapeHtml(T('secSummary'))}</h4></div>
                 ${summaryDraft

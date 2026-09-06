@@ -105,6 +105,12 @@ function applyI18n() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel));
+  });
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
   });
@@ -429,6 +435,40 @@ function setSubview(sub) {
   $('view-perf')?.classList.toggle('hidden', !perf);
   if (perf) perfPanel?.render();
   try { localStorage.setItem('captionsSubview', perf ? 'perf' : 'live'); } catch { /* opsional */ }
+}
+
+/** Kepadatan panel: 'simple' (bawaan) atau 'detail'.
+ * Simple menyembunyikan setiap elemen bertanda data-density="detail":
+ * subtab Performance, Refine/Dual line, Interpreter mode, peringatan model,
+ * pilih tab manual, kartu Native Helper, dan tambahan di panel Notulen.
+ * Pilihan terakhir tersimpan di chrome.storage.local sebagai `panelDensity`. */
+const DENSITY_KEY = 'panelDensity';
+let density = 'simple';
+
+function applyDensity(mode, { persist = true } = {}) {
+  density = mode === 'detail' ? 'detail' : 'simple';
+  document.body.dataset.density = density;
+  document.querySelectorAll('#density-toggle [data-density-mode]').forEach((b) => {
+    const on = b.dataset.densityMode === density;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  // Performance hanya hidup di Detail — jangan tinggalkan pengguna di tab yang hilang.
+  if (density === 'simple') setSubview('live');
+  if (persist) {
+    try {
+      chrome.storage.local.set({ [DENSITY_KEY]: density });
+    } catch { /* storage opsional (harness) */ }
+  }
+}
+
+async function restoreDensity() {
+  let saved = null;
+  try {
+    const got = await chrome.storage.local.get(DENSITY_KEY);
+    saved = got?.[DENSITY_KEY] ?? null;
+  } catch { /* storage opsional */ }
+  applyDensity(saved === 'detail' ? 'detail' : 'simple', { persist: false });
 }
 
 /** Kartu yang bisa dilipat (Native Helper) — tertutup default, status diingat. */
@@ -2336,6 +2376,9 @@ function wire() {
   document.querySelectorAll('#view-tabs button').forEach((b) =>
     b.addEventListener('click', () => setView(b.dataset.view)),
   );
+  document.querySelectorAll('#density-toggle [data-density-mode]').forEach((b) =>
+    b.addEventListener('click', () => applyDensity(b.dataset.densityMode)),
+  );
   document.querySelectorAll('.bottom-nav-item').forEach((b) =>
     b.addEventListener('click', () => {
       if (b.dataset.view === 'settings') {
@@ -2599,6 +2642,7 @@ async function init() {
   applyI18n();
   fillSelects();
   setView('captions');
+  await restoreDensity();
   state.qaCatalog = await loadSampleCatalog();
   renderQaSampleBar();
   setMode('realtime');

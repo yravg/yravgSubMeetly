@@ -1,4 +1,9 @@
 const en = {
+  densityGroup: 'Panel density',
+  densitySimple: 'Simple',
+  densityDetail: 'Detail',
+  densitySimpleHint: 'Simple — everyday controls only',
+  densityDetailHint: 'Detail — engine, models and Performance',
   genTitle: '💬 Subtitle Generation',
   offline: 'Offline',
   realtime: 'Realtime',
@@ -202,6 +207,11 @@ const en = {
 };
 
 const zh = {
+  densityGroup: '面板密度',
+  densitySimple: '简洁',
+  densityDetail: '详细',
+  densitySimpleHint: '简洁 — 仅显示日常控件',
+  densityDetailHint: '详细 — 引擎、模型与性能',
   ...en,
   genTitle: '💬 字幕生成',
   offline: '离线',
@@ -389,6 +399,11 @@ export const I18N = {
   vi: { ...en, uiLang: 'Ngôn ngữ UI', offline: 'Ngoại tuyến', realtime: 'Thời gian thực', startTask: 'Bắt đầu', endTask: 'Kết thúc', settings: 'Cài đặt', qaTest: 'Thử', qaRunSample: 'Chạy mẫu', qaSamples: 'Mẫu CC0', theme: 'Chủ đề', themeAuto: 'Tự động', themeLight: 'Sáng', themeDark: 'Tối' },
   id: {
     ...en,
+    densityGroup: 'Kepadatan panel',
+    densitySimple: 'Ringkas',
+    densityDetail: 'Rinci',
+    densitySimpleHint: 'Ringkas — hanya kendali sehari-hari',
+    densityDetailHint: 'Rinci — mesin, model, dan Performance',
     uiLang: 'Bahasa UI',
     interpreterMode: 'Mode juru bahasa',
     interpreterChange: 'Ubah',
