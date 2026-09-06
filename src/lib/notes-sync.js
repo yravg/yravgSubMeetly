@@ -1,5 +1,5 @@
 // Sinkronisasi notulen ekstensi ↔ Native Helper (macOS membaca berkas JSON
-// yang sama di ~/.localtranssub/notes.json). Register v2 ekstensi dipetakan
+// yang sama di ~/.yraveragesubmin/notes.json). Register v2 ekstensi dipetakan
 // ke skema dokumen v1 helper — lihat _normalize_note_doc di native/server.py.
 // Semua fungsi best-effort: null saat helper tak terjangkau.
 import {

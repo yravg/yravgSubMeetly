@@ -29,6 +29,7 @@ import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-expor
 import { slidingNumber, springProgress, autoHeight, highlight } from './lib/motion.js';
 import { mountExtras } from './minutes-extras.js';
 import { mountDock } from './minutes-dock.js';
+import { migrateLegacyLocalKeys } from './lib/legacy-keys.js';
 
 /** Lapisan tata letak: panel kiri/kanan/bawah, rel, dan dok tampilan. */
 let dock = null;
@@ -36,9 +37,12 @@ let dock = null;
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-const LS_LANG = 'ltsMinutesLang';
-const LS_NAME = 'ltsMinutesMe';
-const LS_GLOSSARY = 'ltsGlossary';
+// Kunci `lts` lama dipindah sebelum apa pun membacanya.
+migrateLegacyLocalKeys();
+
+const LS_LANG = 'ysmMinutesLang';
+const LS_NAME = 'ysmMinutesMe';
+const LS_GLOSSARY = 'ysmGlossary';
 
 /* ==========================================================================
    State
@@ -57,7 +61,7 @@ const state = {
   group: 'none',
   ptFilter: 'all',
   // Bahasa tujuan popover terjemahan di dok: bawaan = lawan dari bahasa antarmuka.
-  tgt: localStorage.getItem('ltsMinutesTgt') || ((localStorage.getItem(LS_LANG) || 'en') === 'en' ? 'id' : 'en'),
+  tgt: localStorage.getItem('ysmMinutesTgt') || ((localStorage.getItem(LS_LANG) || 'en') === 'en' ? 'id' : 'en'),
   sel: /** @type {string|null} */ (null),
   adding: false,
   // ?lang= from the side panel wins once, then the toggle is remembered.

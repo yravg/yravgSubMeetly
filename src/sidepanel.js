@@ -1798,7 +1798,7 @@ let labMediaEl = null;
 
 function releaseLabCapture() {
   try {
-    const s = window.__ltsCaptureStream;
+    const s = window.__ysmCaptureStream;
     if (s?.getTracks) {
       for (const track of s.getTracks()) {
         try {
@@ -1811,8 +1811,8 @@ function releaseLabCapture() {
   } catch {
     /* ignore */
   }
-  window.__ltsCaptureStream = null;
-  window.__ltsLabClock = null;
+  window.__ysmCaptureStream = null;
+  window.__ysmLabClock = null;
   if (labMediaEl) {
     try {
       labMediaEl.pause();
@@ -1876,8 +1876,8 @@ async function acquireLabDemoStream() {
   }
 
   const stream = new MediaStream(audioTracks);
-  window.__ltsCaptureStream = stream;
-  window.__ltsLabClock = () => (labMediaEl && Number.isFinite(labMediaEl.currentTime) ? labMediaEl.currentTime : 0);
+  window.__ysmCaptureStream = stream;
+  window.__ysmLabClock = () => (labMediaEl && Number.isFinite(labMediaEl.currentTime) ? labMediaEl.currentTime : 0);
 
   state.currentTab = { id: 1, title, url, favIconUrl: '' };
   $('tab-title').textContent = title;
@@ -1906,8 +1906,8 @@ async function acquireLabDisplayStream() {
 
   const stream = new MediaStream(audioTracks);
   const t0 = performance.now();
-  window.__ltsCaptureStream = stream;
-  window.__ltsLabClock = () => (performance.now() - t0) / 1000;
+  window.__ysmCaptureStream = stream;
+  window.__ysmLabClock = () => (performance.now() - t0) / 1000;
   audioTracks[0].addEventListener('ended', () => {
     if (state.running) onStop();
   });
@@ -2099,7 +2099,7 @@ function showToast(msg, kind = 'ok') {
     if (el.isConnected) dismiss();
   }, 5000);
 }
-if (typeof window !== 'undefined') window.__ltsToast = showToast;
+if (typeof window !== 'undefined') window.__ysmToast = showToast;
 
 async function startWithStream(streamId, captureType) {
   setStatus(t('loadingModels'));

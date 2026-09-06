@@ -1,7 +1,7 @@
 // Chrome API mock for browser-tab harnesses (app.html / panel-test.html).
 // Offline + realtime reuse the real extension pipeline:
 //   sidepanel → (this mock as background) → /dist/offscreen.js → /dist/ai-worker.js → Whisper.
-// Lab realtime uses captureType "media" + globalThis.__ltsCaptureStream
+// Lab realtime uses captureType "media" + globalThis.__ysmCaptureStream
 // (getDisplayMedia or <audio>.captureStream) — not chrome.tabCapture.
 (() => {
   const listeners = [];
@@ -192,8 +192,8 @@
 
   function labVideoTime() {
     try {
-      if (typeof window.__ltsLabClock === 'function') {
-        const t = Number(window.__ltsLabClock());
+      if (typeof window.__ysmLabClock === 'function') {
+        const t = Number(window.__ysmLabClock());
         if (Number.isFinite(t) && t >= 0) return t;
       }
     } catch {
@@ -267,7 +267,7 @@
 
   async function startLabRealtime(data) {
     await ensureOffscreen();
-    const stream = window.__ltsCaptureStream;
+    const stream = window.__ysmCaptureStream;
     if (!stream || typeof stream.getAudioTracks !== 'function' || !stream.getAudioTracks().length) {
       return {
         ok: false,

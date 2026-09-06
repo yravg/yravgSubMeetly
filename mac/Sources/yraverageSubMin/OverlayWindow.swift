@@ -5,7 +5,7 @@
 // site — the main advantage over the browser extension's in-page overlay.
 import AppKit
 import SwiftUI
-import TransSubKit
+import SubMinKit
 
 /// Panel subtitel yang TIDAK PERNAH bisa mengambil fokus keyboard.
 ///

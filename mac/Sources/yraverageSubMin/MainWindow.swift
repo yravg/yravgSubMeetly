@@ -9,7 +9,7 @@
 import AppKit
 import Combine
 import SwiftUI
-import TransSubKit
+import SubMinKit
 
 @MainActor
 final class MainWindowController: NSObject, NSToolbarDelegate {
@@ -124,6 +124,6 @@ final class MainWindowController: NSObject, NSToolbarDelegate {
 }
 
 private extension NSToolbarItem.Identifier {
-    static let toggleSession = NSToolbarItem.Identifier("com.localtranssub.toggleSession")
-    static let sessionStatus = NSToolbarItem.Identifier("com.localtranssub.sessionStatus")
+    static let toggleSession = NSToolbarItem.Identifier("com.yraveragesubmin.toggleSession")
+    static let sessionStatus = NSToolbarItem.Identifier("com.yraveragesubmin.sessionStatus")
 }

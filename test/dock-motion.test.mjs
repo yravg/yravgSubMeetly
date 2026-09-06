@@ -68,7 +68,7 @@ before(async () => {
   page.on('pageerror', (e) => pageErrors.push(String(e.message || e)));
   await page.goto(`${ORIGIN}/dist/minutes.html`, { waitUntil: 'networkidle0' });
   await page.evaluate(() => {
-    localStorage.removeItem('ltsMinutesLayout');
+    localStorage.removeItem('ysmMinutesLayout');
     localStorage.removeItem('minutesRegister');
     localStorage.removeItem('learningProgress');
   });
@@ -177,7 +177,7 @@ test('lama tunggu diatur di panel Pengaturan dan bertahan setelah muat ulang', a
   const changed = await page.evaluate(() => ({
     pressed: [...document.querySelectorAll('[data-armms]')].filter((x) => x.getAttribute('aria-pressed') === 'true').map((x) => x.dataset.armms),
     cssVar: document.getElementById('viewdock').style.getPropertyValue('--dock-arm-ms'),
-    saved: JSON.parse(localStorage.getItem('ltsMinutesLayout') || '{}').dockArmMs,
+    saved: JSON.parse(localStorage.getItem('ysmMinutesLayout') || '{}').dockArmMs,
   }));
   assert.deepEqual(changed.pressed, ['3000']);
   assert.equal(changed.cssVar, '3000ms', 'animasi cincin tidak ikut berubah');

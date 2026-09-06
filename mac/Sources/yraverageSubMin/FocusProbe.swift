@@ -9,7 +9,7 @@
 // depan), hasilnya UNKNOWN. Pengukuran yang gagal diambil tidak boleh terbaca
 // sebagai PASS.
 import AppKit
-import TransSubKit
+import SubMinKit
 
 @MainActor
 enum FocusProbe {

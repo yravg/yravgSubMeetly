@@ -2,7 +2,22 @@
 // without opening a terminal. Install once:  cd native && ./install-host.sh
 import { classifyNativeHostError, hostInstalledFromState } from './native-protocol.js';
 
-export const NATIVE_HOST_NAME = 'com.localtranssub.helper';
+export const NATIVE_HOST_NAME = 'com.yraveragesubmin.helper';
+/**
+ * Nama host sebelum produk berganti nama. Manifest Native Messaging tersimpan
+ * di mesin pengguna dengan nama berkas ini; sampai mereka menjalankan ulang
+ * installer, satu-satunya host yang ada adalah yang lama. Mencoba nama baru
+ * lalu mundur ke sini membuat pemasangan lama tetap bekerja.
+ */
+export const LEGACY_NATIVE_HOST_NAME = 'com.localtranssub.helper';
+
+/** Nama host yang terbukti menjawab, supaya percobaan ganda hanya sekali. */
+let resolvedHost = null;
+
+/** Host yang benar-benar dipakai sejauh ini (null = belum pernah tersambung). */
+export function activeNativeHostName() {
+  return resolvedHost;
+}
 
 /**
  * Pemeriksaan sambungan: apakah bridge Native Messaging benar-benar terhubung?
@@ -19,12 +34,13 @@ export const NATIVE_HOST_NAME = 'com.localtranssub.helper';
  *   host: string, info: object|null, helperPortOpen: boolean|null, error: string|null}>}
  */
 export async function nativeHostConnection({ timeoutMs = 4_000 } = {}) {
-  const base = { host: NATIVE_HOST_NAME, info: null, helperPortOpen: null, error: null };
+  const base = { host: resolvedHost || NATIVE_HOST_NAME, info: null, helperPortOpen: null, error: null };
   if (!nativeHostSupported()) {
     return { ...base, state: 'unsupported', connected: false, hostInstalled: null };
   }
   try {
     const res = await nativeHostAction('ping', { timeoutMs });
+    base.host = resolvedHost || NATIVE_HOST_NAME;
     // Host lama belum mengenal 'ping' dan menjawab unknown action — itu tetap
     // membuktikan bridge-nya hidup, jadi tetap 'connected'.
     const stale = res?.ok === false && /unknown action/i.test(String(res?.error || ''));
@@ -47,12 +63,12 @@ export function nativeHostSupported() {
   return typeof chrome?.runtime?.connectNative === 'function';
 }
 
-export function nativeHostAction(action, { timeoutMs = 45_000 } = {}) {
+/**
+ * Coba satu nama host. Dipisah supaya nativeHostAction bisa mundur ke nama
+ * lama tanpa menduplikasi seluruh pengurusan port dan timeout.
+ */
+function connectOnce(hostName, action, timeoutMs) {
   return new Promise((resolve, reject) => {
-    if (!nativeHostSupported()) {
-      reject(new Error('Native messaging is not available in this browser'));
-      return;
-    }
     let settled = false;
     const finish = (fn, val) => {
       if (settled) return;
@@ -62,7 +78,7 @@ export function nativeHostAction(action, { timeoutMs = 45_000 } = {}) {
     };
     let port;
     try {
-      port = chrome.runtime.connectNative(NATIVE_HOST_NAME);
+      port = chrome.runtime.connectNative(hostName);
     } catch (e) {
       reject(e);
       return;
@@ -86,4 +102,26 @@ export function nativeHostAction(action, { timeoutMs = 45_000 } = {}) {
     });
     port.postMessage({ action });
   });
+}
+
+export async function nativeHostAction(action, { timeoutMs = 45_000 } = {}) {
+  if (!nativeHostSupported()) {
+    throw new Error('Native messaging is not available in this browser');
+  }
+  const order = resolvedHost ? [resolvedHost] : [NATIVE_HOST_NAME, LEGACY_NATIVE_HOST_NAME];
+  let lastErr;
+  for (const hostName of order) {
+    try {
+      const res = await connectOnce(hostName, action, timeoutMs);
+      resolvedHost = hostName;
+      return res;
+    } catch (e) {
+      lastErr = e;
+      // Hanya "host tidak ditemukan" yang layak dicoba dengan nama lain.
+      // Forbidden, crash, atau timeout berarti hostnya ADA — mencoba nama
+      // lain cuma menutupi galat sebenarnya.
+      if (classifyNativeHostError(e) !== 'not-installed') throw e;
+    }
+  }
+  throw lastErr;
 }

@@ -129,7 +129,7 @@
       const STEPS = {
         macos: 'cd native\n./run.sh                 # mlx-whisper di Apple Silicon\n./install-host.sh <EXT_ID>\ncurl -sf http://127.0.0.1:17865/health',
         linux: 'cd native\n./run.sh                 # faster-whisper di .venv\n./install-host-linux.sh <EXT_ID>\ncurl -sf http://127.0.0.1:17865/health',
-        windows: 'cd native\nrun.sh                   :: via Git Bash / WSL\ninstall-host.bat <EXT_ID>\n:: registry: HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.localtranssub.helper',
+        windows: 'cd native\nrun.sh                   :: via Git Bash / WSL\ninstall-host.bat <EXT_ID>\n:: registry: HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.yraveragesubmin.helper',
       };
       const stepsEl = document.getElementById('os-steps');
       const paintSteps = (os) => { stepsEl.textContent = STEPS[os] || STEPS.macos; };

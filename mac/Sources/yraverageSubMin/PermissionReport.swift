@@ -5,7 +5,7 @@ import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
-import TransSubKit
+import SubMinKit
 
 enum PermissionReport {
     // Fixed path on purpose: NSTemporaryDirectory() inside an app bundle points

@@ -4,7 +4,7 @@
 // yang sedang di depan, lalu pemanggil (skrip) membaca kembali isinya untuk
 // memastikan teks benar-benar mendarat di sana — bukan sekadar "tidak error".
 import AppKit
-import TransSubKit
+import SubMinKit
 
 @MainActor
 enum DictationProbe {

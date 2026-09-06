@@ -149,7 +149,7 @@ export async function nativeGetModels(url, timeoutMs = 5000) {
 }
 
 // Shared local UI prefs (theme + reskin) on the helper — same on-disk home
-// as notes (~/.localtranssub/ui-prefs.json). Null when helper unreachable.
+// as notes (~/.yraveragesubmin/ui-prefs.json). Null when helper unreachable.
 export async function nativeGetUiPrefs(url, timeoutMs = 1500) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);

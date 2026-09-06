@@ -4,7 +4,7 @@
 //   swift run spike-capture              → list capturable apps
 //   swift run spike-capture <name> [sec] → capture that app's audio, report levels
 import Foundation
-import TransSubKit
+import SubMinKit
 
 // Unbuffered: this tool is always piped/redirected, and buffered output is
 // lost if the probe is interrupted.

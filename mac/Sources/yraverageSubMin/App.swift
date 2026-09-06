@@ -3,7 +3,7 @@
 import AppKit
 import Combine
 import SwiftUI
-import TransSubKit
+import SubMinKit
 
 @main
 struct LocalTransSubApp: App {

@@ -1,7 +1,7 @@
 // Live subtitle session: capture → transcribe → translate → overlay.
 import AppKit
 import Foundation
-import TransSubKit
+import SubMinKit
 
 @MainActor
 final class SubtitleSession: ObservableObject {

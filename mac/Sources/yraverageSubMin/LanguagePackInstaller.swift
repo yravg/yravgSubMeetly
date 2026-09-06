@@ -14,7 +14,7 @@ import AppKit
 import SwiftUI
 import Translation
 import _Translation_SwiftUI
-import TransSubKit
+import SubMinKit
 
 @MainActor
 final class LanguagePackInstaller: ObservableObject {

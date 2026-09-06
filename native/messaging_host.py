@@ -22,7 +22,7 @@ LAB_PORT = int(os.environ.get("LAB_PORT", "8799"))
 BASE = f"http://{HOST}:{PORT}"
 LAB_URL = f"http://127.0.0.1:{LAB_PORT}/lab.html"
 LOG = ROOT / ".native-server.log"
-HOST_NAME = "com.localtranssub.helper"
+HOST_NAME = "com.yraveragesubmin.helper"
 # Dinaikkan bila bentuk pesan berubah; ekstensi memakainya untuk mendeteksi
 # host lama yang belum mengenal aksi baru.
 HOST_PROTOCOL = 1

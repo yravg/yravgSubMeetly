@@ -5,8 +5,8 @@ let dirHandle = null;
 export async function loadExportDir() {
   try {
     const db = await openDb();
-    const tx = db.transaction('handles', 'readonly');
-    const req = tx.objectStore('handles').get('exportDir');
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get('exportDir');
     const handle = await reqToPromise(req);
     if (handle && (await verifyPermission(handle))) {
       dirHandle = handle;
@@ -23,8 +23,8 @@ export async function pickExportDir() {
   dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
   await verifyPermission(dirHandle, true);
   const db = await openDb();
-  const tx = db.transaction('handles', 'readwrite');
-  tx.objectStore('handles').put(dirHandle, 'exportDir');
+  const tx = db.transaction(STORE, 'readwrite');
+  tx.objectStore(STORE).put(dirHandle, 'exportDir');
   return dirHandle.name;
 }
 
@@ -32,8 +32,8 @@ export async function clearExportDir() {
   dirHandle = null;
   try {
     const db = await openDb();
-    const tx = db.transaction('handles', 'readwrite');
-    tx.objectStore('handles').delete('exportDir');
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete('exportDir');
   } catch {}
 }
 
@@ -54,13 +54,63 @@ export async function saveExportFile(filename, content) {
   return { saved: false, path: filename };
 }
 
-function openDb() {
+const DB_NAME = 'yraverage-submin';
+const LEGACY_DB_NAME = 'local-transsub';
+const STORE = 'handles';
+let migrated = false;
+
+function openNamed(name) {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('local-transsub', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('handles');
+    const req = indexedDB.open(name, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+}
+
+/**
+ * Pindahkan handle direktori ekspor dari basis data bernama lama.
+ *
+ * Isinya satu hal, tapi hal yang tidak bisa dibuat ulang oleh kode: izin
+ * folder yang dipilih pengguna lewat File System Access. Tanpa migrasi,
+ * mengganti nama basis data berarti diam-diam meminta pengguna memilih
+ * folder ekspornya lagi.
+ */
+async function migrateLegacyDb(db) {
+  if (migrated) return;
+  migrated = true;
+  try {
+    const count = await reqToPromise(db.transaction(STORE, 'readonly').objectStore(STORE).count());
+    if (count > 0) return;
+    // Jangan sampai malah MEMBUAT basis data lama kalau memang tidak ada.
+    // Di browser tanpa indexedDB.databases() pemeriksaan ini dilewati; basis
+    // data kosong yang telanjur terbuat langsung dihapus lagi di bawah.
+    if (typeof indexedDB.databases === 'function') {
+      const list = await indexedDB.databases().catch(() => []);
+      if (!list.some((d) => d.name === LEGACY_DB_NAME)) return;
+    }
+    const legacy = await openNamed(LEGACY_DB_NAME);
+    const handle = await reqToPromise(
+      legacy.transaction(STORE, 'readonly').objectStore(STORE).get('exportDir'),
+    );
+    if (handle) {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(handle, 'exportDir');
+      await new Promise((res) => { tx.oncomplete = res; tx.onerror = res; });
+    }
+    legacy.close();
+    indexedDB.deleteDatabase(LEGACY_DB_NAME);
+  } catch {
+    /* migrasi bersifat usaha terbaik — kegagalannya tidak boleh memblokir ekspor */
+  }
+}
+
+async function openDb() {
+  const db = await openNamed(DB_NAME);
+  await migrateLegacyDb(db);
+  return db;
 }
 
 function reqToPromise(req) {

@@ -21,7 +21,7 @@ import {
 test('galat Chrome dipetakan ke keadaan yang perbaikannya berbeda', () => {
   const cases = {
     'Specified native messaging host not found.': 'not-installed',
-    'Native messaging host com.localtranssub.helper is not registered.': 'not-installed',
+    'Native messaging host com.yraveragesubmin.helper is not registered.': 'not-installed',
     'Access to the specified native messaging host is forbidden.': 'forbidden',
     'Native host has exited.': 'crashed',
     'Failed to start native messaging host.': 'crashed',
@@ -82,7 +82,7 @@ test('nativeHostConnection: host sehat → connected + info host', async () => {
   const seen = [];
   fakeConnectNative((m) => {
     seen.push(m);
-    return { ok: true, connected: true, host: { host: 'com.localtranssub.helper', protocol: 1 }, helper_port_open: true };
+    return { ok: true, connected: true, host: { host: 'com.yraveragesubmin.helper', protocol: 1 }, helper_port_open: true };
   });
   const { nativeHostConnection } = await import('../src/lib/native-host.js');
   const r = await nativeHostConnection();
@@ -156,7 +156,7 @@ test('host Python menjawab ping dengan identitas dirinya', () => {
   const [ping] = talkToHost([{ action: 'ping' }]);
   assert.equal(ping.ok, true);
   assert.equal(ping.connected, true);
-  assert.equal(ping.host.host, 'com.localtranssub.helper');
+  assert.equal(ping.host.host, 'com.yraveragesubmin.helper');
   assert.equal(typeof ping.host.protocol, 'number');
   assert.equal(typeof ping.host.python, 'string');
   assert.equal(typeof ping.helper_port_open, 'boolean');
@@ -171,7 +171,7 @@ test('ping tidak menunggu helper, dan status tetap membawa health', () => {
   assert.equal(typeof status.running, 'boolean');
   assert.ok('health' in status);
   assert.equal(status.connected, true);
-  assert.equal(status.host.host, 'com.localtranssub.helper');
+  assert.equal(status.host.host, 'com.yraveragesubmin.helper');
 });
 
 test('aksi tak dikenal ditolak jelas, dan ping terdaftar di kontrak', () => {

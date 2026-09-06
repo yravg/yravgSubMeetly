@@ -3,7 +3,7 @@
 // through the speakers, and writes the result to /tmp/transsub-selftest.txt.
 import AppKit
 import Foundation
-import TransSubKit
+import SubMinKit
 
 enum SelfTest {
     static let reportPath = URL(fileURLWithPath: "/tmp/transsub-selftest.txt")

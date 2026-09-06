@@ -219,7 +219,7 @@ export const STUB_FEATURES = [
     id: 'helper-http',
     name: 'HTTP lokal + Native Messaging',
     group: 'Native Helper',
-    summary: 'Server 127.0.0.1:17865 dan host com.localtranssub.helper.',
+    summary: 'Server 127.0.0.1:17865 dan host com.yraveragesubmin.helper.',
     surface: 'native/server.py · native/messaging_host.py',
     status: 'unverified',
     evidence: { kind: 'lab', label: 'GET /health dari lab.html', href: 'lab.html' },

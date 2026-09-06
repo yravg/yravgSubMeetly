@@ -323,7 +323,7 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
     if (captureType === 'media') {
       // Lab / browser-tab harness: MediaStream already acquired via
       // getDisplayMedia or <audio|video>.captureStream() (same page as offscreen).
-      const stream = globalThis.__ltsCaptureStream;
+      const stream = globalThis.__ysmCaptureStream;
       if (!stream || typeof stream.getAudioTracks !== 'function') {
         throw new Error('No lab capture stream — Start demo audio or Pick (share tab audio).');
       }

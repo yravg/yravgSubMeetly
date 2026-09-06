@@ -2,7 +2,7 @@
 // actually be moved and resized, by inspecting its style and by performing
 // real frame changes and reading the result back.
 import AppKit
-import TransSubKit
+import SubMinKit
 
 @MainActor
 enum OverlayProbe {

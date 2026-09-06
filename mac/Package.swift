@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "LocalTransSub",
+    name: "yraverageSubMin",
     platforms: [.macOS("26.0")],
     targets: [
         // Capture / audio / translation core, shared by the app and the spikes.
-        .target(name: "TransSubKit"),
+        .target(name: "SubMinKit"),
         // Throwaway probe: verifies ScreenCaptureKit per-app audio capture.
-        .executableTarget(name: "LocalTransSub", dependencies: ["TransSubKit"]),
-        .executableTarget(name: "spike-capture", dependencies: ["TransSubKit"]),
-        .executableTarget(name: "spike-engine", dependencies: ["TransSubKit"]),
+        .executableTarget(name: "yraverageSubMin", dependencies: ["SubMinKit"]),
+        .executableTarget(name: "spike-capture", dependencies: ["SubMinKit"]),
+        .executableTarget(name: "spike-engine", dependencies: ["SubMinKit"]),
     ]
 )

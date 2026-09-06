@@ -14,7 +14,7 @@
 
 export const HELPER_PORT = 17865;
 export const HELPER_URL = `http://127.0.0.1:${HELPER_PORT}`;
-export const HOST_NAME = 'com.localtranssub.helper';
+export const HOST_NAME = 'com.yraveragesubmin.helper';
 
 /** @typedef {'macos' | 'windows' | 'linux'} GuideOS */
 export const GUIDE_OS_ORDER = /** @type {GuideOS[]} */ (['windows', 'linux', 'macos']);
@@ -188,8 +188,8 @@ export const INSTALL_GUIDES = {
       { text: { en: 'Verify the helper answers', id: 'Pastikan helper menjawab' }, cmd: `curl.exe -sf ${HELPER_URL}/health` },
       { text: { en: 'Reload the extension, then Settings → Engine → Native helper → Refresh', id: 'Muat ulang ekstensi, lalu Pengaturan → Mesin → Native helper → Refresh' } },
     ],
-    hostManifest: '%LOCALAPPDATA%\\Google\\Chrome\\User Data\\NativeMessagingHosts\\com.localtranssub.helper.json',
-    hostRegistry: 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.localtranssub.helper',
+    hostManifest: '%LOCALAPPDATA%\\Google\\Chrome\\User Data\\NativeMessagingHosts\\com.yraveragesubmin.helper.json',
+    hostRegistry: 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.yraveragesubmin.helper',
   },
   linux: {
     prereqs: {
@@ -202,8 +202,8 @@ export const INSTALL_GUIDES = {
       { text: { en: 'Verify the helper answers', id: 'Pastikan helper menjawab' }, cmd: `curl -sf ${HELPER_URL}/health` },
       { text: { en: 'Reload the extension, then Settings → Engine → Native helper → Refresh', id: 'Muat ulang ekstensi, lalu Pengaturan → Mesin → Native helper → Refresh' } },
     ],
-    hostManifest: '~/.config/google-chrome/NativeMessagingHosts/com.localtranssub.helper.json',
-    hostManifestChromium: '~/.config/chromium/NativeMessagingHosts/com.localtranssub.helper.json',
+    hostManifest: '~/.config/google-chrome/NativeMessagingHosts/com.yraveragesubmin.helper.json',
+    hostManifestChromium: '~/.config/chromium/NativeMessagingHosts/com.yraveragesubmin.helper.json',
   },
   macos: {
     prereqs: {
@@ -217,7 +217,7 @@ export const INSTALL_GUIDES = {
       { text: { en: 'Verify the helper answers', id: 'Pastikan helper menjawab' }, cmd: `curl -sf ${HELPER_URL}/health` },
       { text: { en: 'Settings → Engine → Native helper → Start / Refresh', id: 'Pengaturan → Mesin → Native helper → Start / Refresh' } },
     ],
-    hostManifest: '~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.localtranssub.helper.json',
+    hostManifest: '~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.yraveragesubmin.helper.json',
   },
 };
 

@@ -3,7 +3,7 @@ import AppKit
 import ApplicationServices
 import ServiceManagement
 import SwiftUI
-import TransSubKit
+import SubMinKit
 
 struct SettingsView: View {
     @ObservedObject var app: AppController

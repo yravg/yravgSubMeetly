@@ -19,7 +19,7 @@
 import { nativeHealth, nativeTranslate } from './lib/native.js';
 import { pickText } from './lib/notes-schema.js';
 
-const LS_LAYOUT = 'ltsMinutesLayout';
+const LS_LAYOUT = 'ysmMinutesLayout';
 const NATIVE_URL = 'http://127.0.0.1:17865';
 
 /** Target languages the on-device MT tier can produce. */
@@ -487,7 +487,7 @@ export function mountDock(h) {
   /* ---------------- translate ---------------- */
   $('#lang-pop').addEventListener('click', (e) => {
     const row = e.target.closest('[data-tgt]');
-    if (row) { h.state().tgt = row.dataset.tgt; try { localStorage.setItem('ltsMinutesTgt', row.dataset.tgt); } catch { /* quota */ } paintLang(); h.paint(); return; }
+    if (row) { h.state().tgt = row.dataset.tgt; try { localStorage.setItem('ysmMinutesTgt', row.dataset.tgt); } catch { /* quota */ } paintLang(); h.paint(); return; }
     if (e.target.closest('#btn-translate')) translateInto(h.state().tgt);
   });
   const translatedCount = (m, tgt) => (m ? m.items.filter((it) => it.text && it.text[tgt]).length : 0);

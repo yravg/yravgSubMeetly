@@ -2,7 +2,7 @@
 // the state is visible without starting a session first.
 import AppKit
 import Foundation
-import TransSubKit
+import SubMinKit
 
 struct PairStatus: Identifiable, Sendable {
     let id: String

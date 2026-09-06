@@ -226,7 +226,7 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **280/280 lulus** (2026-09-07), termasuk `dock-motion` 11 yang baru. Ini run penuh pertama
+- `npm test` → **288/288 lulus** (2026-09-07), termasuk `rename-migration` 8 yang baru. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
 - (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
@@ -247,6 +247,24 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
   jalankan E2E native dengan `--headed` + DevTools performance trace pada halaman panel, atau tambahkan
   `PerformanceObserver('longtask')` ke panel saat `?e2e=1`. Sampai itu, REL-03 = residual `accepted`.
 - `npm run build` → bersih. Sapuan seluruh halaman lab: tanpa galat JS, tanpa overflow horizontal.
+
+## Rename ke yraverageSubMin (2026-09-07)
+
+Dua tahap. **Tahap 1** hanya nama tampilan (`89f83fc`). **Tahap 2** pengenal internal,
+masing-masing dengan migrasi — inilah bagian yang perlu diingat:
+
+| Pengenal | Lama → baru | Migrasi |
+| --- | --- | --- |
+| Kunci localStorage | `lts*` → `ysm*` | `src/lib/legacy-keys.js`, dipanggil di awal `minutes.js` **sebelum** konstanta membacanya. Nilai baru selalu menang; kunci lama dibuang. |
+| Direktori state helper | `~/.localtranssub` → `~/.yraveragesubmin` | `_migrate_state_dir()` di `native/server.py`, jalan saat impor sebelum dependensi berat. `rename()`, mundur ke salin per berkas kalau beda volume. **Berisi notulen pengguna.** |
+| Basis data IndexedDB | `local-transsub` → `yraverage-submin` | `migrateLegacyDb()` di `src/lib/export.js`; memindahkan handle direktori ekspor (izin folder yang tak bisa dibuat ulang kode). Memakai `indexedDB.databases()` supaya tidak malah membuat DB lama. |
+| Host Native Messaging | `com.localtranssub.helper` → `com.yraveragesubmin.helper` | `src/lib/native-host.js` mencoba nama baru lalu mundur ke `LEGACY_NATIVE_HOST_NAME` **hanya** saat galatnya `not-installed`. `forbidden`/`crashed`/`timeout` dilempar apa adanya — mencoba nama lain di situ cuma menutupi galat sebenarnya. Installer membuang manifest lama setelah menulis yang baru. |
+| Bundle id macOS | `com.localtranssub.app` → `com.yraveragesubmin.app` | **Tidak ada migrasi yang mungkin.** macOS menganggapnya aplikasi baru: izin mikrofon dan perekaman layar harus diberikan ulang. |
+| Target Swift | `LocalTransSub`/`TransSubKit` → `yraverageSubMin`/`SubMinKit` | Direktori sumber ikut di-`git mv`; `swift build` bersih. |
+
+`src/lib/native-host.js` adalah **satu-satunya** tempat `com.localtranssub` masih boleh muncul.
+Dijaga `test/rename-migration.test.mjs` (8 tes), termasuk tes yang gagal kalau ada kunci
+`lts*` baru diperkenalkan tanpa masuk peta migrasi.
 
 ## Catatan yang perlu diketahui
 

@@ -59,7 +59,7 @@ Manifest host ditulis untuk setiap browser yang terpasang:
 
 | Browser | Lokasi manifest |
 | --- | --- |
-| Chrome | `~/.config/google-chrome/NativeMessagingHosts/com.localtranssub.helper.json` |
+| Chrome | `~/.config/google-chrome/NativeMessagingHosts/com.yraveragesubmin.helper.json` |
 | Chromium | `~/.config/chromium/NativeMessagingHosts/…` |
 | Microsoft Edge | `~/.config/microsoft-edge/NativeMessagingHosts/…` |
 | Chrome (Flatpak) | `~/.var/app/com.google.Chrome/config/google-chrome/NativeMessagingHosts/…` |
@@ -99,12 +99,12 @@ faster-whisper. `run.bat` memakai `py -3` bila ada (stub Microsoft Store bernama
    berkas `.py` sebagai Native Messaging host, jadi manifest harus menunjuk ke
    berkas yang bisa dieksekusi. Pembungkus itu memanggil Python (`py -3`, atau
    `python` bila peluncur `py` tidak ada).
-2. **Menulis manifest** ke `%LOCALAPPDATA%\yraverageSubMin\com.localtranssub.helper.json`.
+2. **Menulis manifest** ke `%LOCALAPPDATA%\yraverageSubMin\com.yraveragesubmin.helper.json`.
 3. **Mendaftarkan kunci registry** — tanpa ini browser tidak menemukan host:
 
-   - `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.localtranssub.helper`
-   - `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.localtranssub.helper`
-   - `HKCU\Software\Chromium\NativeMessagingHosts\com.localtranssub.helper`
+   - `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.yraveragesubmin.helper`
+   - `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.yraveragesubmin.helper`
+   - `HKCU\Software\Chromium\NativeMessagingHosts\com.yraveragesubmin.helper`
 
 Mencabut: `uninstall-host.bat`.
 

@@ -7,7 +7,7 @@ import AppKit
 import AVFoundation
 import Carbon.HIToolbox
 import Foundation
-import TransSubKit
+import SubMinKit
 
 @MainActor
 final class DictationController: ObservableObject {

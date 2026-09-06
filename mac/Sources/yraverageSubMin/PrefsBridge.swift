@@ -1,7 +1,7 @@
 // Observable wrapper so SwiftUI can bind directly to Prefs.
 import Combine
 import SwiftUI
-import TransSubKit
+import SubMinKit
 
 @MainActor
 final class PrefsBridge: ObservableObject {

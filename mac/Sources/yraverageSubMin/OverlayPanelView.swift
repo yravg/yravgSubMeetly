@@ -3,7 +3,7 @@
 // timestamps and per-line selection, and a status footer.
 import AppKit
 import SwiftUI
-import TransSubKit
+import SubMinKit
 
 /// What a "Force translate" run should cover.
 enum ForceScope: Hashable {

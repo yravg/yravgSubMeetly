@@ -20,7 +20,7 @@ chmod +x "$HOST_PY"
 
 MANIFEST=$(cat <<EOF
 {
-  "name": "com.localtranssub.helper",
+  "name": "com.yraveragesubmin.helper",
   "description": "yraverageSubMin native helper launcher",
   "path": "$HOST_PY",
   "type": "stdio",
@@ -35,8 +35,15 @@ install_one() {
   local dir="$1"
   local name="$2"
   mkdir -p "$dir"
-  echo "$MANIFEST" > "$dir/com.localtranssub.helper.json"
-  echo "✓ Installed for $name → $dir/com.localtranssub.helper.json"
+  echo "$MANIFEST" > "$dir/com.yraveragesubmin.helper.json"
+  echo "✓ Installed for $name → $dir/com.yraveragesubmin.helper.json"
+  # Manifest dari nama lama dibuang setelah yang baru ditulis. Kalau ditinggal,
+  # ekstensi bisa terus memakai host lama lewat fallback-nya dan pemasangan ini
+  # tidak pernah benar-benar terpakai.
+  if [ -f "$dir/com.localtranssub.helper.json" ]; then
+    rm -f "$dir/com.localtranssub.helper.json"
+    echo "  · manifest lama com.localtranssub.helper.json dibuang"
+  fi
 }
 
 case "$(uname -s)" in

@@ -6,7 +6,7 @@
 cd "$(dirname "$0")"
 
 APP_NAME="yraverageSubMin"
-BUNDLE_ID="com.localtranssub.app"
+BUNDLE_ID="com.yraveragesubmin.app"
 CERT_NAME="${CERT_NAME:-yraverageSubMin Dev}"
 APP="build/$APP_NAME.app"
 

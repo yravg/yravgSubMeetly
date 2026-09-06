@@ -6,7 +6,7 @@
 // property wrapper and works fine.
 import AppKit
 import Foundation
-import TransSubKit
+import SubMinKit
 
 @MainActor
 final class UIState: ObservableObject {

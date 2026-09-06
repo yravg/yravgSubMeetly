@@ -31,7 +31,7 @@ Centang berurutan. Setiap baris menunjuk ke perintah atau berkas yang menjadi bu
 
 - [ ] `cd mac && ./make-signing-cert.sh` pernah dijalankan di mesin build (sekali).
 - [ ] `./build-app.sh` sukses **dan** verifikasinya lulus (identifier
-      `com.localtranssub.app`, ikon, `certificate leaf`).
+      `com.yraveragesubmin.app`, ikon, `certificate leaf`).
 - [ ] `./doctor.sh` semua ✓; buka aplikasi sekali agar laporan izin terisi, lalu
       `./doctor.sh` lagi.
 - [ ] Uji manual: Capture audio sistem → subtitel tampil tanpa mencuri fokus keyboard;

@@ -19,7 +19,7 @@ export const OS_GUIDES = {
     engine: 'mlx-whisper (Apple Silicon) / faster-whisper',
     steps: [
       'Jalankan ./scripts/ensure-native.sh atau native/run.sh',
-      'Pastikan Native Messaging Host com.localtranssub.helper terpasang',
+      'Pastikan Native Messaging Host com.yraveragesubmin.helper terpasang',
       'Side Panel → Settings → Engine → Native helper',
     ],
   },

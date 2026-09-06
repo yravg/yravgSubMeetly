@@ -91,7 +91,7 @@ open build/yraverageSubMin.app
 Kenapa sertifikat itu wajib: tanda tangan ad-hoc berubah tiap build, dan macOS
 menyimpan izin Screen Recording / Accessibility / Input Monitoring per identitas —
 setiap rebuild diam-diam mencabut semua izin. `build-app.sh` menolak membangun tanpa
-sertifikat, dan **memverifikasi** hasilnya (identifier `com.localtranssub.app`, ikon
+sertifikat, dan **memverifikasi** hasilnya (identifier `com.yraveragesubmin.app`, ikon
 ada, requirement mengandung `certificate leaf`) sebelum menukar bundel.
 
 Tanpa Xcode penuh: macro `@State` tidak tersedia dengan Command Line Tools, jadi

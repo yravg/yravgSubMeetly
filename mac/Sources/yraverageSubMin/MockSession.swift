@@ -1,6 +1,6 @@
 // Mock session/preferences state for UI development & screenshots (Fase 3).
 import Foundation
-import TransSubKit
+import SubMinKit
 
 enum MockSession {
     static let sampleCues: [SubtitleLine] = [

@@ -5,7 +5,7 @@
 import AVFoundation
 import Foundation
 import Speech
-import TransSubKit
+import SubMinKit
 
 setvbuf(stdout, nil, _IONBF, 0)
 

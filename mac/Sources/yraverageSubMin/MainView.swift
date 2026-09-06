@@ -1,7 +1,7 @@
 // Main window: live subtitles control + file transcription.
 import AppKit
 import SwiftUI
-import TransSubKit
+import SubMinKit
 
 struct MainView: View {
     @ObservedObject var app: AppController

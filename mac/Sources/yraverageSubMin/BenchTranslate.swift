@@ -4,7 +4,7 @@
 import AppKit
 import Foundation
 import Translation
-import TransSubKit
+import SubMinKit
 
 @available(macOS 26.0, *)
 enum BenchTranslate {

@@ -18,7 +18,7 @@ CONFIG="${CONFIG:-release}"
 APP_NAME="yraverageSubMin"
 # Bundle id deliberately stable: macOS ties Screen Recording / Accessibility /
 # Input Monitoring grants to it. Changing it forces the user to re-grant.
-BUNDLE_ID="com.localtranssub.app"
+BUNDLE_ID="com.yraveragesubmin.app"
 CERT_NAME="${CERT_NAME:-yraverageSubMin Dev}"
 VERSION="1.0.0"
 OUT="${OUT:-build}"
@@ -34,8 +34,8 @@ if pgrep -f "$APP_NAME.app/Contents/MacOS/" >/dev/null 2>&1; then
 fi
 
 echo "▸ compiling ($CONFIG)…"
-swift build -c "$CONFIG" --product LocalTransSub
-BIN="$(swift build -c "$CONFIG" --product LocalTransSub --show-bin-path)/LocalTransSub"
+swift build -c "$CONFIG" --product yraverageSubMin
+BIN="$(swift build -c "$CONFIG" --product yraverageSubMin --show-bin-path)/yraverageSubMin"
 [ -x "$BIN" ] || die "compiled binary not found at $BIN"
 
 # --- 2. assemble into staging ----------------------------------------------
@@ -43,7 +43,7 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 SAPP="$STAGE/$APP_NAME.app"
 mkdir -p "$SAPP/Contents/MacOS" "$SAPP/Contents/Resources"
-cp "$BIN" "$SAPP/Contents/MacOS/LocalTransSub"
+cp "$BIN" "$SAPP/Contents/MacOS/yraverageSubMin"
 
 cat > "$SAPP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -56,7 +56,7 @@ cat > "$SAPP/Contents/Info.plist" <<PLIST
     <key>CFBundleVersion</key><string>$VERSION</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleExecutable</key><string>LocalTransSub</string>
+    <key>CFBundleExecutable</key><string>yraverageSubMin</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <!-- Normal Dock app. "Hide Dock icon" in Settings switches the activation

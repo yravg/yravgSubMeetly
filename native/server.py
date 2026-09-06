@@ -48,6 +48,41 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+# ---------------------------------------------------------------------------
+# Direktori state helper.
+#
+# Namanya ikut berganti bersama produk, tapi isinya bukan cache: di sinilah
+# notulen rapat pengguna tersimpan (notes.json), bersama pilihan perangkat,
+# mode mesin, dan preferensi tampilan. Karena itu direktori lama DIPINDAHKAN,
+# bukan ditinggalkan — mengganti nama tanpa ini membuat pengguna membuka
+# aplikasi dan mendapati catatannya hilang.
+STATE_DIR = Path(os.environ.get("YSM_STATE_DIR", Path.home() / ".yraveragesubmin"))
+LEGACY_STATE_DIR = Path.home() / ".localtranssub"
+
+
+def _migrate_state_dir() -> None:
+    """Pindahkan direktori state lama sekali, kalau yang baru belum ada."""
+    try:
+        if STATE_DIR.exists() or not LEGACY_STATE_DIR.is_dir():
+            return
+        STATE_DIR.parent.mkdir(parents=True, exist_ok=True)
+        LEGACY_STATE_DIR.rename(STATE_DIR)
+    except OSError:
+        # Beda volume atau izin kurang: salin berkasnya satu per satu dan
+        # biarkan yang lama utuh, supaya tidak ada yang hilang di tengah jalan.
+        try:
+            STATE_DIR.mkdir(parents=True, exist_ok=True)
+            for item in LEGACY_STATE_DIR.iterdir():
+                target = STATE_DIR / item.name
+                if item.is_file() and not target.exists():
+                    shutil.copy2(item, target)
+        except OSError:
+            pass
+
+
+_migrate_state_dir()
+
+
 # Prefer resumable classic HTTP downloads over the flaky Xet/CAS backend.
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
@@ -162,7 +197,7 @@ if ENGINE is None:
         # Dibaca inline karena helper persistensi didefinisikan setelah blok ini.
         _pref = "auto"
         try:
-            _pp = Path(os.environ.get("DEVICE_PREF_PATH", Path.home() / ".localtranssub" / "device.json"))
+            _pp = Path(os.environ.get("DEVICE_PREF_PATH", STATE_DIR / "device.json"))
             if _pp.is_file():
                 _pv = json.loads(_pp.read_text(encoding="utf-8")).get("device")
                 if _pv in ("auto", "cpu", "cuda"):
@@ -621,7 +656,7 @@ def draft_pipeline(audio: np.ndarray, language, src: str, tgt: str):
 
 # ---------------------------------------------------------------------------
 # Notes store + large-file jobs (Fase 2)
-NOTES_PATH = Path(os.environ.get("NOTES_PATH", Path.home() / ".localtranssub" / "notes.json"))
+NOTES_PATH = Path(os.environ.get("NOTES_PATH", STATE_DIR / "notes.json"))
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 
@@ -775,7 +810,7 @@ def _target_status() -> list:
 #   fast     = draft model kecil + beam 1 (bawaan = perilaku lama, tak berubah)
 #   balanced = beam 3 (faster-whisper) / draft model (mlx)
 #   accurate = model penuh untuk draf + beam 5 (faster-whisper)
-ENGINE_MODE_PATH = Path(os.environ.get("ENGINE_MODE_PATH", Path.home() / ".localtranssub" / "engine-mode.json"))
+ENGINE_MODE_PATH = Path(os.environ.get("ENGINE_MODE_PATH", STATE_DIR / "engine-mode.json"))
 ENGINE_MODES = ("fast", "balanced", "accurate")
 
 
@@ -804,7 +839,7 @@ def _save_engine_mode(mode: str) -> str:
 # Model dimuat sekali saat start, jadi pergantian device tidak bisa berlaku
 # seketika: pilihan disimpan lalu helper perlu di-restart. Ekstensi memang
 # sudah menyediakan tombol restart, dan responsnya menandai restart_required.
-DEVICE_PREF_PATH = Path(os.environ.get("DEVICE_PREF_PATH", Path.home() / ".localtranssub" / "device.json"))
+DEVICE_PREF_PATH = Path(os.environ.get("DEVICE_PREF_PATH", STATE_DIR / "device.json"))
 DEVICE_CHOICES = ("auto", "cpu", "cuda")
 
 
@@ -976,7 +1011,7 @@ def _normalize_note_doc(raw) -> tuple[dict | None, str | None]:
 # so the extension, the helper, and the mac app converge on one file without
 # any account, telemetry, or cloud. Extension chrome.storage stays the live
 # source of truth; this file is the shared mirror (last writer wins).
-UI_PREFS_PATH = Path(os.environ.get("UI_PREFS_PATH", Path.home() / ".localtranssub" / "ui-prefs.json"))
+UI_PREFS_PATH = Path(os.environ.get("UI_PREFS_PATH", STATE_DIR / "ui-prefs.json"))
 UI_PREFS_THEMES = {"auto", "light", "dark"}
 UI_PREFS_RESKINS = {"yraverage", "coretax", "modern"}
 UI_PREFS_DEFAULTS = {"theme": "auto", "reskin": "yraverage"}

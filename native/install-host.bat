@@ -47,14 +47,15 @@ set "WRAPPER=%HOST_DIR%messaging_host.bat"
 REM --- manifest ------------------------------------------------------------
 set "MANIFEST_DIR=%LOCALAPPDATA%\yraverageSubMin"
 if not exist "%MANIFEST_DIR%" mkdir "%MANIFEST_DIR%"
-set "MANIFEST=%MANIFEST_DIR%\com.localtranssub.helper.json"
+set "MANIFEST=%MANIFEST_DIR%\com.yraveragesubmin.helper.json"
+del /q "%MANIFEST_DIR%\com.localtranssub.helper.json" >nul 2>&1
 
 REM JSON needs backslashes escaped.
 set "WRAPPER_JSON=%WRAPPER:\=\\%"
 
 > "%MANIFEST%" (
   echo {
-  echo   "name": "com.localtranssub.helper",
+  echo   "name": "com.yraveragesubmin.helper",
   echo   "description": "yraverageSubMin native helper launcher",
   echo   "path": "%WRAPPER_JSON%",
   echo   "type": "stdio",
@@ -77,7 +78,9 @@ endlocal
 exit /b 0
 
 :register
-reg add "%~1\com.localtranssub.helper" /ve /t REG_SZ /d "%MANIFEST%" /f >nul 2>&1
+reg add "%~1\com.yraveragesubmin.helper" /ve /t REG_SZ /d "%MANIFEST%" /f >nul 2>&1
+rem Sisa pendaftaran dari nama lama dibuang supaya tidak ada dua host.
+reg delete "%~1\com.localtranssub.helper" /f >nul 2>&1
 if errorlevel 1 (
   echo   - %~2: skipped
 ) else (

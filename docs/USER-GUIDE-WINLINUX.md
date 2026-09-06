@@ -64,8 +64,8 @@ Skrip ini melakukan tiga hal yang khusus Windows:
 
 1. Membuat pembungkus `messaging_host.bat` — Chrome tidak bisa menjalankan
    berkas `.py` langsung sebagai host.
-2. Menulis manifest ke `%LOCALAPPDATA%\yraverageSubMin\com.localtranssub.helper.json`.
-3. Mendaftarkan kunci registry `HKCU\Software\…\NativeMessagingHosts\com.localtranssub.helper`
+2. Menulis manifest ke `%LOCALAPPDATA%\yraverageSubMin\com.yraveragesubmin.helper.json`.
+3. Mendaftarkan kunci registry `HKCU\Software\…\NativeMessagingHosts\com.yraveragesubmin.helper`
    untuk Chrome, Edge, dan Chromium — tanpa ini browser tidak menemukan host.
 
 Mencabut: `uninstall-host.bat`.
@@ -109,7 +109,7 @@ Manifest ditulis untuk setiap browser yang ditemukan:
 
 | Browser | Lokasi manifest |
 | --- | --- |
-| Chrome | `~/.config/google-chrome/NativeMessagingHosts/com.localtranssub.helper.json` |
+| Chrome | `~/.config/google-chrome/NativeMessagingHosts/com.yraveragesubmin.helper.json` |
 | Chromium | `~/.config/chromium/NativeMessagingHosts/…` |
 | Microsoft Edge | `~/.config/microsoft-edge/NativeMessagingHosts/…` |
 | Chrome / Chromium / Edge (Flatpak) | `~/.var/app/<app-id>/config/…/NativeMessagingHosts/…` |

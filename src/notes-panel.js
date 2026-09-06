@@ -513,7 +513,7 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
     notice = msg;
     // Cerminkan ke toast global bila ada (tab Notes mungkin tidak terlihat).
     try {
-      window.__ltsToast?.(msg, 'error');
+      window.__ysmToast?.(msg, 'error');
     } catch {
       /* toast opsional — pill status tetap sumber utama */
     }
@@ -601,7 +601,7 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
     meetings = await listMeetings();
     activeId = meeting.id;
     try {
-      window.__ltsToast?.(T('flaggedAt', tc), 'ok');
+      window.__ysmToast?.(T('flaggedAt', tc), 'ok');
     } catch {
       /* toast opsional */
     }
@@ -639,7 +639,7 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
             const note = await onPushShared?.(meeting, lang);
             if (note) {
               try {
-                window.__ltsToast?.(note.title || 'Synced', 'ok');
+                window.__ysmToast?.(note.title || 'Synced', 'ok');
               } catch {
                 /* toast opsional */
               }
@@ -680,7 +680,7 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
           summaryDraft = null;
           meetings = await listMeetings();
           try {
-            window.__ltsToast?.(T('msgSummarySaved'), 'ok');
+            window.__ysmToast?.(T('msgSummarySaved'), 'ok');
           } catch {
             /* toast opsional */
           }
@@ -720,7 +720,7 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
             return;
           }
           try {
-            window.__ltsToast?.(T('secDecisions'), 'ok');
+            window.__ysmToast?.(T('secDecisions'), 'ok');
           } catch {
             /* toast opsional */
           }

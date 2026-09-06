@@ -54,7 +54,7 @@ test('install guides: every OS has prereqs (en+id), steps with bilingual text, h
       assert.ok(s.text.en && s.text.id, `${os} step text bilingual`);
       if (s.cmd) assert.equal(typeof s.cmd, 'string');
     }
-    assert.match(g.hostManifest, /com\.localtranssub\.helper\.json$/);
+    assert.match(g.hostManifest, /com\.yraveragesubmin\.helper\.json$/);
     // the installer for this OS must be referenced verbatim
     const installer = { windows: 'install-host.bat', linux: 'install-host-linux.sh', macos: 'install-host.sh' }[os];
     assert.ok(g.steps.some((s) => s.cmd && s.cmd.includes(installer)), `${os} references ${installer}`);

@@ -1,10 +1,10 @@
 /**
  * Protokol JSON bridge ekstensi ↔ Native Helper (kontrak lokal).
- * Transport: Chrome Native Messaging (`com.localtranssub.helper`)
+ * Transport: Chrome Native Messaging (`com.yraveragesubmin.helper`)
  * atau HTTP loopback `http://127.0.0.1:17865`.
  */
 
-export const NATIVE_MESSAGING_HOST = 'com.localtranssub.helper';
+export const NATIVE_MESSAGING_HOST = 'com.yraveragesubmin.helper';
 export const LOCAL_HELPER_ORIGIN = 'http://127.0.0.1:17865';
 
 /** Pesan native messaging yang didukung host. */
