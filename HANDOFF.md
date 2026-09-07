@@ -2,16 +2,17 @@
 
 ## Identitas dan koordinasi
 
-- Diperbarui: 2026-09-05, Asia/Shanghai.
-- Plan: `908756ef-363c-43d5-8a2b-bb7f2037295b` — UI Interaktif & Rilis Menyeluruh.
-- Workspace: `08b7acf5-2182-429d-a223-5b94ea703f8b`.
-- Repo binding: `f8186cc1-132d-4316-8853-600a60adf935`, provider `local`.
-- Binding repo yang ada dipertahankan; jangan `connect` ulang atau pindah workspace.
+- Diperbarui: 2026-09-07.
+- Binding baru (existing-codebase, provider `github`): workspace `e27623f1-f5d3-4d1e-9772-d8b2fc228681`, repo `b5aa59e9-7c92-42b2-bf4b-fdb39fad947a` (`yraveragework/yraveragesub`), baseline plan `3af1040d-4f94-4890-b5dc-f5c9fbce29f0`.
+- Tautan CLI: https://www.ngodingpakeai.com/workspace/e27623f1-f5d3-4d1e-9772-d8b2fc228681?plan=3af1040d-4f94-4890-b5dc-f5c9fbce29f0
+- Binding lama `08b7acf5-2182-429d-a223-5b94ea703f8b` / `f8186cc1-132d-4316-8853-600a60adf935` (provider `local`) diganti; jangan `connect` ke workspace lama.
+- Klaim sesi: `released` (bind + sync selesai).
 
 ## Posisi sekarang
 
-**Plan NgodingPakeAI selesai** (semua task `done`), **gate rilis CLEAR**, dan final `sync`
-sudah dijalankan (234 ringkasan, wiki dibangun ulang).
+**Rebound ke workspace GitHub baru.** Final `sync` 2026-09-07: 282 summarized, 282 sections, 0 unchanged, 0 ignored; status `ready`. Wiki dan baseline plan sedang disusun server (jangan poll / jangan tulis PRD).
+
+**Plan implementasi lama selesai** (semua task `done`), **gate rilis CLEAR**. Catatan produk di bawah tetap berlaku.
 
 **Peringatan yang masih berlaku:** `dist/` pernah menjadi satu-satunya tempat fitur dock
 hidup. Sumbernya kini ada di `src/` (lihat butir 27), jadi `npm run build` aman. Kalau kelak
@@ -223,8 +224,11 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 
 ## Verifikasi
 
-- **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
-  `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
+- **Sync bind GitHub 2026-09-07** → `282 summarized, 282 sections, 0 unchanged, 0 ignored` (run
+  `2e9568df-2dd9-4331-a003-3db2f835396f`); status `ready`. Tautan CLI:
+  https://www.ngodingpakeai.com/workspace/e27623f1-f5d3-4d1e-9772-d8b2fc228681?plan=3af1040d-4f94-4890-b5dc-f5c9fbce29f0
+- **Sync final workspace lama 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
+  `aaeb8108-…`); siklus plan lama ditutup. Tautan lama:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
 - `npm test` → **294/294 lulus** (2026-09-07), termasuk `rename-migration` 8 dan `design-tokens` 6 yang baru. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
