@@ -341,6 +341,26 @@ Yang perlu diingat:
 - `docs/NOTES-V2-SPEC.md` sengaja tidak diubah: itu analisis bertanggal, bukan dokumentasi
   perilaku sekarang; jalur lama di sana adalah keadaan saat analisisnya ditulis.
 
+**Diverifikasi dengan mata (2026-09-12).** Aplikasi dijalankan dari binari debug dengan
+`YSM_STATE_DIR` menunjuk direktori contoh, lalu jendelanya dipotret `screencapture -l <windowid>`.
+Melihat rendernya menemukan tiga hal yang **tidak terlihat dari probe maupun tes**:
+
+1. **Wordmark masih "yraverage·Sub"** — pil di `Brand.swift` tertinggal saat rename, padahal
+   `accessibilityLabel`-nya sudah "yraverageSubMin". Kini "SubMin".
+2. **Baris filter meluber** di lebar jendela ±520 px: label "Tindak lanjut" membungkus jadi dua
+   baris. Kini `ScrollView(.horizontal)` dengan chip `lineLimit(1)` + `fixedSize`.
+3. **Nama pemilik tercetak dua kali** ("Alya Rahman · PMO · Selesai · Alya Rahman") karena
+   `src.speaker` sering orang yang sama dengan `owner`. Pembicara kini dilewati bila sama.
+
+Tab bukan state yang tersimpan, jadi panel Notes hanya bisa dicapai dengan mengklik. Ditambahkan
+flag `--tab live|file|notes` supaya tangkapan layar QA bisa dilakukan tanpa kontrol layar penuh.
+
+**Build bundel `.app` diblokir: tidak ada sertifikat penanda tangan** di keychain mesin ini
+(`security find-identity -v` → 0 identities). `build-app.sh` sengaja menolak build ad-hoc karena
+identitasnya berubah tiap rebuild sehingga macOS diam-diam mencabut Screen Recording. Perbaiki
+sekali dengan `cd mac && ./make-signing-cert.sh`. Untuk memeriksa UI notulen sertifikat tidak
+diperlukan — jalankan binari debug langsung.
+
 **Bundel `.app` di disk masih bernama lama.** `mac/build/yraverageSub.app` adalah artefak
 sebelum rename; sumbernya sudah `APP_NAME="yraverageSubMin"`. Jalankan `cd mac && ./build-app.sh`
 untuk menghasilkan bundel bernama baru (skrip itu mem-*pkill* instans yang sedang jalan).

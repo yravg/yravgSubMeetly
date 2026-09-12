@@ -57,7 +57,7 @@ extension Brand {
 }
 
 /// The wordmark, redrawn as text so it scales crisply: "yraverage" + a teal
-/// "Sub" tag, matching the logo's construction.
+/// "SubMin" tag, matching the logo's construction.
 struct Wordmark: View {
     var size: CGFloat = 17
     @Environment(\.colorScheme) private var scheme
@@ -67,7 +67,7 @@ struct Wordmark: View {
             Text("yraverage")
                 .font(.system(size: size, weight: .bold))
                 .foregroundStyle(scheme == .dark ? Color.white.opacity(0.92) : Brand.charcoal)
-            Text("Sub")
+            Text("SubMin")
                 .font(.system(size: size, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, size * 0.3)

@@ -72,6 +72,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        // Buka langsung pada satu tab. Tab bukan state yang tersimpan, jadi tanpa
+        // ini panel Notes hanya bisa dicapai dengan mengklik — yang membuat
+        // tangkapan layar QA mustahil tanpa kontrol layar penuh.
+        if let i = CommandLine.arguments.firstIndex(of: "--tab"),
+           i + 1 < CommandLine.arguments.count {
+            switch CommandLine.arguments[i + 1] {
+            case "live": controller.ui.tab = 0
+            case "file": controller.ui.tab = 1
+            case "notes": controller.ui.tab = 2
+            default: break
+            }
+        }
         // Register notulen bersama: cetak apa yang akan ditampilkan panelnya.
         // Sinkron (tidak butuh AppKit) supaya bisa dipanggil dari tes.
         if CommandLine.arguments.contains("--register-probe") {

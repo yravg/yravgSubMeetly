@@ -114,7 +114,9 @@ private struct RegisterRow: View {
         if let r = item.riskLabel { out.append(r) }
         if let m = item.metric { out.append(m.display) }
         if let c = item.carriedFrom, !c.isEmpty { out.append("bawaan \(c)") }
-        if let sp = item.speaker, !sp.isEmpty { out.append(sp) }
+        // Pembicara sering orang yang sama dengan pemilik butir; mencetaknya
+        // dua kali membuat barisnya terbaca seperti salah.
+        if let sp = item.speaker, !sp.isEmpty, sp != item.owner { out.append(sp) }
         return out
     }
 }
@@ -251,17 +253,23 @@ struct SharedRegisterView: View {
     private func filterRow(_ d: SharedNoteDoc) -> some View {
         let present = SharedItemType.allCases.filter { d.count(of: $0) > 0 }
         if !present.isEmpty {
-            HStack(spacing: 6) {
-                chip(label: "Semua", count: d.register.count, color: accent, active: typeFilter == nil) {
-                    typeFilter = nil
-                }
-                ForEach(present, id: \.self) { t in
-                    chip(label: t.label, count: d.count(of: t), color: t.color, active: typeFilter == t) {
-                        typeFilter = (typeFilter == t) ? nil : t
+            // Jendela aplikasi ini sempit (±520 px) dan jumlah chip bergantung
+            // isi rapat, jadi barisnya digulir mendatar. Tanpa ini label seperti
+            // "Tindak lanjut" membungkus jadi dua baris dan barisnya jadi ragged.
+            ScrollView(.horizontal) {
+                HStack(spacing: 6) {
+                    chip(label: "Semua", count: d.register.count, color: accent, active: typeFilter == nil) {
+                        typeFilter = nil
+                    }
+                    ForEach(present, id: \.self) { t in
+                        chip(label: t.label, count: d.count(of: t), color: t.color, active: typeFilter == t) {
+                            typeFilter = (typeFilter == t) ? nil : t
+                        }
                     }
                 }
-                Spacer(minLength: 0)
+                .padding(.vertical, 1)
             }
+            .scrollIndicators(.hidden)
         }
     }
 
@@ -270,6 +278,8 @@ struct SharedRegisterView: View {
         Button(action: action) {
             Text("\(label) \(count)")
                 .font(.caption2.weight(active ? .semibold : .regular))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(color.opacity(active ? 0.22 : 0.10))
