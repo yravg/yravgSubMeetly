@@ -20,9 +20,9 @@ Everything below is the long form of that one sentence.
 | Tab, screen, microphone, or file audio **you start capturing** | Speech recognition (Whisper in the browser via WASM/WebGPU, or the local helper) | In memory during the session; audio is not written to disk by the extension | Discarded when the session ends |
 | Transcript and subtitle lines | Live overlay, side-panel transcript, exports | `chrome.storage.local` (session history, at most 50 sessions) and a transcript cache | Until you delete a session or clear extension data |
 | Files you drop for offline transcription | Decoding and chunked staging for large files | Origin Private File System (OPFS) inside the extension | Removed after processing / on clear |
-| Meeting minutes (decisions, action items, owners, flagged moments, pasted Teams transcripts) | The Notes / Minutes Register feature | `chrome.storage.local` (at most 500 meetings). If you press **Sync** or use the macOS app, the same minutes are written to `~/.localtranssub/notes.json` on your machine | Until you delete the meeting |
+| Meeting minutes (decisions, action items, owners, flagged moments, pasted Teams transcripts) | The Notes / Minutes Register feature | `chrome.storage.local` (at most 500 meetings). If you press **Sync** or use the macOS app, the same minutes are written to `~/.yraveragesubmin/notes.json` on your machine | Until you delete the meeting |
 | Training progress (XP, levels, achievements, streaks, quiz answers) | The Training / gamification panel | `chrome.storage.local` key `learningProgress` | Until you clear extension data |
-| Preferences (languages, engine, device, theme, overlay position, project type, export options) | Remembering your settings | `chrome.storage.local`; the helper keeps `device.json`, `engine-mode.json`, `ui-prefs.json` under `~/.localtranssub/` | Until changed or cleared |
+| Preferences (languages, engine, device, theme, overlay position, project type, export options) | Remembering your settings | `chrome.storage.local`; the helper keeps `device.json`, `engine-mode.json`, `ui-prefs.json` under `~/.yraveragesubmin/` | Until changed or cleared |
 | Model weights | Running recognition/translation offline | Browser cache (extension) and `~/.cache/huggingface/hub` (helper) | Until you delete them from the model manager |
 
 The **sample library** (200+ example transcripts) is synthetic, generated
@@ -67,7 +67,7 @@ machine. That path is inert in the packaged extension.
 - **Delete** a session or meeting from those screens, delete models from Settings →
   Model Files, or remove all extension data via `chrome://extensions` → Details →
   *Clear data* / uninstall.
-- **Helper files** are plain JSON under `~/.localtranssub/`; delete the folder to
+- **Helper files** are plain JSON under `~/.yraveragesubmin/`; delete the folder to
   remove them. `~/.cache/huggingface/hub` holds downloaded weights.
 - **Exports** (SRT/VTT/TXT/MD/CSV/JSON) go only where you save them.
 
@@ -99,7 +99,7 @@ yraverageSubMin **tidak** mengumpulkan, menjual, atau mengunggah audio, transkri
 notulen, maupun konten pribadi Anda ke server kami. Tidak ada akun, analitik, iklan,
 atau inferensi awan. Pengenalan suara dan terjemahan berjalan di perangkat Anda.
 Yang tersimpan — riwayat sesi, notulen, kemajuan latihan, preferensi, bobot model —
-ada di penyimpanan lokal ekstensi atau folder `~/.localtranssub/` dan
+ada di penyimpanan lokal ekstensi atau folder `~/.yraveragesubmin/` dan
 `~/.cache/huggingface/hub` di komputer Anda, dan bisa Anda hapus sendiri. Koneksi
 jaringan hanya untuk unduhan model yang Anda minta (Hugging Face / HF-Mirror), paket
 bahasa Translator milik Chrome, dan helper lokal di `127.0.0.1`.

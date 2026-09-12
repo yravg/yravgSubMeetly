@@ -130,7 +130,7 @@ pemiliknya dari transkrip sesi.
   sebagai **Belum ditugaskan**.
 - Ekspor tersedia dalam **Markdown** dan teks polos.
 
-Catatan disimpan di `~/.localtranssub/notes.json` — berkas yang sama dibaca
+Catatan disimpan di `~/.yraveragesubmin/notes.json` — berkas yang sama dibaca
 ekstensi Chrome, jadi notulen dari kedua sisi tampil di satu register.
 
 ---

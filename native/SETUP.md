@@ -253,4 +253,4 @@ autentikasi. Batas keamanannya adalah "hanya bisa dijangkau dari mesin ini", dij
 API lokal (opsional, saat helper hidup):
 
 - `POST /notes/generate` — body JSON `{ "lines": [{"text":"..."}], "title":"..." }`
-- `GET /notes` / `POST /notes` — simpan/ambil notulen di `~/.localtranssub/notes.json`
+- `GET /notes` / `POST /notes` — simpan/ambil notulen di `~/.yraveragesubmin/notes.json`

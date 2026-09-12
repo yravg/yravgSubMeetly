@@ -947,6 +947,134 @@ def _scan_model_cache() -> list:
 #     transcriptPreview:str, savedLocally:bool }
 # Normalisasi toleran (frontend register v2 mengirim superset) + validasi
 # ketat untuk tipe yang salah agar file tidak korup.
+# --- Register v2: butir lengkap yang dibawa dokumen bersama -----------------
+# Dokumen v1 hanya mengenal summary/decisions/actions, jadi keputusan dan
+# tindak lanjut kehilangan nomor register, pemilik, tenggat, dan jejak waktunya,
+# sementara pertanyaan, risiko, metrik, dan info hilang sama sekali. Field di
+# bawah menambahkannya TANPA membuang field v1 — berkas ini tersimpan di disk
+# pengguna dan bisa dibaca build lama kapan saja.
+_ITEM_TYPES = {"decision", "action", "question", "risk", "metric", "info"}
+_ITEM_STATUSES = {"open", "progress", "closed", "carried"}
+_REVIEW_STATES = {"ai", "accepted", "edited"}
+_PRIORITIES = {"high", "med", "low"}
+_LIKELIHOODS = {"certain", "likely", "possible", "unlikely"}
+_MAX_ITEMS = 500
+# Sejajar LOW_CONFIDENCE di src/lib/notes-schema.js. Ditegakkan di sini karena
+# helper adalah satu-satunya titik yang dilewati SEMUA penulis dokumen — kalau
+# ambangnya hanya dihitung di sisi pengirim, dokumen dari sumber lain lolos
+# tanpa tanda meski keyakinannya rendah.
+_LOW_CONFIDENCE = 0.7
+
+
+def _flat_text(v) -> str:
+    """Teks bisa datang sebagai peta bahasa; ratakan ke satu string."""
+    if isinstance(v, dict):
+        v = v.get("id") or v.get("en") or next(iter(v.values()), "")
+    return str(v or "").strip()
+
+
+def _pick(v, allowed, fallback=None):
+    return v if isinstance(v, str) and v in allowed else fallback
+
+
+def _normalize_metric(raw):
+    if not isinstance(raw, dict):
+        return None
+    try:
+        value = float(raw.get("value"))
+    except (TypeError, ValueError):
+        return None
+    def opt_num(k):
+        try:
+            return float(raw.get(k)) if raw.get(k) is not None else None
+        except (TypeError, ValueError):
+            return None
+    return {
+        "measure": str(raw.get("measure") or "")[:120],
+        "value": value,
+        "unit": str(raw.get("unit") or "")[:24],
+        "baseline": opt_num("baseline"),
+        "variance": opt_num("variance"),
+        "asOf": str(raw.get("asOf"))[:32] if raw.get("asOf") else None,
+    }
+
+
+def _normalize_items(raw) -> list:
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for n, it in enumerate(raw[:_MAX_ITEMS], 1):
+        if not isinstance(it, dict):
+            continue
+        text = _flat_text(it.get("text"))
+        if not text:
+            continue
+        try:
+            confidence = float(it.get("confidence"))
+        except (TypeError, ValueError):
+            confidence = 1.0
+        confidence = min(1.0, max(0.0, confidence))
+        out.append(
+            {
+                "ref": str(it.get("ref") or f"I-{n}")[:40],
+                "type": _pick(it.get("type"), _ITEM_TYPES, "info"),
+                "topic": str(it.get("topic") or "")[:120],
+                "text": text[:4000],
+                "owner": (str(it["owner"])[:80] if it.get("owner") else None),
+                "org": (str(it["org"])[:80] if it.get("org") else None),
+                "due": (str(it["due"])[:32] if it.get("due") else None),
+                "status": _pick(it.get("status"), _ITEM_STATUSES, "open"),
+                "priority": _pick(it.get("priority"), _PRIORITIES),
+                "likelihood": _pick(it.get("likelihood"), _LIKELIHOODS),
+                "review": _pick(it.get("review"), _REVIEW_STATES, "ai"),
+                "confidence": confidence,
+                "needsReview": bool(it.get("needsReview")) or confidence < _LOW_CONFIDENCE,
+                "tc": (str(it["tc"])[:16] if it.get("tc") else None),
+                "speaker": (str(it["speaker"])[:80] if it.get("speaker") else None),
+                "carriedFrom": (str(it["carriedFrom"])[:64] if it.get("carriedFrom") else None),
+                "links": [str(x)[:40] for x in it.get("links", [])[:20]] if isinstance(it.get("links"), list) else [],
+                "metric": _normalize_metric(it.get("metric")),
+            }
+        )
+    return out
+
+
+def _normalize_meeting_meta(raw):
+    if not isinstance(raw, dict):
+        return None
+    agenda = raw.get("agenda") if isinstance(raw.get("agenda"), dict) else {}
+    engine = raw.get("engine") if isinstance(raw.get("engine"), dict) else None
+
+    def as_int(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "seriesId": str(raw.get("seriesId") or "")[:80],
+        "seq": as_int(raw.get("seq")),
+        "projectType": str(raw.get("projectType") or "general")[:40],
+        "locale": str(raw.get("locale") or "en")[:16],
+        "tz": str(raw.get("tz") or "")[:64],
+        "start": (str(raw["start"])[:32] if raw.get("start") else None),
+        "end": (str(raw["end"])[:32] if raw.get("end") else None),
+        "chair": (str(raw["chair"])[:80] if raw.get("chair") else None),
+        "attendees": [str(a)[:100] for a in raw.get("attendees", [])[:60]] if isinstance(raw.get("attendees"), list) else [],
+        "agenda": {"total": as_int(agenda.get("total")) or 0, "covered": as_int(agenda.get("covered")) or 0},
+        "issuedAt": (str(raw["issuedAt"])[:40] if raw.get("issuedAt") else None),
+        "generatedAt": str(raw.get("generatedAt") or "")[:40],
+        "engine": {
+            "asr": str(engine.get("asr") or "")[:80],
+            "mt": (str(engine["mt"])[:80] if engine.get("mt") else None),
+            "segments": as_int(engine.get("segments")) or 0,
+            "durationSec": as_int(engine.get("durationSec")),
+        }
+        if engine
+        else None,
+    }
+
+
 def _normalize_note_doc(raw) -> tuple[dict | None, str | None]:
     if not isinstance(raw, dict):
         return None, "note must be a JSON object"
@@ -1001,6 +1129,9 @@ def _normalize_note_doc(raw) -> tuple[dict | None, str | None]:
             "actions": actions,
             "transcriptPreview": str(raw.get("transcriptPreview") or ""),
             "savedLocally": True,
+            "schemaVersion": 2,
+            "meeting": _normalize_meeting_meta(raw.get("meeting")),
+            "items": _normalize_items(raw.get("items")),
         },
         None,
     )

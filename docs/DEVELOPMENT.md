@@ -71,7 +71,7 @@ Catatan yang menggigit:
 - Variabel: `WHISPER_MODEL`, `ENGINE=mlx|faster`, `DEVICE=cpu|cuda`, `COMPUTE=int8|float16`,
   `TRANSLATE=off`, `PORT`, `HOST` (menolak non-loopback kecuali `ALLOW_REMOTE=1`),
   `ALLOWED_ORIGINS`, `STREAM_CHUNK_SEC`, `STREAM_OVERLAP_SEC`, `STREAM_MIN_BYTES`.
-- Berkas helper: `~/.localtranssub/{device,engine-mode,ui-prefs,notes}.json`,
+- Berkas helper: `~/.yraveragesubmin/{device,engine-mode,ui-prefs,notes}.json`,
   bobot di `~/.cache/huggingface/hub`.
 
 Rincian per OS: [`native/SETUP.md`](../native/SETUP.md).

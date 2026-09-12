@@ -226,7 +226,8 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **294/294 lulus** (2026-09-07), termasuk `rename-migration` 8 dan `design-tokens` 6 yang baru. Ini run penuh pertama
+- `npm test` → **306/306 lulus** (2026-09-12), termasuk `shared-register` 12 yang baru (3 di antaranya menjalankan binari macOS).
+- (2026-09-07) 294/294 dengan `rename-migration` 8 dan `design-tokens` 6. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
 - (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
 - `mac/`: `swift build` bersih; `./doctor.sh` ✓ sertifikat/tanda tangan/identifier/ikon (laporan izin butuh aplikasi dibuka).
@@ -295,6 +296,54 @@ Yang perlu diingat:
   `minutes.html` dan `app.html`, dibandingkan dengan commit sebelum refactor → **0 beda**.
 
 Dijaga `test/design-tokens.test.mjs` (6 tes).
+
+## Register notulen di aplikasi macOS (2026-09-12)
+
+Aplikasi macOS dulu hanya menampilkan judul dokumen bersama dan dua angka
+("N keputusan · M tindak lanjut"). Sekarang ia menampilkan register penuh.
+
+**Bug yang ditemukan lebih dulu, dan sudah diperbaiki:** `HelperSharedNotes.swift`
+masih menunjuk `~/.localtranssub/notes.json` — jalur SEBELUM rename. Helper sudah
+memindahkan direktorinya, jadi aplikasi macOS membaca berkas yang tidak ada lagi dan
+notulen pengguna tampak hilang. Konsumen ini terlewat saat rename; sekarang ia membaca
+jalur baru dan **mundur ke jalur lama** bila yang baru belum ada (pengguna bisa membuka
+aplikasi sebelum helper pernah dijalankan).
+
+Rantainya: Minutes Register → `meetingToDoc` → `POST /notes` → `_normalize_note_doc` →
+`~/.yraveragesubmin/notes.json` → `HelperSharedNotes.swift` → `SharedRegisterView`.
+
+| Lapisan | Perubahan |
+| --- | --- |
+| `src/lib/notes-sync.js` | Dokumen bersama naik ke **v2**: `items[]` (keenam tipe, `ref`, `topic`, `owner`/`org`, `due`, `status`, `priority`×`likelihood`, `review`, `confidence`, `tc`, `speaker`, `carriedFrom`, `metric`) + `meeting{}` (seri, seq, tipe proyek, ketua, peserta, cakupan agenda, stempel mesin). |
+| `native/server.py` | `_normalize_items` / `_normalize_meeting_meta` memvalidasi dan membatasi (≤500 butir, tipe/status tak dikenal jatuh ke default, metrik tanpa nilai numerik dibuang). |
+| `mac/…/HelperSharedNotes.swift` | Model v2 + `register` yang **menyusun ulang** butir dari `decisions`/`actions` untuk dokumen v1. |
+| `mac/…/SharedRegisterView.swift` | Panel detail: kepala rapat, progres agenda, filter per tipe (hanya tipe yang berisi), baris butir dengan ref berwarna, pemilik, tenggat, status, jejak waktu, matriks risiko, metrik, penanda perlu-dicek. |
+| `mac/…/RegisterProbe.swift` | `--register-probe` mencetak apa yang akan dirender sebagai JSON. |
+
+Yang perlu diingat:
+
+- **`decisions`/`actions` v1 SENGAJA tetap ditulis** walau `items` sudah memuatnya.
+  Dokumen ini tinggal di disk pengguna; build macOS lama bisa membacanya kapan saja
+  setelah build baru menulisnya. Dijaga tes.
+- **Ambang `needsReview` ditegakkan di helper**, bukan dipercaya dari pengirim. Helper
+  adalah satu-satunya titik yang dilewati semua penulis; kalau ambangnya hanya dihitung
+  di sisi ekstensi, dokumen dari sumber lain lolos tanpa tanda meski keyakinannya rendah.
+- **`homeDirectoryForCurrentUser` DAN `NSHomeDirectory()` sama-sama mengabaikan `$HOME`**
+  (keduanya membaca catatan akun). `HelperSharedStore.homeDir` karena itu mendahulukan
+  `$HOME` — launchd memasangnya ke home yang sama saat aplikasi dibuka dari Finder, jadi
+  produksi tidak berubah, tapi jalurnya bisa diarahkan dari shell dan tes.
+- **`YSM_STATE_DIR` kini dihormati sisi macOS juga**, sama seperti `native/server.py`.
+  Sebelumnya pengguna yang memindahkan direktori state-nya kehilangan notulen di aplikasi ini saja.
+- Dekoder Swift sengaja toleran (`try?` di setiap field), jadi field yang diganti nama
+  **tidak melempar galat** — ia diam-diam menjadi kosong. `test/shared-register.test.mjs`
+  memaku nama fieldnya dan menjalankan `--register-probe` pada binari yang benar-benar
+  dibangun (dilewati bila `swift build` belum pernah dijalankan).
+- `docs/NOTES-V2-SPEC.md` sengaja tidak diubah: itu analisis bertanggal, bukan dokumentasi
+  perilaku sekarang; jalur lama di sana adalah keadaan saat analisisnya ditulis.
+
+**Bundel `.app` di disk masih bernama lama.** `mac/build/yraverageSub.app` adalah artefak
+sebelum rename; sumbernya sudah `APP_NAME="yraverageSubMin"`. Jalankan `cd mac && ./build-app.sh`
+untuk menghasilkan bundel bernama baru (skrip itu mem-*pkill* instans yang sedang jalan).
 
 ## Catatan yang perlu diketahui
 

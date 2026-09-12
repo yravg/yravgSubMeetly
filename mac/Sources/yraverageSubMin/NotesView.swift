@@ -91,6 +91,8 @@ final class NotesViewState: ObservableObject {
     @Published var notes = MeetingNotesStub.samples
     @Published var selectedId = MeetingNotesStub.sample.id
     @Published var sharedDocs: [SharedNoteDoc] = []
+    @Published var sharedSelectedId = ""
+    @Published var sharedTypeFilter: SharedItemType? = nil
     @Published var showTranscript = false
     @Published var summaryDraft: String? = nil
     @Published var addingDecision = false
@@ -262,29 +264,20 @@ struct NotesView: View {
                     .padding(6)
                 }
 
-                GroupBox("Bersama · helper (\(vm.sharedDocs.count))") {
-                    if vm.sharedDocs.isEmpty {
-                        Text("Belum ada dokumen bersama — dorong dari ekstensi via Native Helper.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(6)
-                    } else {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(vm.sharedDocs.prefix(5)) { d in
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(d.title)
-                                        .font(.callout.weight(.medium))
-                                        .lineLimit(1)
-                                    Text("\(d.decisions.count) keputusan · \(d.actions.count) tindak lanjut")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .padding(6)
+                SharedRegisterView(
+                    docs: vm.sharedDocs,
+                    selectedId: $vm.sharedSelectedId,
+                    typeFilter: $vm.sharedTypeFilter,
+                    accent: accent
+                )
+                .onAppear {
+                    vm.sharedDocs = HelperSharedStore.load()
+                    // Pilihan yang tersimpan bisa menunjuk rapat yang sudah
+                    // dihapus dari sisi ekstensi; jatuhkan ke yang pertama.
+                    if !vm.sharedDocs.contains(where: { $0.id == vm.sharedSelectedId }) {
+                        vm.sharedSelectedId = vm.sharedDocs.first?.id ?? ""
                     }
                 }
-                .onAppear { vm.sharedDocs = HelperSharedStore.load() }
 
                 GroupBox {
                     VStack(alignment: .leading, spacing: 6) {

@@ -72,6 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        // Register notulen bersama: cetak apa yang akan ditampilkan panelnya.
+        // Sinkron (tidak butuh AppKit) supaya bisa dipanggil dari tes.
+        if CommandLine.arguments.contains("--register-probe") {
+            RegisterProbe.run()
+            exit(0)
+        }
         // Overlay move/resize probe.
         if CommandLine.arguments.contains("--overlay-probe") {
             MainActor.assumeIsolated {
