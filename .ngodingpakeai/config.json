@@ -1,9 +1,9 @@
 {
-  "workspaceId": "08b7acf5-2182-429d-a223-5b94ea703f8b",
-  "repoId": "f8186cc1-132d-4316-8853-600a60adf935",
-  "repoName": "yraverage-Local TransSub",
-  "provider": "local",
-  "remoteUrl": null,
-  "rootPathHash": "bf9fba88159d2807ce55248ffa651605904f91268dcab562c6b219410e583f8a",
-  "lastSyncedCommit": "7631715aefd35996db2f6ff43b3bd7b6b426f552"
+  "workspaceId": "e27623f1-f5d3-4d1e-9772-d8b2fc228681",
+  "repoId": "b5aa59e9-7c92-42b2-bf4b-fdb39fad947a",
+  "repoName": "yraveragework/yraveragesub",
+  "provider": "github",
+  "remoteUrl": "https://github.com/yraveragework/yraveragesub",
+  "rootPathHash": "c52ddf65534b7b46035084358ab7902be4bfef220bdb503ac7039cc861905b05",
+  "lastSyncedCommit": "d4eb9708760322eca7581cd239b941f9141d57ac"
 }

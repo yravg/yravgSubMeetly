@@ -15,10 +15,10 @@ repository with NgodingPakeAI, follow this skill.
 
 ## Prerequisites
 - Node.js available (the CLI runs via `npx ngodingpakeai …`).
-- Workspace ID: `08b7acf5-2182-429d-a223-5b94ea703f8b`
+- Workspace ID: `e27623f1-f5d3-4d1e-9772-d8b2fc228681`
 - An access token starting with `ngpk_`. Provide it via the `NGODINGPAKEAI_TOKEN`
   environment variable (preferred) or the `--token` flag on `connect`.
-  Create one at https://www.ngodingpakeai.com/settings (API keys). Synced content is viewable at https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b.
+  Create one at https://www.ngodingpakeai.com/settings (API keys). Synced content is viewable at https://www.ngodingpakeai.com/workspace/e27623f1-f5d3-4d1e-9772-d8b2fc228681.
 
 ## How sync works (one mode — YOU write the summaries)
 NgodingPakeAI never uploads or stores raw source code. Instead **you**, the
@@ -81,7 +81,7 @@ What you must do about it:
 
 ## Instructions — the sync loop
 1. `npx ngodingpakeai doctor` — check environment + connectivity.
-2. `npx ngodingpakeai connect --workspace 08b7acf5-2182-429d-a223-5b94ea703f8b --token "$NGODINGPAKEAI_TOKEN"` — link this repo to the workspace (first time only).
+2. `npx ngodingpakeai connect --workspace e27623f1-f5d3-4d1e-9772-d8b2fc228681 --token "$NGODINGPAKEAI_TOKEN"` — link this repo to the workspace (first time only).
 3. `npx ngodingpakeai sync --plan` — detects repository apps/packages, scans + uploads file METADATA (paths/hashes only), then writes `.ngodingpakeai/pending.json`: the list of new/changed files that need summaries (already curated — lockfiles/fixtures/barrels are excluded, so no wasted effort).
 4. **Write the summaries.** Read each file in `pending.json` and produce `.ngodingpakeai/summaries.json` (format below). Only files in the pending list — unchanged files keep their existing summaries.
 5. `npx ngodingpakeai sync` — validates and uploads summaries only. It FAILS with a list if any pending file is missing a summary (fix and re-run; `--allow-missing` skips them only if the user says so). **This final summary pass CLOSES the cycle** — run it only when every task is done (see hard rule 6). The earlier `sync --plan` metadata pass never closes a cycle.
@@ -117,7 +117,7 @@ Rules for good summaries:
 2. Raw source code must never leave the machine — the CLI only uploads metadata + your summaries, and the server rejects/strips anything else.
 3. Never put secrets in summaries. Never read or print `.env*` files.
 4. Respect `.gitignore` and `.ngodingpakeaiignore`. If the CLI blocks a file, do not bypass it.
-5. Always report the sync summary and https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b. Only pass on links the CLI actually printed — never assemble one from an id yourself.
+5. Always report the sync summary and https://www.ngodingpakeai.com/workspace/e27623f1-f5d3-4d1e-9772-d8b2fc228681. Only pass on links the CLI actually printed — never assemble one from an id yourself.
 6. **For active implementation plans, run the final `sync` ONLY when every task is done — never mid-cycle.** The final summaries pass closes the cycle, rebuilds the wiki, and records a wiki version. `sync --plan` is metadata discovery only and is safe. A prepared reverse baseline plan has no tasks, so its first summary sync is the entry point.
 7. **Workspace targeting is fixed.** Use the exact Workspace ID embedded above and the repo's `.ngodingpakeai/config.json`. Never infer a workspace from a plan, account default, URL, or another agent session. If the server reports a workspace conflict or the target looks wrong, STOP and ask the user; never retry with another workspace ID.
 
