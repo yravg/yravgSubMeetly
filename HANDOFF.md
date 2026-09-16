@@ -226,7 +226,8 @@ Ketiganya dijaga `test/app-surfaces.test.mjs`.
 - **Sync final NgodingPakeAI 2026-09-05** → `234 summarized, 235 sections, 34 unchanged` (run
   `aaeb8108-…`); siklus plan ditutup, wiki dibangun ulang otomatis. Tautan yang dicetak CLI:
   https://www.ngodingpakeai.com/workspace/08b7acf5-2182-429d-a223-5b94ea703f8b?plan=2f0a7eb0-348d-4904-9f14-77c68c89cb5f
-- `npm test` → **306/306 lulus** (2026-09-12), termasuk `shared-register` 12 yang baru (3 di antaranya menjalankan binari macOS).
+- `npm test` → **306/306 lulus** (2026-09-16, kerangka Meetily Tahap 1; lihat catatan `export-browser`)
+- (2026-09-12) 306/306, termasuk `shared-register` 12 yang baru (3 di antaranya menjalankan binari macOS).
 - (2026-09-07) 294/294 dengan `rename-migration` 8 dan `design-tokens` 6. Ini run penuh pertama
   tanpa kegagalan: flaky `export-browser` yang lama tercatat ternyata bug toast (lihat di atas), bukan beban mesin.
 - (sebelumnya) 241/242 dan 242/242 dengan `export-browser` flaky.
@@ -364,6 +365,54 @@ diperlukan — jalankan binari debug langsung.
 **Bundel `.app` di disk masih bernama lama.** `mac/build/yraverageSub.app` adalah artefak
 sebelum rename; sumbernya sudah `APP_NAME="yraverageSubMin"`. Jalankan `cd mac && ./build-app.sh`
 untuk menghasilkan bundel bernama baru (skrip itu mem-*pkill* instans yang sedang jalan).
+
+## Upgrade ala Meetily — Tahap 1: kerangka (2026-09-16)
+
+Keputusan pengguna (AskUserQuestion): **struktur Meetily, brand kita** (teal menggantikan biru
+sebagai satu-satunya warna interaktif; merah/oranye/hijau status tetap) · **sidebar rapat dari
+register bersama + tulis balik ke helper** (Tahap 2) · **dokumentasi lewat generator**
+(Docusaurus/Mintlify, Tahap 4). Sumber desain: `Meetily Design System.zip` (dibangun dari sumber
+Meetily 0.4.1) — diekstrak ke scratchpad sesi; token diterjemahkan ke `DesignTokens.swift`.
+
+Berkas baru di `mac/Sources/yraverageSubMin/`: `DesignTokens.swift` (warna dinamis terang/gelap,
+radius 8/6/4, shadow 2 tingkat, gerak 150/200/300, `DSButtonStyle`, `DSCallout`, `DSStatusDot`),
+`AppShellView.swift` (akar jendela: sidebar + konten + bilah status; `SettingsPage`, `AboutSheet`),
+`SidebarView.swift` (256/64 px, pencarian dengan baris "Match:", daftar rapat dari
+`HelperSharedStore`, kaki Start Recording/Settings/About), `RecordingPill.swift` (pil mengambang +
+`RecordingStatusBar` `Recording • MM:SS`), `HomeView.swift` (subtitel langsung: toolbar Copy/Export/
+Source/Language popover, callout izin, `ReadingColumn` 750 px, `TranscriptSegmentView`),
+`FilesView.swift`, `MeetingView.swift` (kepala + register tertanam + `SharedNoteExport` TXT/MD).
+**Dihapus:** `MainView.swift` (pemilih tab bersegmen) dan data contoh `MeetingNotesStub` di
+`NotesView.swift` — sidebar hanya menampilkan rapat yang benar-benar ada.
+
+Pemetaan fitur lama → baru (tidak ada yang hilang):
+- LiveView: Source/Refresh → popover "Capture source"; Spoken/Translate/Into/dual-line → popover
+  "Languages"; Start/Stop → pil + tombol sidebar + ⌘⇧S menu bar; Export → toolbar; catatan
+  terjemahan + Install fast model → callout info; galat → callout warning; transkrip → kolom baca.
+- NSToolbar Start/Stop + status di `MainWindow` **dibuang** (kendali kini selalu terlihat di sidebar
+  dan pil); jendela 1100×720 (min 900×600), `fullSizeContentView`, bilah judul transparan.
+- `UIState.tab` tetap ada sebagai jembatan (`--tab live|home|file|files|notes|meeting|settings`);
+  rute sebenarnya `AppRoute`. Prefs baru: `sidebarCollapsed`, `transcriptPaneRatio`, `onboardingDone`.
+- Tambah keputusan/tindak lanjut & ringkasan otomatis (dulu hanya di data contoh) **kembali di Tahap 2**
+  pada data sungguhan bersama jalur tulis; ekspor sudah bekerja pada dokumen bersama.
+
+Yang perlu diingat:
+- `@State` tetap tak tersedia (build CLT) — semua state di `UIState`/`NotesViewState`; animasi
+  (denyut titik, batang aktivitas, jam) memakai `TimelineView`, bukan state.
+- Batang meter di pil **bukan level audio** — Meetily pun mengacaknya tiap 300 ms; dinamai
+  "indikator aktivitas". Tidak ada tombol jeda karena sesi tidak punya keadaan jeda.
+- Tangkapan layar QA: jalankan binari debug dengan `YSM_STATE_DIR=<fixture> --tab <rute>`;
+  `-NSRequiresAquaSystemAppearance YES` memaksa mode terang; `-sidebarCollapsed YES` (argumen
+  NSArgumentDomain) memaksa rail terlipat. **Matikan instans lama dulu** (`pkill -f
+  Products/Debug/yraverageSubMin`) — satu tangkapan sempat tertukar dengan proses sesi sebelumnya.
+- Popover "Capture source" **sekali** terlihat terbuka sendiri saat peluncuran; tidak terulang pada
+  tiga titik waktu dan peluncuran baru. Belum dijelaskan.
+- `export-browser` gagal sekali (batas 32 dtk) saat suite berjalan bersamaan dengan build Swift +
+  peluncuran aplikasi; 3/3 lulus ~2,6 dtk saat sendirian. Beban mesin, bukan regresi.
+
+Sisa tahap: **2** workspace split + tulis balik `POST /notes` · **3** onboarding 4 langkah + Settings
+tab bergaris-bawah (Capture · Subtitles & Overlay · Dictation · Languages & Permissions · General)
+· **4** dokumentasi.
 
 ## Catatan yang perlu diketahui
 

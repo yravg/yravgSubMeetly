@@ -8,11 +8,48 @@ import AppKit
 import Foundation
 import SubMinKit
 
+/// Rute konten di kerangka dua panel. `meeting(nil)` = rapat pertama yang ada.
+enum AppRoute: Equatable {
+    case home, files, settings
+    case meeting(String?)
+
+    var isMeeting: Bool { if case .meeting = self { return true } else { return false } }
+}
+
 @MainActor
 final class UIState: ObservableObject {
-    @Published var tab: Int = 0
+    @Published var route: AppRoute = .home
+    /// Tersimpan: sidebar yang dilipat harus tetap terlipat setelah relaunch.
+    @Published var sidebarCollapsed: Bool = Prefs.shared.sidebarCollapsed {
+        didSet { Prefs.shared.sidebarCollapsed = sidebarCollapsed }
+    }
+    @Published var search: String = ""
+    @Published var showAbout = false
+    @Published var showSourcePopover = false
+    @Published var showLanguagePopover = false
+    @Published var showFileLanguagePopover = false
     @Published var launchAtLogin: Bool = false
     @Published var packStatus: String = ""
+
+    /// Kompatibilitas: `--tab live|file|notes` dan kode lama yang memakai indeks.
+    var tab: Int {
+        get {
+            switch route {
+            case .home: 0
+            case .files: 1
+            case .meeting: 2
+            case .settings: 3
+            }
+        }
+        set {
+            switch newValue {
+            case 1: route = .files
+            case 2: route = .meeting(nil)
+            case 3: route = .settings
+            default: route = .home
+            }
+        }
+    }
 }
 
 @MainActor

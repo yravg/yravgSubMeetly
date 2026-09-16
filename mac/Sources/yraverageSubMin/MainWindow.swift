@@ -12,12 +12,10 @@ import SwiftUI
 import SubMinKit
 
 @MainActor
-final class MainWindowController: NSObject, NSToolbarDelegate {
+final class MainWindowController: NSObject {
     private var window: NSWindow?
     private let app: AppController
     private var cancellables = Set<AnyCancellable>()
-    private var toggleItem: NSToolbarItem?
-    private var statusItem: NSToolbarItem?
 
     init(app: AppController) {
         self.app = app
@@ -37,23 +35,23 @@ final class MainWindowController: NSObject, NSToolbarDelegate {
     }
 
     private func build() {
+        // Kerangka dua panel ala Meetily: konten ukuran penuh dengan bilah judul
+        // transparan, sehingga lampu lalu-lintas duduk di atas sidebar. Kendali
+        // Start/Stop kini selalu terlihat di sidebar dan pil rekam, jadi
+        // NSToolbar lama tidak lagi diperlukan; ⌘⇧S tetap lewat menu bar extra.
         let w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 640),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 720),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false)
         w.title = "yraverageSubMin"
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.isMovableByWindowBackground = false
+        w.minSize = NSSize(width: 900, height: 600)
         w.isReleasedWhenClosed = false
-        w.contentView = NSHostingView(rootView: MainView(app: app))
-        let toolbar = NSToolbar(identifier: "TransSubSession")
-        toolbar.delegate = self
-        toolbar.displayMode = .iconAndLabel
-        w.toolbar = toolbar
-        w.setFrameAutosaveName("LocalTransSubMain")
-        app.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.refreshSessionItems() }
-            .store(in: &cancellables)
+        w.contentView = NSHostingView(rootView: AppShellView(app: app))
+        w.setFrameAutosaveName("yraverageSubMinShell")
         // Back to menu-bar-only when the window closes.
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: w, queue: .main
@@ -63,67 +61,6 @@ final class MainWindowController: NSObject, NSToolbarDelegate {
             }
         }
         window = w
-        refreshSessionItems()
     }
 
-    // MARK: - Session toolbar (NSToolbarDelegate)
-
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.toggleSession, .flexibleSpace, .sessionStatus]
-    }
-
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.toggleSession, .flexibleSpace, .sessionStatus]
-    }
-
-    func toolbar(
-        _ toolbar: NSToolbar,
-        itemForItemIdentifier id: NSToolbarItem.Identifier,
-        willBeInsertedIntoToolbar flag: Bool
-    ) -> NSToolbarItem? {
-        switch id {
-        case .toggleSession:
-            let item = NSToolbarItem(itemIdentifier: id)
-            item.label = "Sesi"
-            item.toolTip = "Mulai / hentikan subtitel (⌘⇧S)"
-            let button = NSButton(title: "", target: self, action: #selector(toggleSession))
-            button.bezelStyle = .rounded
-            item.view = button
-            toggleItem = item
-            refreshSessionItems()
-            return item
-        case .sessionStatus:
-            let item = NSToolbarItem(itemIdentifier: id)
-            item.label = "Status"
-            let label = NSTextField(labelWithString: "")
-            label.font = .systemFont(ofSize: 11)
-            label.textColor = .secondaryLabelColor
-            item.view = label
-            statusItem = item
-            refreshSessionItems()
-            return item
-        default:
-            return nil
-        }
-    }
-
-    @objc private func toggleSession() {
-        app.toggle()
-    }
-
-    private func refreshSessionItems() {
-        if let button = toggleItem?.view as? NSButton {
-            button.title = app.isRunning ? "■ Stop" : "▶ Start"
-        }
-        if let label = statusItem?.view as? NSTextField {
-            label.stringValue = app.isRunning
-                ? (app.status.isEmpty ? "Listening…" : app.status)
-                : (app.error.isEmpty ? "Idle" : app.error)
-        }
-    }
-}
-
-private extension NSToolbarItem.Identifier {
-    static let toggleSession = NSToolbarItem.Identifier("com.yraveragesubmin.toggleSession")
-    static let sessionStatus = NSToolbarItem.Identifier("com.yraveragesubmin.sessionStatus")
 }

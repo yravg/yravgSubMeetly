@@ -126,13 +126,17 @@ private struct RegisterRow: View {
 private struct RegisterHeader: View {
     let doc: SharedNoteDoc
     let accent: Color
+    /// Kepala halaman MeetingView sudah memuat judulnya; jangan cetak dua kali.
+    var showTitle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(doc.title)
-                    .font(.headline)
-                    .lineLimit(2)
+                if showTitle {
+                    Text(doc.title)
+                        .font(.headline)
+                        .lineLimit(2)
+                }
                 Spacer(minLength: 0)
                 if doc.isIssued {
                     Text("Terbit")
@@ -203,47 +207,58 @@ struct SharedRegisterView: View {
         return d.register.filter { $0.type == f }
     }
 
+    /// Tertanam di MeetingView: tanpa bingkai GroupBox dan tanpa judul dokumen,
+    /// karena kerangka halaman sudah menyediakan keduanya.
+    var embedded = false
+
     var body: some View {
-        GroupBox("Register bersama · helper (\(docs.count))") {
-            if docs.isEmpty {
-                Text("Belum ada dokumen bersama — dorong dari ekstensi via Native Helper.")
+        if embedded {
+            if let d = doc { panel(d) } else { emptyText }
+        } else {
+            GroupBox("Register bersama · helper (\(docs.count))") {
+                if docs.isEmpty { emptyText } else if let d = doc { panel(d).padding(6) }
+            }
+        }
+    }
+
+    private var emptyText: some View {
+        Text("Belum ada dokumen bersama — dorong dari ekstensi via Native Helper.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(6)
+    }
+
+    private func panel(_ d: SharedNoteDoc) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if docs.count > 1 {
+                Picker("Rapat", selection: $selectedId) {
+                    ForEach(docs) { Text($0.title).tag($0.id) }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+
+            RegisterHeader(doc: d, accent: accent, showTitle: !embedded)
+
+            Divider()
+
+            filterRow(d)
+
+            if visibleItems.isEmpty {
+                Text("Tidak ada butir pada filter ini.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(6)
-            } else if let d = doc {
-                VStack(alignment: .leading, spacing: 10) {
-                    if docs.count > 1 {
-                        Picker("Rapat", selection: $selectedId) {
-                            ForEach(docs) { Text($0.title).tag($0.id) }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
+                    .padding(.vertical, 4)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(visibleItems.enumerated()), id: \.offset) { _, item in
+                        RegisterRow(item: item)
                     }
-
-                    RegisterHeader(doc: d, accent: accent)
-
-                    Divider()
-
-                    filterRow(d)
-
-                    if visibleItems.isEmpty {
-                        Text("Tidak ada butir pada filter ini.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 4)
-                    } else {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(Array(visibleItems.enumerated()), id: \.offset) { _, item in
-                                RegisterRow(item: item)
-                            }
-                        }
-                    }
-
-                    footer(d)
                 }
-                .padding(6)
             }
+
+            footer(d)
         }
     }
 

@@ -78,9 +78,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let i = CommandLine.arguments.firstIndex(of: "--tab"),
            i + 1 < CommandLine.arguments.count {
             switch CommandLine.arguments[i + 1] {
-            case "live": controller.ui.tab = 0
-            case "file": controller.ui.tab = 1
-            case "notes": controller.ui.tab = 2
+            case "live", "home": controller.ui.tab = 0
+            case "file", "files": controller.ui.tab = 1
+            case "notes", "meeting": controller.ui.tab = 2
+            case "settings": controller.ui.tab = 3
             default: break
             }
         }
@@ -198,6 +199,8 @@ final class AppController: ObservableObject {
     @Published var error = ""
     @Published var hasScreenPermission = true
     @Published var needsRelaunch = false
+    /// Untuk jam `Recording • 04:12`; nil saat tidak merekam.
+    @Published var sessionStartedAt: Date?
 
     private var observers: [NSObjectProtocol] = []
 
@@ -246,7 +249,10 @@ final class AppController: ObservableObject {
             NotificationCenter.default.addObserver(
                 forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
             ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.recheckPermission() }
+                MainActor.assumeIsolated {
+                    self?.recheckPermission()
+                    self?.refreshSharedNotes()
+                }
             })
         // Mirror session state for the menu/UI.
         observers.append(
@@ -290,11 +296,23 @@ final class AppController: ObservableObject {
         Task {
             if session.isRunning {
                 await session.stop()
+                sessionStartedAt = nil
             } else {
                 Prefs.shared.captureTarget = selectedTarget.id
                 await session.start(target: selectedTarget)
+                sessionStartedAt = session.isRunning ? Date() : nil
             }
             syncFromSession()
+        }
+    }
+
+    /// Baca ulang register bersama (sidebar + workspace rapat). Dipanggil saat
+    /// kerangka tampil dan tiap kali jendela kembali aktif — berkasnya bisa
+    /// berubah kapan saja dari sisi ekstensi.
+    func refreshSharedNotes() {
+        notesUI.sharedDocs = HelperSharedStore.load()
+        if !notesUI.sharedDocs.contains(where: { $0.id == notesUI.sharedSelectedId }) {
+            notesUI.sharedSelectedId = notesUI.sharedDocs.first?.id ?? ""
         }
     }
 

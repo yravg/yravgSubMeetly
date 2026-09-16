@@ -25,6 +25,9 @@ public enum PrefKey {
     public static let audioSourceMode = "audioSourceMode" // app | system | mic
     public static let languageMode = "languageMode" // transcribe | translate
     public static let reskin = "reskin" // yraverage | coretax | modern
+    public static let sidebarCollapsed = "sidebarCollapsed"
+    public static let transcriptPaneRatio = "transcriptPaneRatio" // 0.30–0.50
+    public static let onboardingDone = "onboardingDone"
 }
 
 public final class Prefs: @unchecked Sendable {
@@ -54,6 +57,9 @@ public final class Prefs: @unchecked Sendable {
             PrefKey.overlayPosition: "bottom",
             PrefKey.a11yLargeContrast: false,
             PrefKey.reskin: "yraverage",
+            PrefKey.sidebarCollapsed: false,
+            PrefKey.transcriptPaneRatio: 0.30,
+            PrefKey.onboardingDone: false,
         ])
     }
 
@@ -162,5 +168,18 @@ public final class Prefs: @unchecked Sendable {
             d.set(["top", "center", "bottom"].contains(newValue) ? newValue : "bottom",
                   forKey: PrefKey.overlayPosition)
         }
+    }
+    public var sidebarCollapsed: Bool {
+        get { d.bool(forKey: PrefKey.sidebarCollapsed) }
+        set { d.set(newValue, forKey: PrefKey.sidebarCollapsed) }
+    }
+    /// Lebar panel transkrip di workspace rapat, dijepit 0,30–0,50 seperti Meetily.
+    public var transcriptPaneRatio: Double {
+        get { min(0.5, max(0.3, d.double(forKey: PrefKey.transcriptPaneRatio))) }
+        set { d.set(min(0.5, max(0.3, newValue)), forKey: PrefKey.transcriptPaneRatio) }
+    }
+    public var onboardingDone: Bool {
+        get { d.bool(forKey: PrefKey.onboardingDone) }
+        set { d.set(newValue, forKey: PrefKey.onboardingDone) }
     }
 }
