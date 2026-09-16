@@ -35,6 +35,13 @@ struct AppShellView: View {
         .background(DS.Colors.app)
         .tint(Brand.reskinAccent(prefs.reskin, scheme))
         .languagePackHost(app.packInstaller)
+        // Onboarding menutupi seluruh kerangka sampai selesai / dilewati.
+        .overlay {
+            if !ui.onboardingDone {
+                OnboardingView(app: app).transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: DS.Motion.slow), value: ui.onboardingDone)
         .sheet(isPresented: $ui.showAbout) { AboutSheet(ui: ui) }
         .sheet(isPresented: Binding(get: { ui.renamingId != nil }, set: { if !$0 { ui.renamingId = nil } })) {
             RenameSheet(app: app, ui: ui)
@@ -62,7 +69,7 @@ struct AppShellView: View {
         case .meeting(let id):
             MeetingView(app: app, id: id)
         case .settings:
-            SettingsPage(app: app)
+            SettingsPageView(app: app)
         }
     }
 }
@@ -110,44 +117,6 @@ private struct StatusFooter: View {
         .background(DS.Colors.sunken)
         .overlay(alignment: .top) { DS.Colors.line.frame(height: 1) }
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// Settings di dalam konten (Tahap 1: tampilan Settings yang ada, dibingkai
-/// halaman ber-judul; Tahap 3 memecahnya jadi tab bergaris-bawah + kartu).
-private struct SettingsPage: View {
-    @ObservedObject var app: AppController
-    @ObservedObject var ui: UIState
-
-    init(app: AppController) {
-        self.app = app
-        self.ui = app.ui
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 16) {
-                Button { ui.route = .home } label: {
-                    Label("Back", systemImage: "arrow.left").font(.system(size: 14))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(DS.Colors.textMuted)
-                Text("Settings").font(.system(size: 28, weight: .bold)).foregroundStyle(DS.Colors.textStrong)
-                Spacer()
-            }
-            .padding(.horizontal, DS.Space.s8)
-            .padding(.vertical, DS.Space.s6)
-            .frame(maxWidth: DS.Width.settingsMax)
-            .overlay(alignment: .bottom) { DS.Colors.line.frame(height: 1) }
-
-            ScrollView {
-                SettingsView(app: app)
-                    .dsCard(padding: DS.Space.s2)
-                    .padding(DS.Space.s8)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(DS.Colors.app)
     }
 }
 

@@ -438,9 +438,30 @@ Yang perlu diingat:
   (sertifikat self-signed "yraverageSubMin Dev" di keychain login); bundel lama `yraverageSub.app`
   dihapus.
 
-Sisa tahap: **2** workspace split + tulis balik `POST /notes` · **3** onboarding 4 langkah + Settings
-tab bergaris-bawah (Capture · Subtitles & Overlay · Dictation · Languages & Permissions · General)
-· **4** dokumentasi.
+## Upgrade ala Meetily — Tahap 3: onboarding + Settings bertab (2026-09-16)
+
+- **`OnboardingView.swift`** — 4 langkah (Welcome → Setup overview → Translation models →
+  Grant permissions → Finish Setup), overlay di atas seluruh kerangka selama
+  `Prefs.onboardingDone == false`. **Kunci itu baru dan default `false`, jadi pengguna lama
+  juga melihatnya sekali** — "Skip for now" selalu ada di setiap langkah. Langkah "Models"
+  sengaja tidak mengunduh ASR (bawaan macOS); ia memakai `LanguageStatusModel` +
+  `LanguagePackInstaller` untuk pasangan terjemahan yang dipilih.
+- **`SettingsPageView.swift`** menggantikan `SettingsView` sebagai isi: tab bergaris-bawah
+  (`matchedGeometryEffect` untuk garisnya), `SettingsCard` (judul/deskripsi kiri, switch/tombol
+  kanan), `PermissionRowView`. Setiap kendali lama dipetakan satu-satu — daftarnya ada di komentar
+  kepala berkas. Tambahan yang tak ada sebelumnya: kartu **Data storage locations** dengan
+  "Open Folder" ke `HelperSharedStore.stateDir` (menghormati `YSM_STATE_DIR`).
+- `SettingsView.swift` (jendela ⌘,) kini hanya pembungkus `SettingsPageView(showHeader: false)`
+  760×560 — satu sumber, dua pintu. Jendela itu perlu `.languagePackHost`-nya sendiri.
+- **Argumen QA**: `-onboardingDone NO -onboardingStep 3`, `--tab settings -settingsTab 4`
+  (NSArgumentDomain; `UIState` membaca `UserDefaults` sekali di awal, tidak menulis balik) —
+  `--tab onboarding` juga memaksa overlay muncul. Tangkapan layar: 4 langkah + 5 tab, gelap dan
+  terang, semuanya utuh di 1100×720.
+- Yang **belum** dipindah karena memang tidak ada di app lama: Meetily "Recordings" (kita tidak
+  menyimpan audio — itu klaim privasi, bukan kekurangan), "Summary model provider" (ringkasan
+  kita heuristik lokal di helper).
+
+Sisa tahap: **4** dokumentasi lewat generator (`docs/`), lalu rebuild bundel.
 
 ## Catatan yang perlu diketahui
 

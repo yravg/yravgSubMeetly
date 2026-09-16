@@ -82,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "file", "files": controller.ui.tab = 1
             case "notes", "meeting": controller.ui.tab = 2
             case "settings": controller.ui.tab = 3
+            case "onboarding": controller.ui.onboardingDone = false
             default: break
             }
         }

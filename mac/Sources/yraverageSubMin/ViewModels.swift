@@ -31,6 +31,15 @@ final class UIState: ObservableObject {
     @Published var launchAtLogin: Bool = false
     @Published var packStatus: String = ""
 
+    // Settings & onboarding (Tahap 3)
+    // Nilai awal bisa dipaksa dari argumen peluncuran (-settingsTab 2,
+    // -onboardingStep 3) untuk tangkapan layar QA; tidak pernah ditulis balik.
+    @Published var settingsTab: Int = UserDefaults.standard.integer(forKey: "settingsTab")
+    @Published var onboardingStep: Int = max(1, UserDefaults.standard.integer(forKey: "onboardingStep"))
+    @Published var onboardingDone: Bool = Prefs.shared.onboardingDone {
+        didSet { Prefs.shared.onboardingDone = onboardingDone }
+    }
+
     // Workspace rapat (Tahap 2)
     /// Lebar panel transkrip, 0,30–0,50, tersimpan — seperti Meetily.
     @Published var paneRatio: Double = Prefs.shared.transcriptPaneRatio {
