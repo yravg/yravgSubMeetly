@@ -410,6 +410,34 @@ Yang perlu diingat:
 - `export-browser` gagal sekali (batas 32 dtk) saat suite berjalan bersamaan dengan build Swift +
   peluncuran aplikasi; 3/3 lulus ~2,6 dtk saat sendirian. Beban mesin, bukan regresi.
 
+## Upgrade ala Meetily — Tahap 2: workspace rapat + jalur tulis (2026-09-16)
+
+- **Dokumen bersama membawa `transcript[]`** (`{t0,t1,source,translation}`, ≤3000 baris,
+  `_normalize_transcript` di helper). Dokumen dari ekstensi tidak punya → kosong, bukan galat.
+- **`HelperClient.swift`** — POST/DELETE `/notes`, POST `/notes/generate` (heuristik helper yang
+  sudah ada). Hanya `Data` yang menyeberangi batas actor: `[String: Any]` **tidak Sendable** di
+  Swift 6 dan build gagal dengan "sending 'json' risks causing data races" — serialisasi di
+  `AppController`, klien menerima/mengembalikan `Data`.
+- **`HelperSharedStore.upsertLocally/removeLocally`** — cadangan saat helper mati; aturan sama
+  dengan helper (ganti per id, sisip depan, ≤50); dokumen lain disalin sebagai dict mentah supaya
+  field yang tak dikenal Swift tidak hilang. `SharedNoteDoc.json`/`SharedNoteItem.json` adalah
+  encoder-nya; `items` selalu diisi dari `register`, jadi dokumen v1 yang disunting naik ke v2.
+- **Stop → rapat tersimpan** (`AppController.finishMeeting`): id `MOM-MAC-<epoch>`, transkrip
+  dari `session.lines`, draf summary/decisions/actions dari `/notes/generate` bila helper hidup,
+  lalu rute pindah ke rapat itu. Sesi tanpa baris tidak membuat rapat.
+- **Mutasi**: `renameMeeting`, `deleteMeeting`, `addItem`, `setItemStatus`, `removeItem`,
+  `generateNotes` (butir draf AI diberi confidence 0,6 → helper menandai "perlu dicek").
+- **UI**: `MeetingView` = split transkrip | register (rasio 0,30–0,50 lewat `DragGesture` di
+  `coordinateSpace("split")`, tersimpan `Prefs.transcriptPaneRatio`); toolbar register: Generate
+  notes (`.dsAI`), + Decision/Action/More; menu konteks butir (Mark done/Reopen, Delete) lewat
+  callback opsional `SharedRegisterView(onToggle:onDelete:)`; sidebar: menu konteks Rename…/Delete…;
+  `RenameSheet` + alert hapus dengan kalimat akibat.
+- **Probe**: `--register-probe --upsert <json>` / `--remove <id>` menjalankan jalur tulis cadangan;
+  `transcriptLines` ikut dilaporkan. Tes `shared-register` kini 15.
+- Bundel `mac/build/yraverageSubMin.app` **sudah bisa dibangun**: `make-signing-cert.sh` dijalankan
+  (sertifikat self-signed "yraverageSubMin Dev" di keychain login); bundel lama `yraverageSub.app`
+  dihapus.
+
 Sisa tahap: **2** workspace split + tulis balik `POST /notes` · **3** onboarding 4 langkah + Settings
 tab bergaris-bawah (Capture · Subtitles & Overlay · Dictation · Languages & Permissions · General)
 · **4** dokumentasi.

@@ -41,6 +41,9 @@ private extension SharedItemType {
 
 private struct RegisterRow: View {
     let item: SharedNoteItem
+    /// Ada hanya di workspace yang bisa menulis; nil = baca-saja.
+    var onToggle: ((SharedNoteItem) -> Void)? = nil
+    var onDelete: ((SharedNoteItem) -> Void)? = nil
 
     private var statusLabel: String? {
         switch item.status {
@@ -102,6 +105,15 @@ private struct RegisterRow: View {
             }
         }
         .padding(.vertical, 3)
+        .contentShape(Rectangle())
+        .contextMenu {
+            if item.type == .action, let toggle = onToggle {
+                Button(item.isClosed ? "Reopen" : "Mark done") { toggle(item) }
+            }
+            if let del = onDelete {
+                Button("Delete item", role: .destructive) { del(item) }
+            }
+        }
     }
 
     /// Baris fakta di bawah teks. Hanya yang benar-benar ada yang ikut —
@@ -210,6 +222,8 @@ struct SharedRegisterView: View {
     /// Tertanam di MeetingView: tanpa bingkai GroupBox dan tanpa judul dokumen,
     /// karena kerangka halaman sudah menyediakan keduanya.
     var embedded = false
+    var onToggle: ((SharedNoteItem) -> Void)? = nil
+    var onDelete: ((SharedNoteItem) -> Void)? = nil
 
     var body: some View {
         if embedded {
@@ -253,7 +267,7 @@ struct SharedRegisterView: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(visibleItems.enumerated()), id: \.offset) { _, item in
-                        RegisterRow(item: item)
+                        RegisterRow(item: item, onToggle: onToggle, onDelete: onDelete)
                     }
                 }
             }

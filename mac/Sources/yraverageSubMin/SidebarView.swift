@@ -128,7 +128,9 @@ struct SidebarView: View {
                             subtitle: [d.date, d.meeting?.seq.map { "#\($0)" }].compactMap { $0 }
                                 .filter { !$0.isEmpty }.joined(separator: " · "),
                             match: matchSnippet(d),
-                            active: ui.route == .meeting(d.id)
+                            active: ui.route == .meeting(d.id),
+                            onRename: { ui.renameText = d.title; ui.renamingId = d.id },
+                            onDelete: { ui.deletingId = d.id }
                         ) { ui.route = .meeting(d.id) }
                     }
                 }
@@ -273,13 +275,16 @@ struct SidebarView: View {
     }
 }
 
-/// Satu baris rapat di sidebar. Aksi ubah nama/hapus datang di Tahap 2 bersama
-/// jalur tulis ke helper — tanpa itu tombolnya hanya akan berbohong.
+/// Satu baris rapat di sidebar. Ubah nama / hapus lewat menu konteks —
+/// Meetily menampilkannya sebagai ikon saat hover; menu konteks lebih jujur di
+/// macOS dan tidak menyembunyikan aksi destruktif di balik gerakan mouse.
 private struct MeetingRow: View {
     let title: String
     let subtitle: String
     let match: String?
     let active: Bool
+    var onRename: () -> Void = {}
+    var onDelete: () -> Void = {}
     let action: () -> Void
 
     var body: some View {
@@ -318,6 +323,10 @@ private struct MeetingRow: View {
             .contentShape(RoundedRectangle(cornerRadius: DS.Radius.md))
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button("Rename…", action: onRename)
+            Button("Delete…", role: .destructive, action: onDelete)
+        }
     }
 }
 

@@ -12,6 +12,29 @@ import Foundation
 enum RegisterProbe {
     /// Bentuk cetakan sengaja datar dan stabil — ia adalah kontrak tes.
     static func run() {
+        // `--upsert <berkas.json>`: jalankan jalur tulis cadangan (encoder JSON
+        // dokumen + tulis berkas) pada dokumen di berkas itu, lalu laporkan
+        // keadaan sesudahnya. Inilah yang dipakai aplikasi saat helper mati.
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--upsert"), i + 1 < args.count,
+           let data = FileManager.default.contents(atPath: args[i + 1]),
+           let raw = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            // Lewatkan dekoder + encoder: itulah yang diuji — sebuah dokumen v1
+            // yang disunting harus keluar sebagai v2 dengan field lamanya utuh.
+            if let d = (try? JSONDecoder().decode(SharedNoteDoc.self, from: data)) {
+                var j = d.json
+                if let extra = raw["__addItem"] as? [String: Any] {
+                    var items = (j["items"] as? [[String: Any]]) ?? []
+                    items.append(extra)
+                    j["items"] = items
+                }
+                if let t = raw["__rename"] as? String { j["title"] = t }
+                HelperSharedStore.upsertLocally(j)
+            }
+        }
+        if let i = args.firstIndex(of: "--remove"), i + 1 < args.count {
+            HelperSharedStore.removeLocally(id: args[i + 1])
+        }
         let docs = HelperSharedStore.load()
         let payload: [String: Any] = [
             "source": HelperSharedStore.fileURL.path,
@@ -28,6 +51,7 @@ enum RegisterProbe {
                     // Benar bila registernya disusun ulang dari decisions/actions
                     // karena dokumennya format lama.
                     "rebuiltFromV1": doc.items.isEmpty,
+                    "transcriptLines": doc.transcript.count,
                     "counts": Dictionary(
                         uniqueKeysWithValues: SharedItemType.allCases.map { ($0.rawValue, doc.count(of: $0)) }
                     ),

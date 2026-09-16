@@ -31,6 +31,21 @@ final class UIState: ObservableObject {
     @Published var launchAtLogin: Bool = false
     @Published var packStatus: String = ""
 
+    // Workspace rapat (Tahap 2)
+    /// Lebar panel transkrip, 0,30–0,50, tersimpan — seperti Meetily.
+    @Published var paneRatio: Double = Prefs.shared.transcriptPaneRatio {
+        didSet { Prefs.shared.transcriptPaneRatio = paneRatio }
+    }
+    @Published var renamingId: String? = nil
+    @Published var renameText = ""
+    @Published var deletingId: String? = nil
+    @Published var addingType: SharedItemType? = nil
+    @Published var addText = ""
+    @Published var addOwner = ""
+    /// Pesan singkat saat menyimpan/menghasilkan; kosong = diam.
+    @Published var noteBusy = ""
+    @Published var noteError = ""
+
     /// Kompatibilitas: `--tab live|file|notes` dan kode lama yang memakai indeks.
     var tab: Int {
         get {

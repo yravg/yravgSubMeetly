@@ -1039,6 +1039,40 @@ def _normalize_items(raw) -> list:
     return out
 
 
+_MAX_TRANSCRIPT = 3000
+
+
+def _normalize_transcript(raw) -> list:
+    """Baris transkrip sesi yang direkam aplikasi macOS. Dokumen dari ekstensi
+    tidak membawanya (register hanya menyimpan provenance per butir), jadi
+    field ini opsional dan kosong bukan galat."""
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for l in raw[:_MAX_TRANSCRIPT]:
+        if not isinstance(l, dict):
+            continue
+        text = _flat_text(l.get("source") or l.get("text"))
+        if not text:
+            continue
+
+        def num(k):
+            try:
+                return max(0.0, float(l.get(k)))
+            except (TypeError, ValueError):
+                return 0.0
+
+        out.append(
+            {
+                "t0": num("t0"),
+                "t1": num("t1"),
+                "source": text[:2000],
+                "translation": _flat_text(l.get("translation"))[:2000],
+            }
+        )
+    return out
+
+
 def _normalize_meeting_meta(raw):
     if not isinstance(raw, dict):
         return None
@@ -1132,6 +1166,7 @@ def _normalize_note_doc(raw) -> tuple[dict | None, str | None]:
             "schemaVersion": 2,
             "meeting": _normalize_meeting_meta(raw.get("meeting")),
             "items": _normalize_items(raw.get("items")),
+            "transcript": _normalize_transcript(raw.get("transcript")),
         },
         None,
     )

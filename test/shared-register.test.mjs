@@ -20,7 +20,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -354,4 +354,75 @@ test('aplikasi macOS mundur ke berkas nama lama bila yang baru belum ada', { ski
   const seen = JSON.parse(out.trim().split('\n').at(-1));
   assert.equal(seen.docs.length, 1, 'notulen di direktori lama tidak terbaca');
   assert.equal(seen.docs[0].title, 'Dari direktori lama');
+});
+
+test('transkrip sesi macOS dipertahankan helper dan dibaca aplikasi', { skip: macSkip }, () => {
+  // Dokumen dari ekstensi tidak membawa transkrip; yang direkam aplikasi mac
+  // membawanya, dan itulah isi panel kiri workspace rapat.
+  const { doc, err } = normalizeViaHelper({
+    id: 'MOM-MAC-1', title: 'Rekaman mac', source: 'mac',
+    transcript: [
+      { t0: 0, t1: 4.2, source: 'Selamat pagi semua.', translation: 'Good morning all.' },
+      { t0: 4.2, t1: 9, source: 'Kita mulai dari progres.' },
+      { t0: 'x', source: '' },                 // tanpa teks → dibuang
+      'bukan objek',
+    ],
+  });
+  assert.equal(err, null);
+  assert.equal(doc.transcript.length, 2, 'baris kosong dan bukan objek harus dibuang');
+  assert.deepEqual(doc.transcript[0], { t0: 0, t1: 4.2, source: 'Selamat pagi semua.', translation: 'Good morning all.' });
+  assert.equal(doc.transcript[1].translation, '', 'terjemahan opsional jadi string kosong');
+
+  const seen = probeRegister(doc).docs[0];
+  assert.equal(seen.transcriptLines, 2, 'aplikasi macOS tidak membaca transkrip');
+});
+
+test('dokumen tanpa transkrip (dari ekstensi) tetap sah', () => {
+  const { doc, err } = normalizeViaHelper(meetingToDoc(sampleMeeting()));
+  assert.equal(err, null);
+  assert.deepEqual(doc.transcript, []);
+});
+
+/** Jalankan probe dengan argumen tambahan pada direktori state tertentu. */
+function probeWith(dir, args) {
+  const out = execFileSync(MAC_BIN, ['--register-probe', ...args], {
+    env: { ...process.env, YSM_STATE_DIR: dir }, encoding: 'utf8',
+  });
+  return JSON.parse(out.trim().split('\n').at(-1));
+}
+
+test('jalur tulis cadangan: dokumen v1 yang disunting naik ke v2 tanpa kehilangan isi lama', { skip: macSkip }, () => {
+  // Saat helper mati, aplikasi menulis berkasnya sendiri lewat encoder JSON
+  // SharedNoteDoc. Ini memastikan (1) decisions/actions v1 tetap ada, (2)
+  // register-nya jadi items v2, (3) butir baru masuk, (4) dokumen lain di
+  // berkas yang sama tidak tersentuh.
+  const dir = mkdtempSync(`${tmpdir()}/ysm-write-`);
+  const lain = { id: 'lain', title: 'Rapat lain', decisions: ['Tetap'], actions: [], custom: 'field asing' };
+  const v1 = { id: 'v1', title: 'Judul lama', summary: 'S', decisions: ['Keputusan lama'],
+    actions: [{ id: 'act-1', text: 'Tindak lanjut lama', owner: 'Citra', status: 'open' }] };
+  writeFileSync(join(dir, 'notes.json'), JSON.stringify({ notes: [lain, v1] }));
+
+  const edit = { ...v1, __rename: 'Judul baru',
+    __addItem: { ref: 'M-3', type: 'risk', text: 'Risiko baru', status: 'open', priority: 'high', likelihood: 'likely', review: 'edited', confidence: 1 } };
+  const editPath = join(dir, 'edit.json');
+  writeFileSync(editPath, JSON.stringify(edit));
+
+  const seen = probeWith(dir, ['--upsert', editPath]);
+  assert.equal(seen.docs.length, 2);
+  const v = seen.docs.find((d) => d.id === 'v1');
+  assert.equal(v.title, 'Judul baru', 'ubah nama tidak tersimpan');
+  assert.equal(v.schemaVersion, 2, 'dokumen yang disunting harus naik ke v2');
+  assert.equal(v.rebuiltFromV1, false, 'register harus tersimpan sebagai items, bukan disusun ulang');
+  assert.equal(v.registerCount, 3, 'keputusan + tindak lanjut lama + risiko baru');
+  assert.equal(v.items.find((i) => i.ref === 'M-3').riskLabel, 'High × Likely');
+  assert.equal(v.items.find((i) => i.type === 'action').ownerLabel, 'Citra', 'pemilik tindak lanjut v1 hilang');
+  assert.equal(seen.docs[0].id, 'v1', 'dokumen yang disunting harus pindah ke depan (aturan helper)');
+
+  // Berkas mentah: dokumen lain tetap utuh termasuk field yang tak dikenal Swift.
+  const raw = JSON.parse(readFileSync(join(dir, 'notes.json'), 'utf8'));
+  assert.equal(raw.notes.find((n) => n.id === 'lain').custom, 'field asing', 'field asing dokumen lain ikut hilang');
+  assert.deepEqual(raw.notes.find((n) => n.id === 'v1').decisions, ['Keputusan lama'], 'decisions v1 harus tetap ditulis');
+
+  const after = probeWith(dir, ['--remove', 'v1']);
+  assert.deepEqual(after.docs.map((d) => d.id), ['lain'], 'hapus lokal tidak bekerja');
 });

@@ -296,6 +296,9 @@ final class AppController: ObservableObject {
         Task {
             if session.isRunning {
                 await session.stop()
+                // Meetily: berhenti = rapat tersimpan. Dilakukan sebelum
+                // sessionStartedAt dibersihkan karena judulnya memakai jam mulai.
+                await finishMeeting()
                 sessionStartedAt = nil
             } else {
                 Prefs.shared.captureTarget = selectedTarget.id
@@ -303,6 +306,169 @@ final class AppController: ObservableObject {
                 sessionStartedAt = session.isRunning ? Date() : nil
             }
             syncFromSession()
+        }
+    }
+
+    // MARK: - Notulen: jalur tulis
+
+    /// Simpan lewat helper (yang menormalkan dokumen); bila helper tidak hidup,
+    /// tulis langsung ke berkas dengan aturan yang sama. Selalu muat ulang.
+    @discardableResult
+    private func persist(_ json: [String: Any]) async -> SharedNoteDoc? {
+        var saved: SharedNoteDoc?
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["note": json])
+            saved = try await HelperClient.save(body: body)
+        } catch {
+            saved = HelperSharedStore.upsertLocally(json)
+        }
+        refreshSharedNotes()
+        return saved
+    }
+
+    private func sharedDoc(_ id: String) -> SharedNoteDoc? {
+        notesUI.sharedDocs.first { $0.id == id }
+    }
+
+    /// Draf heuristik helper, sebagai dict. Serialisasi/urai di sini supaya
+    /// hanya Data yang menyeberangi batas actor.
+    private func requestDraft(texts: [String], title: String) async throws -> [String: Any] {
+        let body = try JSONSerialization.data(withJSONObject: [
+            "lines": texts.map { ["text": $0] }, "title": title, "source": "mac",
+        ])
+        let data = try await HelperClient.generate(body: body)
+        guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let note = obj["note"] as? [String: Any] else {
+            throw HelperClient.Failure(message: "helper returned no note")
+        }
+        return note
+    }
+
+    /// Stop → rapat baru dari baris sesi. Draf keputusan/tindak lanjut diminta
+    /// ke helper (heuristik, best-effort); tanpa helper rapat tetap tersimpan
+    /// dengan transkripnya saja.
+    func finishMeeting() async {
+        let lines = session.lines.filter { !$0.source.isEmpty }
+        guard !lines.isEmpty else { return }
+        let start = sessionStartedAt ?? Date()
+        let day = DateFormatter(); day.dateFormat = "yyyy-MM-dd"
+        let clock = DateFormatter(); clock.dateFormat = "HH:mm"
+        let id = "MOM-MAC-\(Int(start.timeIntervalSince1970))"
+        let title = "Meeting \(day.string(from: start)) \(clock.string(from: start))"
+        ui.noteBusy = "Saving meeting…"
+        defer { ui.noteBusy = "" }
+
+        var engine: [String: Any] = [
+            "asr": "apple-speech",
+            "segments": lines.count,
+            "durationSec": Int(Date().timeIntervalSince(start)),
+        ]
+        if Prefs.shared.translateEnabled { engine["mt"] = "apple-translation" }
+        var doc: [String: Any] = [
+            "id": id, "title": title, "date": day.string(from: start),
+            "source": "mac", "status": "ready", "summary": "",
+            "decisions": [], "actions": [], "schemaVersion": 2, "items": [],
+            "transcript": lines.map {
+                ["t0": $0.start, "t1": $0.end, "source": $0.source, "translation": $0.translation]
+            },
+            "meeting": [
+                "locale": Prefs.shared.sourceLocale,
+                "generatedAt": ISO8601DateFormatter().string(from: Date()),
+                "engine": engine,
+            ],
+        ]
+        if let draft = try? await requestDraft(texts: lines.map(\.source), title: title) {
+            doc["summary"] = draft["summary"] ?? ""
+            doc["decisions"] = draft["decisions"] ?? []
+            doc["actions"] = draft["actions"] ?? []
+        }
+        await persist(doc)
+        ui.route = .meeting(id)
+    }
+
+    func renameMeeting(id: String, title: String) async {
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var j = sharedDoc(id)?.json, !t.isEmpty else { return }
+        j["title"] = t
+        ui.noteBusy = "Saving…"
+        await persist(j)
+        ui.noteBusy = ""
+    }
+
+    func deleteMeeting(id: String) async {
+        do { try await HelperClient.delete(id: id) } catch { HelperSharedStore.removeLocally(id: id) }
+        refreshSharedNotes()
+        if case .meeting(let cur) = ui.route, cur == id {
+            ui.route = notesUI.sharedDocs.first.map { .meeting($0.id) } ?? .home
+        }
+    }
+
+    func addItem(to id: String, type: SharedItemType, text: String, owner: String) async {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let d = sharedDoc(id), !t.isEmpty else { return }
+        var j = d.json
+        var items = (j["items"] as? [[String: Any]]) ?? []
+        var item: [String: Any] = [
+            "ref": "M-\(items.count + 1)", "type": type.rawValue, "text": t,
+            "status": "open", "review": "edited", "confidence": 1,
+        ]
+        let o = owner.trimmingCharacters(in: .whitespaces)
+        if !o.isEmpty { item["owner"] = o }
+        items.append(item)
+        j["items"] = items
+        ui.noteBusy = "Saving…"
+        await persist(j)
+        ui.noteBusy = ""
+    }
+
+    func setItemStatus(in id: String, ref: String, closed: Bool) async {
+        guard let d = sharedDoc(id) else { return }
+        var j = d.json
+        j["items"] = ((j["items"] as? [[String: Any]]) ?? []).map { it -> [String: Any] in
+            var it = it
+            if (it["ref"] as? String) == ref { it["status"] = closed ? "closed" : "open" }
+            return it
+        }
+        await persist(j)
+    }
+
+    func removeItem(from id: String, ref: String) async {
+        guard let d = sharedDoc(id) else { return }
+        var j = d.json
+        j["items"] = ((j["items"] as? [[String: Any]]) ?? []).filter { ($0["ref"] as? String) != ref }
+        await persist(j)
+    }
+
+    /// "Generate notes": draf heuristik helper dari transkrip, digabung ke
+    /// register sebagai butir berkeyakinan 0,6 — di bawah ambang, jadi helper
+    /// menandainya "perlu dicek". Draf AI memang harus dibaca ulang manusia.
+    func generateNotes(for id: String) async {
+        guard let d = sharedDoc(id), !d.transcript.isEmpty else { return }
+        ui.noteBusy = "Generating notes…"
+        ui.noteError = ""
+        defer { ui.noteBusy = "" }
+        do {
+            let draft = try await requestDraft(texts: d.transcript.map(\.source), title: d.title)
+            var j = d.json
+            if let sum = draft["summary"] as? String, !sum.isEmpty { j["summary"] = sum }
+            var items = (j["items"] as? [[String: Any]]) ?? []
+            let existing = Set(items.compactMap { ($0["text"] as? String)?.lowercased() })
+            var n = items.count
+            for dec in (draft["decisions"] as? [String]) ?? [] where !existing.contains(dec.lowercased()) {
+                n += 1
+                items.append(["ref": "M-\(n)", "type": "decision", "text": dec,
+                              "status": "open", "review": "ai", "confidence": 0.6])
+            }
+            for act in (draft["actions"] as? [[String: Any]]) ?? [] {
+                guard let text = act["text"] as? String, !existing.contains(text.lowercased()) else { continue }
+                n += 1
+                items.append(["ref": "M-\(n)", "type": "action", "text": text,
+                              "status": "open", "review": "ai", "confidence": 0.6])
+            }
+            j["items"] = items
+            await persist(j)
+        } catch {
+            ui.noteError = "Generate needs the Native Helper running — \(error.localizedDescription)"
         }
     }
 

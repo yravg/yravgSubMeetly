@@ -135,6 +135,31 @@ struct SharedNoteItem: Identifiable, Decodable {
 
     var isClosed: Bool { status == "closed" }
 
+    /// Bentuk yang dikirim ke helper — nama field persis CodingKeys.
+    var json: [String: Any] {
+        var j: [String: Any] = [
+            "ref": ref, "type": type.rawValue, "topic": topic, "text": text,
+            "status": status, "review": review, "confidence": confidence,
+            "needsReview": needsReview, "links": links,
+        ]
+        if let v = owner { j["owner"] = v }
+        if let v = org { j["org"] = v }
+        if let v = due { j["due"] = v }
+        if let v = priority { j["priority"] = v }
+        if let v = likelihood { j["likelihood"] = v }
+        if let v = tc { j["tc"] = v }
+        if let v = speaker { j["speaker"] = v }
+        if let v = carriedFrom { j["carriedFrom"] = v }
+        if let m = metric {
+            var mj: [String: Any] = ["measure": m.measure, "value": m.value, "unit": m.unit]
+            if let b = m.baseline { mj["baseline"] = b }
+            if let v = m.variance { mj["variance"] = v }
+            if let a = m.asOf { mj["asOf"] = a }
+            j["metric"] = mj
+        }
+        return j
+    }
+
     var ownerLabel: String? {
         guard let o = owner, !o.isEmpty else { return nil }
         if let g = org, !g.isEmpty { return "\(o) · \(g)" }
@@ -146,6 +171,31 @@ struct SharedNoteItem: Identifiable, Decodable {
         guard type == .risk, let p = priority, let l = likelihood else { return nil }
         return "\(p.capitalized) × \(l.capitalized)"
     }
+}
+
+/// Satu baris transkrip yang direkam aplikasi ini (t0/t1 detik).
+struct SharedTranscriptLine: Identifiable, Decodable {
+    var t0: Double = 0
+    var t1: Double = 0
+    var source: String = ""
+    var translation: String = ""
+    var id: String { "\(t0)-\(source.hashValue)" }
+
+    private enum CodingKeys: String, CodingKey { case t0, t1, source, translation }
+
+    init(t0: Double, t1: Double, source: String, translation: String = "") {
+        self.t0 = t0; self.t1 = t1; self.source = source; self.translation = translation
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        t0 = (try? c.decode(Double.self, forKey: .t0)) ?? 0
+        t1 = (try? c.decode(Double.self, forKey: .t1)) ?? 0
+        source = (try? c.decode(String.self, forKey: .source)) ?? ""
+        translation = (try? c.decode(String.self, forKey: .translation)) ?? ""
+    }
+
+    var json: [String: Any] { ["t0": t0, "t1": t1, "source": source, "translation": translation] }
 }
 
 // MARK: - Metadata rapat
@@ -264,10 +314,11 @@ struct SharedNoteDoc: Identifiable, Decodable {
     var schemaVersion: Int = 1
     var meeting: SharedMeetingMeta? = nil
     var items: [SharedNoteItem] = []
+    var transcript: [SharedTranscriptLine] = []
 
     private enum CodingKeys: String, CodingKey {
         case id, title, date, source, status, summary, decisions, actions
-        case schemaVersion, meeting, items
+        case schemaVersion, meeting, items, transcript
     }
 
     init(from decoder: Decoder) throws {
@@ -287,6 +338,7 @@ struct SharedNoteDoc: Identifiable, Decodable {
         schemaVersion = (try? c.decode(Int.self, forKey: .schemaVersion)) ?? 1
         meeting = try? c.decodeIfPresent(SharedMeetingMeta.self, forKey: .meeting)
         items = (try? c.decode([SharedNoteItem].self, forKey: .items)) ?? []
+        transcript = (try? c.decode([SharedTranscriptLine].self, forKey: .transcript)) ?? []
     }
 
     /// Register yang ditampilkan. Dokumen v1 tidak punya `items`, jadi
@@ -325,6 +377,44 @@ struct SharedNoteDoc: Identifiable, Decodable {
     }
 
     var isIssued: Bool { status == "issued" }
+
+    /// Dokumen utuh untuk dikirim/ditulis ulang. `items` selalu diisi dari
+    /// `register`, jadi dokumen v1 yang disunting naik ke v2 saat disimpan.
+    var json: [String: Any] {
+        var j: [String: Any] = [
+            "id": id, "title": title, "date": date, "source": source, "status": status,
+            "summary": summary, "decisions": decisions,
+            "actions": actions.map { a -> [String: Any] in
+                var aj: [String: Any] = ["id": a.id, "text": a.text, "status": a.status]
+                if let o = a.owner { aj["owner"] = o }
+                if let d = a.due { aj["due"] = d }
+                return aj
+            },
+            "schemaVersion": 2,
+            "items": register.map(\.json),
+            "transcript": transcript.map(\.json),
+        ]
+        if let m = meeting {
+            var mj: [String: Any] = [
+                "seriesId": m.seriesId, "projectType": m.projectType, "locale": m.locale, "tz": m.tz,
+                "attendees": m.attendees, "generatedAt": m.generatedAt,
+                "agenda": ["total": m.agenda.total, "covered": m.agenda.covered],
+            ]
+            if let v = m.seq { mj["seq"] = v }
+            if let v = m.start { mj["start"] = v }
+            if let v = m.end { mj["end"] = v }
+            if let v = m.chair { mj["chair"] = v }
+            if let v = m.issuedAt { mj["issuedAt"] = v }
+            if let e = m.engine {
+                var ej: [String: Any] = ["asr": e.asr, "segments": e.segments]
+                if let v = e.mt { ej["mt"] = v }
+                if let v = e.durationSec { ej["durationSec"] = v }
+                mj["engine"] = ej
+            }
+            j["meeting"] = mj
+        }
+        return j
+    }
 }
 
 private struct SharedNotesEnvelope: Decodable {
@@ -366,6 +456,39 @@ enum HelperSharedStore {
     /// ini lebih dulu — tanpa jalur cadangan, notulen mereka terlihat hilang.
     static var legacyFileURL: URL {
         homeDir.appendingPathComponent(".localtranssub/notes.json", isDirectory: false)
+    }
+
+    /// Cadangan jalur tulis saat helper tidak hidup. Aturannya sama dengan
+    /// POST /notes di helper: ganti per id, sisip di depan, maksimal 50.
+    /// Dokumen lain disalin apa adanya (dict mentah) supaya field yang tidak
+    /// dikenal aplikasi ini tidak ikut hilang.
+    @discardableResult
+    static func upsertLocally(_ note: [String: Any]) -> SharedNoteDoc? {
+        guard let id = note["id"] as? String, !id.isEmpty else { return nil }
+        var notes = rawNotes().filter { ($0["id"] as? String) != id }
+        notes.insert(note, at: 0)
+        write(Array(notes.prefix(50)))
+        return (try? JSONSerialization.data(withJSONObject: note))
+            .flatMap { try? JSONDecoder().decode(SharedNoteDoc.self, from: $0) }
+    }
+
+    static func removeLocally(id: String) {
+        write(rawNotes().filter { ($0["id"] as? String) != id })
+    }
+
+    private static func rawNotes() -> [[String: Any]] {
+        guard let data = try? Data(contentsOf: fileURL),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let notes = obj["notes"] as? [[String: Any]] else { return [] }
+        return notes
+    }
+
+    private static func write(_ notes: [[String: Any]]) {
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        guard let data = try? JSONSerialization.data(
+            withJSONObject: ["updatedAt": stamp, "notes": notes], options: [.prettyPrinted]) else { return }
+        try? FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
+        try? data.write(to: fileURL, options: .atomic)
     }
 
     /// Muat dokumen bersama; [] bila berkas belum ada / korup.

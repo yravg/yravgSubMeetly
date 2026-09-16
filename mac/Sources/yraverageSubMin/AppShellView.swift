@@ -36,6 +36,20 @@ struct AppShellView: View {
         .tint(Brand.reskinAccent(prefs.reskin, scheme))
         .languagePackHost(app.packInstaller)
         .sheet(isPresented: $ui.showAbout) { AboutSheet(ui: ui) }
+        .sheet(isPresented: Binding(get: { ui.renamingId != nil }, set: { if !$0 { ui.renamingId = nil } })) {
+            RenameSheet(app: app, ui: ui)
+        }
+        // Konfirmasi destruktif menyebut akibatnya — kalimat Meetily sendiri.
+        .alert("Delete this meeting?",
+               isPresented: Binding(get: { ui.deletingId != nil }, set: { if !$0 { ui.deletingId = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let id = ui.deletingId { Task { await app.deleteMeeting(id: id) } }
+                ui.deletingId = nil
+            }
+            Button("Cancel", role: .cancel) { ui.deletingId = nil }
+        } message: {
+            Text("This action cannot be undone. The meeting is removed from the shared register used by the browser extension too.")
+        }
     }
 
     @ViewBuilder
@@ -178,5 +192,37 @@ private struct AboutSheet: View {
         .padding(DS.Space.s6)
         .frame(width: 480)
         .background(DS.Colors.panel)
+    }
+}
+
+/// Dialog "Edit Meeting Title" — satu kolom, Simpan/Batal.
+private struct RenameSheet: View {
+    @ObservedObject var app: AppController
+    @ObservedObject var ui: UIState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.s4) {
+            Text("Edit meeting title").font(.system(size: 17, weight: .semibold)).foregroundStyle(DS.Colors.textStrong)
+            TextField("Meeting title", text: $ui.renameText)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 13))
+                .onSubmit { save() }
+            HStack {
+                Spacer()
+                Button("Cancel") { ui.renamingId = nil }.buttonStyle(.dsSecondary).keyboardShortcut(.cancelAction)
+                Button("Save") { save() }.buttonStyle(.dsSolid).keyboardShortcut(.defaultAction)
+                    .disabled(ui.renameText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(DS.Space.s6)
+        .frame(width: 424)
+        .background(DS.Colors.panel)
+    }
+
+    private func save() {
+        guard let id = ui.renamingId else { return }
+        let t = ui.renameText
+        ui.renamingId = nil
+        Task { await app.renameMeeting(id: id, title: t) }
     }
 }
