@@ -306,3 +306,44 @@ fn live_keeps_the_last_caption_and_its_rtf() {
     assert_eq!(get()["seq"], 1);
     let _ = fs::remove_dir_all(&state);
 }
+
+#[test]
+fn engine_device_choice_is_validated_and_persisted() {
+    let (app, state) = app_with_state();
+    let post = |body: &str| {
+        let mut req = request("POST", "/engine/device", None, "127.0.0.1:17865", true);
+        req.body = body.as_bytes().to_vec();
+        app.handle(&req)
+    };
+    assert_eq!(post(r#"{"device":"quantum"}"#).status, 400);
+    assert_eq!(post("not json").status, 400);
+    assert_eq!(post(r#"{"device":"cpu"}"#).status, 200);
+    let got = app
+        .handle(&request(
+            "GET",
+            "/engine/device",
+            None,
+            "127.0.0.1:17865",
+            true,
+        ))
+        .body
+        .expect("body");
+    assert_eq!(got["device"], "cpu");
+    // A fresh App on the same state dir reads the saved choice back.
+    let again = App::new(state.clone());
+    let got = again
+        .handle(&request(
+            "GET",
+            "/engine/device",
+            None,
+            "127.0.0.1:17865",
+            true,
+        ))
+        .body
+        .expect("body");
+    assert_eq!(got["device"], "cpu");
+    // cuda without a GPU is accepted with a warning, never an error.
+    let cuda = post(r#"{"device":"cuda"}"#);
+    assert_eq!(cuda.status, 200);
+    let _ = fs::remove_dir_all(&state);
+}

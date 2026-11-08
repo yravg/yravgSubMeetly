@@ -40,7 +40,7 @@ set "MANIFEST=%MANIFEST_DIR%\com.yraveragesubmin.helper.json"
 del /q "%MANIFEST_DIR%\com.localtranssub.helper.json" >nul 2>&1
 
 REM JSON needs backslashes escaped.
-set "ENGINE_JSON=%ENGINE:\=\%"
+set "ENGINE_JSON=%ENGINE:\=\\%"
 
 > "%MANIFEST%" (
   echo {
