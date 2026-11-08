@@ -1,0 +1,75 @@
+{
+  "name": "GET /languages/targets",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "GET",
+    "path": "/languages/targets",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "targets": [
+        {
+          "code": "en",
+          "via": "whisper-direct",
+          "local": true
+        },
+        {
+          "code": "zh",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "de",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "fr",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "es",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "ru",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "it",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "id",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "vi",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "ja",
+          "via": "none",
+          "local": false
+        },
+        {
+          "code": "ko",
+          "via": "none",
+          "local": false
+        }
+      ]
+    }
+  },
+  "mask": [
+    "engine"
+  ]
+}

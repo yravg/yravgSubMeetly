@@ -1,0 +1,17 @@
+{
+  "name": "GET /jobs/unknown",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "GET",
+    "path": "/jobs/unknown",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "body": {
+      "error": "job not found"
+    }
+  },
+  "mask": []
+}

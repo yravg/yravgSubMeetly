@@ -1,0 +1,20 @@
+{
+  "name": "POST /engine/mode",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/engine/mode",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"mode\":\"accurate\"}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "mode": "accurate"
+    }
+  },
+  "mask": []
+}

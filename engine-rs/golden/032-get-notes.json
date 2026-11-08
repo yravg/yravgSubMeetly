@@ -1,0 +1,300 @@
+{
+  "name": "GET /notes",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "GET",
+    "path": "/notes",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "notes": [
+        {
+          "id": "note two",
+          "title": "Catatan Dua",
+          "date": "",
+          "source": "helper",
+          "status": "ready",
+          "generatedAt": "2026-11-08T10:00:00Z",
+          "summary": "",
+          "decisions": [
+            "Lanjut"
+          ],
+          "actions": [
+            {
+              "id": "act-1",
+              "text": "Tutup tiket",
+              "owner": null,
+              "due": null,
+              "status": "closed"
+            }
+          ],
+          "transcriptPreview": "",
+          "savedLocally": true,
+          "schemaVersion": 2,
+          "meeting": null,
+          "items": [],
+          "transcript": []
+        },
+        {
+          "id": "golden-note-1",
+          "title": "Rapat Mingguan — Proyek Alpha",
+          "date": "2026-11-08",
+          "source": "extension",
+          "status": "issued",
+          "generatedAt": "2026-11-08T09:30:00Z",
+          "summary": "Ringkasan rapat: keputusan utama dan tindak lanjut.",
+          "decisions": [
+            "Setujui jadwal baru",
+            "Tunda rilis beta",
+            "5",
+            "None"
+          ],
+          "actions": [
+            {
+              "id": "act-1",
+              "text": "Kirim jadwal ke tim",
+              "owner": "Rina",
+              "due": "2026-11-10",
+              "status": "open"
+            },
+            {
+              "id": "act-2",
+              "text": "Perbarui dokumen",
+              "owner": "Budi",
+              "due": "2026-11-12",
+              "status": "closed"
+            },
+            {
+              "id": "act-3",
+              "text": "Status tak dikenal",
+              "owner": null,
+              "due": null,
+              "status": "open"
+            }
+          ],
+          "transcriptPreview": "Halo semua, mari kita mulai.",
+          "savedLocally": true,
+          "schemaVersion": 2,
+          "meeting": {
+            "seriesId": "series-alpha",
+            "seq": 7,
+            "projectType": "engineering",
+            "locale": "id",
+            "tz": "Asia/Jakarta",
+            "start": "2026-11-08T09:00:00+07:00",
+            "end": "2026-11-08T09:30:00+07:00",
+            "chair": "Rina",
+            "attendees": [
+              "Rina",
+              "Budi",
+              "Sari"
+            ],
+            "agenda": {
+              "total": 5,
+              "covered": 4
+            },
+            "issuedAt": "2026-11-08T09:35:00Z",
+            "generatedAt": "2026-11-08T09:30:00Z",
+            "engine": {
+              "asr": "faster-whisper",
+              "mt": "mlx-lm",
+              "segments": 42,
+              "durationSec": 1800
+            }
+          },
+          "items": [
+            {
+              "ref": "D-01",
+              "type": "decision",
+              "topic": "Jadwal",
+              "text": "Jadwal baru disetujui",
+              "owner": "Rina",
+              "org": "PMO",
+              "due": "2026-11-10",
+              "status": "closed",
+              "priority": "high",
+              "likelihood": "certain",
+              "review": "accepted",
+              "confidence": 0.93,
+              "needsReview": false,
+              "tc": "00:01:10",
+              "speaker": "Rina",
+              "carriedFrom": "meeting-2026-10-01",
+              "links": [
+                "A-2",
+                "D-1"
+              ],
+              "metric": {
+                "measure": "Kapasitas",
+                "value": 12.5,
+                "unit": "orang",
+                "baseline": 10,
+                "variance": 2.5,
+                "asOf": "2026-11-08"
+              }
+            },
+            {
+              "ref": "I-2",
+              "type": "info",
+              "topic": "",
+              "text": "Pertanyaan penting",
+              "owner": null,
+              "org": null,
+              "due": null,
+              "status": "open",
+              "priority": null,
+              "likelihood": null,
+              "review": "ai",
+              "confidence": 0.55,
+              "needsReview": true,
+              "tc": null,
+              "speaker": null,
+              "carriedFrom": null,
+              "links": [],
+              "metric": null
+            },
+            {
+              "ref": "I-3",
+              "type": "info",
+              "topic": "",
+              "text": "Metrik lengkap",
+              "owner": null,
+              "org": null,
+              "due": null,
+              "status": "open",
+              "priority": null,
+              "likelihood": null,
+              "review": "ai",
+              "confidence": 0.9,
+              "needsReview": false,
+              "tc": null,
+              "speaker": null,
+              "carriedFrom": null,
+              "links": [],
+              "metric": {
+                "measure": "Biaya",
+                "value": 1500,
+                "unit": "USD",
+                "baseline": null,
+                "variance": 100,
+                "asOf": "5"
+              }
+            },
+            {
+              "ref": "1234567890123456789012345678901234567890",
+              "type": "info",
+              "topic": "",
+              "text": "Ref panjang",
+              "owner": null,
+              "org": null,
+              "due": null,
+              "status": "open",
+              "priority": null,
+              "likelihood": null,
+              "review": "ai",
+              "confidence": 1,
+              "needsReview": false,
+              "tc": null,
+              "speaker": null,
+              "carriedFrom": null,
+              "links": [
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+                "g",
+                "h",
+                "i",
+                "j",
+                "k",
+                "l",
+                "m",
+                "n",
+                "o",
+                "p",
+                "q",
+                "r",
+                "s",
+                "t"
+              ],
+              "metric": null
+            },
+            {
+              "ref": "I-8",
+              "type": "info",
+              "topic": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+              "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "owner": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+              "org": "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+              "due": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+              "status": "open",
+              "priority": null,
+              "likelihood": null,
+              "review": "ai",
+              "confidence": 1,
+              "needsReview": true,
+              "tc": "CCCCCCCCCCCCCCCC",
+              "speaker": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+              "carriedFrom": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+              "links": [],
+              "metric": null
+            },
+            {
+              "ref": "I-9",
+              "type": "info",
+              "topic": "",
+              "text": "Ruang",
+              "owner": "42",
+              "org": null,
+              "due": "20261110",
+              "status": "carried",
+              "priority": "low",
+              "likelihood": "unlikely",
+              "review": "edited",
+              "confidence": 1,
+              "needsReview": false,
+              "tc": "12",
+              "speaker": "True",
+              "carriedFrom": null,
+              "links": [],
+              "metric": {
+                "measure": "Bool",
+                "value": 1,
+                "unit": "",
+                "baseline": null,
+                "variance": null,
+                "asOf": null
+              }
+            }
+          ],
+          "transcript": [
+            {
+              "t0": 0.5,
+              "t1": 2.5,
+              "source": "Halo semua",
+              "translation": "Hello all"
+            },
+            {
+              "t0": 0,
+              "t1": 4.25,
+              "source": "Baris kedua",
+              "translation": "Second line"
+            },
+            {
+              "t0": 0,
+              "t1": 0,
+              "source": "Only EN",
+              "translation": "Hanya ID"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "mask": []
+}

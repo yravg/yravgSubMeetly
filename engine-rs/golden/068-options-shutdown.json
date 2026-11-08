@@ -1,0 +1,17 @@
+{
+  "name": "OPTIONS /shutdown",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "OPTIONS",
+    "path": "/shutdown",
+    "headers": {
+      "Origin": "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 204,
+    "body": null
+  },
+  "mask": []
+}

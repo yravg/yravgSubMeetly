@@ -1,0 +1,21 @@
+{
+  "name": "GET /ui-prefs",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "GET",
+    "path": "/ui-prefs",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "prefs": {
+        "theme": "dark",
+        "reskin": "yraverage"
+      },
+      "stored": true
+    }
+  },
+  "mask": []
+}

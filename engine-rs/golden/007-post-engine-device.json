@@ -1,0 +1,19 @@
+{
+  "name": "POST /engine/device",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/engine/device",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{bad json"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "body harus JSON {\"device\": ...}"
+    }
+  },
+  "mask": []
+}

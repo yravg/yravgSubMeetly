@@ -1,0 +1,23 @@
+{
+  "name": "GET /engine/device",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "GET",
+    "path": "/engine/device",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "device": "cuda",
+      "cuda_available": false,
+      "supported": true,
+      "applied": false
+    }
+  },
+  "mask": [
+    "active",
+    "compute"
+  ]
+}

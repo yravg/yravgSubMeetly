@@ -1,0 +1,46 @@
+{
+  "name": "POST /notes",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"note\":{\"id\":\"note two\",\"title\":\"Catatan Dua\",\"generatedAt\":\"2026-11-08T10:00:00Z\",\"decisions\":[\"Lanjut\"],\"actions\":[{\"text\":\"Tutup tiket\",\"status\":\"closed\",\"owner\":null,\"due\":null}]}}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "note": {
+        "id": "note two",
+        "title": "Catatan Dua",
+        "date": "",
+        "source": "helper",
+        "status": "ready",
+        "generatedAt": "2026-11-08T10:00:00Z",
+        "summary": "",
+        "decisions": [
+          "Lanjut"
+        ],
+        "actions": [
+          {
+            "id": "act-1",
+            "text": "Tutup tiket",
+            "owner": null,
+            "due": null,
+            "status": "closed"
+          }
+        ],
+        "transcriptPreview": "",
+        "savedLocally": true,
+        "schemaVersion": 2,
+        "meeting": null,
+        "items": [],
+        "transcript": []
+      }
+    }
+  },
+  "mask": []
+}

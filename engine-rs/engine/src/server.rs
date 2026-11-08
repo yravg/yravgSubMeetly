@@ -1,0 +1,209 @@
+//! Minimal HTTP/1.1 loopback server around `App`.
+//!
+//! Plain std::net on purpose: the engine needs no framework, and the route
+//! behaviour is proven by the golden replay in tests/golden.rs.
+
+use std::env;
+use std::io::{self, BufRead, BufReader, Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+
+use crate::app::{is_loopback_host, App};
+use crate::protocol::{Request, Response};
+
+/// Non-ML bodies are small. Larger uploads (ML routes answer 501) are drained
+/// without being buffered so a multi-GB media file cannot exhaust memory.
+const MAX_BUFFERED_BODY: usize = 32 * 1024 * 1024;
+const MAX_HEAD: usize = 64 * 1024;
+
+pub fn run(app: App) -> io::Result<()> {
+    let host = env::var("HOST")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "127.0.0.1".to_string());
+    if !is_loopback_host(&host) && env::var("ALLOW_REMOTE").as_deref() != Ok("1") {
+        eprintln!(
+            "HOST={host} bukan loopback. Helper ini menyimpan transkrip & catatan dan bisa \
+             dimatikan lewat HTTP tanpa autentikasi, jadi menolak mengikat alamat yang bisa \
+             dijangkau jaringan.\nPakai HOST=127.0.0.1, atau set ALLOW_REMOTE=1 kalau memang \
+             disengaja."
+        );
+        std::process::exit(2);
+    }
+    let port = env::var("PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(17865);
+    let listener = TcpListener::bind((host.as_str(), port))?;
+    println!(
+        "listening on http://{}:{}   (Ctrl-C to stop)",
+        host,
+        listener
+            .local_addr()
+            .map(|addr| addr.port())
+            .unwrap_or(port)
+    );
+    serve(listener, app)
+}
+
+pub fn serve(listener: TcpListener, app: App) -> io::Result<()> {
+    let app = Arc::new(app);
+    for incoming in listener.incoming() {
+        let stream = match incoming {
+            Ok(stream) => stream,
+            Err(_) => continue,
+        };
+        let app = Arc::clone(&app);
+        thread::spawn(move || {
+            let _ = handle_connection(stream, &app);
+        });
+    }
+    Ok(())
+}
+
+fn handle_connection(stream: TcpStream, app: &App) -> io::Result<()> {
+    stream.set_read_timeout(Some(Duration::from_secs(30)))?;
+    let peer_loopback = stream
+        .peer_addr()
+        .map(|addr| addr.ip().is_loopback())
+        .unwrap_or(false);
+    let mut reader = BufReader::new(stream.try_clone()?);
+    let mut writer = stream;
+    loop {
+        let Some(head) = read_head(&mut reader)? else {
+            return Ok(());
+        };
+        let mut lines = head.split("\r\n");
+        let mut request_line = lines.next().unwrap_or("").split_whitespace();
+        let method = request_line.next().unwrap_or("").to_ascii_uppercase();
+        let target = request_line.next().unwrap_or("/").to_string();
+        let version = request_line.next().unwrap_or("HTTP/1.1").to_string();
+        let mut headers = Vec::new();
+        for line in lines {
+            if let Some((name, value)) = line.split_once(':') {
+                headers.push((name.trim().to_ascii_lowercase(), value.trim().to_string()));
+            }
+        }
+        let content_length = headers
+            .iter()
+            .find(|(name, _)| name == "content-length")
+            .and_then(|(_, value)| value.parse::<usize>().ok())
+            .unwrap_or(0);
+        let mut body = Vec::new();
+        if content_length > 0 {
+            if content_length <= MAX_BUFFERED_BODY {
+                body.resize(content_length, 0);
+                reader.read_exact(&mut body)?;
+            } else {
+                io::copy(
+                    &mut (&mut reader).take(content_length as u64),
+                    &mut io::sink(),
+                )?;
+            }
+        }
+        let request = Request {
+            method,
+            target,
+            headers,
+            body,
+            peer_loopback,
+        };
+        let response = app.handle(&request);
+        write_response(&mut writer, &response)?;
+        let close = request
+            .header("connection")
+            .map(|value| value.eq_ignore_ascii_case("close"))
+            .unwrap_or(false)
+            || version == "HTTP/1.0";
+        if close {
+            return Ok(());
+        }
+    }
+}
+
+fn read_head(reader: &mut impl BufRead) -> io::Result<Option<String>> {
+    let mut head = Vec::new();
+    let mut line = Vec::new();
+    loop {
+        line.clear();
+        let read = reader.read_until(b'\n', &mut line)?;
+        if read == 0 {
+            return Ok(None);
+        }
+        if line == b"\r\n" || line == b"\n" {
+            break;
+        }
+        head.extend_from_slice(&line);
+        if head.len() > MAX_HEAD {
+            return Ok(None);
+        }
+    }
+    Ok(Some(String::from_utf8_lossy(&head).into_owned()))
+}
+
+fn write_response(writer: &mut TcpStream, response: &Response) -> io::Result<()> {
+    let body = match &response.body {
+        Some(value) => serde_json::to_vec(value).unwrap_or_else(|_| b"null".to_vec()),
+        None => Vec::new(),
+    };
+    let mut head = format!(
+        "HTTP/1.1 {} {}\r\n",
+        response.status,
+        reason_phrase(response.status)
+    );
+    for (name, value) in &response.headers {
+        head.push_str(&format!("{name}: {value}\r\n"));
+    }
+    if response.body.is_some() {
+        head.push_str("Content-Type: application/json; charset=utf-8\r\n");
+    }
+    head.push_str(&format!("Content-Length: {}\r\n\r\n", body.len()));
+    writer.write_all(head.as_bytes())?;
+    writer.write_all(&body)?;
+    writer.flush()
+}
+
+fn reason_phrase(status: u16) -> &'static str {
+    match status {
+        200 => "OK",
+        202 => "Accepted",
+        204 => "No Content",
+        400 => "Bad Request",
+        403 => "Forbidden",
+        404 => "Not Found",
+        500 => "Internal Server Error",
+        501 => "Not Implemented",
+        _ => "OK",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::net::TcpStream;
+
+    #[test]
+    fn serves_a_real_request_over_tcp() {
+        let state =
+            std::env::temp_dir().join(format!("submeetly-engine-tcp-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&state);
+        fs::create_dir_all(&state).expect("state dir");
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let address = listener.local_addr().expect("addr");
+        thread::spawn(move || {
+            let _ = serve(listener, App::new(state));
+        });
+
+        let mut stream = TcpStream::connect(address).expect("connect");
+        stream
+            .write_all(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+            .expect("write");
+        let mut response = String::new();
+        stream.read_to_string(&mut response).expect("read");
+        assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
+        assert!(response.contains("\"ok\":true"), "{response}");
+    }
+}

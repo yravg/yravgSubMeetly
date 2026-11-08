@@ -45,3 +45,6 @@ __pycache__/
 
 # Potongan ringkasan per-slice dari subagen (digabung ke summaries.json)
 .ngodingpakeai/summaries.part-*.json
+
+# Rust engine build output (Cargo target dir is usually external)
+engine-rs/target/

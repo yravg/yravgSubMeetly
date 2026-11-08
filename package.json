@@ -28,7 +28,8 @@
     "release:check": "node scripts/mark-release-priorities.mjs --check",
     "pack:store": "node scripts/pack-store.mjs",
     "pack:store:screens": "node scripts/capture-store-screens.mjs",
-    "test": "node --test --test-concurrency=1 test/*.test.mjs test/*.test.js"
+    "test": "node --test --test-concurrency=1 test/*.test.mjs test/*.test.js",
+    "test:engine-rs": "node scripts/test-engine-rs.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

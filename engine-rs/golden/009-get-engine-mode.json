@@ -1,0 +1,17 @@
+{
+  "name": "GET /engine/mode",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "GET",
+    "path": "/engine/mode",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "mode": "fast"
+    }
+  },
+  "mask": []
+}

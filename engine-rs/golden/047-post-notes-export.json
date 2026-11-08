@@ -1,0 +1,19 @@
+{
+  "name": "POST /notes/export",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes/export",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{}"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "body needs id or note"
+    }
+  },
+  "mask": []
+}
