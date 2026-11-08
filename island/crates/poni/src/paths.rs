@@ -1,7 +1,7 @@
-//! Where Poni keeps its files.
+//! Where yravgSubMeetly keeps its files (never Oyenza Studio's `Poni` folders: both apps can be installed side by side).
 //!
-//! - Settings + data: `%APPDATA%\Poni\` (roams with the user profile)
-//! - Cache + log:     `%LOCALAPPDATA%\Poni\`
+//! - Settings + data: `%APPDATA%\yravgSubMeetly\` (roams with the user profile)
+//! - Cache + log:     `%LOCALAPPDATA%\yravgSubMeetly\`
 //!
 //! `PONI_HOME` overrides both (used by `--selftest` to stay isolated).
 
@@ -19,11 +19,11 @@ fn env_dir(var: &str) -> PathBuf {
 }
 
 pub fn data_dir() -> PathBuf {
-    home_override().unwrap_or_else(|| env_dir("APPDATA").join("Poni"))
+    home_override().unwrap_or_else(|| env_dir("APPDATA").join("yravgSubMeetly"))
 }
 
 pub fn cache_dir() -> PathBuf {
-    home_override().map(|h| h.join("cache")).unwrap_or_else(|| env_dir("LOCALAPPDATA").join("Poni"))
+    home_override().map(|h| h.join("cache")).unwrap_or_else(|| env_dir("LOCALAPPDATA").join("yravgSubMeetly"))
 }
 
 pub fn settings_path() -> PathBuf {
@@ -54,16 +54,15 @@ pub fn apple_music_web_token_path() -> PathBuf {
 }
 
 /// Where files sent from a phone land: `Downloads\yravgSubMeetly` (wherever the
-/// user moved Downloads to), or `Downloads\Oyen Poni` where an install from
-/// before the rename made it: Shelf items link to the files in it. Under
+/// user moved Downloads to). Never Oyenza Studio's `Downloads\Oyen Poni`: that
+/// folder belongs to another app that may be installed beside this one. Under
 /// `PONI_HOME` for the self-test.
 pub fn phone_inbox_dir() -> PathBuf {
     if let Some(h) = home_override() {
         return h.join("phone-drop");
     }
     let downloads = downloads_dir().unwrap_or_else(|| env_dir("USERPROFILE").join("Downloads"));
-    let before_rename = downloads.join("Oyen Poni");
-    if before_rename.is_dir() { before_rename } else { downloads.join("yravgSubMeetly") }
+    downloads.join("yravgSubMeetly")
 }
 
 /// Where the Downloader saves videos and sound: the user's Downloads folder

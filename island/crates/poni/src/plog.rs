@@ -1,4 +1,4 @@
-//! Tiny file logger: %LOCALAPPDATA%\Poni\poni.log (rotated at 1 MB).
+//! Tiny file logger: %LOCALAPPDATA%\yravgSubMeetly\poni.log (rotated at 1 MB).
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;

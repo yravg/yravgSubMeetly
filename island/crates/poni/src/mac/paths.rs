@@ -1,8 +1,8 @@
 //! Where Poni keeps its files on a Mac.
 //!
-//! - Settings + data: `~/Library/Application Support/Poni/`
-//! - Cache:           `~/Library/Caches/Poni/`
-//! - Log:             `~/Library/Logs/Poni/poni.log` (Console.app lists it)
+//! - Settings + data: `~/Library/Application Support/yravgSubMeetly/`
+//! - Cache:           `~/Library/Caches/yravgSubMeetly/`
+//! - Log:             `~/Library/Logs/yravgSubMeetly/poni.log` (Console.app lists it)
 //!
 //! `PONI_HOME` overrides all three (used by `--render` and `--smoke` to stay
 //! isolated).
@@ -18,11 +18,11 @@ fn library() -> PathBuf {
 }
 
 pub fn data_dir() -> PathBuf {
-    home_override().unwrap_or_else(|| library().join("Application Support").join("Poni"))
+    home_override().unwrap_or_else(|| library().join("Application Support").join("yravgSubMeetly"))
 }
 
 pub fn cache_dir() -> PathBuf {
-    home_override().map(|h| h.join("cache")).unwrap_or_else(|| library().join("Caches").join("Poni"))
+    home_override().map(|h| h.join("cache")).unwrap_or_else(|| library().join("Caches").join("yravgSubMeetly"))
 }
 
 pub fn settings_path() -> PathBuf {
@@ -34,7 +34,7 @@ pub fn store_path() -> PathBuf {
 }
 
 pub fn log_path() -> PathBuf {
-    home_override().map(|h| h.join("poni.log")).unwrap_or_else(|| library().join("Logs").join("Poni").join("poni.log"))
+    home_override().map(|h| h.join("poni.log")).unwrap_or_else(|| library().join("Logs").join("yravgSubMeetly").join("poni.log"))
 }
 
 /// Held while Poni runs, so a second copy quits at start.
@@ -42,16 +42,14 @@ pub fn lock_path() -> PathBuf {
     cache_dir().join("poni.lock")
 }
 
-/// Where files from a phone land (Phone drop): `~/Downloads/yravgSubMeetly`, or
-/// `~/Downloads/Oyen Poni` where a copy from before the rename made it: Shelf
-/// items link to the files in it.
+/// Where files from a phone land (Phone drop): `~/Downloads/yravgSubMeetly`
+/// (never Oyenza Studio's `~/Downloads/Oyen Poni`).
 pub fn phone_inbox_dir() -> PathBuf {
     if let Some(h) = home_override() {
         return h.join("phone-drop");
     }
     let downloads = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(".")).join("Downloads");
-    let before_rename = downloads.join("Oyen Poni");
-    if before_rename.is_dir() { before_rename } else { downloads.join("yravgSubMeetly") }
+    downloads.join("yravgSubMeetly")
 }
 
 /// Where the Downloader saves videos and sound: `~/Downloads`, as a browser

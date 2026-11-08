@@ -794,7 +794,7 @@ fn monitor_rect(mon: HMONITOR) -> Option<RECT> {
     unsafe { GetMonitorInfoW(mon, &mut mi).as_bool() }.then_some(mi.rcMonitor)
 }
 
-/// Our island window ("Poni.Island" in this process), cached.
+/// Our island window ("yravgSubMeetly.Island" in this process), cached.
 fn island_window(w: &Watch) -> HWND {
     let cached = w.island.get();
     if !cached.is_invalid() && unsafe { IsWindow(cached) }.as_bool() {

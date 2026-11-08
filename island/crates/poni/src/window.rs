@@ -19,9 +19,9 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
-pub const ISLAND_CLASS: PCWSTR = w!("Poni.Island");
-pub const HELPER_CLASS: PCWSTR = w!("Poni.Helper");
-pub const VISUAL_CLASS: PCWSTR = w!("Poni.Visual");
+pub const ISLAND_CLASS: PCWSTR = w!("yravgSubMeetly.Island");
+pub const HELPER_CLASS: PCWSTR = w!("yravgSubMeetly.Helper");
+pub const VISUAL_CLASS: PCWSTR = w!("yravgSubMeetly.Visual");
 
 pub type WndProc = unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> windows::Win32::Foundation::LRESULT;
 

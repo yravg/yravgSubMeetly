@@ -10,8 +10,8 @@
 ;
 ; Per-user install: no admin rights, no UAC prompt. The app goes to
 ; %LOCALAPPDATA%\Programs\yravgSubMeetly. The person's own data stays when uninstalling:
-; settings and data in %APPDATA%\Poni, the helper's notes and state in
-; %USERPROFILE%\.yraveragesubmin. Only the cache and log in %LOCALAPPDATA%\Poni are removed.
+; settings and data in %APPDATA%\yravgSubMeetly, the helper's notes and state in
+; %USERPROFILE%\.yraveragesubmin. Only the cache and log in %LOCALAPPDATA%\yravgSubMeetly are removed.
 ;
 ; Silent update (what the app's Install runs, services/feed.rs setup_command):
 ;   Setup /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /reopen
@@ -30,10 +30,10 @@
 #define AppName "yravgSubMeetly"
 #define AppDir "yravgSubMeetly"
 #define AppPublisher "yraverage"
-#define AppExe "poni.exe"
+#define AppExe "yravgSubMeetly.exe"
 #define EngineExe "submeetly-engine.exe"
 ; The island window's class (crates/poni/src/window.rs), used to ask a running copy to quit.
-#define IslandClass "Poni.Island"
+#define IslandClass "yravgSubMeetly.Island"
 ; The Native Messaging host the Chrome extension talks to (engine-rs native_host.rs, native/install-host.bat).
 #define HostName "com.yraveragesubmin.helper"
 
@@ -79,7 +79,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "autostart"; Description: "Start with Windows"; GroupDescription: "Startup:"
 
 [Files]
-Source: "{#ExeSource}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ExeSource}"; DestDir: "{app}"; DestName: "{#AppExe}"; Flags: ignoreversion
 Source: "{#EngineSource}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "submeetly-host.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -111,9 +111,9 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/IM {#EngineExe} /F"; Flags: runhid
 [UninstallDelete]
 ; The host manifest Setup wrote.
 Type: files; Name: "{app}\{#HostName}.json"
-; Cache and log only (poni.log, downloaded updates); settings and data in %APPDATA%\Poni and the
+; Cache and log only (poni.log, downloaded updates); settings and data in %APPDATA%\yravgSubMeetly and the
 ; helper's notes in %USERPROFILE%\.yraveragesubmin are kept.
-Type: filesandordirs; Name: "{localappdata}\Poni"
+Type: filesandordirs; Name: "{localappdata}\yravgSubMeetly"
 
 [Code]
 const
@@ -123,9 +123,10 @@ const
 var
   ExtPage: TInputQueryWizardPage;
 
-function ManifestPath(): String;
+{ Dir, not the app constant: the wizard reads the old manifest before the app constant exists. }
+function ManifestPath(Dir: String): String;
 begin
-  Result := ExpandConstant('{app}\{#HostName}.json');
+  Result := AddBackslash(Dir) + '{#HostName}.json';
 end;
 
 { The extension ID a previous install wrote into the host manifest, so an update (silent or not) keeps it. }
@@ -136,7 +137,7 @@ var
   S: String;
 begin
   Result := '';
-  if not LoadStringFromFile(ManifestPath(), Json) then
+  if not LoadStringFromFile(ManifestPath(WizardDirValue()), Json) then
     Exit;
   S := String(Json);
   P := Pos('chrome-extension://', S);
@@ -177,7 +178,21 @@ begin
     'Paste the extension ID from chrome://extensions (Developer mode). Leave it empty to skip: ' +
     'the island and the engine work without it, and you can run Setup again later.');
   ExtPage.Add('Extension ID (32 letters):', False);
-  ExtPage.Values[0] := ExistingExtensionId();
+  { /EXTID=<id> for silent installs; otherwise filled from a previous install once the folder is known. }
+  ExtPage.Values[0] := ExpandConstant('{param:EXTID|}');
+end;
+
+{ The folder is only known after the Select Folder step (or at once on an upgrade). }
+procedure FillExtensionId();
+begin
+  if Trim(ExtPage.Values[0]) = '' then
+    ExtPage.Values[0] := ExistingExtensionId();
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = ExtPage.ID then
+    FillExtensionId();
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -213,6 +228,7 @@ end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
+  FillExtensionId();
   StopIsland();
   Result := '';
 end;
@@ -232,7 +248,7 @@ begin
     '  "allowed_origins": [' + #13#10 +
     '    "chrome-extension://' + Trim(ExtPage.Values[0]) + '/"' + #13#10 +
     '  ]' + #13#10 + '}' + #13#10;
-  SaveStringToFile(ManifestPath(), AnsiString(Json), False);
+  SaveStringToFile(ManifestPath(ExpandConstant('{app}')), AnsiString(Json), False);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
