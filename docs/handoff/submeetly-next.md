@@ -105,3 +105,21 @@ then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
 - s4 merged (2026-11-08) a595096: see S4 row. Worker stopped. To close ENG-003 run (needs a faster network): `HF_HOME=engine-rs/.hf-cache TRANSLATE_TEST_MODEL=Qwen/Qwen2.5-0.5B-Instruct cargo test --release --manifest-path engine-rs/Cargo.toml --test ml_golden qwen_translation -- --ignored --nocapture`.
 - minutes merged (2026-11-08): yravg/sm-minutes e046066 (D01 register summary, T03 draft options, #d-save dock fix). Lead verified: build ok, npm test 363: 339 pass, 4 baseline fail, 20 skipped; `npm run qa` 15/15 (run-20261108-173522) after the lead updated TC011/TC013 for the D01 dock-starts-mini default; viewed d01-coretax-1440 and t03-compare-coretax-390. Open: T03 draws from library transcripts, not live side-panel session lines.
 - Done: addins (Sonnet ctx_9e65c01cd0dc, worktree sm-addins, branch yravg/sm-addins, spec scratchpad specs/w-addins.md: board T05 Side panel › Settings › Add-ins + Add-in API v0 as declarative MV3 manifests, two examples Flag decision and Actions; ADD-001, THB step 5); lead runs the Qwen property test in the sm-s4 worktree (model download).
+
+## Wave 3 (2026-11-08, owner: "continue with all that still open and not checked")
+
+- Lead found and fixed (e461729): Oyenza Studio is installed on this machine (poni.exe, %APPDATA%\Poni,
+  %LOCALAPPDATA%\Poni). Our island used the same folders, window class Poni.Island and ETW session
+  names: our dev island logged into Oyenza's poni.log at 12:39 today and Oyenza reported "island covered by
+  a Poni.Island window". Our uninstaller would have deleted Oyenza's cache (add-ons, paired phones) and Setup
+  would have taskkilled poni.exe. Now all ours are yravgSubMeetly-named; Setup installs yravgSubMeetly.exe.
+- Lead found and fixed (e461729): Setup crashed at start on every run ("expand the app constant before it was
+  initialized" in InitializeWizard). Rebuilt Setup compiles. A first silent install attempt failed on that crash
+  and left nothing (no files, no uninstall key, Oyenza folders unchanged, compared file by file). The retry
+  install was refused by the session's permission classifier (persistence), so the installed run, uninstall,
+  /EXTID page and autostart are still unverified: owner runs `yravgSubMeetly-Setup-<v>.exe` once.
+- Workers (Sonnet): threads ctx_1f104e6cae6a (T01 Inbox, T02 Librarian, T04 Highlights in Minutes, T03 on
+  live lines; spec specs/w-threads.md), polish ctx_176710a964af (add-ins i18n, the 4 Windows-only test
+  failures, store PNG wordmark, side panel dark + swatch contrast; specs/w-polish.md), island3
+  ctx_ad370109b179 (Live caption stream, Pause/Stop honesty, Engine CPU/RTF, mac Oyenza strings, pairdrop
+  default server, cargo test -p poni, Update sheet shot; specs/w-island3.md). Lead re-runs the Qwen test.
