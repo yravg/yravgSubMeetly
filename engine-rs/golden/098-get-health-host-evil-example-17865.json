@@ -1,0 +1,19 @@
+{
+  "name": "GET /health (Host: evil.example:17865)",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "GET",
+    "path": "/health",
+    "headers": {
+      "Host": "evil.example:17865"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 403,
+    "body": {
+      "error": "header Host bukan loopback"
+    }
+  },
+  "mask": []
+}

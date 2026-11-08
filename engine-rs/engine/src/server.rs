@@ -13,8 +13,8 @@ use std::time::Duration;
 use crate::app::{is_loopback_host, App};
 use crate::protocol::{Request, Response};
 
-/// Non-ML bodies are small. Larger uploads (ML routes answer 501) are drained
-/// without being buffered so a multi-GB media file cannot exhaust memory.
+/// Bodies up to this size are buffered. Larger uploads to the file routes are
+/// streamed to a temp file (multi-GB media stays out of RAM); elsewhere drained.
 const MAX_BUFFERED_BODY: usize = 32 * 1024 * 1024;
 const MAX_HEAD: usize = 64 * 1024;
 
@@ -92,10 +92,23 @@ fn handle_connection(stream: TcpStream, app: &App) -> io::Result<()> {
             .and_then(|(_, value)| value.parse::<usize>().ok())
             .unwrap_or(0);
         let mut body = Vec::new();
+        let mut body_file = None;
         if content_length > 0 {
+            let upload = target.starts_with("/transcribe_file");
             if content_length <= MAX_BUFFERED_BODY {
                 body.resize(content_length, 0);
                 reader.read_exact(&mut body)?;
+            } else if upload {
+                let path = std::env::temp_dir()
+                    .join(format!(
+                        "ysm-body-{}-{:?}.bin",
+                        std::process::id(),
+                        thread::current().id()
+                    ))
+                    .with_extension("bin");
+                let mut file = std::fs::File::create(&path)?;
+                io::copy(&mut (&mut reader).take(content_length as u64), &mut file)?;
+                body_file = Some(path);
             } else {
                 io::copy(
                     &mut (&mut reader).take(content_length as u64),
@@ -109,9 +122,18 @@ fn handle_connection(stream: TcpStream, app: &App) -> io::Result<()> {
             headers,
             body,
             peer_loopback,
+            body_file,
         };
         let response = app.handle(&request);
+        if let Some(path) = &request.body_file {
+            let _ = std::fs::remove_file(path);
+        }
         write_response(&mut writer, &response)?;
+        if app.shutdown_requested() {
+            writer.flush()?;
+            thread::sleep(Duration::from_millis(150));
+            std::process::exit(0);
+        }
         let close = request
             .header("connection")
             .map(|value| value.eq_ignore_ascii_case("close"))

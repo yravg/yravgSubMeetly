@@ -1,0 +1,17 @@
+{
+  "name": "DELETE /models/cache/generate",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "DELETE",
+    "path": "/models/cache/generate",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "body": {
+      "error": "not found"
+    }
+  },
+  "mask": []
+}

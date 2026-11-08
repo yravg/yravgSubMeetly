@@ -1,6 +1,6 @@
 {
   "name": "POST /notes/export",
-  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
   "request": {
     "method": "POST",
     "path": "/notes/export",

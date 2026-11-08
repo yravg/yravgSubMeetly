@@ -1,0 +1,19 @@
+{
+  "name": "POST /models/pull",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "POST",
+    "path": "/models/pull",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{}"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "id must be one of the /models inventory ids"
+    }
+  },
+  "mask": []
+}

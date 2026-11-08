@@ -378,7 +378,9 @@ export function runDiagnostics(ctx) {
   else if (platOs === os) push('platform', 'ok', G('detail.platformOk', G(`os.${platOs}`)));
   else push('platform', 'warn', G('detail.platformWarn', G(`os.${platOs}`), G(`os.${os}`)));
 
-  push('ffmpeg', h.ffmpeg ? 'ok' : 'fail', h.ffmpeg ? G('detail.ffmpegOk') : G('detail.ffmpegFail'));
+  // The Rust engine reports ffmpeg:false but decodes media itself (media_decoder).
+  const canDecode = h.ffmpeg || h.media_decoder;
+  push('ffmpeg', canDecode ? 'ok' : 'fail', canDecode ? G('detail.ffmpegOk') : G('detail.ffmpegFail'));
 
   const device = String(h.device || '').toLowerCase();
   const accel = device && device !== 'cpu';

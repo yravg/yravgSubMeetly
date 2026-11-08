@@ -65,7 +65,11 @@ const HEALTH_MASK = [
   'features.streaming_file_jobs',
   'features.faster_whisper',
   'features.models',
+  'loaded',
+  'media_decoder',
 ];
+const MODELS_MASK = ['models'];
+const NOTE_MASK = ['note.id', 'note.generatedAt'];
 const DEVICE_MASK = ['active', 'compute'];
 const LANGUAGES_MASK = ['engine'];
 
@@ -346,6 +350,46 @@ post('/notes', NOTE_ITEM_CAP);
 postBody('/notes', '', { mask: ['note.id', 'note.generatedAt'] });
 post('/notes', { note: 5 });
 
+// ML routes whose answer does not need a model: short PCM bodies.
+postBody('/transcribe', '');
+postBody('/transcribe?language=en', 'abcd'.repeat(10));
+postBody('/draft?src=en&tgt=de', '');
+
+// Heuristic notes (no model in the oracle either).
+const MEETING_LINES = [
+  { text: 'Halo semua, kita mulai rapat.' },
+  { src: 'Keputusan: rilis versi 2 ditunda ke Jumat. Lalu lanjut.' },
+  { text: 'Decision -   pakai Rust untuk engine sekarang!' },
+  { text: 'decisions are not matched here, keputusan pendek.' },
+  { text: 'Tindak lanjut: Budi mengirim laporan mingguan', src: 'ignored' },
+  { text: 'action item kirim email ke vendor? todo:      abc.' },
+  { text: '   ' },
+  { text: 42 },
+  'bukan objek',
+  { text: 'xaction bukan kata. TODO update dokumen rilis' },
+];
+post('/notes/generate', { lines: MEETING_LINES, title: 'Rapat Engine', source: 'golden' }, { mask: NOTE_MASK });
+post('/notes/generate', {}, { mask: NOTE_MASK });
+post('/notes/generate', { lines: [{ text: 'Satu baris saja.' }], title: '' }, { mask: NOTE_MASK });
+post('/notes/generate', { lines: Array.from({ length: 20 }, (_, i) => ({ text: `Keputusan nomor ${i + 1} disetujui tim. Action kerjakan bagian ${i + 1} segera` })) }, { mask: NOTE_MASK });
+postBody('/notes/generate', '{bad json');
+post('/notes/summarize', { lines: MEETING_LINES });
+post('/notes/summarize', { lines: [] });
+post('/notes/summarize', { lines: 'x' });
+postBody('/notes/summarize', '{bad json');
+
+// Model cache (HF_HUB_CACHE points at a copy of engine-rs/golden/fixtures/hf-cache).
+get('/models', { mask: MODELS_MASK });
+del('/models/cache/generate');
+del('/models/cache/nodash');
+del('/models/cache/org--missing');
+del('/models/cache/org--missing?confirm=1');
+del('/models/cache/acme--tiny-model?confirm=1');
+get('/models', { mask: MODELS_MASK });
+post('/models/pull', {});
+post('/models/pull', { id: 'acme/not-in-inventory' });
+postBody('/models/pull', '{bad json');
+
 get('/jobs/unknown');
 post('/jobs/unknown/cancel');
 get('/nope');
@@ -461,6 +505,8 @@ async function waitReady(targetPort, child, logsRef) {
 // ---------------------------------------------------------------- main flow
 const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ysm-golden-state-'));
 const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ysm-golden-home-'));
+const hfCache = path.join(fakeHome, 'hf-cache');
+fs.cpSync(path.join(GOLDEN_DIR, 'fixtures', 'hf-cache'), hfCache, { recursive: true });
 const bootstrapPath = path.join(fakeHome, 'bootstrap.py');
 fs.writeFileSync(bootstrapPath, BOOTSTRAP);
 
@@ -474,6 +520,7 @@ for (const key of [
   'DEVICE',
   'COMPUTE',
   'FFMPEG',
+  'HF_HOME',
 ]) {
   delete env[key];
 }
@@ -482,6 +529,7 @@ Object.assign(env, {
   YSM_STATE_DIR: stateDir,
   HOME: fakeHome,
   USERPROFILE: fakeHome,
+  HF_HUB_CACHE: hfCache,
   HOST: '127.0.0.1',
   ENGINE: 'auto',
   TRANSLATE: 'on',
@@ -549,7 +597,7 @@ results.forEach((item, index) => {
   for (const maskPath of item.mask) stripPath(item.response.body, maskPath);
   const golden = {
     name: item.name,
-    capturedFrom: 'native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)',
+    capturedFrom: 'native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)',
     request: item.request,
     response: item.response,
     mask: item.mask,

@@ -1675,7 +1675,7 @@ async function checkNative({ allowAutoStart = false } = {}) {
         ? t('nativeStale', 'Helper running — click Restart to load latest features')
         : t(
             'nativeOnline',
-            `${nativeInfo.engine} · ${nativeInfo.model}${nativeInfo.translate ? ' · +LLM translate' : ''}${nativeInfo.ffmpeg ? '' : ' · ⚠ no ffmpeg'}`,
+            `${nativeInfo.engine} · ${nativeInfo.model}${nativeInfo.translate ? ' · +LLM translate' : ''}${nativeInfo.ffmpeg || nativeInfo.media_decoder ? '' : ' · ⚠ no ffmpeg'}`,
           ),
     });
     tryEnsureLab();

@@ -1,0 +1,19 @@
+{
+  "name": "OPTIONS /shutdown",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "OPTIONS",
+    "path": "/shutdown",
+    "headers": {
+      "Origin": "https://evil.example"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 403,
+    "body": {
+      "error": "asal tidak diizinkan"
+    }
+  },
+  "mask": []
+}

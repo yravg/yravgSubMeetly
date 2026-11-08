@@ -1,0 +1,19 @@
+{
+  "name": "DELETE /models/cache/acme--tiny-model?confirm=1",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "DELETE",
+    "path": "/models/cache/acme--tiny-model?confirm=1",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "id": "acme/tiny-model",
+      "freedBytes": 23
+    }
+  },
+  "mask": []
+}

@@ -1,19 +1,29 @@
-//! Loopback HTTP engine: the non-ML routes of native/server.py.
+//! Loopback HTTP engine: the routes of native/server.py.
 //!
 //! `App` is transport-free so the golden replay can call `handle` directly;
-//! `server` puts it behind std::net. ML routes intentionally answer 501.
+//! `server` puts it behind std::net. Models load lazily on first ML request.
 
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Map, Value};
 
+use crate::audio::pcm_f32_le;
+use crate::engine::{segments_json, Jobs, Ml, ASR_ENGINE, MT_ENGINE};
+use crate::heuristic::heuristic_notes;
+use crate::models::{delete_cached, hub_cache_dir, scan_model_cache};
 use crate::notes::{
     export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
 };
 use crate::protocol::{Request, Response};
 use crate::state::now_utc_iso;
+use crate::translate::norm_lang;
+use crate::whisper::Task;
 
 const ENGINE_MODES: [&str; 3] = ["fast", "balanced", "accurate"];
 const DEVICE_CHOICES: [&str; 3] = ["auto", "cpu", "cuda"];
@@ -22,7 +32,7 @@ const UI_RESKINS: [&str; 3] = ["yraverage", "coretax", "modern"];
 const TARGET_LANGS: [&str; 11] = [
     "en", "zh", "de", "fr", "es", "ru", "it", "id", "vi", "ja", "ko",
 ];
-const ML_NOT_IMPLEMENTED: &str = "not-implemented-in-rust";
+const NO_TRANSLATE: &str = "no translation model (set TRANSLATE=on)";
 const CUDA_WARNING: &str = "CUDA tidak terdeteksi — helper akan jatuh ke CPU saat start";
 
 pub struct App {
@@ -32,6 +42,10 @@ pub struct App {
     device_pref_path: PathBuf,
     ui_prefs_path: PathBuf,
     allowed_origins: Vec<String>,
+    hf_cache: PathBuf,
+    ml: Arc<Ml>,
+    jobs: Jobs,
+    shutdown: AtomicBool,
 }
 
 impl App {
@@ -47,6 +61,9 @@ impl App {
             .filter(|value| !value.is_empty())
             .map(str::to_string)
             .collect();
+        let device_pref = read_json(&device_pref_path)
+            .and_then(|v| v.get("device").and_then(Value::as_str).map(str::to_string))
+            .unwrap_or_else(|| "auto".to_string());
         Self {
             state_dir,
             notes_path,
@@ -54,7 +71,21 @@ impl App {
             device_pref_path,
             ui_prefs_path,
             allowed_origins,
+            hf_cache: hub_cache_dir(),
+            ml: Arc::new(Ml::from_env(&device_pref)),
+            jobs: Jobs::default(),
+            shutdown: AtomicBool::new(false),
         }
+    }
+
+    /// Point the model-cache routes at another hub cache (tests).
+    pub fn set_hf_cache(&mut self, dir: PathBuf) {
+        self.hf_cache = dir;
+    }
+
+    /// True once `POST /shutdown` answered; the server exits after the reply.
+    pub fn shutdown_requested(&self) -> bool {
+        self.shutdown.load(Ordering::Relaxed)
     }
 
     pub fn state_dir(&self) -> &PathBuf {
@@ -163,13 +194,18 @@ impl App {
             "/engine/device" => self.json_response(request, 200, self.device_state()),
             "/health" => self.json_response(request, 200, self.health()),
             "/notes" => self.json_response(request, 200, json!({ "notes": self.load_notes() })),
+            "/models" => self.json_response(
+                request,
+                200,
+                json!({ "models": self.model_inventory(), "cached": scan_model_cache(&self.hf_cache) }),
+            ),
             "/engine/mode" => {
                 self.json_response(request, 200, json!({ "mode": self.load_engine_mode() }))
             }
             "/languages/targets" => self.json_response(
                 request,
                 200,
-                json!({ "targets": target_status(), "engine": "rust" }),
+                json!({ "targets": target_status(self.ml.translate_available()), "engine": ASR_ENGINE }),
             ),
             "/ui-prefs" => {
                 let (prefs, stored) = self.load_ui_prefs();
@@ -192,8 +228,12 @@ impl App {
                             self.json_response(request, 404, json!({ "error": "note not found" }))
                         }
                     }
-                } else if path.starts_with("/jobs/") {
-                    self.json_response(request, 404, json!({ "error": "job not found" }))
+                } else if let Some(id) = path.strip_prefix("/jobs/") {
+                    let job = crate::engine::jobs_lock(&self.jobs).get(id).cloned();
+                    match job {
+                        Some(job) => self.json_response(request, 200, job),
+                        None => self.json_response(request, 404, json!({ "error": "job not found" })),
+                    }
                 } else {
                     self.json_response(request, 404, json!({ "error": "not found" }))
                 }
@@ -209,17 +249,33 @@ impl App {
             "/ui-prefs" => self.post_ui_prefs(request),
             "/notes/export" => self.post_notes_export(request),
             "/notes" => self.post_notes(request),
-            "/translate" | "/translate_refine" | "/draft" | "/notes/generate"
-            | "/notes/summarize" | "/models/pull" => self.not_implemented(request),
-            _ if path.starts_with("/transcribe") => self.not_implemented(request),
+            "/notes/generate" => self.post_notes_generate(request, false),
+            "/notes/summarize" => self.post_notes_generate(request, true),
+            "/models/pull" => self.post_models_pull(request),
+            "/shutdown" => {
+                self.shutdown.store(true, Ordering::Relaxed);
+                self.json_response(request, 200, json!({ "ok": true, "shutting_down": true }))
+            }
+            "/transcribe"
+            | "/transcribe_file"
+            | "/transcribe_file_job"
+            | "/translate"
+            | "/draft"
+            | "/translate_refine" => {
+                // The oracle answers any exception in these routes with 500.
+                match self.ml_route(request, path) {
+                    Ok(response) => response,
+                    Err(error) => self.json_response(
+                        request,
+                        500,
+                        json!({ "error": format!("Error: {error:#}") }),
+                    ),
+                }
+            }
             _ => {
                 if let Some(rest) = path.strip_prefix("/jobs/") {
-                    if rest.ends_with("/cancel") {
-                        return self.json_response(
-                            request,
-                            404,
-                            json!({ "error": "job not found" }),
-                        );
+                    if let Some(id) = rest.strip_suffix("/cancel") {
+                        return self.cancel_job(request, id);
                     }
                 }
                 self.json_response(request, 404, json!({ "error": "not found" }))
@@ -227,8 +283,350 @@ impl App {
         }
     }
 
+    fn cancel_job(&self, request: &Request, id: &str) -> Response {
+        let mut jobs = crate::engine::jobs_lock(&self.jobs);
+        let Some(Value::Object(job)) = jobs.get_mut(id) else {
+            return self.json_response(request, 404, json!({ "error": "job not found" }));
+        };
+        job.insert("cancel".into(), json!(true));
+        if job.get("status") == Some(&json!("running")) {
+            job.insert("status".into(), json!("cancelling"));
+        }
+        drop(jobs);
+        self.json_response(request, 200, json!({ "ok": true, "jobId": id }))
+    }
+
+    fn ml_route(&self, request: &Request, path: &str) -> anyhow::Result<Response> {
+        let q = query(&request.target);
+        let language = q.get("language").cloned().unwrap_or_else(|| "auto".into());
+        let task = if q.get("task").map(String::as_str) == Some("translate") {
+            Task::Translate
+        } else {
+            Task::Transcribe
+        };
+        let lang = |code: &str| (!code.is_empty() && code != "auto").then(|| code.to_string());
+        let src = norm_lang(q.get("src").map(String::as_str), "auto");
+        let tgt = norm_lang(q.get("tgt").map(String::as_str), "en");
+        let accurate = self.load_engine_mode() == "accurate";
+        let started = std::time::Instant::now();
+        let ms = || started.elapsed().as_millis() as u64;
+        Ok(match path {
+            "/transcribe" => {
+                let pcm = pcm_f32_le(&request.body);
+                if pcm.len() < 1600 {
+                    return Ok(self.json_response(request, 200, json!({ "text": "" })));
+                }
+                let text = self.ml.text(&pcm, lang(&language).as_deref(), task)?;
+                self.json_response(request, 200, json!({ "text": text, "ms": ms() }))
+            }
+            "/transcribe_file" => {
+                let file = self.body_to_file(request, &q)?;
+                let result = self.ml.file(&file, lang(&language).as_deref(), task);
+                let _ = fs::remove_file(&file);
+                self.json_response(
+                    request,
+                    200,
+                    json!({ "segments": segments_json(&result?), "ms": ms() }),
+                )
+            }
+            "/transcribe_file_job" => self.start_job(request, &q, lang(&language), task)?,
+            "/translate" => {
+                if !self.ml.translate_available() {
+                    return Ok(self.json_response(request, 501, json!({ "error": NO_TRANSLATE })));
+                }
+                let text = String::from_utf8_lossy(&request.body).to_string();
+                let fast = matches!(
+                    q.get("fast").map(String::as_str),
+                    Some("1" | "true" | "yes")
+                ) && !accurate;
+                if text.trim().is_empty() {
+                    return Ok(self.json_response(request, 200, json!({ "text": "" })));
+                }
+                let out = self
+                    .ml
+                    .with_translator(|mt| mt.translate(&text, &src, &tgt, fast))?;
+                self.json_response(request, 200, json!({ "text": out, "ms": ms() }))
+            }
+            "/translate_refine" => {
+                if !self.ml.translate_available() {
+                    return Ok(self.json_response(request, 501, json!({ "error": NO_TRANSLATE })));
+                }
+                let Some(payload) = parse_body(&request.body) else {
+                    return Ok(self.json_response(
+                        request,
+                        400,
+                        json!({ "error": "invalid JSON body" }),
+                    ));
+                };
+                let field = |key: &str| {
+                    payload
+                        .get(key)
+                        .filter(|v| py_truthy(v))
+                        .map(py_str)
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string()
+                };
+                let (text, draft) = (field("text"), field("draft"));
+                if text.is_empty() {
+                    return Ok(self.json_response(request, 200, json!({ "text": draft })));
+                }
+                let out = self
+                    .ml
+                    .with_translator(|mt| mt.refine(&text, &draft, &src, &tgt))?;
+                self.json_response(request, 200, json!({ "text": out }))
+            }
+            _ => self.draft(request, &q, &src, &tgt, accurate)?,
+        })
+    }
+
+    /// `/draft`: full-model ASR + fast translate (the oracle has no small
+    /// draft model off Apple Silicon either).
+    fn draft(
+        &self,
+        request: &Request,
+        q: &HashMap<String, String>,
+        src: &str,
+        tgt: &str,
+        accurate: bool,
+    ) -> anyhow::Result<Response> {
+        let started = std::time::Instant::now();
+        let ms = || started.elapsed().as_millis() as u64;
+        let pcm = pcm_f32_le(&request.body);
+        if pcm.len() < 1600 {
+            return Ok(self.json_response(
+                request,
+                200,
+                json!({ "source": "", "translation": "" }),
+            ));
+        }
+        let language = q.get("language").map(String::as_str).unwrap_or(src);
+        let language = (!language.is_empty() && language != "auto").then_some(language);
+        let source = self.ml.text(&pcm, language, Task::Transcribe)?;
+        let asr_ms = ms();
+        if !draft_source_ok(&source, pcm.len()) {
+            return Ok(self.json_response(
+                request,
+                200,
+                json!({ "source": "", "translation": "", "ms": ms(), "asr_ms": asr_ms }),
+            ));
+        }
+        if !self.ml.translate_available() {
+            return Ok(self.json_response(
+                request,
+                200,
+                json!({ "source": source, "translation": source, "ms": ms(), "asr_ms": asr_ms }),
+            ));
+        }
+        let mt_start = std::time::Instant::now();
+        let translation = self
+            .ml
+            .with_translator(|mt| mt.translate(&source, src, tgt, !accurate))?;
+        let translate_ms = mt_start.elapsed().as_millis() as u64;
+        Ok(self.json_response(
+            request,
+            200,
+            json!({
+                "source": source,
+                "translation": translation,
+                "ms": ms(),
+                "asr_ms": asr_ms,
+                "translate_ms": translate_ms,
+            }),
+        ))
+    }
+
+    /// Upload body as a temp file owned by the caller. The server already
+    /// streamed large bodies to disk (`body_file`); small ones are written here.
+    fn body_to_file(
+        &self,
+        request: &Request,
+        q: &HashMap<String, String>,
+    ) -> anyhow::Result<PathBuf> {
+        let name = q.get("filename").map(String::as_str).unwrap_or("input.bin");
+        let ext = std::path::Path::new(name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .filter(|e| e.chars().all(|c| c.is_ascii_alphanumeric()))
+            .unwrap_or("bin");
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let target =
+            env::temp_dir().join(format!("ysm-upload-{}-{nanos}.{ext}", std::process::id()));
+        match &request.body_file {
+            // Rename takes ownership: the server's own cleanup then finds nothing.
+            Some(file) => {
+                if fs::rename(file, &target).is_err() {
+                    fs::copy(file, &target)?;
+                }
+            }
+            None => fs::write(&target, &request.body)?,
+        }
+        Ok(target)
+    }
+
+    fn start_job(
+        &self,
+        request: &Request,
+        q: &HashMap<String, String>,
+        language: Option<String>,
+        task: Task,
+    ) -> anyhow::Result<Response> {
+        let name = q
+            .get("filename")
+            .cloned()
+            .unwrap_or_else(|| "input.bin".into());
+        let millis = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let id = format!("job-{millis}");
+        let file = self.body_to_file(request, q)?;
+        let size = fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
+        crate::engine::jobs_lock(&self.jobs).insert(
+            id.clone(),
+            json!({
+                "id": id,
+                "status": "running",
+                "progress": 0.05,
+                "filename": name,
+                "sizeBytes": size,
+                "segments": null,
+                "partialSegments": 0,
+                "streaming": false,
+                "error": null,
+                "cancel": false,
+            }),
+        );
+        let (ml, jobs, job_id) = (Arc::clone(&self.ml), Arc::clone(&self.jobs), id.clone());
+        std::thread::spawn(move || {
+            crate::engine::run_job(ml, jobs, job_id, file, language, task, size)
+        });
+        Ok(self.json_response(request, 202, json!({ "jobId": id })))
+    }
+
+    fn post_notes_generate(&self, request: &Request, summarize: bool) -> Response {
+        let Some(payload) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let get = |key: &str| payload.get(key).filter(|v| py_truthy(v));
+        let text = |key: &str, fallback: &str| {
+            get(key).map(py_str).unwrap_or_else(|| fallback.to_string())
+        };
+        let lines: Vec<Value> = match get("lines") {
+            Some(Value::Array(items)) => items.clone(),
+            _ => Vec::new(),
+        };
+        if summarize && lines.is_empty() {
+            return self.json_response(
+                request,
+                400,
+                json!({ "error": "body needs non-empty lines[]" }),
+            );
+        }
+        let note = heuristic_notes(
+            &lines,
+            &text("title", "Notulen sesi"),
+            &text("source", "helper"),
+        );
+        if !summarize {
+            return self.json_response(request, 200, json!({ "note": note }));
+        }
+        let count = |key: &str| note[key].as_array().map_or(0, Vec::len);
+        self.json_response(
+            request,
+            200,
+            json!({
+                "summary": note["summary"],
+                "decisions": note["decisions"],
+                "actions": note["actions"],
+                "counts": {
+                    "segments": lines.len(),
+                    "decisions": count("decisions"),
+                    "actions": count("actions"),
+                },
+            }),
+        )
+    }
+
+    fn model_inventory(&self) -> Vec<Value> {
+        let device = self.ml.device_name();
+        let mt = self.ml.translate_available();
+        vec![
+            json!({
+                "key": "asr",
+                "kind": "asr",
+                "id": self.ml.asr_model,
+                "engine": ASR_ENGINE,
+                "device": device,
+                "available": true,
+                "loaded": self.ml.asr_loaded(),
+            }),
+            json!({
+                "key": "translate",
+                "kind": "translate",
+                "id": self.ml.translate_model,
+                "engine": if mt { Value::from(MT_ENGINE) } else { Value::Null },
+                "device": device,
+                "available": mt,
+                "loaded": self.ml.translate_loaded(),
+            }),
+        ]
+    }
+
+    fn inventory_ids(&self) -> Vec<String> {
+        let mut ids = vec![self.ml.asr_model.clone()];
+        ids.extend(self.ml.translate_model.clone());
+        ids
+    }
+
+    fn post_models_pull(&self, request: &Request) -> Response {
+        let Some(payload) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let want = match payload.get("id") {
+            Some(id) if py_truthy(id) => py_str(id).trim().to_string(),
+            _ => String::new(),
+        };
+        if want.is_empty() || !self.inventory_ids().contains(&want) {
+            return self.json_response(
+                request,
+                400,
+                json!({ "error": "id must be one of the /models inventory ids" }),
+            );
+        }
+        match crate::models::pull(&want) {
+            Ok((path, bytes)) => self.json_response(
+                request,
+                200,
+                json!({ "ok": true, "id": want, "path": path.to_string_lossy(), "bytes": bytes }),
+            ),
+            Err(error) => self.json_response(
+                request,
+                502,
+                json!({ "error": format!("download failed: {error:#}") }),
+            ),
+        }
+    }
+
     fn delete(&self, request: &Request) -> Response {
         let path = request.path();
+        if let Some(rest) = path.strip_prefix("/models/cache/") {
+            let q = query(&request.target);
+            let confirm = matches!(
+                q.get("confirm").map(String::as_str),
+                Some("1" | "true" | "yes")
+            );
+            let (status, body) = delete_cached(
+                &self.hf_cache,
+                &percent_decode(rest),
+                &self.inventory_ids(),
+                confirm,
+            );
+            return self.json_response(request, status, body);
+        }
         if let Some(rest) = path.strip_prefix("/notes/") {
             let note_id = percent_decode(rest);
             if note_id.is_empty() || note_id.contains('/') {
@@ -250,46 +648,47 @@ impl App {
         self.json_response(request, 404, json!({ "error": "not found" }))
     }
 
-    fn not_implemented(&self, request: &Request) -> Response {
-        self.json_response(request, 501, json!({ "error": ML_NOT_IMPLEMENTED }))
-    }
-
     fn health(&self) -> Value {
+        let mt = self.ml.translate_available();
         json!({
             "ok": true,
-            "engine": "rust",
-            "engine_label": "rust",
-            "model": Value::Null,
+            "engine": ASR_ENGINE,
+            "engine_label": ASR_ENGINE,
+            "model": self.ml.asr_model,
+            // Media is decoded in-process (symphonia), not by ffmpeg.
             "ffmpeg": false,
-            "translate": false,
-            "translate_model": Value::Null,
+            "media_decoder": "symphonia",
+            "translate": mt,
+            "translate_model": self.ml.translate_model,
             "draft_model": Value::Null,
-            "device": "cpu",
-            "compute": Value::Null,
+            "device": self.ml.device_name(),
+            "compute": "float32",
             "engine_mode": self.load_engine_mode(),
             "platform": env::consts::OS,
+            "loaded": { "asr": self.ml.asr_loaded(), "translate": self.ml.translate_loaded() },
             "features": {
-                "fast_translate": false,
-                "translate_refine": false,
+                "fast_translate": true,
+                "translate_refine": mt,
+                // The oracle's draft flag means a separate small draft model; none here.
                 "draft": false,
                 "notes": true,
-                "transcribe_file_jobs": false,
-                "streaming_file_jobs": false,
+                "transcribe_file_jobs": true,
+                "streaming_file_jobs": true,
                 "faster_whisper": false,
                 "ui_prefs": true,
-                "models": false,
+                "models": true,
             },
         })
     }
 
     fn device_state(&self) -> Value {
         let pref = self.load_device_pref();
-        let active = "cpu";
+        let active = self.ml.device_name();
         json!({
             "device": pref,
             "active": active,
-            "compute": Value::Null,
-            "cuda_available": false,
+            "compute": "float32",
+            "cuda_available": crate::ml::gpu_available(),
             "supported": true,
             "applied": pref == "auto" || pref == active,
         })
@@ -318,7 +717,7 @@ impl App {
             );
         }
         let saved = self.save_device_pref(want);
-        if saved == "cuda" {
+        if saved == "cuda" && !crate::ml::gpu_available() {
             return self.json_response(
                 request,
                 200,
@@ -338,7 +737,7 @@ impl App {
                 "ok": true,
                 "supported": true,
                 "device": saved,
-                "restart_required": saved != "cpu",
+                "restart_required": saved != self.ml.device_name(),
             }),
         )
     }
@@ -581,12 +980,40 @@ impl App {
     }
 }
 
-fn target_status() -> Vec<Value> {
+fn draft_source_ok(source: &str, samples: usize) -> bool {
+    let s = source.trim();
+    if s.is_empty() {
+        return false;
+    }
+    let max_chars = 40usize.max((samples as f64 / 16000.0 * 25.0) as usize + 20);
+    s.chars().count() <= max_chars
+}
+
+/// `parse_qs(...)` first values: `+` is a space, then percent-decoded.
+fn query(target: &str) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    let Some((_, qs)) = target.split_once('?') else {
+        return out;
+    };
+    for pair in qs.split(['&', ';']) {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if value.is_empty() {
+            continue; // parse_qs drops blank values
+        }
+        out.entry(percent_decode(&key.replace('+', " ")))
+            .or_insert_with(|| percent_decode(&value.replace('+', " ")));
+    }
+    out
+}
+
+fn target_status(translate: bool) -> Vec<Value> {
     TARGET_LANGS
         .iter()
         .map(|code| {
             if *code == "en" {
                 json!({ "code": code, "via": "whisper-direct", "local": true })
+            } else if translate {
+                json!({ "code": code, "via": "llm", "local": true })
             } else {
                 json!({ "code": code, "via": "none", "local": false })
             }

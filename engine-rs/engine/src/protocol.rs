@@ -10,6 +10,9 @@ pub struct Request {
     /// Header names are lower-case; values are kept verbatim.
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+    /// Upload bodies the server streamed to disk instead of `body`; the server
+    /// deletes it after `handle` unless a route moved it away.
+    pub body_file: Option<std::path::PathBuf>,
     pub peer_loopback: bool,
 }
 

@@ -2,12 +2,26 @@
 name = "submeetly-engine"
 version = "0.1.0"
 edition = "2021"
-description = "Loopback engine for yravgSubMeetly: non-ML HTTP routes and Native Messaging host"
+description = "Loopback engine for yravgSubMeetly: HTTP routes, candle ASR/translation, Native Messaging host"
 
 [[bin]]
 name = "submeetly-engine"
 path = "src/main.rs"
 
+[features]
+default = []
+cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+
 [dependencies]
+anyhow = "1"
+candle-core = "=0.11.1"
+candle-nn = "=0.11.1"
+candle-transformers = "=0.11.1"
+hf-hub = { version = "1", default-features = false, features = ["blocking", "rustls-tls"] }
+realfft = "3.5"
+rubato = "5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+symphonia = { version = "0.5", features = ["aac", "flac", "isomp4", "mp3", "pcm", "wav"] }
+tokenizers = { version = "0.22", default-features = false, features = ["onig"] }

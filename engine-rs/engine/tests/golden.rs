@@ -55,7 +55,12 @@ fn replays_every_golden_with_zero_mismatches() {
     ));
     let _ = fs::remove_dir_all(&state_dir);
     fs::create_dir_all(&state_dir).expect("state dir");
-    let app = App::new(state_dir.clone());
+    // The oracle on a non-Apple machine has no translation model.
+    std::env::set_var("TRANSLATE", "off");
+    let hf_cache = state_dir.join("hf-cache");
+    copy_dir(&golden_dir.join("fixtures").join("hf-cache"), &hf_cache);
+    let mut app = App::new(state_dir.clone());
+    app.set_hf_cache(hf_cache);
 
     let mut failures: Vec<String> = Vec::new();
     for path in &files {
@@ -82,6 +87,7 @@ fn replays_every_golden_with_zero_mismatches() {
             headers,
             body: golden.request.body.clone().unwrap_or_default().into_bytes(),
             peer_loopback: true,
+            body_file: None,
         };
 
         let actual = app.handle(&request);
@@ -119,6 +125,18 @@ fn replays_every_golden_with_zero_mismatches() {
             .join("\n")
     );
     println!("replayed {} goldens, 0 mismatches", files.len());
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    fs::create_dir_all(to).expect("mkdir");
+    for entry in fs::read_dir(from).expect("fixture dir").flatten() {
+        let target = to.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy_dir(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).expect("copy fixture");
+        }
+    }
 }
 
 fn preview(value: &Value) -> String {

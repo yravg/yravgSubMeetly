@@ -122,6 +122,12 @@ test('diagnostics: platform mismatch + cpu + no ffmpeg + old helper are surfaced
   assert.equal(summarizeDiagnostics(d).fail, 1);
 });
 
+test('diagnostics: Rust engine decodes media itself, so ffmpeg=false + media_decoder is ok', () => {
+  const h = { ...HEALTH_LINUX_CUDA, ffmpeg: false, media_decoder: 'symphonia' };
+  const d = runDiagnostics({ os: 'linux', health: h, engine: 'native', nativeHostSupported: false, lang: 'en' });
+  assert.equal(d.find((c) => c.id === 'ffmpeg').state, 'ok');
+});
+
 test('diagnostics: macOS Apple Silicon helper reports darwin → macos and LLM translate ok', () => {
   const d = runDiagnostics({ os: 'macos', health: HEALTH_MAC, engine: 'native', nativeHostSupported: true, hostInstalled: true, lang: 'en' });
   const by = Object.fromEntries(d.map((c) => [c.id, c.state]));

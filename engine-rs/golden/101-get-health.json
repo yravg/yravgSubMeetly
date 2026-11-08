@@ -1,0 +1,42 @@
+{
+  "name": "GET /health",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "GET",
+    "path": "/health",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "translate": false,
+      "engine_mode": "accurate",
+      "features": {
+        "notes": true,
+        "ui_prefs": true
+      }
+    }
+  },
+  "mask": [
+    "engine",
+    "engine_label",
+    "model",
+    "ffmpeg",
+    "translate_model",
+    "draft_model",
+    "device",
+    "compute",
+    "platform",
+    "features.fast_translate",
+    "features.translate_refine",
+    "features.draft",
+    "features.transcribe_file_jobs",
+    "features.streaming_file_jobs",
+    "features.faster_whisper",
+    "features.models",
+    "loaded",
+    "media_decoder"
+  ]
+}

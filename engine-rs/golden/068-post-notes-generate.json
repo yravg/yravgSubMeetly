@@ -1,0 +1,125 @@
+{
+  "name": "POST /notes/generate",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "POST",
+    "path": "/notes/generate",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"lines\":[{\"text\":\"Keputusan nomor 1 disetujui tim. Action kerjakan bagian 1 segera\"},{\"text\":\"Keputusan nomor 2 disetujui tim. Action kerjakan bagian 2 segera\"},{\"text\":\"Keputusan nomor 3 disetujui tim. Action kerjakan bagian 3 segera\"},{\"text\":\"Keputusan nomor 4 disetujui tim. Action kerjakan bagian 4 segera\"},{\"text\":\"Keputusan nomor 5 disetujui tim. Action kerjakan bagian 5 segera\"},{\"text\":\"Keputusan nomor 6 disetujui tim. Action kerjakan bagian 6 segera\"},{\"text\":\"Keputusan nomor 7 disetujui tim. Action kerjakan bagian 7 segera\"},{\"text\":\"Keputusan nomor 8 disetujui tim. Action kerjakan bagian 8 segera\"},{\"text\":\"Keputusan nomor 9 disetujui tim. Action kerjakan bagian 9 segera\"},{\"text\":\"Keputusan nomor 10 disetujui tim. Action kerjakan bagian 10 segera\"},{\"text\":\"Keputusan nomor 11 disetujui tim. Action kerjakan bagian 11 segera\"},{\"text\":\"Keputusan nomor 12 disetujui tim. Action kerjakan bagian 12 segera\"},{\"text\":\"Keputusan nomor 13 disetujui tim. Action kerjakan bagian 13 segera\"},{\"text\":\"Keputusan nomor 14 disetujui tim. Action kerjakan bagian 14 segera\"},{\"text\":\"Keputusan nomor 15 disetujui tim. Action kerjakan bagian 15 segera\"},{\"text\":\"Keputusan nomor 16 disetujui tim. Action kerjakan bagian 16 segera\"},{\"text\":\"Keputusan nomor 17 disetujui tim. Action kerjakan bagian 17 segera\"},{\"text\":\"Keputusan nomor 18 disetujui tim. Action kerjakan bagian 18 segera\"},{\"text\":\"Keputusan nomor 19 disetujui tim. Action kerjakan bagian 19 segera\"},{\"text\":\"Keputusan nomor 20 disetujui tim. Action kerjakan bagian 20 segera\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "note": {
+        "title": "Notulen sesi",
+        "source": "helper",
+        "status": "ready",
+        "summary": "Keputusan nomor 1 disetujui tim. Action kerjakan bagian 1 segera … Keputusan nomor 20 disetujui tim. Action kerjakan bagian 20 segera (20 segmen).",
+        "decisions": [
+          "nomor 1 disetujui tim",
+          "nomor 2 disetujui tim",
+          "nomor 3 disetujui tim",
+          "nomor 4 disetujui tim",
+          "nomor 5 disetujui tim",
+          "nomor 6 disetujui tim",
+          "nomor 7 disetujui tim",
+          "nomor 8 disetujui tim"
+        ],
+        "actions": [
+          {
+            "id": "act-1",
+            "text": "kerjakan bagian 1 segera Keputusan nomor 2 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-2",
+            "text": "kerjakan bagian 2 segera Keputusan nomor 3 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-3",
+            "text": "kerjakan bagian 3 segera Keputusan nomor 4 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-4",
+            "text": "kerjakan bagian 4 segera Keputusan nomor 5 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-5",
+            "text": "kerjakan bagian 5 segera Keputusan nomor 6 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-6",
+            "text": "kerjakan bagian 6 segera Keputusan nomor 7 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-7",
+            "text": "kerjakan bagian 7 segera Keputusan nomor 8 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-8",
+            "text": "kerjakan bagian 8 segera Keputusan nomor 9 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-9",
+            "text": "kerjakan bagian 9 segera Keputusan nomor 10 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-10",
+            "text": "kerjakan bagian 10 segera Keputusan nomor 11 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-11",
+            "text": "kerjakan bagian 11 segera Keputusan nomor 12 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "act-12",
+            "text": "kerjakan bagian 12 segera Keputusan nomor 13 disetujui tim",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          }
+        ],
+        "transcriptPreview": "Keputusan nomor 1 disetujui tim. Action kerjakan bagian 1 segera\nKeputusan nomor 2 disetujui tim. Action kerjakan bagian 2 segera\nKeputusan nomor 3 disetujui tim. Action kerjakan bagian 3 segera\nKeputusan nomor 4 disetujui tim. Action kerjakan bagian 4 segera\nKeputusan nomor 5 disetujui tim. Action kerjakan bagian 5 segera\nKeputusan nomor 6 disetujui tim. Action kerjakan bagian 6 segera",
+        "savedLocally": false
+      }
+    }
+  },
+  "mask": [
+    "note.id",
+    "note.generatedAt"
+  ]
+}
