@@ -2,7 +2,7 @@
   "name": "yraverage-submin",
   "version": "1.1.1",
   "private": true,
-  "description": "yravgSubMeetly \u2014 on-device realtime subtitle & translation Chrome extension. Inference stays local after models download.",
+  "description": "yravgSubMeetly 2014 on-device realtime subtitle & translation Chrome extension. Inference stays local after models download.",
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs",
@@ -29,13 +29,15 @@
     "pack:store": "node scripts/pack-store.mjs",
     "pack:store:screens": "node scripts/capture-store-screens.mjs",
     "test": "node --test --test-concurrency=1 test/*.test.mjs test/*.test.js",
-    "test:engine-rs": "node scripts/test-engine-rs.mjs"
+    "test:engine-rs": "node scripts/test-engine-rs.mjs",
+    "qa": "playwright test -c qa/specs/playwright.config.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
     "@ricky0123/vad-web": "^0.0.30"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "esbuild": "^0.24.0",
     "puppeteer": "^25.8.0"
   }
