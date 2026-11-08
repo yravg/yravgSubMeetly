@@ -1,10 +1,13 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Side panel (board D02):** lima tab bawah (Captions, Notes, History, Helper, Settings); Captions tiga kartu, ekspor subtitel di History, Native Helper di tab sendiri; Settings bertab (General, Engine, Models, Output, About); satu baris tab secara bawaan dengan pilihan "Tab rows: One / Two"; warna terjemahan bisa diganti (Indigo bawaan, Navy, Teal, Neutral, Bronze)
+- **Lab shell (board D03):** app.html kini empat tab (Panel, Test pages, Mock helper, Guides and docs), 21 halaman uji, panel How the lab works, log permintaan mock helper
+- **Island:** halaman Live, Meeting, Inbox dan add-in Agenda timer, Talk time, Engine monitor yang membaca helper lokal; hover 0,22/1,5/3 dtk/Off, warna terjemahan, tampilan kertas SubMeetly sebagai bawaan; fitur doa, kota, dan unduhan dihapus
 - **Nama tampilan:** yraverageSubMin menjadi **yravgSubMeetly** di ekstensi, helper native, aplikasi macOS, panduan, dan listing toko; wordmark kini yravg + SubMeetly. ID internal (ysm*, ~/.yraveragesubmin, com.yraveragesubmin.helper, bundle id) tidak berubah, tanpa migrasi
 - **Engine Rust (`engine-rs/`)** untuk rute non-ML helper: 79 golden direkam dari oracle Python (`scripts/gen-engine-golden.mjs`), replay 0 selisih, kebijakan loopback/Origin, migrasi direktori state, host Native Messaging `ping`; rute ML menjawab 501 sampai port candle (S4). `npm run test:engine-rs`
 - **Suite QA Playwright (`npm run qa`)** ala TestSprite: strategi, 15 kasus (TC001–TC015) untuk lab shell, Minutes Register, dan engine Rust, run bertanggal dengan screenshot dan video; run pertama 14 lulus, 1 gagal karena bug nyata (dock menutup tombol Add item di 1280×800)
-- **Island Windows (`island/`)**: pill di tepi atas layar, fork Oyenza Studio (MIT) dengan tampilan SubMeetly; `cargo build -p poni` jalan, 429 tes `poni-core` lulus. Masih gelap saja, belum ada halaman SubMeetly (S7)
+- **Island Windows (`island/`)**: pill di tepi atas layar, fork Oyenza Studio (MIT) dengan tampilan SubMeetly; `cargo build -p poni` jalan, 343 tes `poni-core` lulus (429 sebelum modul doa dan kota dihapus).
 - **Peta Threadbear → rapat** (`docs/roadmap/threadbear-mapping.md`): fitur dipetakan ke register/island/add-in, lima langkah pertama dengan kriteria terima
 - **Rencana besar yravgSubMeetly** (`docs/roadmap/submeetly-next.md`, `docs/handoff/submeetly-next.md`): island ala Oyenza, add-in, engine Rust, de-slop halaman
 - **Tab Performance** (child tab Captions): sampel waktu ASR/MT/draft/refine per mesin & bahasa, KPI (p50, RTF), bar/scatter/line SVG murni dengan palet 3 seri tervalidasi CVD, tabel, filter, jendela mengapung yang bisa digeser, ekspor laporan JSON/Markdown + impor laporan/bench untuk membandingkan platform

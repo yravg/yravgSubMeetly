@@ -1,0 +1,143 @@
+{
+  "id": "run-20261108-145858",
+  "at": 1794121138571,
+  "commit": "bb86286",
+  "results": [
+    {
+      "case": "TC001",
+      "status": "fail",
+      "durationMs": 13163,
+      "note": "Error: expect(locator).toHaveCount(expected) failed",
+      "evidence": [
+        "run-20261108-145858/TC001-1.png",
+        "run-20261108-145858/TC001-2.webm"
+      ]
+    },
+    {
+      "case": "TC002",
+      "status": "pass",
+      "durationMs": 2164,
+      "evidence": [
+        "run-20261108-145858/TC002-1.png",
+        "run-20261108-145858/TC002-2.webm"
+      ]
+    },
+    {
+      "case": "TC003",
+      "status": "pass",
+      "durationMs": 728,
+      "evidence": [
+        "run-20261108-145858/TC003-1.png",
+        "run-20261108-145858/TC003-2.webm"
+      ]
+    },
+    {
+      "case": "TC004",
+      "status": "fail",
+      "durationMs": 61296,
+      "note": "Test timeout of 60000ms exceeded.",
+      "evidence": [
+        "run-20261108-145858/TC004-1.png",
+        "run-20261108-145858/TC004-2.webm"
+      ]
+    },
+    {
+      "case": "TC005",
+      "status": "fail",
+      "durationMs": 2133,
+      "note": "Error: locator.click: Element is not visible",
+      "evidence": [
+        "run-20261108-145858/TC005-1.png",
+        "run-20261108-145858/TC005-2.webm"
+      ]
+    },
+    {
+      "case": "TC006",
+      "status": "pass",
+      "durationMs": 2149,
+      "evidence": [
+        "run-20261108-145858/TC006-1.png",
+        "run-20261108-145858/TC006-2.webm"
+      ]
+    },
+    {
+      "case": "TC007",
+      "status": "pass",
+      "durationMs": 3690,
+      "evidence": [
+        "run-20261108-145858/TC007-1.png",
+        "run-20261108-145858/TC007-2.png",
+        "run-20261108-145858/TC007-3.webm",
+        "run-20261108-145858/TC007-4.webm"
+      ]
+    },
+    {
+      "case": "TC008",
+      "status": "fail",
+      "durationMs": 60166,
+      "note": "Test timeout of 60000ms exceeded.",
+      "evidence": [
+        "run-20261108-145858/TC008-1.png",
+        "run-20261108-145858/TC008-2.webm"
+      ]
+    },
+    {
+      "case": "TC009",
+      "status": "pass",
+      "durationMs": 2797,
+      "evidence": [
+        "run-20261108-145858/TC009-1.png",
+        "run-20261108-145858/TC009-2.webm"
+      ]
+    },
+    {
+      "case": "TC010",
+      "status": "fail",
+      "durationMs": 1501,
+      "note": "Error: Add item (#d-save) is covered by another element",
+      "evidence": [
+        "run-20261108-145858/TC010-1.png",
+        "run-20261108-145858/TC010-2.webm"
+      ]
+    },
+    {
+      "case": "TC011",
+      "status": "pass",
+      "durationMs": 1915,
+      "evidence": [
+        "run-20261108-145858/TC011-1.png",
+        "run-20261108-145858/TC011-2.webm"
+      ]
+    },
+    {
+      "case": "TC012",
+      "status": "pass",
+      "durationMs": 1836,
+      "evidence": [
+        "run-20261108-145858/TC012-1.png",
+        "run-20261108-145858/TC012-2.webm"
+      ]
+    },
+    {
+      "case": "TC013",
+      "status": "pass",
+      "durationMs": 3981,
+      "evidence": [
+        "run-20261108-145858/TC013-1.png",
+        "run-20261108-145858/TC013-2.webm"
+      ]
+    },
+    {
+      "case": "TC014",
+      "status": "pass",
+      "durationMs": 48,
+      "evidence": []
+    },
+    {
+      "case": "TC015",
+      "status": "pass",
+      "durationMs": 24,
+      "evidence": []
+    }
+  ]
+}

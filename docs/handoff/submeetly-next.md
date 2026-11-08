@@ -16,7 +16,7 @@ PRD rows with acceptance: roadmap section "PRD rows" (BRAND, ENG, ISL, ADD, THB,
 | S4 ASR/translate | in progress | Claude worker on Opus 5.5, effort low (owner decision 2026-11-08, overrides the OpenCode-first worker rule for S4), dispatch ctx_fa4448d709c1; earlier OpenCode dispatches ctx_67550f45a226 and ctx_872375276a6c stopped, worktree sm-s4, branch yravg/sm-s4, spec scratchpad specs/s4.md. candle-transformers 0.11.1 chosen. Stops on OpenCode "external directory" prompts; `permission.external_directory: allow` added to `~/.config/opencode/opencode.json` 2026-11-08 (backup `.bak-2026-11-08`), takes effect for new sessions |
 | S5 switch | open | |
 | S6 island fork | done, merged fe8ca90 (owner yes 2026-11-08) | `yravg/sm-island` e48c6a6 (Sonnet worker ctx_999d4e8149cd after two OpenCode workers stalled). Lead verified: `cargo build -p poni` ok (103 dead-code warnings), `cargo test -p poni-core` 429 pass. Pill runs on Windows (island/docs/pill-first-run.png, cropped by lead: the worker shot included a personal browser tab). Open: island still dark (owner wants light first), no SubMeetly pages (S7), mac-only code still shows "Oyenza" strings (menu, sign-in), crate names poni/poni-core kept |
-| S7 island pages | open | |
+| S7 island pages | done, part open, merged 17c98db | branch yravg/sm-island2 b642817 (Sonnet ctx_19304829a6b2). Lead verified: `cargo test -p poni-core` 343 + helper_smoke 1 pass, `cargo build -p poni` ok (99 warnings), looked at island/docs/s7-*.png (21 shots, 5 states). Open: Live follows the note transcript tail (no caption stream); Pause/Stop control the island, not capture; Talk time = items per owner; Engine shows no CPU/RTF; mac code still has "Oyenza" strings; pairdrop default server drop.oyenza.com; `cargo test -p poni` broken at baseline |
 | S8 add-ins | open | |
 | S9 threadbear spec | done, merged | merge 92f2ef5 (db2eb95), docs/roadmap/threadbear-mapping.md |
 | S10b canvas rework (owner comments v4) | in progress | Sonnet agents, files under docs/design/submeetly-canvas: D02/D03/T03 (inventory-D02-D03-T03.md, icons/), I-boards (inventory-island.md), T-boards except T03 DONE and published v5 2026-11-08 (threads.mjs, inventory-threadbear-boards.md 37 rows/36 landed, T04 + T05 new, interactive, render 0 errors 0 overflow, slop threads.mjs 100 A; lint_boards not run, DC runtime clicks not verified; T01 threads resolved), island film DONE 2026-11-08 (stageshow gold dynamic-island, film.mjs --gate "rehearsal passed" at 900 and 390; shots/island-demo.gif 1.9 MB 16 s, poster png; source docs/design/island-demo/; uploaded as /_blob/af4958e4..., /_blob/19053ddc..., in blobs.json; not yet placed on a board). Checkpoints `.checkpoints/canvas-*.md`, `island-demo.md`. Open comment threads: D02, D03, T03, T01 x4, I01, I02. Lead publishes and resolves threads. |
@@ -94,3 +94,11 @@ then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
 - qa merged (2026-11-08): `yravg/sm-qa` 0871ead + lead run; `npm run qa` re-run by the lead = 14 pass, 1 fail
   (TC010: floating dock at src/minutes.css:879 covers #d-save at 1280x800, a real bug; sent to the minutes worker).
   Needs python3 on PATH (QA_PYTHON), `npm run build` first, PUPPETEER_EXECUTABLE_PATH; cargo for TC014-015.
+- sidepanel merged (2026-11-08) bb86286 (branch 116733e + lead fix 023f16c: lab shell said "yraverageSubMeetly", now yravgSubMeetly).
+  Lead checks: `npm run build` ok; `npm test` 323 tests, 299 pass, 4 fail (same Windows-only four as baseline), 20 skipped;
+  app.html viewed at 1440/1024/390 (overflow 0, no page errors); Settings > Tab rows Two brings back the Captions/Notes row;
+  five translation swatches present. QA specs TC001/004/005/008 were stale against board D02 (3 Captions cards, export in
+  History, engine on Settings > Engine) and were updated, not the product. TC005 now clicks the visible label.
+  `npm run qa` after merge: run-20261108-145858 (before spec update) 10 pass 5 fail; run-20261108-151018 14 pass, 1 fail (TC010, minutes worker).
+- island2 merged (2026-11-08) 17c98db: see S7 row.
+- Still running: s4fix (ctx_00df3435961e), minutes (ctx_d660a26755a6, also fixes TC010).

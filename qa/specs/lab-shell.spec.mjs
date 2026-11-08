@@ -4,11 +4,12 @@ import { download, emitPanel, openApp, openView } from './helpers.mjs';
 
 const FINAL = { source: 'Selamat pagi', translation: 'Good morning', t0: 1.25, t1: 3.5, final: true };
 
-test('TC001 lab shell opens with the five side-panel cards and both views', async ({ page }) => {
+test('TC001 lab shell opens with the three Captions cards and both views', async ({ page }) => {
   const errors = await openApp(page);
   await openView(page, 'captions');
   const cards = page.locator('#view-captions .card');
-  await expect(cards).toHaveCount(5);
+  // Board D02: Captions holds Source, Task, Actions; History and Helper have their own tabs.
+  await expect(cards).toHaveCount(3);
   for (const sel of ['#mode-toggle', '#rt-target', '#task-toggle', '#src-lang', '#tgt-lang', '#btn-start', '#status-line', '#live-src-lines', '#live-tgt-lines', '#off-lines', '#helper-export']) {
     await expect(page.locator(sel), sel).toBeAttached();
   }
@@ -52,6 +53,7 @@ test('TC003 pipeline error shows a friendly card with the raw message as detail'
 test('TC004 export captions as SRT, VTT and TXT', async ({ page }) => {
   await openApp(page);
   await openView(page, 'captions');
+  await openView(page, 'history'); // Board D02: export moved to History
   const srtBtn = page.locator('#helper-export [data-export-kind="srt"]');
   await expect(srtBtn).toBeDisabled();
   await emitPanel(page, 'subtitle', FINAL);
@@ -80,6 +82,7 @@ test('TC005 export options CRLF and BOM change the bytes and persist after reloa
   await openApp(page);
   await openView(page, 'captions');
   await emitPanel(page, 'subtitle', FINAL);
+  await openView(page, 'history');
   await expect(page.locator('#helper-export [data-export-kind="srt"]')).toBeEnabled();
 
   const box = (opt) => page.locator(`#helper-export [data-export-opt="${opt}"]`);
@@ -88,7 +91,8 @@ test('TC005 export options CRLF and BOM change the bytes and persist after reloa
   // The card re-renders on every toggle: wait for the stored value before the next click.
   const setOpt = async (opt, want) => {
     if ((await box(opt).isChecked()) === want) return;
-    await box(opt).click({ force: true });
+    // Click the visible label, not a forced click on the input: a forced click can land on the bottom bar.
+    await box(opt).locator('xpath=..').click();
     await page.waitForFunction(([k, v]) => JSON.parse(localStorage.getItem('settings') || 'null')?.exportOptions?.[k] === v, [opt, want]);
   };
   const exportSrt = () => download(page, () => page.locator('#helper-export [data-export-kind="srt"]').click());
@@ -106,6 +110,7 @@ test('TC005 export options CRLF and BOM change the bytes and persist after reloa
   expect(srt.text).toContain('\r\n');
 
   await page.reload();
+  await openView(page, 'history');
   await page.waitForSelector('#helper-export [data-export-opt="crlf"]');
   await expect(box('crlf')).toBeChecked();
   await expect(box('bom')).toBeChecked();
@@ -161,6 +166,7 @@ test('TC007 notes view: load the sample meeting, then export TXT and Markdown', 
 test('TC008 native helper card: fixture shows the engine, offline shows a warning', async ({ page }) => {
   await openApp(page);
   await page.locator('#btn-settings').click();
+  await page.locator('#settings-tabs [data-stab="engine"]').click(); // Board D02: engine settings sit on the Engine sub-tab
   await expect(page.locator('#native-block')).toBeHidden();
 
   await page.evaluate(() => (window.__labMock.helper.mode = 'fixture'));

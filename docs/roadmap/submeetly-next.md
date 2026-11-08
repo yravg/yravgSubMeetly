@@ -60,19 +60,19 @@ Status words: `missing`, `partial`, `done`. The handoff holds the evidence for e
 | ENG-002 | P0 | Rust engine speech-to-text (candle Whisper) | WER <= 0.10 vs Python faster-whisper per clip on 5 CC0 clips; segment starts within 0.5 s; RTF reported | missing (S4 running) |
 | ENG-003 | P1 | Rust engine translation (candle Qwen2.5) | Same prompts as Python; non-empty, target script, no prompt leakage on fixed set | missing (S4 running) |
 | ENG-004 | P0 | Rust is the default engine, Python removed | Owner sign-off; installers start Rust binary; e2e + e2e:native pass | missing (S5, owner gate) |
-| ISL-001 | P0 | Island at top of screen (Windows) | `island/` builds and runs, pill theme default, our tokens, no Oyenza brand/account pages | partial (S6 on branch e48c6a6: builds, 429 core tests pass, runs; dark only, no SubMeetly pages) |
-| ISL-002 | P0 | Island pages: Live, Meeting, Record | Live line + start/stop in pill; decisions Accept; talks to engine over loopback | missing (S7) |
+| ISL-001 | P0 | Island at top of screen (Windows) | `island/` builds and runs, pill theme default, our tokens, no Oyenza brand/account pages | done (S6 fe8ca90; paper look default 17c98db; 343 core tests pass) |
+| ISL-002 | P0 | Island pages: Live, Meeting, Record | Live line + start/stop in pill; decisions Accept; talks to engine over loopback | done, part open (merge 17c98db: Live, Meeting, Inbox pages; Accept/Answered/Carry/Assign POST /notes; helper smoke test vs Python. Open: Live follows note transcript tail, no caption stream; Pause/Stop control island only) |
 | ISL-003 | P1 | Every Oyenza pill/island feature mapped and drawn | `docs/design/submeetly-canvas/inventory-island.md` each line on a board or "not ported" with reason; boards interactive, animations checked frame by frame | done on canvas v10 (inventory files, interactive boards) |
-| ADD-001 | P1 | Meeting add-ins in the island | Add-on system kept; list fixed by owner (proposed: Agenda timer, Quick capture on by default) | missing (S8, owner list) |
+| ADD-001 | P1 | Meeting add-ins in the island | Add-on system kept; list fixed by owner (proposed: Agenda timer, Quick capture on by default) | partial (island add-ins Agenda timer, Talk time, Engine monitor in 17c98db; final list still owner) |
 | THB-001 | P1 | Threadbear map to meetings | `docs/roadmap/threadbear-mapping.md`, first five steps with acceptance | done (merged 92f2ef5) |
 | THB-002 | P1 | Threadbear boards show the full three-pane layout with working interactions | `inventory-threadbear-boards.md`; open thread, reply, done, archive, inbox zero clickable on T-boards | done on canvas v10 (inventory files, interactive boards) |
 | UI-001 | P0 | Canvas of every redesigned screen, light theme, Before/After, reference strips | Claude Design canvas Un8sDJNJmo7Fu2yivL6Qxh; lint + per-board check pass; owner comments resolved | partial (v11 published; owner comments answered, sign-off open) |
 | UI-002 | P0 | No feature lost in redesign of side panel, lab shell, draft options | `inventory-D02-D03-T03.md`: every control of today's code lands on a board | done on canvas v10 (inventory files, interactive boards) |
-| UI-003 | P1 | De-slop build of Minutes register, side panel, app.html | Per board: slop scan 0 errors, viewed at 1440/1024/390, built same as drawn | missing (S11, after owner sign-off) |
-| ISL-004 | P1 | Island opens on hover after 0.22 s by default, as in Oyenza; 1.5 s selectable | Default dwell 0.22 s in island settings and boards; option kept | missing (canvas update running; build in S7) |
-| UI-004 | P2 | Translation colour selectable (indigo default, 4-5 swatches) | Setting in island Settings and side panel Settings; every swatch >= 4.5:1 on its card | missing (canvas update running) |
-| UI-005 | P1 | Side panel shows one tab row by default; a toggle brings back the second row | Default one row; "Tab rows: One / Two" toggle; nothing removed | missing (canvas update running) |
-| ISL-005 | P2 | Island carries only meeting features | Prayer module, `site/places` data (6.8 MB), sholat/ja/downloader add-ons and Gmail/Calendar icons removed from `island/` | missing (follow-up after S6 merge) |
+| UI-003 | P1 | De-slop build of Minutes register, side panel, app.html | Per board: slop scan 0 errors, viewed at 1440/1024/390, built same as drawn | partial (D02 side panel + D03 lab shell merged bb86286, viewed 1440/1024/390, overflow 0; D01 Minutes in progress) |
+| ISL-004 | P1 | Island opens on hover after 0.22 s by default, as in Oyenza; 1.5 s selectable | Default dwell 0.22 s in island settings and boards; option kept | done (canvas v12; island ff6a90b: 0.22 / 1.5 / 3 s / Off) |
+| UI-004 | P2 | Translation colour selectable (indigo default, 4-5 swatches) | Setting in island Settings and side panel Settings; every swatch >= 4.5:1 on its card | done (side panel bb86286, island ff6a90b; 5 swatches, contrast 5.44-10.00:1 on canvas) |
+| UI-005 | P1 | Side panel shows one tab row by default; a toggle brings back the second row | Default one row; "Tab rows: One / Two" toggle; nothing removed | done (bb86286; Settings > General > Tab rows, viewed in lab) |
+| ISL-005 | P2 | Island carries only meeting features | Prayer module, `site/places` data (6.8 MB), sholat/ja/downloader add-ons and Gmail/Calendar icons removed from `island/` | done (dc9e181 in 17c98db; site/places removed) |
 
 ## Decisions (owner, 2026-11-08)
 
