@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>yraverageSubMin — Browser</title>
+    <title>yravgSubMeetly — Lab</title>
 <link rel="stylesheet" href="/dist/tokens.css" />
         <link rel="stylesheet" href="/dist/sidepanel.css" />
     <link rel="stylesheet" href="/dist/notes-panel.css" />
@@ -189,57 +189,227 @@
       body.app-shell[data-width='auto']:has(#view-notes:not(.hidden)) main .card {
         max-width: none;
       }
+
+      /* ======================================================================
+         Board D03 — lab shell: lab bar, tab Panel / Test pages / Mock helper /
+         Guides and docs, rails, "How the lab works". Memakai token panel.
+         ====================================================================== */
+      body.app-shell:not([data-ltab='panel'])[data-width='auto'] { --shell-w: 1140px; }
+      .labbar {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+        padding: 10px 14px; border-bottom: 1px solid var(--border);
+        background: var(--card2);
+      }
+      .labbar .wm { font-weight: 700; font-size: 14px; color: var(--text); letter-spacing: -0.01em; }
+      .labbar .lpill {
+        font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+        background: var(--accent); color: var(--on-accent);
+      }
+      .labbar .grow { flex: 1 1 auto; }
+      .lab-link, .gb {
+        font: inherit; font-size: 12px; color: var(--text); text-decoration: none; cursor: pointer;
+        background: var(--card3); border: 1px solid var(--border);
+        border-radius: 999px; padding: 4px 12px;
+      }
+      .lab-link:hover, .gb:hover { border-color: var(--accent); }
+      .newtag { font-size: 10px; font-weight: 700; color: var(--accent-soft); margin-left: 4px; }
+      .ltabs { display: flex; gap: 4px; padding: 8px 14px 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+      .ltabs button {
+        display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 13px;
+        color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent;
+        padding: 6px 10px 8px; cursor: pointer; white-space: nowrap;
+      }
+      .ltabs button[aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+      .ltab[hidden] { display: none; }
+      .lpane { padding: 14px; }
+      .lstate { display: flex; align-items: flex-start; gap: 10px; margin: 10px 14px 0; padding: 10px 12px;
+        border: 1px solid var(--border); border-radius: 12px; background: var(--card2); font-size: 12.5px; line-height: 1.45; }
+      .lstate b { color: var(--text); }
+      .lstate.err { border-color: var(--danger); }
+      .lstate.err b { color: var(--danger); }
+      .lstate[hidden] { display: none; }
+      .lcard { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
+      .lcard > h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; color: var(--text); }
+      .lcard > h3 .grow { flex: 1; }
+      .lcard a { color: var(--accent-soft); }
+      .lcard p { margin: 6px 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+      .lrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 3px 0; color: var(--text); }
+      .lrow .mono, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+      .chip { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+      .chip.ok { color: var(--accent-soft); border-color: var(--accent); }
+      .chip.warn { color: var(--warn-text); border-color: var(--warn-border); }
+      .chip.bad { color: var(--danger); border-color: var(--danger); }
+      .olog { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--muted); max-height: 140px; overflow: auto; }
+      .olog span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .lrails { margin: 0 14px 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+      .lrail { min-width: 0; }
+      @media (min-width: 1500px) {
+        body.app-shell:not([data-width='full'])[data-ltab='panel'] .lrails { display: contents; }
+        body.app-shell:not([data-width='full'])[data-ltab='panel'] .lrail { position: absolute; top: 0; width: 280px; }
+        body.app-shell:not([data-width='full'])[data-ltab='panel'] .lrail.l { right: calc(100% + 16px); }
+        body.app-shell:not([data-width='full'])[data-ltab='panel'] .lrail.r { left: calc(100% + 16px); }
+      }
+      .btn-l { font: inherit; font-size: 12.5px; cursor: pointer; color: var(--text); background: var(--card3);
+        border: 1px solid var(--border); border-radius: 999px; padding: 5px 14px; }
+      .btn-l.p { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+      .btn-l.sm { padding: 2px 10px; font-size: 11.5px; }
+      .btn-l:hover { border-color: var(--accent); }
+      .lsel, .lnum, .lta { font: inherit; font-size: 12.5px; color: var(--text); background: var(--card2);
+        border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; max-width: 100%; }
+      .lta { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; min-height: 120px; resize: vertical; }
+      .lta.bad { border-color: var(--danger); }
+      .lerr { color: var(--danger); font-size: 11.5px; min-height: 1em; }
+      /* Pages grid */
+      .pg { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; align-items: start; }
+      .pgr { display: block; padding: 7px 10px; border-radius: 8px; text-decoration: none; color: var(--text); font-size: 12.5px; line-height: 1.4; }
+      .pgr:hover { background: var(--card3); }
+      .pgr b { display: block; font-weight: 600; }
+      .pgr.pri b { color: var(--accent-soft); }
+      .pgr .pd { display: block; color: var(--muted); font-size: 11.5px; }
+      .pgr .href { display: block; color: var(--muted2); font-size: 11px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+      /* Mock tab */
+      .mk { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.2fr); gap: 12px; align-items: start; }
+      @media (max-width: 900px) { .mk { grid-template-columns: 1fr; } }
+      .mkr { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; }
+      .mkr .lbl { width: 92px; flex: none; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--muted); }
+      .mseg { display: inline-flex; background: var(--card3); border: 1px solid var(--border); border-radius: 999px; padding: 2px; }
+      .mseg button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; padding: 3px 12px; border-radius: 999px; cursor: pointer; }
+      .mseg button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+      .ltbl { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+      .ltbl th { text-align: left; color: var(--muted2); font-weight: 600; padding: 3px 6px; border-bottom: 1px solid var(--border); }
+      .ltbl td { padding: 3px 6px; color: var(--text); font-family: ui-monospace, Menlo, Consolas, monospace; }
+      .ltbl tr.bad td { color: var(--danger); }
+      .ltbl td.dim { color: var(--muted); }
+      .lempty { padding: 14px; text-align: center; color: var(--muted); font-size: 12.5px; }
+      /* Guides tab */
+      .gcols { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr); gap: 12px; align-items: start; }
+      @media (max-width: 900px) { .gcols { grid-template-columns: 1fr; } }
+      .dev { font-size: 13px; line-height: 1.6; color: var(--text); margin: 0; }
+      /* Overlay "How the lab works" */
+      .lov { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; }
+      .lov[hidden] { display: none; }
+      .lov .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 60%, transparent); }
+      .lov .pop { position: relative; width: min(560px, 100%); max-height: 86vh; overflow: auto; background: var(--card2);
+        border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; box-shadow: 0 12px 40px color-mix(in srgb, var(--bg) 70%, transparent); }
+      .lov .lh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .lov .lh b { font-size: 15px; }
+      .lov .x { font: inherit; font-size: 18px; line-height: 1; cursor: pointer; background: none; color: var(--muted); border: 0; padding: 2px 6px; }
+      .dim { color: var(--muted); }
     </style>
   </head>
-  <body class="app-shell" data-width="auto">
-    <div class="app-banner" role="note">
-      <div class="banner-text">
-        <strong>Browser tab · on-device Whisper</strong> —
-        Same pipeline as the extension (<code>offscreen.js</code> → <code>ai-worker.js</code> → ASR/MT).
-        <strong>Realtime:</strong> Start loops a CC0/demo clip via <code>captureStream</code>;
-        Pick uses <code>getDisplayMedia</code> (share a tab + audio).
-        Overlay injection and <code>tabCapture</code> still need the Chrome extension.
-        Offline → CC0 test samples for 10–30s public-domain clips per language.
+  <body class="app-shell" data-width="auto" data-ltab="panel">
+    <header class="labbar">
+      <span class="wm">yravgSubMeetly</span><span class="lpill">Lab</span>
+      <button type="button" class="gb" id="lab-how-btn">How the lab works</button>
+      <span class="grow"></span>
+      <div class="width-seg" role="group" aria-label="Page width" id="width-seg">
+        <button type="button" data-width="auto" aria-pressed="true" title="Compact for Captions, wide for Notes">Auto</button>
+        <button type="button" data-width="compact" aria-pressed="false" title="Side-panel width (480px)">Compact</button>
+        <button type="button" data-width="wide" aria-pressed="false" title="880px">Wide</button>
+        <button type="button" data-width="full" aria-pressed="false" title="Whole window">Full</button>
       </div>
-      <div class="banner-actions">
-        <div class="width-seg" role="group" aria-label="Page width" id="width-seg">
-          <button type="button" data-width="auto" aria-pressed="true" title="Compact for Captions, wide for Notes">Auto</button>
-          <button type="button" data-width="compact" aria-pressed="false" title="Side-panel width (480px)">Compact</button>
-          <button type="button" data-width="wide" aria-pressed="false" title="880px">Wide</button>
-          <button type="button" data-width="full" aria-pressed="false" title="Whole window">Full</button>
-        </div>
-        <details class="pages-menu" id="pages-menu">
-          <summary>All test pages ▾</summary>
-          <div class="pages-list">
-            <a class="primary" href="/guide.html"><b>Panduan pengguna — ekstensi</b><span>Pasang, subtitel langsung, berkas, ekspor, notulen, helper.</span></a>
-            <a class="primary" href="/guide.html?doc=USER-GUIDE-MACOS.md"><b>Panduan pengguna — macOS</b><span>Audio sistem, overlay layar penuh, dikte global, izin macOS.</span></a>
-            <a class="primary" href="/guide.html?doc=USER-GUIDE-WINLINUX.md"><b>Panduan pengguna — Windows &amp; Linux</b><span>Native Helper faster-whisper, installer host per OS, GPU CUDA, ekspor CRLF/BOM.</span></a>
-            <a class="primary" href="/src/minutes.html"><b>Minutes Register (full tab)</b><span>Typed register, provenance drawer, series view and the issued-MoM document.</span></a>
-            <a href="/lab.html"><b>Translation Lab</b><span>Media player + automated zh↔en / ja↔en benchmark against the native helper.</span></a>
-            <a href="/studio.html"><b>Offline Studio (transcription / export)</b><span>File transcription, dual-line translation and the SRT/VTT/TXT export panel.</span></a>
-            <a href="/models.html"><b>Model manager (mock)</b><span>ASR + translation model sizes, download states and actions — preview only.</span></a>
-            <a href="/history.html"><b>Session history (samples)</b><span>Saved sessions list, transcript preview and per-session export — sample data.</span></a>
-            <a href="/helper-status.html"><b>Helper status (mock)</b><span>Native Helper cards for macOS / Windows / Linux with sample states.</span></a>
-            <a href="/helper-guide.html"><b>Helper install guide &amp; troubleshooting (harness)</b><span>Per-OS install steps, live diagnostics and ranked troubleshooting — the panel inside the Native Helper card.</span></a>
-            <a href="/notes-panel.html"><b>Meeting notes ticker (harness)</b><span>Side-panel notes ticker on the v2 register.</span></a>
-            <div class="sec">Release QA</div>
-            <a href="/verify.html"><b>Phase 1 release verification</b><span>Status dashboard for the 26 baseline sub-features before smoke, E2E and the lab are wired up.</span></a>
-            <a href="/qa-report.html"><b>Smoke &amp; E2E test report</b><span>Summary of scripts/smoke.mjs and scripts/e2e.mjs (tabCapture, --pick, --native).</span></a>
-            <a href="/bench.html"><b>Model performance benchmark lab</b><span>Whisper / Voxtral / Opus-MT / native MLX comparison (last-bench.json).</span></a>
-            <a href="/defects.html"><b>Release defect list</b><span>Phase 1 release gate: must-fix defects vs accepted limitations (DRM, MKV, single tab, etc.).</span></a>
-            <div class="sec">Extension harnesses</div>
-            <a href="/audio-page.html"><b>Audio test page</b><span>Looping tab audio for extension e2e / dev-browser.</span></a>
-            <a href="/overlay-test.html"><b>Overlay test</b></a>
-            <a href="/panel-test.html"><b>Panel test</b></a>
-            <a href="/offscreen-test.html"><b>Offscreen test</b></a>
-            <div class="sec">More</div>
-            <a href="/"><b>Test page index</b></a>
-            <a href="/samples/ATTRIBUTION.md"><b>CC0 sample credits</b></a>
+      <a class="lab-link" href="/src/minutes.html">Minutes register</a>
+      <details class="pages-menu" id="pages-menu">
+        <summary class="lab-link">All test pages ▾</summary>
+        <div class="pages-list" id="pages-list"></div>
+      </details>
+    </header>
+    <nav class="ltabs" role="tablist" aria-label="Lab sections" id="ltabs">
+      <button type="button" role="tab" data-ltab="panel" aria-selected="true"><span data-ltile="captions"></span>Panel</button>
+      <button type="button" role="tab" data-ltab="pages" aria-selected="false"><span data-ltile="pages"></span>Test pages</button>
+      <button type="button" role="tab" data-ltab="mock" aria-selected="false"><span data-ltile="mock"></span>Mock helper</button>
+      <button type="button" role="tab" data-ltab="guides" aria-selected="false"><span data-ltile="docs"></span>Guides and docs</button>
+    </nav>
+
+    <section class="ltab" id="ltab-panel" role="tabpanel">
+      <div class="lstate" id="lab-loading"><span data-ltile="engine"></span><span><b>Loading the panel.</b> Fetching /dist/sidepanel.html …</span></div>
+      <div class="lstate err" id="lab-error" role="alert" hidden><span data-ltile="warn"></span><span><b id="lab-error-title"></b><br /><span id="lab-error-detail"></span><br /><button type="button" class="btn-l sm" id="lab-reload">Reload</button></span></div>
+      <div class="lstate" id="lab-locked"><span data-ltile="lock"></span><span><b>Needs the Chrome extension.</b> Tab capture (<code>tabCapture</code>) and overlay injection do not run in a plain tab. Realtime loops a CC0 clip instead; Pick uses <code>getDisplayMedia</code>.</span></div>
+      <div class="lstate" id="lab-need"><span data-ltile="sample"></span><span><b>Choose an input.</b> Pick a CC0 sample on the rail, or press Pick and share a tab with audio.</span></div>
+      <div id="app-mount"></div>
+      <div class="lrails" id="lab-rails">
+        <div class="lrail l">
+          <div class="lcard"><h3><span data-ltile="check"></span>Lab status</h3>
+            <div class="lrow">chrome-mock.js <span class="chip ok" id="st-mock">loaded</span></div>
+            <div class="lrow">dist/content.js <span class="chip ok">overlay host</span></div>
+            <div class="lrow">dist/offscreen.js <span class="chip warn" id="st-offscreen">Offscreen engine: loading</span></div>
+            <div class="lrow">Panel <span class="chip warn" id="st-panel">loading</span></div>
           </div>
-        </details>
+          <div class="lcard"><h3><span data-ltile="captions"></span>Overlay log</h3>
+            <div class="olog mono" id="overlay-log"><span>No overlay messages yet.</span></div>
+          </div>
+        </div>
+        <div class="lrail r">
+          <div class="lcard"><h3><span data-ltile="sample"></span>CC0 samples<span class="grow"></span><span class="chip">lab only</span></h3>
+            <select class="lsel" id="rail-sample" aria-label="CC0 sample"></select>
+            <p><button type="button" class="btn-l p sm" id="rail-sample-run">Run sample</button></p>
+            <p>10–30 s public-domain clips per language.</p>
+          </div>
+          <div class="lcard"><h3><span data-ltile="mock"></span>Helper mock</h3>
+            <div class="lrow">helper.mode <b class="mono" id="rail-mode"></b></div>
+            <div class="lrow">latencyMs <span class="mono" id="rail-latency"></span></div>
+            <div class="lrow">failNext <span class="mono" id="rail-failnext"></span></div>
+            <p><a href="#" id="rail-open-mock">Open mock controls</a></p>
+          </div>
+        </div>
       </div>
+    </section>
+
+    <section class="ltab lpane" id="ltab-pages" role="tabpanel" hidden>
+      <div class="pg" id="pages-grid"></div>
+    </section>
+
+    <section class="ltab lpane" id="ltab-mock" role="tabpanel" hidden>
+      <div class="mk">
+        <div>
+          <div class="lcard"><h3><span data-ltile="mock"></span>Helper mock (window.__labMock)</h3>
+            <div class="mkr"><span class="lbl">helper.mode</span>
+              <div class="mseg" role="group" aria-label="helper.mode" id="mock-mode">
+                <button type="button" data-mode="passthrough" aria-pressed="true">passthrough</button>
+                <button type="button" data-mode="offline" aria-pressed="false">offline</button>
+                <button type="button" data-mode="fixture" aria-pressed="false">fixture</button>
+              </div>
+            </div>
+            <p id="mock-mode-note"></p>
+            <div class="mkr"><span class="lbl">latencyMs</span><input class="lnum" id="mock-latency" type="number" min="0" step="50" value="0" aria-label="latencyMs" /><span class="dim">delay on every answer</span></div>
+            <div class="mkr"><span class="lbl">failNext</span><label><input type="checkbox" id="mock-failnext" /> fail next request</label><span class="dim">then back to normal</span></div>
+            <div class="mkr"><button type="button" class="btn-l" id="mock-reset">Reset</button><span class="chip">reset() restores passthrough, 0, 0 and clears both logs</span></div>
+            <p>The mock intercepts <code>fetch</code> to 127.0.0.1:17865 (<code>/health</code>, <code>/engine/device</code> GET and POST). Chrome APIs are mocked by chrome-mock.js.</p>
+          </div>
+        </div>
+        <div>
+          <div class="lcard"><h3><span data-ltile="check"></span>health fixture</h3>
+            <textarea class="lta" id="mock-health" spellcheck="false" aria-label="health fixture JSON"></textarea><div class="lerr" id="mock-health-err"></div></div>
+          <div class="lcard"><h3><span data-ltile="engine"></span>device fixture</h3>
+            <textarea class="lta" id="mock-device" spellcheck="false" aria-label="device fixture JSON"></textarea><div class="lerr" id="mock-device-err"></div></div>
+          <div class="lcard"><h3><span data-ltile="history"></span>Request log<span class="grow"></span><button type="button" class="btn-l sm" id="mock-log-clear">Clear</button></h3>
+            <div id="mock-log"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ltab lpane" id="ltab-guides" role="tabpanel" hidden>
+      <div class="gcols">
+        <div>
+          <div class="lcard"><h3><span data-ltile="docs"></span>User guides</h3>
+            <a class="pgr pri" href="/guide.html"><b>Extension (Bahasa Indonesia)</b><span class="href">/guide.html</span></a>
+            <a class="pgr pri" href="/guide.html?doc=USER-GUIDE-MACOS.md"><b>macOS</b><span class="href">/guide.html?doc=USER-GUIDE-MACOS.md</span></a>
+            <a class="pgr pri" href="/guide.html?doc=USER-GUIDE-WINLINUX.md"><b>Windows and Linux</b><span class="href">/guide.html?doc=USER-GUIDE-WINLINUX.md</span></a>
+          </div>
+          <div class="lcard"><h3><span data-ltile="register"></span>Project docs</h3>
+            <a class="pgr" href="/docs/DEVELOPMENT.md"><b>DEVELOPMENT.md</b><span class="pd">Build, test, run the lab</span></a>
+            <a class="pgr" href="/docs/QA.md"><b>QA.md</b><span class="pd">Smoke, E2E, release gate</span></a>
+            <a class="pgr" href="/docs/RELEASE-CHECKLIST.md"><b>RELEASE-CHECKLIST.md</b><span class="pd">Before a store upload</span></a>
+          </div>
+        </div>
+        <div><div class="lcard"><h3><span data-ltile="notes"></span>How the lab works</h3><p class="dev" data-dev></p></div></div>
+      </div>
+    </section>
+
+    <div class="lov" id="lab-how" role="dialog" aria-modal="true" aria-label="How the lab works" hidden>
+      <div class="scrim" data-close></div>
+      <div class="pop"><div class="lh"><b>How the lab works</b><button type="button" class="x" data-close aria-label="Close">×</button></div><p class="dev" data-dev></p></div>
     </div>
-    <div id="app-mount"></div>
 
     <!-- chrome mock must run before offscreen (Worker uses getURL) -->
     <script src="/chrome-mock.js"></script>
@@ -248,12 +418,64 @@
          Mock meneruskan pesan {target:'content'} kepadanya. -->
     <script src="/dist/content.js"></script>
     <script type="module">
+      import { tile } from '/src/lib/colour-icons.js';
       import '/dist/offscreen.js';
       window.__browserOffscreenLoaded = true;
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-      // Width toggle — remembered per browser.
+      $('st-offscreen').textContent = 'Offscreen engine: loaded';
+      $('st-offscreen').className = 'chip ok';
+      document.querySelectorAll('[data-ltile]').forEach((el) => {
+        try { el.innerHTML = tile(el.dataset.ltile, 22); } catch { /* ikon tak dikenal */ }
+        el.style.display = 'inline-flex';
+      });
+
+      // Satu paragraf pengembang, dipakai overlay dan tab Guides (kata demi kata dari banner lama).
+      const DEV =
+        '<b>Browser tab · on-device Whisper</b> — Same pipeline as the extension (<code>offscreen.js</code> → <code>ai-worker.js</code> → ASR/MT). ' +
+        '<b>Realtime:</b> Start loops a CC0/demo clip via <code>captureStream</code>; Pick uses <code>getDisplayMedia</code> (share a tab + audio). ' +
+        'Overlay injection and <code>tabCapture</code> still need the Chrome extension. ' +
+        'Offline → CC0 test samples for 10–30s public-domain clips per language.';
+      document.querySelectorAll('[data-dev]').forEach((p) => { p.innerHTML = DEV; });
+
+      // ---- Daftar halaman uji: satu sumber untuk menu dan grid tab Test pages ----
+      const PAGES = [
+        ['Guides and register', 'docs', [
+          ['Panduan pengguna — ekstensi', '/guide.html', 'Pasang, subtitel langsung, berkas, ekspor, notulen, helper.', 1],
+          ['Panduan pengguna — macOS', '/guide.html?doc=USER-GUIDE-MACOS.md', 'Audio sistem, overlay layar penuh, dikte global, izin macOS.', 1],
+          ['Panduan pengguna — Windows & Linux', '/guide.html?doc=USER-GUIDE-WINLINUX.md', 'Native Helper faster-whisper, installer host per OS, GPU CUDA, ekspor CRLF/BOM.', 1],
+          ['Minutes Register (full tab)', '/src/minutes.html', 'Typed register, provenance drawer, series view and the issued-MoM document.', 1]]],
+        ['Tools', 'pages', [
+          ['Translation Lab', '/lab.html', 'Media player + automated zh↔en / ja↔en benchmark against the native helper.'],
+          ['Offline Studio (transcription / export)', '/studio.html', 'File transcription, dual-line translation and the SRT/VTT/TXT export panel.'],
+          ['Model manager (mock)', '/models.html', 'ASR + translation model sizes, download states and actions — preview only.'],
+          ['Session history (samples)', '/history.html', 'Saved sessions list, transcript preview and per-session export — sample data.'],
+          ['Helper status (mock)', '/helper-status.html', 'Native Helper cards for macOS / Windows / Linux with sample states.'],
+          ['Helper install guide & troubleshooting (harness)', '/helper-guide.html', 'Per-OS install steps, live diagnostics and ranked troubleshooting — the panel inside the Native Helper card.'],
+          ['Meeting notes ticker (harness)', '/notes-panel.html', 'Side-panel notes ticker on the v2 register.']]],
+        ['Release QA', 'perf', [
+          ['Phase 1 release verification', '/verify.html', 'Status dashboard for the 26 baseline sub-features before smoke, E2E and the lab are wired up.'],
+          ['Smoke & E2E test report', '/qa-report.html', 'Summary of scripts/smoke.mjs and scripts/e2e.mjs (tabCapture, --pick, --native).'],
+          ['Model performance benchmark lab', '/bench.html', 'Whisper / Voxtral / Opus-MT / native MLX comparison (last-bench.json).'],
+          ['Release defect list', '/defects.html', 'Phase 1 release gate: must-fix defects vs accepted limitations (DRM, MKV, single tab, etc.).']]],
+        ['Extension harnesses', 'helper', [
+          ['Audio test page', '/audio-page.html', 'Looping tab audio for extension e2e / dev-browser.'],
+          ['Overlay test', '/overlay-test.html', ''], ['Panel test', '/panel-test.html', ''], ['Offscreen test', '/offscreen-test.html', '']]],
+        ['More', 'register', [['Test page index', '/', ''], ['CC0 sample credits', '/samples/ATTRIBUTION.md', '']]],
+      ];
+      const row = ([n, href, d, pri]) =>
+        `<a class="pgr${pri ? ' pri' : ''}" href="${href}"><b>${esc(n)}</b>${d ? `<span class="pd">${esc(d)}</span>` : ''}<span class="href">${esc(href)}</span></a>`;
+      $('pages-grid').innerHTML = PAGES.map(
+        ([t, i, rows]) => `<div class="lcard"><h3>${tile(i, 22)}${esc(t)}<span class="grow"></span><span class="chip mono">${rows.length}</span></h3>${rows.map(row).join('')}</div>`,
+      ).join('');
+      $('pages-list').innerHTML = PAGES.map(
+        ([t, , rows]) => `<div class="sec">${esc(t)}</div>${rows.map(([n, href, d, pri]) => `<a${pri ? ' class="primary"' : ''} href="${href}"><b>${esc(n)}</b>${d ? `<span>${esc(d)}</span>` : ''}</a>`).join('')}`,
+      ).join('');
+
+      // ---- Lebar halaman (diingat per browser) ----
       const WIDTH_KEY = 'ysmAppWidth';
-      const seg = document.getElementById('width-seg');
+      const seg = $('width-seg');
       function setWidth(w, persist = true) {
         document.body.dataset.width = w;
         seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.width === w)));
@@ -268,11 +490,135 @@
         const b = e.target.closest('button[data-width]');
         if (b) setWidth(b.dataset.width);
       });
-      document.getElementById('pages-menu').addEventListener('click', (e) => {
+      $('pages-menu').addEventListener('click', (e) => {
         if (e.target.closest('a')) e.currentTarget.removeAttribute('open');
       });
 
-      const mount = document.getElementById('app-mount');
+      // ---- Tab lab ----
+      const LTABS = ['panel', 'pages', 'mock', 'guides'];
+      function setLabTab(tab) {
+        const t = LTABS.includes(tab) ? tab : 'panel';
+        document.body.dataset.ltab = t;
+        document.querySelectorAll('#ltabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.ltab === t)));
+        for (const k of LTABS) $(`ltab-${k}`).hidden = k !== t;
+        if (t === 'mock') renderMock();
+      }
+      $('ltabs').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-ltab]');
+        if (b) setLabTab(b.dataset.ltab);
+      });
+      $('rail-open-mock').addEventListener('click', (e) => { e.preventDefault(); setLabTab('mock'); });
+
+      // ---- Overlay "How the lab works" ----
+      const how = $('lab-how');
+      const openHow = (on) => { how.hidden = !on; if (on) how.querySelector('.x').focus(); else $('lab-how-btn').focus(); };
+      $('lab-how-btn').addEventListener('click', () => openHow(true));
+      how.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) openHow(false); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !how.hidden) openHow(false); });
+
+      // ---- Mock helper: kendali + log permintaan ----
+      const M = () => window.__labMock;
+      const MODE_NOTE = {
+        passthrough: 'Requests to 127.0.0.1:17865 go to the real helper if one is running.',
+        offline: 'Every request fails like a helper that is not running. Use it to see the fallback to the browser engine.',
+        fixture: 'Answers /health and /engine/device from the fixtures below, no network.',
+      };
+      function renderLog() {
+        const rows = M().helper.log;
+        $('mock-log').innerHTML = rows.length
+          ? `<table class="ltbl"><tr><th>Time</th><th>Method</th><th>Path</th><th>Result</th><th>Delay</th></tr>${rows
+              .slice(-50)
+              .map((r) => {
+                const ok = String(r.result).startsWith('2') || r.result === '…';
+                const t = r.time ? new Date(r.time).toLocaleTimeString('en-GB') : '';
+                return `<tr class="${ok ? '' : 'bad'}"><td class="dim">${esc(t)}</td><td>${esc(r.method)}</td><td>${esc(r.path)}</td><td>${esc(r.result ?? '')}</td><td>${esc(r.delayMs ?? 0)} ms</td></tr>`;
+              })
+              .join('')}</table>`
+          : '<div class="lempty">No requests yet.</div>';
+      }
+      function renderRails() {
+        const h = M().helper;
+        $('rail-mode').textContent = h.mode;
+        $('rail-latency').textContent = h.latencyMs;
+        $('rail-failnext').textContent = h.failNext;
+      }
+      function renderMock() {
+        const h = M().helper;
+        document.querySelectorAll('#mock-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === h.mode)));
+        $('mock-mode-note').textContent = MODE_NOTE[h.mode] || '';
+        $('mock-latency').value = h.latencyMs;
+        $('mock-failnext').checked = h.failNext > 0;
+        if (document.activeElement !== $('mock-health')) $('mock-health').value = JSON.stringify(h.health, null, 2);
+        if (document.activeElement !== $('mock-device')) $('mock-device').value = JSON.stringify(h.device, null, 2);
+        renderLog();
+        renderRails();
+      }
+      $('mock-mode').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-mode]');
+        if (b) { M().helper.mode = b.dataset.mode; renderMock(); }
+      });
+      $('mock-latency').addEventListener('input', (e) => {
+        M().helper.latencyMs = Math.max(0, Number(e.target.value) || 0);
+        renderRails();
+      });
+      $('mock-failnext').addEventListener('change', (e) => { M().helper.failNext = e.target.checked ? 1 : 0; renderRails(); });
+      $('mock-reset').addEventListener('click', () => { M().reset(); renderMock(); renderOverlay(); });
+      $('mock-log-clear').addEventListener('click', () => { M().helper.log.length = 0; renderLog(); });
+      for (const [key, id] of [['health', 'mock-health'], ['device', 'mock-device']]) {
+        $(id).addEventListener('input', (e) => {
+          try {
+            const v = JSON.parse(e.target.value);
+            if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('must be a JSON object');
+            M().helper[key] = v;
+            e.target.classList.remove('bad');
+            $(`${id}-err`).textContent = '';
+          } catch (err) {
+            e.target.classList.add('bad');
+            $(`${id}-err`).textContent = `Not applied: ${err.message}`;
+          }
+        });
+      }
+      function renderOverlay() {
+        const log = M().content.log.slice(-6);
+        $('overlay-log').innerHTML = log.length
+          ? log.map((m) => `<span>${esc(m.type)}: ${esc(m.data?.source || m.data?.text || m.data?.translation || '')}</span>`).join('')
+          : '<span>No overlay messages yet.</span>';
+      }
+      window.addEventListener('labmock:log', () => {
+        renderOverlay();
+        if (!$('ltab-mock').hidden) renderLog();
+      });
+      renderRails();
+
+      // ---- Rel: sampel CC0 mencerminkan bilah sampel milik panel ----
+      function syncSamples() {
+        const src = document.getElementById('qa-sample-select');
+        const dst = $('rail-sample');
+        if (!src) return;
+        if (dst.options.length !== src.options.length) dst.innerHTML = src.innerHTML;
+        dst.value = src.value;
+      }
+      $('rail-sample').addEventListener('change', (e) => {
+        const src = document.getElementById('qa-sample-select');
+        if (src) { src.value = e.target.value; src.dispatchEvent(new Event('change')); }
+      });
+      $('rail-sample-run').addEventListener('click', () => document.getElementById('btn-qa-run')?.click());
+
+      // ---- Mount panel produksi ----
+      const mount = $('app-mount');
+      const setPanelState = (s) => {
+        $('lab-loading').hidden = s !== 'loading';
+        $('lab-error').hidden = s !== 'error';
+        const chip = $('st-panel');
+        chip.textContent = { loading: 'loading', error: 'missing', mounted: 'mounted' }[s];
+        chip.className = `chip ${{ loading: 'warn', error: 'bad', mounted: 'ok' }[s]}`;
+      };
+      const showError = (title, detail) => {
+        $('lab-error-title').textContent = title;
+        $('lab-error-detail').textContent = detail || '';
+        setPanelState('error');
+      };
+      $('lab-reload').addEventListener('click', () => location.reload());
 
       try {
         const r = await fetch('/dist/sidepanel.html');
@@ -288,19 +634,12 @@
         const s = document.createElement('script');
         s.type = 'module';
         s.src = '/dist/sidepanel.js';
-        s.onerror = () => {
-          mount.insertAdjacentHTML(
-            'afterbegin',
-            '<p style="padding:16px;color:#e06c75">Failed to load /dist/sidepanel.js — rebuild with <code>npm run build</code>.</p>',
-          );
-        };
+        s.onload = () => { setPanelState('mounted'); syncSamples(); setInterval(syncSamples, 1500); };
+        s.onerror = () => showError('dist/sidepanel.html missing — run npm run build', 'Failed to load /dist/sidepanel.js');
         // Stay on Realtime by default so lab users can Start immediately.
         document.body.appendChild(s);
       } catch (err) {
-        mount.innerHTML =
-          '<p style="padding:16px;color:#e06c75">' +
-          String(err.message || err) +
-          '. Lab serves <code>/dist/</code> from the project build output.</p>';
+        showError(String(err.message || err), 'Lab serves /dist/ from the project build output.');
       }
     </script>
   </body>

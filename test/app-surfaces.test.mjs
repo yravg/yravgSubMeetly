@@ -106,7 +106,8 @@ test('layout Side Panel transkripsi lengkap: sumber, bahasa, aksi, riwayat, help
       // Baris transkrip punya wadah terpisah untuk sumber dan terjemahan
       // supaya mode dual-line bisa menampilkan keduanya sejajar.
       transkrip: has('#live-src-lines') && has('#live-tgt-lines') && has('#off-lines'),
-      ekspor: has('#helper-export') && has('#helper-export-name-hint'),
+      // Board D02: ekspor pindah ke tab History, bukan lagi di Captions.
+      ekspor: !!document.querySelector('#view-history #helper-export #helper-export-name-hint'),
     };
   });
 
@@ -115,9 +116,9 @@ test('layout Side Panel transkripsi lengkap: sumber, bahasa, aksi, riwayat, help
   assert.equal(layout.aksi, true, 'Actions & Preview tidak lengkap');
   assert.equal(layout.transkrip, true, 'wadah baris transkrip tidak lengkap');
   assert.equal(layout.ekspor, true, 'kartu Export tidak lengkap');
-  // Kelima kartu itulah kerangka panel; kehilangan salah satunya berarti
-  // ada bagian panel yang tidak terpasang.
-  assert.equal(layout.kartu.length, 5, `harus 5 kartu, dapat ${layout.kartu.length}: ${layout.kartu}`);
+  // Board D02: Captions kini tiga kartu (Source, Task, Actions); History dan
+  // Helper punya tab sendiri. Kehilangan satu berarti bagian panel tak terpasang.
+  assert.equal(layout.kartu.length, 3, `harus 3 kartu, dapat ${layout.kartu.length}: ${layout.kartu}`);
 });
 
 test('penerima segmen: interim sementara, final permanen, arah dua arah, status pipeline', async () => {
@@ -538,15 +539,15 @@ test('Captions punya child tab Live/Performance; Performance memuat bench dan me
   assert.equal(r.docked, true); assert.equal(r.liveBack, true);
 });
 
-test('kartu Native Helper terlipat secara bawaan; Export subtitles berada di bawah History; bahasa standar ZH → EN', async () => {
+test('kartu Native Helper tidak lagi terlipat (tab Helper sendiri); Export subtitles berada di bawah History; bahasa standar ZH → EN', async () => {
   const r = await page.evaluate(() => ({
+    helperInOwnTab: !!document.querySelector('#view-helper #helper-status-card'),
     helperCollapsed: document.getElementById('helper-status-card').classList.contains('collapsed'),
-    helperBodyHidden: document.getElementById('helper-status-mount').offsetHeight === 0,
     exportUnderHistory: !!document.querySelector('#export-mount #helper-export'),
     exportInHelper: !!document.querySelector('#helper-status-mount #helper-export'),
     srcLang: document.getElementById('src-lang')?.value,
   }));
-  assert.equal(r.helperCollapsed, true); assert.equal(r.helperBodyHidden, true);
+  assert.equal(r.helperInOwnTab, true); assert.equal(r.helperCollapsed, false);
   assert.equal(r.exportUnderHistory, true, 'blok ekspor harus dipindah ke kartu History');
   assert.equal(r.exportInHelper, false);
   assert.equal(r.srcLang, 'zh');

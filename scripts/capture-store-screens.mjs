@@ -82,22 +82,10 @@ async function stageShot(page, { width = 'full' } = {}) {
 /**
  * Buka satu permukaan panel lewat kontrol nyatanya.
  *
- * "settings" BUKAN view-panel melainkan modal (#settings-modal). Versi
- * sebelumnya menunggu `#view-settings` yang tidak pernah ada — dan karena
- * `undefined?.classList` menghasilkan undefined, penantiannya lolos seketika
- * dan screenshot diambil pada saat modal belum terbuka.
+ * Board D02: "settings" kini tab biasa (#view-settings), jadi jalurnya sama
+ * dengan permukaan lain: klik item nav bawah lalu tunggu panel terlihat.
  */
 async function openSurface(page, surface) {
-  if (surface === 'settings') {
-    await page.evaluate(() => document.getElementById('btn-settings')?.click());
-    await page.waitForFunction(
-      () => {
-        const m = document.getElementById('settings-modal');
-        return !!m && !m.classList.contains('hidden');
-      },
-      { timeout: 10_000 },
-    );
-  } else {
     await page.evaluate((v) => {
       document.querySelector(`.bottom-nav-item[data-view="${v}"]`)?.click();
     }, surface);
@@ -109,7 +97,6 @@ async function openSurface(page, surface) {
       { timeout: 10_000 },
       surface,
     );
-  }
   await new Promise((r) => setTimeout(r, 700));
 }
 

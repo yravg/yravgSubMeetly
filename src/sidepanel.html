@@ -134,6 +134,12 @@
           </div>
         </div>
 
+        <div class="engine-line reveal reveal-delay-3" id="engine-line">
+          <span data-ctile="engine" data-size="22"></span>
+          <span id="engine-line-text" class="engine-line-text"></span>
+          <button type="button" class="link-btn" id="btn-engine-line" data-open-view="helper" data-i18n="engineLineChange">Change</button>
+        </div>
+
         <!-- data-density sits on the clipping wrapper, not the banner: Simple mode
              must take the whole thing out of the flow, and the wrapper is what
              carries the height MP-03 animates. -->
@@ -204,31 +210,6 @@
         </div>
       </section>
 
-      <!-- ============ History ============ -->
-      <section class="card reveal reveal-delay-1">
-        <div class="card-head reveal reveal-delay-2">
-          <h2 data-i18n="history">🕘 History</h2>
-        </div>
-        <input id="history-search" class="history-search" type="search"
-               data-i18n-placeholder="historySearch" placeholder="Search transcripts…" />
-        <div id="history-list" class="history reveal reveal-delay-3">
-          <div class="empty" data-i18n="noHistory">No history yet</div>
-        </div>
-        <!-- Blok "Export subtitles" dirender helper-status.js lalu dipindah ke sini (dekat riwayat yang diekspor). -->
-        <div id="export-mount" class="reveal reveal-delay-3"></div>
-      </section>
-
-      <!-- ============ Native helper status (Win/Linux/mac) ============ -->
-      <section class="card reveal reveal-delay-1 collapsible collapsed" id="helper-status-card" data-density="detail" data-collapse-key="helper">
-        <div class="card-head reveal reveal-delay-2">
-          <button type="button" class="card-toggle" id="helper-card-toggle" aria-expanded="false" aria-controls="helper-status-mount">
-            <h2>🖥️ Native Helper</h2>
-            <span class="card-chevron" aria-hidden="true">›</span>
-          </button>
-        </div>
-        <div id="helper-status-mount" class="reveal reveal-delay-3"></div>
-        <div id="helper-guide-mount" class="reveal reveal-delay-4"></div>
-      </section>
       </div>
 
       <!-- ============ Meeting notes (top-level Notes tab) ============ -->
@@ -260,6 +241,268 @@
         </div>
       </section>
       </div>
+      <!-- ============ History (own tab) ============ -->
+      <div id="view-history" class="view-panel hidden">
+        <!-- ============ History ============ -->
+        <section class="card reveal reveal-delay-1">
+          <div class="card-head reveal reveal-delay-2">
+            <h2 data-i18n="history">🕘 History</h2>
+          </div>
+          <input id="history-search" class="history-search" type="search"
+                 data-i18n-placeholder="historySearch" placeholder="Search transcripts…" />
+          <div id="history-list" class="history reveal reveal-delay-3">
+            <div class="empty" data-i18n="noHistory">No history yet</div>
+          </div>
+          <!-- Blok "Export subtitles" dirender helper-status.js lalu dipindah ke sini (dekat riwayat yang diekspor). -->
+          <div id="export-mount" class="reveal reveal-delay-3"></div>
+        </section>
+
+      </div>
+
+      <!-- ============ Native Helper (own tab) ============ -->
+      <div id="view-helper" class="view-panel hidden">
+        <!-- ============ Native helper status (Win/Linux/mac) ============ -->
+        <section class="card reveal reveal-delay-1" id="helper-status-card">
+          <div class="card-head reveal reveal-delay-2">
+            <span data-ctile="helper" data-size="28"></span>
+              <h2 data-i18n="helperTitle">Native Helper</h2>
+          </div>
+          <div id="helper-status-mount" class="reveal reveal-delay-3"></div>
+          <div id="helper-guide-mount" class="reveal reveal-delay-4"></div>
+        </section>
+
+      <section class="card reveal reveal-delay-1" id="helper-compute-card" aria-labelledby="helper-compute-title">
+        <div class="card-head reveal reveal-delay-2">
+          <span data-ctile="engine" data-size="28"></span>
+          <h2 id="helper-compute-title" data-i18n="helperCompute">Compute device</h2>
+        </div>
+          <div class="native-device-row" id="native-device-row">
+            <div class="native-device-head">
+              <label class="lbl" data-i18n="helperDevice">Helper compute</label>
+              <span id="native-device-active" class="notes-pill idle"></span>
+            </div>
+            <div class="seg" id="native-device-toggle" role="radiogroup" aria-label="Helper compute device">
+              <button type="button" data-hdevice="auto" class="active" data-i18n="helperDeviceAuto">Auto</button>
+              <button type="button" data-hdevice="cpu">CPU</button>
+              <button type="button" data-hdevice="cuda" data-i18n="helperDeviceGpu">GPU (CUDA)</button>
+            </div>
+            <div id="native-device-hint" class="hint native-device-hint"></div>
+          </div>
+              </section>
+      </div>
+
+      <!-- ============ Settings (own tab; id kept so older hooks still find it) ============ -->
+      <div id="view-settings" class="view-panel hidden">
+      <div id="settings-modal" class="settings-view" data-stab="general">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h2><span data-ctile="settings" data-size="28"></span> <span data-i18n="settings">Settings</span></h2>
+          <button id="btn-close-settings" class="icon-btn" aria-label="Back" title="Back">✕</button>
+        </div>
+        <div class="settings-search-row">
+          <input type="search" id="settings-search" class="settings-search" autocomplete="off" spellcheck="false"
+                 placeholder="Search settings…" data-i18n-placeholder="settingsSearch"
+                 data-i18n-aria-label="settingsSearch" aria-label="Search settings" />
+        </div>
+        <div id="settings-no-match" class="hint hidden"></div>
+        <div class="settings-tabs" id="settings-tabs" role="tablist" aria-label="Settings groups">
+          <button type="button" role="tab" data-stab="general" class="active" aria-selected="true" data-i18n="sGeneral">General</button>
+          <button type="button" role="tab" data-stab="engine" aria-selected="false" data-i18n="sEngine">Engine</button>
+          <button type="button" role="tab" data-stab="models" aria-selected="false" data-i18n="sModels">Models</button>
+          <button type="button" role="tab" data-stab="output" aria-selected="false" data-i18n="sOutput">Output</button>
+          <button type="button" role="tab" data-stab="about" aria-selected="false" data-i18n="sAbout">About</button>
+        </div>
+
+        <section class="set-card" data-pane="general">
+          <h3 class="set-card-head"><span data-ctile="settings" data-size="24"></span><span data-i18n="sGeneral">General</span></h3>
+        <div class="setting-row">
+          <label for="ui-lang-toggle" data-i18n="uiLang">UI language</label>
+          <select id="ui-lang-toggle"></select>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="theme">Theme</label>
+          <div class="seg" id="theme-toggle">
+            <button data-theme="auto" class="active" data-i18n="themeAuto">Auto</button>
+            <button data-theme="light" data-i18n="themeLight">Light</button>
+            <button data-theme="dark" data-i18n="themeDark">Dark</button>
+          </div>
+        </div>
+
+        <div class="setting-col">
+          <label class="lbl" data-i18n="reskin">Reskin pattern</label>
+          <div class="reskin-grid" id="reskin-toggle" role="radiogroup" aria-label="Reskin pattern">
+            <button type="button" class="reskin-card active" data-reskin="yraverage" role="radio" aria-checked="true">
+              <span class="reskin-mock reskin-mock-yraverage" aria-hidden="true"><i></i><b></b></span>
+              <span data-i18n="reskinYraverage">Yraverage</span>
+            </button>
+            <button type="button" class="reskin-card" data-reskin="coretax" role="radio" aria-checked="false">
+              <span class="reskin-mock reskin-mock-coretax" aria-hidden="true"><i></i><b></b></span>
+              <span data-i18n="reskinCoretax">Coretax</span>
+            </button>
+            <button type="button" class="reskin-card" data-reskin="modern" role="radio" aria-checked="false">
+              <span class="reskin-mock reskin-mock-modern" aria-hidden="true"><i></i><b></b></span>
+              <span data-i18n="reskinModern">Yraverage Modern</span>
+            </button>
+          </div>
+          <div class="reskin-foot">
+            <button type="button" id="btn-reskin-reset" class="mini-btn" data-i18n="reskinReset">Reset to default</button>
+          </div>
+        </div>
+
+
+              <div class="setting-row">
+                <label data-i18n="tabRows">Tab rows</label>
+                <div class="seg" id="tabrows-toggle" role="radiogroup" aria-label="Tab rows">
+                  <button type="button" data-tabrows="one" class="active" role="radio" aria-checked="true" data-i18n="tabRowsOne">One</button>
+                  <button type="button" data-tabrows="two" role="radio" aria-checked="false" data-i18n="tabRowsTwo">Two</button>
+                </div>
+              </div>
+              <div class="hint" data-i18n="tabRowsHint">One shows only the bottom bar. Two brings back the Captions / Notes row at the top.</div>
+              <div class="setting-row">
+                <label data-i18n="tcolor">Translation colour</label>
+                <div class="tcolor-grid" id="tcolor-toggle" role="radiogroup" aria-label="Translation colour">
+                  <button type="button" class="tcolor-sw active" data-tcolor="indigo" role="radio" aria-checked="true" aria-label="Indigo" title="Indigo"><i></i></button>
+                  <button type="button" class="tcolor-sw" data-tcolor="navy" role="radio" aria-checked="false" aria-label="Navy" title="Navy"><i></i></button>
+                  <button type="button" class="tcolor-sw" data-tcolor="teal" role="radio" aria-checked="false" aria-label="Teal" title="Teal"><i></i></button>
+                  <button type="button" class="tcolor-sw" data-tcolor="neutral" role="radio" aria-checked="false" aria-label="Neutral" title="Neutral"><i></i></button>
+                  <button type="button" class="tcolor-sw" data-tcolor="bronze" role="radio" aria-checked="false" aria-label="Bronze" title="Bronze"><i></i></button>
+                </div>
+              </div>
+              <div class="live-box live-tgt-box tcolor-preview" aria-hidden="true"><div class="live-box-body">Terjemahan contoh · Sample translation</div></div>
+
+        </section>
+
+        <section class="set-card" data-pane="engine">
+          <h3 class="set-card-head"><span data-ctile="engine" data-size="24"></span><span data-i18n="sEngine">Engine</span></h3>
+        <div class="setting-row">
+          <label for="engine-toggle" data-i18n="engine">Engine</label>
+          <select id="engine-toggle"></select>
+        </div>
+        <div id="native-block" class="native-block hidden">
+          <div class="native-row">
+            <input type="text" id="native-url" value="http://127.0.0.1:17865" spellcheck="false" />
+          </div>
+          <div class="native-status-row">
+            <span id="native-status-dot" class="status-dot unknown"></span>
+            <span id="native-status" class="native-status">…</span>
+          </div>
+          <div class="native-actions">
+            <button id="btn-native-start" class="mini-btn" data-i18n="nativeStart">Start</button>
+            <button id="btn-native-stop" class="mini-btn" data-i18n="nativeStop">Stop</button>
+            <button id="btn-native-restart" class="mini-btn" data-i18n="nativeRestart">Restart</button>
+            <button id="btn-native-check" class="mini-btn" data-i18n="check">Refresh</button>
+          </div>
+          <div id="native-host-hint" class="hint native-host-hint hidden"></div>
+          <div class="hint" data-i18n="nativeNote"></div>
+          <div id="native-models" class="model-list"></div>
+        </div>
+
+    <div class="hint"><button type="button" class="link-btn" data-open-view="helper" data-i18n="helperComputeLink">Helper compute (CPU / GPU) lives on the Helper tab</button></div>
+        <div class="setting-row">
+          <label data-i18n="device">Inference device</label>
+          <div class="seg" id="device-toggle">
+            <button data-device="auto" class="active">Auto</button>
+            <button data-device="webgpu">WebGPU</button>
+            <button data-device="wasm">WASM</button>
+          </div>
+        </div>
+
+
+        </section>
+
+        <section class="set-card" data-pane="models">
+          <h3 class="set-card-head"><span data-ctile="model" data-size="24"></span><span data-i18n="sModels">Models</span></h3>
+        <div class="setting-row">
+          <label data-i18n="dlSource">Download source</label>
+          <div class="seg" id="mirror-toggle">
+            <button data-mirror="huggingface" class="active">HuggingFace</button>
+            <button data-mirror="hf-mirror">HF-Mirror</button>
+          </div>
+        </div>
+
+        <h3 class="models-title" data-i18n="modelFiles">Model Files</h3>
+        <div class="hint" data-i18n="modelHint">
+          Models download once from HuggingFace and are cached locally — everything runs
+          offline afterwards. If downloads stall, switch the download source and retry.
+        </div>
+        <div class="setting-row">
+          <label data-i18n="asrPreset">Speed vs accuracy</label>
+          <div class="seg" id="asr-preset-toggle">
+            <button data-preset="fast" data-i18n="presetFast">Fast</button>
+            <button data-preset="balanced" data-i18n="presetBalanced">Balanced</button>
+            <button data-preset="accurate" data-i18n="presetAccurate">Accurate</button>
+          </div>
+        </div>
+        <div class="hint" id="asr-preset-hint"></div>
+        <div id="asr-models" class="model-list"></div>
+        <h3 class="models-title" data-i18n="mtModels">Translation models (per language pair)</h3>
+        <div id="mt-models" class="model-list"></div>
+
+
+        </section>
+
+        <section class="set-card" data-pane="output">
+          <h3 class="set-card-head"><span data-ctile="export" data-size="24"></span><span data-i18n="sOutput">Output</span></h3>
+        <div class="setting-row">
+          <label data-i18n="exportFolder">Save exports to folder</label>
+          <div class="export-folder-row">
+            <span id="export-folder-label" class="export-folder-label" data-i18n="exportFolderNone">Downloads (default)</span>
+            <button id="btn-pick-export-folder" class="mini-btn" data-i18n="exportFolderPick">Choose…</button>
+            <button id="btn-clear-export-folder" class="mini-btn hidden" data-i18n="exportFolderClear">Clear</button>
+          </div>
+          <div class="hint" data-i18n="exportFolderHint"></div>
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="refineLine">Live refine translation (draft while speaking, correct at end)</label>
+          <input type="checkbox" id="refine" class="switch" />
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="dualLine">Show original + translation (dual line)</label>
+          <input type="checkbox" id="dual-line" class="switch" />
+        </div>
+
+        <div class="setting-row">
+          <label data-i18n="fontSize">Subtitle font size</label>
+          <input type="range" id="font-size" min="14" max="40" value="24" />
+        </div>
+
+
+        </section>
+
+        <section class="set-card" data-pane="about">
+          <h3 class="set-card-head"><span data-ctile="docs" data-size="24"></span><span data-i18n="sAbout">About</span></h3>
+        <div id="about-block" class="about">
+          <h3>About / Open-source licenses</h3>
+          <p>
+            yravgSubMeetly runs recognition and translation on your device. Audio, video, and
+            transcripts are not uploaded to our servers. Model weights may download once
+            (user-triggered) from Hugging Face or another source you choose, then stay cached
+            locally. Open-source components used:
+          </p>
+          <ul>
+            <li>OpenAI Whisper — MIT License</li>
+            <li>Mistral Voxtral — Apache License 2.0</li>
+            <li>Apple MLX / mlx-whisper / mlx-lm (native helper) — MIT License</li>
+            <li>Qwen2.5 (native translation) — Apache License 2.0</li>
+            <li>Hugging Face transformers.js — Apache License 2.0</li>
+            <li>Microsoft ONNX Runtime Web — MIT License</li>
+            <li>Helsinki-NLP Opus-MT models — CC BY 4.0</li>
+            <li>Silero VAD — MIT License</li>
+            <li>@ricky0123/vad-web — ISC License</li>
+          </ul>
+          <p>Copyright and trademarks of model weights belong to their original authors.</p>
+        </div>
+
+    <section id="feature-map-card"><h3 class="models-title" data-i18n="fmapTitle">Every control, by group</h3>
+    <div class="hint" data-i18n="fmapHint">Pick a group to jump to its tab.</div>
+    <div id="feature-map" class="fmap"></div></section>
+        </section>
+      </div>
+      </div>
+      </div>
     </main>
 
     <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
@@ -273,16 +516,24 @@
     <nav class="bottom-nav" id="bottom-nav" aria-label="Bottom navigation">
       <div class="bottom-nav-inner">
         <button type="button" class="bottom-nav-item active" data-view="captions" aria-label="Captions" title="Captions">
-          <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 17l4-4 4 4M12 3v14M20 17l-4-4-4 4"/><path d="M4 11a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z"/></svg>
-          <span class="label">Captions</span>
+          <span class="icon" data-ctile="captions" data-size="24" aria-hidden="true"></span>
+          <span class="label" data-i18n="navCaptions">Captions</span>
         </button>
         <button type="button" class="bottom-nav-item" data-view="notes" aria-label="Notes" title="Notes">
-          <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          <span class="label">Notes</span>
+          <span class="icon" data-ctile="notes" data-size="24" aria-hidden="true"></span>
+          <span class="label" data-i18n="navNotes">Notes</span>
+        </button>
+        <button type="button" class="bottom-nav-item" data-view="history" aria-label="History" title="History">
+          <span class="icon" data-ctile="history" data-size="24" aria-hidden="true"></span>
+          <span class="label" data-i18n="navHistory">History</span>
+        </button>
+        <button type="button" class="bottom-nav-item" data-view="helper" aria-label="Helper" title="Helper">
+          <span class="icon" data-ctile="helper" data-size="24" aria-hidden="true"></span>
+          <span class="label" data-i18n="navHelper">Helper</span>
         </button>
         <button type="button" class="bottom-nav-item" data-view="settings" aria-label="Settings" title="Settings">
-          <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span class="label">Settings</span>
+          <span class="icon" data-ctile="settings" data-size="24" aria-hidden="true"></span>
+          <span class="label" data-i18n="navSettings">Settings</span>
         </button>
       </div>
     </nav>
@@ -370,174 +621,6 @@
         <div class="interp-foot">
           <button id="btn-interp-cancel" class="btn ghost" data-i18n="interpCancel">Cancel</button>
           <button id="btn-interp-apply" class="btn primary" data-i18n="interpTurnOn">Turn on</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ============ Settings modal ============ -->
-    <div id="settings-modal" class="modal hidden">
-      <div class="modal-card">
-        <div class="modal-head">
-          <h2>⚙️ <span data-i18n="settings">Settings</span></h2>
-          <button id="btn-close-settings" class="icon-btn">✕</button>
-        </div>
-        <div class="settings-search-row">
-          <input type="search" id="settings-search" class="settings-search" autocomplete="off" spellcheck="false"
-                 placeholder="Search settings…" data-i18n-placeholder="settingsSearch"
-                 data-i18n-aria-label="settingsSearch" aria-label="Search settings" />
-        </div>
-        <div id="settings-no-match" class="hint hidden"></div>
-
-        <div class="setting-row">
-          <label for="ui-lang-toggle" data-i18n="uiLang">UI language</label>
-          <select id="ui-lang-toggle"></select>
-        </div>
-
-        <div class="setting-row">
-          <label data-i18n="theme">Theme</label>
-          <div class="seg" id="theme-toggle">
-            <button data-theme="auto" class="active" data-i18n="themeAuto">Auto</button>
-            <button data-theme="light" data-i18n="themeLight">Light</button>
-            <button data-theme="dark" data-i18n="themeDark">Dark</button>
-          </div>
-        </div>
-
-        <div class="setting-col">
-          <label class="lbl" data-i18n="reskin">Reskin pattern</label>
-          <div class="reskin-grid" id="reskin-toggle" role="radiogroup" aria-label="Reskin pattern">
-            <button type="button" class="reskin-card active" data-reskin="yraverage" role="radio" aria-checked="true">
-              <span class="reskin-mock reskin-mock-yraverage" aria-hidden="true"><i></i><b></b></span>
-              <span data-i18n="reskinYraverage">Yraverage</span>
-            </button>
-            <button type="button" class="reskin-card" data-reskin="coretax" role="radio" aria-checked="false">
-              <span class="reskin-mock reskin-mock-coretax" aria-hidden="true"><i></i><b></b></span>
-              <span data-i18n="reskinCoretax">Coretax</span>
-            </button>
-            <button type="button" class="reskin-card" data-reskin="modern" role="radio" aria-checked="false">
-              <span class="reskin-mock reskin-mock-modern" aria-hidden="true"><i></i><b></b></span>
-              <span data-i18n="reskinModern">Yraverage Modern</span>
-            </button>
-          </div>
-          <div class="reskin-foot">
-            <button type="button" id="btn-reskin-reset" class="mini-btn" data-i18n="reskinReset">Reset to default</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <label for="engine-toggle" data-i18n="engine">Engine</label>
-          <select id="engine-toggle"></select>
-        </div>
-        <div id="native-block" class="native-block hidden">
-          <div class="native-row">
-            <input type="text" id="native-url" value="http://127.0.0.1:17865" spellcheck="false" />
-          </div>
-          <div class="native-status-row">
-            <span id="native-status-dot" class="status-dot unknown"></span>
-            <span id="native-status" class="native-status">…</span>
-          </div>
-          <div class="native-actions">
-            <button id="btn-native-start" class="mini-btn" data-i18n="nativeStart">Start</button>
-            <button id="btn-native-stop" class="mini-btn" data-i18n="nativeStop">Stop</button>
-            <button id="btn-native-restart" class="mini-btn" data-i18n="nativeRestart">Restart</button>
-            <button id="btn-native-check" class="mini-btn" data-i18n="check">Refresh</button>
-          </div>
-          <div id="native-host-hint" class="hint native-host-hint hidden"></div>
-          <div class="native-device-row" id="native-device-row">
-            <div class="native-device-head">
-              <label class="lbl" data-i18n="helperDevice">Helper compute</label>
-              <span id="native-device-active" class="notes-pill idle"></span>
-            </div>
-            <div class="seg" id="native-device-toggle" role="radiogroup" aria-label="Helper compute device">
-              <button type="button" data-hdevice="auto" class="active" data-i18n="helperDeviceAuto">Auto</button>
-              <button type="button" data-hdevice="cpu">CPU</button>
-              <button type="button" data-hdevice="cuda" data-i18n="helperDeviceGpu">GPU (CUDA)</button>
-            </div>
-            <div id="native-device-hint" class="hint native-device-hint"></div>
-          </div>
-          <div class="hint" data-i18n="nativeNote"></div>
-          <div id="native-models" class="model-list"></div>
-        </div>
-
-        <div class="setting-row">
-          <label data-i18n="dlSource">Download source</label>
-          <div class="seg" id="mirror-toggle">
-            <button data-mirror="huggingface" class="active">HuggingFace</button>
-            <button data-mirror="hf-mirror">HF-Mirror</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <label data-i18n="device">Inference device</label>
-          <div class="seg" id="device-toggle">
-            <button data-device="auto" class="active">Auto</button>
-            <button data-device="webgpu">WebGPU</button>
-            <button data-device="wasm">WASM</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <label data-i18n="exportFolder">Save exports to folder</label>
-          <div class="export-folder-row">
-            <span id="export-folder-label" class="export-folder-label" data-i18n="exportFolderNone">Downloads (default)</span>
-            <button id="btn-pick-export-folder" class="mini-btn" data-i18n="exportFolderPick">Choose…</button>
-            <button id="btn-clear-export-folder" class="mini-btn hidden" data-i18n="exportFolderClear">Clear</button>
-          </div>
-          <div class="hint" data-i18n="exportFolderHint"></div>
-        </div>
-
-        <div class="setting-row">
-          <label data-i18n="refineLine">Live refine translation (draft while speaking, correct at end)</label>
-          <input type="checkbox" id="refine" class="switch" />
-        </div>
-
-        <div class="setting-row">
-          <label data-i18n="dualLine">Show original + translation (dual line)</label>
-          <input type="checkbox" id="dual-line" class="switch" />
-        </div>
-
-        <div class="setting-row">
-          <label data-i18n="fontSize">Subtitle font size</label>
-          <input type="range" id="font-size" min="14" max="40" value="24" />
-        </div>
-
-        <h3 class="models-title" data-i18n="modelFiles">Model Files</h3>
-        <div class="hint" data-i18n="modelHint">
-          Models download once from HuggingFace and are cached locally — everything runs
-          offline afterwards. If downloads stall, switch the download source and retry.
-        </div>
-        <div class="setting-row">
-          <label data-i18n="asrPreset">Speed vs accuracy</label>
-          <div class="seg" id="asr-preset-toggle">
-            <button data-preset="fast" data-i18n="presetFast">Fast</button>
-            <button data-preset="balanced" data-i18n="presetBalanced">Balanced</button>
-            <button data-preset="accurate" data-i18n="presetAccurate">Accurate</button>
-          </div>
-        </div>
-        <div class="hint" id="asr-preset-hint"></div>
-        <div id="asr-models" class="model-list"></div>
-        <h3 class="models-title" data-i18n="mtModels">Translation models (per language pair)</h3>
-        <div id="mt-models" class="model-list"></div>
-
-        <div id="about-block" class="about hidden">
-          <h3>About / Open-source licenses</h3>
-          <p>
-            yravgSubMeetly runs recognition and translation on your device. Audio, video, and
-            transcripts are not uploaded to our servers. Model weights may download once
-            (user-triggered) from Hugging Face or another source you choose, then stay cached
-            locally. Open-source components used:
-          </p>
-          <ul>
-            <li>OpenAI Whisper — MIT License</li>
-            <li>Mistral Voxtral — Apache License 2.0</li>
-            <li>Apple MLX / mlx-whisper / mlx-lm (native helper) — MIT License</li>
-            <li>Qwen2.5 (native translation) — Apache License 2.0</li>
-            <li>Hugging Face transformers.js — Apache License 2.0</li>
-            <li>Microsoft ONNX Runtime Web — MIT License</li>
-            <li>Helsinki-NLP Opus-MT models — CC BY 4.0</li>
-            <li>Silero VAD — MIT License</li>
-            <li>@ricky0123/vad-web — ISC License</li>
-          </ul>
-          <p>Copyright and trademarks of model weights belong to their original authors.</p>
         </div>
       </div>
     </div>
