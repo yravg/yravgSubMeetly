@@ -237,6 +237,56 @@ register actions `src/lib/notes-actions.js:58-224`; island S6/S7 (not in this tr
 | Ask links / multi-pick | Links on an ask (file, page, review) and several picks (`docs/protocol.md:2169`) | Provenance link to timecode + linked item refs; one review state per item | Register drawer + island card | Keep provenance, drop multi-pick | S | `src/lib/notes-schema.js:70-91`, `src/lib/notes-actions.js:120`, `src/minutes.js:951` |
 | Notion task board | Read a Notion board into a project (`runner/src/notion-tasks.ts`) | Local action items are already the board | - | Drop: external dependency | - | `src/lib/notes-actions.js:279` |
 
+## Dropped or later, and why
+
+- **Convex phone/web sync**: a cloud backend is the one thing the owner excluded; our
+  register is local (`src/lib/notes-store.js`). Revisit only as a
+  user-owned export/import, not a live sync.
+- **Accounts, pools, usage**: no login pool; the Performance tab
+  (`src/perf-panel.js:59`) measures the engine, not quota.
+- **Connectors/MCP**: no external services in a meeting. Add-ins are the local extension
+  point; a local MCP host is a separate project.
+- **Updates/fork/worktrees/voice/schedules/reply buttons**: all solve agent-app problems
+  (forking, coding in worktrees, spoken agent turns, agent message queues), not meeting
+  problems. Schedules may return as meeting reminders after the first five.
+- **Image/video options compare** and **Notion boards**: both need durable external media
+  or a cloud account; later than the text-only compare.
+
+## Risks and non-goals
+
+- The island does not exist in this worktree. S6/S7 land it; this spec assumes the island
+  can host pages and add-ins and can read the register through the engine.
+- The Rust engine does not exist yet (S2-S5). Suggestions, add-in verbs and inbox reads
+  should go through the same HTTP routes the Python helper already exposes
+  (`native/server.py:16-27`), so the Python oracle and the Rust engine stay interchangeable.
+- Register storage is `chrome.storage.local` / `localStorage` (`src/lib/notes-store.js`).
+  Cross-device sync is out of scope; the Mac app reads shared notes through the helper, not
+  a server (`mac/Sources/yraverageSubMin/HelperSharedNotes.swift`).
+- Add-in trust is new surface. Default to "not run until trusted", show the exact engine
+  call and scope, and never let a meeting payload install an add-in.
+- Threadbear is MIT, so code can be copied with its LICENSE. Its mascot, name and brand
+  are not needed for any feature here; do not copy them. Oyenza's brand and Oyen character
+  remain excluded by `docs/roadmap/submeetly-next.md:24-26`.
+
+## Sources read
+
+- Threadbear: `README.md`; `docs/guide.md` (Threads, Hibernate and archive, Panels,
+  Highlights, Projects, The librarian, Patches, Schedules); `docs/protocol.md` (Needs you,
+  Design reviews, Reply buttons, Patches, Showing panels, Projects);
+  `docs/options-review-design/README.md`; `docs/reply-card-design/README.md`;
+  `docs/archive-transition-design/README.md`; `docs/threadbear-design/README.md`;
+  `runner/src/needs.ts`, `patches.ts`, `librarian.ts`, `projects.ts`, `protocol.ts`;
+  `app/Sources/ThreadbearCore/Threads/{Decisions,ThreadSections,Panels}.swift`;
+  `app/Sources/ThreadbearCore/Protocol/{Models,ReplyButton}.swift`;
+  `app/Sources/Threadbear/Views/{SidebarView,ActionChips,AnswerChips,ReviewWindow,LibrarianView}.swift`;
+  `app/Sources/Threadbear/AppModel+ThreadActions.swift`.
+- Ours: `src/lib/notes-schema.js`, `notes-actions.js`, `notes-api.js`, `notes-generate.js`,
+  `notes-store.js`; `src/minutes.js`, `src/minutes.html`, `src/minutes-dock.js`,
+  `src/minutes-extras.js`, `src/notes-panel.js`, `src/sidepanel.js`, `src/sidepanel.html`,
+  `src/offscreen.js`, `src/background.js`, `src/content.js`, `src/perf-panel.js`,
+  `src/lib/perf-log.js`; `native/server.py`; `mac/Sources/yraverageSubMin/*`;
+  `docs/roadmap/submeetly-next.md`.
+
 ## Recommended first 5, in order
 
 Each one is shippable alone and leaves the app usable if the next is delayed. The order
@@ -338,52 +388,3 @@ Acceptance criteria:
 - Tests cover: manifest validation, trust gate, scoping, the two example add-ins, and one
   action end-to-end on a fixed meeting fixture.
 
-## Dropped or later, and why
-
-- **Convex phone/web sync**: a cloud backend is the one thing the owner excluded; our
-  register is local (`src/lib/notes-store.js`). Revisit only as a
-  user-owned export/import, not a live sync.
-- **Accounts, pools, usage**: no login pool; the Performance tab
-  (`src/perf-panel.js:59`) measures the engine, not quota.
-- **Connectors/MCP**: no external services in a meeting. Add-ins are the local extension
-  point; a local MCP host is a separate project.
-- **Updates/fork/worktrees/voice/schedules/reply buttons**: all solve agent-app problems
-  (forking, coding in worktrees, spoken agent turns, agent message queues), not meeting
-  problems. Schedules may return as meeting reminders after the first five.
-- **Image/video options compare** and **Notion boards**: both need durable external media
-  or a cloud account; later than the text-only compare.
-
-## Risks and non-goals
-
-- The island does not exist in this worktree. S6/S7 land it; this spec assumes the island
-  can host pages and add-ins and can read the register through the engine.
-- The Rust engine does not exist yet (S2-S5). Suggestions, add-in verbs and inbox reads
-  should go through the same HTTP routes the Python helper already exposes
-  (`native/server.py:16-27`), so the Python oracle and the Rust engine stay interchangeable.
-- Register storage is `chrome.storage.local` / `localStorage` (`src/lib/notes-store.js`).
-  Cross-device sync is out of scope; the Mac app reads shared notes through the helper, not
-  a server (`mac/Sources/yraverageSubMin/HelperSharedNotes.swift`).
-- Add-in trust is new surface. Default to "not run until trusted", show the exact engine
-  call and scope, and never let a meeting payload install an add-in.
-- Threadbear is MIT, so code can be copied with its LICENSE. Its mascot, name and brand
-  are not needed for any feature here; do not copy them. Oyenza's brand and Oyen character
-  remain excluded by `docs/roadmap/submeetly-next.md:24-26`.
-
-## Sources read
-
-- Threadbear: `README.md`; `docs/guide.md` (Threads, Hibernate and archive, Panels,
-  Highlights, Projects, The librarian, Patches, Schedules); `docs/protocol.md` (Needs you,
-  Design reviews, Reply buttons, Patches, Showing panels, Projects);
-  `docs/options-review-design/README.md`; `docs/reply-card-design/README.md`;
-  `docs/archive-transition-design/README.md`; `docs/threadbear-design/README.md`;
-  `runner/src/needs.ts`, `patches.ts`, `librarian.ts`, `projects.ts`, `protocol.ts`;
-  `app/Sources/ThreadbearCore/Threads/{Decisions,ThreadSections,Panels}.swift`;
-  `app/Sources/ThreadbearCore/Protocol/{Models,ReplyButton}.swift`;
-  `app/Sources/Threadbear/Views/{SidebarView,ActionChips,AnswerChips,ReviewWindow,LibrarianView}.swift`;
-  `app/Sources/Threadbear/AppModel+ThreadActions.swift`.
-- Ours: `src/lib/notes-schema.js`, `notes-actions.js`, `notes-api.js`, `notes-generate.js`,
-  `notes-store.js`; `src/minutes.js`, `src/minutes.html`, `src/minutes-dock.js`,
-  `src/minutes-extras.js`, `src/notes-panel.js`, `src/sidepanel.js`, `src/sidepanel.html`,
-  `src/offscreen.js`, `src/background.js`, `src/content.js`, `src/perf-panel.js`,
-  `src/lib/perf-log.js`; `native/server.py`; `mac/Sources/yraverageSubMin/*`;
-  `docs/roadmap/submeetly-next.md`.
