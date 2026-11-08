@@ -11,6 +11,9 @@ use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
 
 const EVERY: Duration = Duration::from_millis(2500);
+/// The extension ID of the unpacked build (the manifest "key"); the engine's
+/// `web::EXTENSION_ID` is the same value.
+pub const EXTENSION_ID: &str = "llhpkcjflnepbpgldhbceifjbjgcbapi";
 const EXE_NAME: &str = "submeetly-engine.exe";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -44,6 +47,22 @@ fn spawn(exe: &std::path::Path, port: u16) -> std::io::Result<Child> {
         cmd.current_dir(dir);
     }
     cmd.spawn()
+}
+
+/// Open `path` of the engine's own pages in the default browser once the engine
+/// answers /health (up to 15 s; after that the browser shows the honest error).
+pub fn open_when_ready(path: &str) {
+    let port = helper::configured_port();
+    let url = format!("http://127.0.0.1:{port}{path}");
+    let _ = std::thread::Builder::new().name("engine-open".into()).spawn(move || {
+        for _ in 0..50 {
+            if helper::request(port, "GET", "/health", None).is_ok_and(|(code, _)| code == 200) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(300));
+        }
+        crate::shell::open(&url);
+    });
 }
 
 impl EngineService {

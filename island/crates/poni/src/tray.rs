@@ -2,6 +2,7 @@
 
 use crate::events::WM_APP_TRAY;
 use crate::updates::UpdateLine;
+use poni_core::engine_link::EngineInfo;
 use poni_core::settings::{IdleStyle, Settings, Theme};
 use windows::core::{Result, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, POINT, WPARAM};
@@ -84,6 +85,16 @@ pub enum MenuCmd {
     Update,
     /// "Check for updates…": read the update file now (`crate::updates`).
     CheckForUpdates,
+    /// Our own parts, from the product group of the menu.
+    OpenMinutes,
+    OpenLive,
+    OpenMeeting,
+    OpenInbox,
+    StartEngine,
+    RestartEngine,
+    /// Opens the how-to page for loading the Chrome extension.
+    SetupExtension,
+    OpenCaptionsPanel,
     Quit,
 }
 
@@ -110,69 +121,93 @@ fn idle_label(s: IdleStyle) -> &'static str {
     }
 }
 
+/// The engine and extension entries of the product group, shared by the tray
+/// menu and the island's Menu list. `None` command = a greyed line.
+/// `check`: add "Check for updates…" (no newer version is on offer).
+pub fn product_actions(engine: &EngineInfo, check: bool) -> Vec<(String, Option<MenuCmd>)> {
+    let mut v = vec![(engine.line.clone(), None)];
+    if !engine.running {
+        v.push(("Start engine".into(), Some(MenuCmd::StartEngine)));
+    } else if engine.ours {
+        v.push(("Restart engine".into(), Some(MenuCmd::RestartEngine)));
+    }
+    v.push(if engine.ext_seen {
+        ("Open captions panel in Chrome".into(), Some(MenuCmd::OpenCaptionsPanel))
+    } else {
+        ("Set up Chrome extension…".into(), Some(MenuCmd::SetupExtension))
+    });
+    if check {
+        v.push(("Check for updates…".into(), Some(MenuCmd::CheckForUpdates)));
+    }
+    v
+}
+
 /// `update`: a later version the update file offers, or Check for updates…
-/// (`crate::updates::menu_line`).
-pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine) -> Vec<MenuItem> {
+/// (`crate::updates::menu_line`). `engine`: the engine link's last word.
+pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &EngineInfo) -> Vec<MenuItem> {
     // The look the theme draws is the one checked: outside Pill, Status shows the clock.
     let shown = crate::pill::status::shown(s.theme, s.idle_style);
     let style = |st: IdleStyle| item(idle_label(st), MenuCmd::ToggleIdleStyle(st), shown == st);
     let theme = |label: &str, t: Theme| item(label, MenuCmd::SetTheme(t), s.theme == t);
     let fullscreen = |label: &str, hide: bool| item(label, MenuCmd::SetHideFullscreen(hide), s.hide_in_fullscreen == hide);
-    let mut items = vec![
-        item("Advanced settings…", MenuCmd::ShowSettings, false),
-        MenuItem::Separator,
-        item("Keep island open", MenuCmd::TogglePinned, pinned),
-        MenuItem::Sub { label: "Theme".into(), items: vec![theme("Classic", Theme::Classic), theme("Glass", Theme::Glass), theme("Paper", Theme::Paper), theme("Pill", Theme::Pill)] },
-        // The status bar is listed only in Pill, as on the Settings page: the
-        // other themes would draw the clock for it.
-        MenuItem::Sub { label: "Idle look".into(), items: crate::pill::status::looks(s.theme).iter().map(|l| style(*l)).collect() },
-        MenuItem::Separator,
+    let mut items = vec![MenuItem::Info { label: "yravgSubMeetly".into() }];
+    for (label, cmd) in [("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
+        items.push(item(label, cmd, false));
+    }
+    items.push(MenuItem::Separator);
+    for (label, cmd) in product_actions(engine, matches!(update, UpdateLine::Check)) {
+        items.push(match cmd {
+            Some(cmd) => item(&label, cmd, false),
+            None => MenuItem::Info { label },
+        });
+    }
+    items.push(MenuItem::Separator);
+    items.push(item("Advanced settings…", MenuCmd::ShowSettings, false));
+    items.push(item("Keep island open", MenuCmd::TogglePinned, pinned));
+    // Only once the island was dragged off the middle: the way back, under Keep island open.
+    if s.island_x.is_some() {
+        items.push(item("Move island to the centre", MenuCmd::CentreIsland, false));
+    }
+    items.push(MenuItem::Sub { label: "Theme".into(), items: vec![theme("Classic", Theme::Classic), theme("Glass", Theme::Glass), theme("Paper", Theme::Paper), theme("Pill", Theme::Pill)] });
+    // The status bar is listed only in Pill, as on the Settings page: the
+    // other themes would draw the clock for it.
+    items.push(MenuItem::Sub { label: "Idle look".into(), items: crate::pill::status::looks(s.theme).iter().map(|l| style(*l)).collect() });
+    items.push(item("Start with Windows", MenuCmd::ToggleAutostart, crate::autostart::is_enabled()));
+    items.push(MenuItem::Separator);
+    // Oyenza's own extras: all still here, one level down.
+    let mut more = vec![
         item("Synced lyrics", MenuCmd::ToggleLyrics, s.lyrics),
         item("Lyrics pronunciation (romaji, pinyin, Korean)", MenuCmd::TogglePronunciation, s.lyrics_pronunciation),
         apple_music_menu(),
-        item("Sounds", MenuCmd::ToggleSounds, s.sounds),
-        MenuItem::Sub {
-            label: "In full-screen apps".into(),
-            items: vec![
-                fullscreen("Hide", true),
-                fullscreen("Stay on top", false),
-                MenuItem::Separator,
-                item("Show FPS, GPU and CPU over games", MenuCmd::ToggleGameStats, s.game_stats),
-                item("Only for a few seconds (no added delay)", MenuCmd::ToggleGamePeek, s.game_peek),
-            ],
-        },
-        item("Start with Windows", MenuCmd::ToggleAutostart, crate::autostart::is_enabled()),
-        MenuItem::Separator,
-        item("Open settings file", MenuCmd::OpenSettings, false),
-        item("Reload settings", MenuCmd::ReloadSettings, false),
-        item("Open data folder", MenuCmd::OpenDataFolder, false),
-        item("Lyrics by LRCLIB", MenuCmd::LyricsCredit, false),
-        // Which version and build this is, as the Mac menu says it.
-        item(&crate::version::about_label(), MenuCmd::About, false),
-        MenuItem::Separator,
-        item("Quit yravgSubMeetly", MenuCmd::Quit, false),
     ];
-    // Only once the island was dragged off the middle: the way back, under Keep island open.
-    if s.island_x.is_some() {
-        let at = items.iter().position(|i| matches!(i, MenuItem::Item { cmd: MenuCmd::TogglePinned, .. })).map_or(items.len(), |i| i + 1);
-        items.insert(at, item("Move island to the centre", MenuCmd::CentreIsland, false));
-    }
-    // Only while the System add-on is on: its page's history, under Sounds.
+    // Only while the System add-on is on: its page's history, above Sounds.
     if s.system_on() {
-        let at = items.iter().position(|i| matches!(i, MenuItem::Item { cmd: MenuCmd::ToggleSounds, .. })).unwrap_or(items.len());
-        items.insert(at, item("Keep System page history", MenuCmd::ToggleSystemHistory, s.system_history));
+        more.push(item("Keep System page history", MenuCmd::ToggleSystemHistory, s.system_history));
     }
-    match update {
-        // A new version first, until it is installed.
-        UpdateLine::Offer(v) => {
-            items.splice(0..0, [item(&format!("Update to yravgSubMeetly {v}…"), MenuCmd::Update, false), MenuItem::Separator]);
-        }
-        // Otherwise a look on request, under the version line.
-        UpdateLine::Check => {
-            let at = items.iter().position(|i| matches!(i, MenuItem::Item { cmd: MenuCmd::About, .. })).map_or(items.len(), |i| i + 1);
-            items.insert(at, item("Check for updates…", MenuCmd::CheckForUpdates, false));
-        }
-        UpdateLine::None => {}
+    more.push(item("Sounds", MenuCmd::ToggleSounds, s.sounds));
+    more.push(MenuItem::Sub {
+        label: "In full-screen apps".into(),
+        items: vec![
+            fullscreen("Hide", true),
+            fullscreen("Stay on top", false),
+            MenuItem::Separator,
+            item("Show FPS, GPU and CPU over games", MenuCmd::ToggleGameStats, s.game_stats),
+            item("Only for a few seconds (no added delay)", MenuCmd::ToggleGamePeek, s.game_peek),
+        ],
+    });
+    more.push(MenuItem::Separator);
+    more.push(item("Open settings file", MenuCmd::OpenSettings, false));
+    more.push(item("Reload settings", MenuCmd::ReloadSettings, false));
+    more.push(item("Open data folder", MenuCmd::OpenDataFolder, false));
+    more.push(item("Lyrics by LRCLIB", MenuCmd::LyricsCredit, false));
+    items.push(MenuItem::Sub { label: "More".into(), items: more });
+    items.push(MenuItem::Separator);
+    // Which version and build this is, as the Mac menu says it.
+    items.push(item(&crate::version::about_label(), MenuCmd::About, false));
+    items.push(item("Quit yravgSubMeetly", MenuCmd::Quit, false));
+    // A new version first, until it is installed.
+    if let UpdateLine::Offer(v) = update {
+        items.splice(0..0, [item(&format!("Update to yravgSubMeetly {v}…"), MenuCmd::Update, false), MenuItem::Separator]);
     }
     items
 }
@@ -251,106 +286,145 @@ pub fn show_menu(owner: HWND, pt: POINT, items: &[MenuItem]) -> Option<MenuCmd> 
 mod tests {
     use super::*;
 
-    fn fullscreen_choices(s: &Settings) -> Vec<(String, MenuCmd, bool)> {
-        let items = menu_items(s, false, UpdateLine::None);
-        let Some(MenuItem::Sub { items, .. }) = items.into_iter().find(|i| matches!(i, MenuItem::Sub { label, .. } if label == "In full-screen apps")) else {
-            panic!("no full-screen submenu");
-        };
-        items
-            .into_iter()
-            .filter_map(|i| match i {
-                MenuItem::Item { label, cmd, checked } => Some((label, cmd, checked)),
-                _ => None,
-            })
-            .collect()
+    fn items(s: &Settings, update: UpdateLine, engine: &EngineInfo) -> Vec<MenuItem> {
+        menu_items(s, false, update, engine)
+    }
+
+    /// Every command in the menu, submenus included, in order.
+    fn flat(list: &[MenuItem]) -> Vec<(String, MenuCmd, bool)> {
+        let mut out = Vec::new();
+        for i in list {
+            match i {
+                MenuItem::Item { label, cmd, checked } => out.push((label.clone(), *cmd, *checked)),
+                MenuItem::Sub { items, .. } => out.extend(flat(items)),
+                _ => {}
+            }
+        }
+        out
+    }
+
+    fn cmds(s: &Settings, update: UpdateLine, e: &EngineInfo) -> Vec<MenuCmd> {
+        flat(&items(s, update, e)).into_iter().map(|c| c.1).collect()
+    }
+
+    fn sub<'a>(list: &'a [MenuItem], name: &str) -> &'a [MenuItem] {
+        for i in list {
+            if let MenuItem::Sub { label, items } = i {
+                if label == name {
+                    return items;
+                }
+            }
+        }
+        panic!("no {name} submenu");
+    }
+
+    fn engine(running: bool, ours: bool, ext_seen: bool) -> EngineInfo {
+        EngineInfo { line: if running { "Engine: running (Rust) on 17865".into() } else { "Engine: not running".into() }, running, ours, ext_seen }
     }
 
     #[test]
-    fn the_menu_says_which_version_this_is() {
-        let items = menu_items(&Settings::default(), false, UpdateLine::None);
-        let labels: Vec<(String, MenuCmd)> = items
-            .into_iter()
+    fn our_own_parts_come_first_in_the_order_the_owner_asked() {
+        let list = items(&Settings::default(), UpdateLine::Check, &engine(true, true, false));
+        let labels: Vec<String> = list
+            .iter()
+            .take_while(|i| !matches!(i, MenuItem::Item { cmd: MenuCmd::ShowSettings, .. }))
             .filter_map(|i| match i {
-                MenuItem::Item { label, cmd, .. } => Some((label, cmd)),
+                MenuItem::Item { label, .. } | MenuItem::Info { label } => Some(label.clone()),
                 _ => None,
             })
             .collect();
-        let at = |cmd: MenuCmd| labels.iter().position(|l| l.1 == cmd);
-        let about = at(MenuCmd::About).expect("no About line");
+        assert_eq!(
+            labels,
+            ["yravgSubMeetly", "Open Minutes register", "Live captions", "Meeting", "Inbox", "Engine: running (Rust) on 17865", "Restart engine", "Set up Chrome extension…", "Check for updates…"]
+        );
+    }
+
+    #[test]
+    fn the_engine_lines_follow_the_engine() {
+        let c = |e: &EngineInfo| cmds(&Settings::default(), UpdateLine::None, e);
+        let stopped = c(&engine(false, false, false));
+        assert!(stopped.contains(&MenuCmd::StartEngine) && !stopped.contains(&MenuCmd::RestartEngine));
+        // A helper the island did not start is not the island's to restart.
+        let foreign = c(&engine(true, false, false));
+        assert!(!foreign.contains(&MenuCmd::StartEngine) && !foreign.contains(&MenuCmd::RestartEngine));
+        assert!(c(&engine(true, true, false)).contains(&MenuCmd::RestartEngine));
+    }
+
+    #[test]
+    fn the_extension_line_says_set_up_until_the_extension_has_been_seen() {
+        let c = |seen: bool| cmds(&Settings::default(), UpdateLine::None, &engine(true, true, seen));
+        assert!(c(false).contains(&MenuCmd::SetupExtension) && !c(false).contains(&MenuCmd::OpenCaptionsPanel));
+        assert!(c(true).contains(&MenuCmd::OpenCaptionsPanel) && !c(true).contains(&MenuCmd::SetupExtension));
+    }
+
+    #[test]
+    fn nothing_of_oyenzas_was_removed_it_moved_under_more() {
+        let list = items(&Settings::default(), UpdateLine::None, &engine(true, true, false));
+        let top: Vec<MenuCmd> = list.iter().filter_map(|i| if let MenuItem::Item { cmd, .. } = i { Some(*cmd) } else { None }).collect();
+        for gone in [MenuCmd::ToggleLyrics, MenuCmd::TogglePronunciation, MenuCmd::ToggleSounds, MenuCmd::LyricsCredit, MenuCmd::OpenSettings, MenuCmd::ReloadSettings, MenuCmd::OpenDataFolder] {
+            assert!(!top.contains(&gone), "{gone:?} should sit under More");
+        }
+        let more = flat(sub(&list, "More"));
+        for c in [MenuCmd::ToggleLyrics, MenuCmd::TogglePronunciation, MenuCmd::ToggleSounds, MenuCmd::ToggleGameStats, MenuCmd::ToggleGamePeek, MenuCmd::LyricsCredit, MenuCmd::AppleMusicToken, MenuCmd::OpenSettings] {
+            assert!(more.iter().any(|m| m.1 == c), "{c:?} missing from More");
+        }
+        // The island's own settings stay up top.
+        for c in [MenuCmd::ShowSettings, MenuCmd::TogglePinned, MenuCmd::ToggleAutostart] {
+            assert!(top.contains(&c), "{c:?}");
+        }
+    }
+
+    #[test]
+    fn quit_is_last_and_the_version_line_sits_above_it() {
+        let labels = flat(&items(&Settings::default(), UpdateLine::None, &engine(true, true, false)));
+        let about = labels.iter().position(|l| l.1 == MenuCmd::About).expect("no About line");
         assert!(labels[about].0.starts_with(&format!("About yravgSubMeetly {}", env!("CARGO_PKG_VERSION"))), "{}", labels[about].0);
-        // Right above Quit, with the lyrics credit kept above it.
-        assert_eq!(at(MenuCmd::Quit), Some(about + 1));
-        assert_eq!(at(MenuCmd::LyricsCredit), Some(about - 1));
+        assert_eq!(labels.last().map(|l| l.1), Some(MenuCmd::Quit));
+        assert_eq!(about + 1, labels.len() - 1);
     }
 
     #[test]
     fn a_new_version_comes_first_until_it_is_installed() {
-        let s = Settings::default();
-        let first = |update: UpdateLine| match menu_items(&s, false, update).into_iter().next() {
+        let e = engine(true, true, false);
+        let first = |update: UpdateLine| match items(&Settings::default(), update, &e).into_iter().next() {
             Some(MenuItem::Item { label, cmd, .. }) => Some((label, cmd)),
             _ => None,
         };
         assert_eq!(first(UpdateLine::Offer("0.2.5".into())), Some(("Update to yravgSubMeetly 0.2.5…".to_string(), MenuCmd::Update)));
-        assert_eq!(first(UpdateLine::None).map(|(_, cmd)| cmd), Some(MenuCmd::ShowSettings));
-        assert_eq!(first(UpdateLine::Check).map(|(_, cmd)| cmd), Some(MenuCmd::ShowSettings));
-    }
-
-    #[test]
-    fn check_for_updates_sits_under_the_version_line() {
-        let cmds = |update: UpdateLine| -> Vec<MenuCmd> {
-            menu_items(&Settings::default(), false, update)
-                .into_iter()
-                .filter_map(|i| match i {
-                    MenuItem::Item { cmd, .. } => Some(cmd),
-                    _ => None,
-                })
-                .collect()
-        };
-        let items = cmds(UpdateLine::Check);
-        let about = items.iter().position(|c| *c == MenuCmd::About).expect("no About line");
-        assert_eq!(&items[about..], &[MenuCmd::About, MenuCmd::CheckForUpdates, MenuCmd::Quit]);
-        // Not while a version is on offer (its line comes first), nor with the checks off.
-        assert!(!cmds(UpdateLine::Offer("0.2.5".into())).contains(&MenuCmd::CheckForUpdates));
-        assert!(!cmds(UpdateLine::None).contains(&MenuCmd::CheckForUpdates));
+        assert_eq!(first(UpdateLine::None), None);
+        let c = |update: UpdateLine| cmds(&Settings::default(), update, &e);
+        assert!(c(UpdateLine::Check).contains(&MenuCmd::CheckForUpdates));
+        assert!(!c(UpdateLine::Offer("0.2.5".into())).contains(&MenuCmd::CheckForUpdates));
+        assert!(!c(UpdateLine::None).contains(&MenuCmd::CheckForUpdates));
     }
 
     #[test]
     fn the_way_back_to_the_centre_shows_once_the_island_moved() {
-        let cmds = |s: &Settings| -> Vec<MenuCmd> {
-            menu_items(s, false, UpdateLine::None)
-                .into_iter()
-                .filter_map(|i| match i {
-                    MenuItem::Item { cmd, .. } => Some(cmd),
-                    _ => None,
-                })
-                .collect()
-        };
-        assert!(!cmds(&Settings::default()).contains(&MenuCmd::CentreIsland));
-        let moved = cmds(&Settings { island_x: Some(0.8), ..Settings::default() });
+        let e = engine(true, true, false);
+        assert!(!cmds(&Settings::default(), UpdateLine::None, &e).contains(&MenuCmd::CentreIsland));
+        let moved = cmds(&Settings { island_x: Some(0.8), ..Settings::default() }, UpdateLine::None, &e);
         let pin = moved.iter().position(|c| *c == MenuCmd::TogglePinned).expect("no Keep island open");
         assert_eq!(moved.get(pin + 1), Some(&MenuCmd::CentreIsland));
     }
 
     #[test]
     fn system_history_is_in_the_menu_only_while_system_is_on() {
-        let has = |s: &Settings| menu_items(s, false, UpdateLine::None).iter().position(|i| matches!(i, MenuItem::Item { cmd: MenuCmd::ToggleSystemHistory, .. }));
+        let e = engine(true, true, false);
+        let at = |s: &Settings| cmds(s, UpdateLine::None, &e).iter().position(|c| *c == MenuCmd::ToggleSystemHistory);
         let mut s = Settings::default();
-        assert_eq!(has(&s), None, "System is off by default");
+        assert_eq!(at(&s), None, "System is off by default");
         s.set_addon(poni_core::addons::SYSTEM.id, true);
-        let at = has(&s).expect("no System history item");
+        let all = cmds(&s, UpdateLine::None, &e);
         // Right above Sounds, where it always was.
-        let items = menu_items(&s, false, UpdateLine::None);
-        assert!(matches!(&items[at + 1], MenuItem::Item { cmd: MenuCmd::ToggleSounds, .. }));
+        assert_eq!(all[at(&s).expect("no System history item") + 1], MenuCmd::ToggleSounds);
     }
+
     fn idle_choices(s: &Settings) -> Vec<(String, bool)> {
-        let items = menu_items(s, false, UpdateLine::None);
-        let Some(MenuItem::Sub { items, .. }) = items.into_iter().find(|i| matches!(i, MenuItem::Sub { label, .. } if label == "Idle look")) else {
-            panic!("no idle look submenu");
-        };
-        items
-            .into_iter()
+        let list = items(s, UpdateLine::None, &engine(true, true, false));
+        sub(&list, "Idle look")
+            .iter()
             .filter_map(|i| match i {
-                MenuItem::Item { label, checked, .. } => Some((label, checked)),
+                MenuItem::Item { label, checked, .. } => Some((label.clone(), *checked)),
                 _ => None,
             })
             .collect()
@@ -374,21 +448,14 @@ mod tests {
     }
 
     #[test]
-    fn start_with_windows_follows_the_full_screen_submenu() {
-        // Over maximized windows (Step aside) is gone: nothing sits between them.
-        let items = menu_items(&Settings::default(), false, UpdateLine::None);
-        let fs = items.iter().position(|i| matches!(i, MenuItem::Sub { label, .. } if label == "In full-screen apps")).expect("full-screen submenu");
-        assert!(matches!(items.get(fs + 1), Some(MenuItem::Item { cmd: MenuCmd::ToggleAutostart, .. })));
-    }
-
-    #[test]
     fn full_screen_submenu_checks_the_current_choice() {
         let mut s = Settings::default();
         for hide in [true, false] {
             s.hide_in_fullscreen = hide;
-            let choices = fullscreen_choices(&s);
+            let list = items(&s, UpdateLine::None, &engine(true, true, false));
+            let more = sub(&list, "More");
             assert_eq!(
-                choices,
+                flat(sub(more, "In full-screen apps")),
                 vec![
                     ("Hide".to_string(), MenuCmd::SetHideFullscreen(true), hide),
                     ("Stay on top".to_string(), MenuCmd::SetHideFullscreen(false), !hide),

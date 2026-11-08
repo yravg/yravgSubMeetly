@@ -307,7 +307,7 @@ fn run_deferred(d: Deferred) {
             let Some((helper, items)) = with_app(|app| {
                 // Right-clicked on the open island (the tray's menu leaves it as it is).
                 app.menu_open = app.expanded && app.hovering;
-                (app.helper, tray::menu_items(&app.st.settings, app.st.pinned, crate::updates::menu_line(&app.st, app.updater.is_some())))
+                (app.helper, tray::menu_items(&app.st.settings, app.st.pinned, crate::updates::menu_line(&app.st, app.updater.is_some()), &app.st.engine))
             }) else {
                 return;
             };
@@ -1902,6 +1902,32 @@ impl App {
                 self.expand();
             }
             CheckForUpdates => self.check_for_updates(),
+            OpenLive => self.open_page(PageKind::Live),
+            OpenMeeting => self.open_page(PageKind::Meeting),
+            OpenInbox => self.open_page(PageKind::Inbox),
+            OpenMinutes => {
+                if let Some(svc) = &self.services {
+                    svc.engine_start();
+                }
+                crate::services::engine::open_when_ready("/app/minutes.html");
+            }
+            StartEngine => {
+                if let Some(svc) = &self.services {
+                    svc.engine_start();
+                }
+            }
+            RestartEngine => {
+                if let Some(svc) = &self.services {
+                    svc.engine_restart();
+                }
+            }
+            SetupExtension => {
+                if let Some(svc) = &self.services {
+                    svc.engine_start();
+                }
+                crate::services::engine::open_when_ready("/app/setup-extension.html");
+            }
+            OpenCaptionsPanel => shell::open_in_chrome(&format!("chrome-extension://{}/sidepanel.html", crate::services::engine::EXTENSION_ID)),
             Quit => {
                 self.quit(0);
                 return;
@@ -3504,6 +3530,12 @@ impl App {
         pinfo!("notice: inline action {a:?} done");
     }
 
+    /// Open the island on page `p` (the menu's entries for our own pages).
+    fn open_page(&mut self, p: PageKind) {
+        self.set_page(p);
+        self.expand();
+    }
+
     fn set_page(&mut self, p: PageKind) {
         if p != self.st.page {
             self.st.page = p;
@@ -3580,6 +3612,7 @@ impl App {
                     SetTimer(self.hwnd, TIMER_SAVE, 800, None);
                 },
                 Command::SetPage(p) => self.set_page(p),
+                Command::Menu(c) => self.on_menu(c),
                 Command::OpenSystem(m) => {
                     self.st.ui.system_module = m;
                     self.set_page(PageKind::System);
