@@ -642,7 +642,7 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
      ditambatkan `right: 0` lalu berakhir di luar jendela. Label tombol
      sekunder dilipat jadi ikon; judulnya pindah ke tooltip. */
   .appbar .btn.collapsible { padding: 0 9px; gap: 0; }
-  .appbar .btn.collapsible > span:not(.lt-lvl) { display: none; }
+  .appbar .btn.collapsible > span:not(.lt-lvl):not(.ct) { display: none; }
 }
 @media (max-width: 880px) {
   .appbar { padding: 0 12px; gap: 7px; }
@@ -657,6 +657,15 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
   .appbar .btn.primary > span { display: none; }
   .appbar .btn.primary { padding: 0 9px; gap: 0; }
   #learn-pill { display: none; }
+}
+/* Phone width: even folded to icons the toolbar needs ~530 px, so Add item, Export,
+   Issue MoM and Settings fell off the right edge and could not be reached. The bar
+   wraps to a second row instead of scrolling (a scroll container would clip the popovers). */
+@media (max-width: 560px) {
+  .appbar { flex-wrap: wrap; height: auto; min-height: 46px; padding-block: 6px; row-gap: 6px; }
+  .mswitch { max-width: none; flex: 1 1 140px; }
+  /* Key hints and the layout note mean nothing on a phone; the save state stays visible. */
+  #kbd-hints, #foot-layout, .foot .sep { display: none; }
 }
 @media (max-width: 900px) {
   .drawer { position: fixed; inset: 0; width: 100%; z-index: var(--z-drawer); border-left: none; }

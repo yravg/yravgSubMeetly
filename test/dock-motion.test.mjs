@@ -298,7 +298,8 @@ test('halaman tidak meluber mendatar di jendela sempit; appbar dan dok tetap ter
   // Appbar butuh ~1070 px penuh. Sebelum dilipat, di bawah lebar itu halaman
   // menggulir mendatar dan popover yang ditambatkan `right: 0` — termasuk
   // panel Pengaturan — berakhir di luar jendela.
-  for (const width of [1400, 1100, 1000, 900, 800, 700, 640]) {
+  // 390: phone width, where the toolbar used to push Add item, Export, Issue MoM and Settings off screen.
+  for (const width of [1400, 1100, 1000, 900, 800, 700, 640, 390]) {
     await page.setViewport({ width, height: 700 });
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('#btn-settings');
@@ -312,12 +313,17 @@ test('halaman tidak meluber mendatar di jendela sempit; appbar dan dok tetap ter
         gearDalam: gear.right <= window.innerWidth + 1 && gear.left >= -1,
         dokDalam: dock.left >= -1 && dock.right <= window.innerWidth + 1,
         gripDalam: grip.left >= -1,
+        tombolLuar: ['btn-add-item', 'btn-export', 'btn-issue'].filter((id) => {
+          const b = document.getElementById(id).getBoundingClientRect();
+          return b.right > window.innerWidth + 1 || b.left < -1;
+        }),
       };
     });
     assert.equal(r.meluber, false, `halaman menggulir mendatar pada lebar ${width}`);
     assert.equal(r.gearDalam, true, `tombol Pengaturan di luar layar pada lebar ${width}`);
     assert.equal(r.dokDalam, true, `dok tampilan di luar layar pada lebar ${width}`);
     assert.equal(r.gripDalam, true, `grip dok terpotong pada lebar ${width}`);
+    assert.deepEqual(r.tombolLuar, [], `tombol appbar di luar layar pada lebar ${width}`);
   }
 
   // Label yang dilipat harus tetap punya tooltip, dan tombolnya tetap berfungsi.
