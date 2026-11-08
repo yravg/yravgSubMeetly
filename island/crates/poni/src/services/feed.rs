@@ -117,12 +117,12 @@ mod tests {
     fn a_feed_pointing_outside_the_release_repo_is_not_believed() {
         // The signature over the original does not cover an edited payload, and a payload that
         // is signed but names another repository is refused by parse_payload on its own.
-        let other = SAMPLE.replace("yraveragework/yraveragesub", "someone/else");
+        let other = SAMPLE.replace("yravg/yravgSubMeetly", "someone/else");
         assert!(believe(&other).is_err());
         let payload = update::parse_file(SAMPLE).unwrap().payload;
         assert!(update::parse_payload(&payload).is_ok());
-        assert!(update::parse_payload(&payload.replace("yraveragework/yraveragesub", "someone/else")).is_err());
-        assert!(update::FEED_URL.starts_with("https://github.com/yraveragework/yraveragesub/releases/"));
+        assert!(update::parse_payload(&payload.replace("yravg/yravgSubMeetly", "someone/else")).is_err());
+        assert!(update::FEED_URL.starts_with("https://github.com/yravg/yravgSubMeetly/releases/"));
     }
 
     #[test]

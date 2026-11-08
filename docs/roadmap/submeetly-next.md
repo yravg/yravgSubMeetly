@@ -94,4 +94,4 @@ Status words: `missing`, `partial`, `done`. The handoff holds the evidence for e
 ## Open questions (owner)
 
 - S8: final add-in list after S9.
-- S12: which GitHub repo hosts releases (default: origin yraveragework/yraveragesub; must be public for the app to download), and who keeps the offline backup signing key.
+- S12: which GitHub repo hosts releases (default: origin yravg/yravgSubMeetly; must be public for the app to download), and who keeps the offline backup signing key.

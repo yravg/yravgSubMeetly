@@ -49,7 +49,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KEYS = os.path.join(ROOT, "crates", "poni-core", "data", "update-keys.txt")
 # One release repository; keep in step with `repo!` in crates/poni-core/src/update.rs.
-REPO = os.environ.get("GITHUB_REPOSITORY") or "yraveragework/yraveragesub"
+REPO = os.environ.get("GITHUB_REPOSITORY") or "yravg/yravgSubMeetly"
 KEY_FILE = os.path.join(os.path.expanduser("~"), ".yravg", "update-feed-key.pem")
 API = "https://api.github.com/repos/" + REPO
 SCHEMA = 1

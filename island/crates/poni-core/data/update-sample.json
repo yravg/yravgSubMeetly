@@ -1,6 +1,6 @@
 {
   "about": "yravgSubMeetly's update file. payload is signed (ECDSA P-256, SHA-256) with the key named by key; see docs/updates.md.",
-  "payload": "{\"schema\":1,\"version\":\"0.2.3\",\"date\":\"2026-11-08\",\"headline\":\"Sample release for the update tests\",\"notes\":\"https://github.com/yraveragework/yraveragesub/releases/tag/v0.2.3\",\"windows\":{\"url\":\"https://github.com/yraveragework/yraveragesub/releases/download/v0.2.3/yravgSubMeetly-Setup-0.2.3.exe\",\"size\":2457657,\"sha256\":\"8f30919c3c13e7074ae0381d9b478e1ef5fb802476b637f5febefe949d26e26b\"}}",
-  "signature": "PjDpAY0hMoKOCg6F8sbRzqovXSB/K6DoVFMxcQ/Pc6WqWv11Ps1AExNrDF0GBlSYeARrNf32BJcyM2LajrObKQ==",
+  "payload": "{\"schema\":1,\"version\":\"0.2.3\",\"date\":\"2026-11-08\",\"headline\":\"Sample release for the update tests\",\"notes\":\"https://github.com/yravg/yravgSubMeetly/releases/tag/v0.2.3\",\"windows\":{\"url\":\"https://github.com/yravg/yravgSubMeetly/releases/download/v0.2.3/yravgSubMeetly-Setup-0.2.3.exe\",\"size\":2457657,\"sha256\":\"8f30919c3c13e7074ae0381d9b478e1ef5fb802476b637f5febefe949d26e26b\"}}",
+  "signature": "5kGIlThk31r5aBNjfgOOkGrOExlhK9QIvm+Aul7ZS2UFXugBgxk3vGfLVN9rrBF78oDrlFYBeNztLnUSorRhaA==",
   "key": "ad662e29df0544ce"
 }
