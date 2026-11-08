@@ -46,6 +46,49 @@ pub enum MonitorChoice {
     Cursor,
 }
 
+/// `hover_delay_ms` value for "Off": the island opens on click only.
+pub const HOVER_OFF_MS: u32 = 600_000;
+/// Longest dwell the settings offer besides Off.
+pub const HOVER_MAX_MS: u32 = 3000;
+
+/// The colour of the translated line on the Live page (board I08). Five
+/// swatches that read on the paper ground; Indigo is the default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranslationColor {
+    #[default]
+    Indigo,
+    Navy,
+    Teal,
+    Neutral,
+    Bronze,
+}
+
+impl TranslationColor {
+    pub const ALL: [TranslationColor; 5] = [Self::Indigo, Self::Navy, Self::Teal, Self::Neutral, Self::Bronze];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Indigo => "Indigo",
+            Self::Navy => "Navy",
+            Self::Teal => "Teal",
+            Self::Neutral => "Neutral",
+            Self::Bronze => "Bronze",
+        }
+    }
+
+    /// 0xRRGGBB.
+    pub fn rgb(self) -> u32 {
+        match self {
+            Self::Indigo => 0x4A3C94,
+            Self::Navy => 0x2F3D80,
+            Self::Teal => 0x0B6E83,
+            Self::Neutral => 0x4F5675,
+            Self::Bronze => 0x7A5200,
+        }
+    }
+}
+
 /// Bumped when defaults change in a way existing files should pick up.
 pub const SETTINGS_VERSION: u32 = 6;
 
@@ -62,8 +105,10 @@ pub struct Settings {
     pub theme: Theme,
     pub idle_style: IdleStyle,
     pub use_24h: bool,
-    /// Delay before hover expands the island.
+    /// Delay before hover expands the island; `HOVER_OFF_MS` = never.
     pub hover_delay_ms: u32,
+    /// Colour of the translated line on the Live page.
+    pub translation_color: TranslationColor,
     /// Grace period after the cursor leaves before collapsing (0 = the
     /// island starts closing on the next frame).
     pub collapse_delay_ms: u32,
@@ -133,6 +178,7 @@ impl Default for Settings {
             idle_style: IdleStyle::Clock,
             use_24h: true,
             hover_delay_ms: 220,
+            translation_color: TranslationColor::Indigo,
             collapse_delay_ms: 0,
             expanded_width: 620.0,
             hide_in_fullscreen: true,
@@ -241,7 +287,9 @@ impl Settings {
         if self.game_stats {
             self.hide_in_fullscreen = false;
         }
-        self.hover_delay_ms = self.hover_delay_ms.min(2000);
+        if self.hover_delay_ms != HOVER_OFF_MS {
+            self.hover_delay_ms = self.hover_delay_ms.min(HOVER_MAX_MS);
+        }
         self.lyrics_offset_ms = self.lyrics_offset_ms.clamp(-5000, 5000);
         self.collapse_delay_ms = self.collapse_delay_ms.min(5000);
         if !self.expanded_width.is_finite() {
@@ -328,7 +376,22 @@ mod tests {
     fn sanitize_clamps() {
         let s = Settings { expanded_width: 5000.0, hover_delay_ms: 99999, ..Default::default() }.sanitized();
         assert_eq!(s.expanded_width, 900.0);
-        assert_eq!(s.hover_delay_ms, 2000);
+        assert_eq!(s.hover_delay_ms, HOVER_MAX_MS);
+        // Off survives; so does a pick inside the range.
+        let off = Settings { hover_delay_ms: HOVER_OFF_MS, ..Default::default() }.sanitized();
+        assert_eq!(off.hover_delay_ms, HOVER_OFF_MS);
+    }
+
+    #[test]
+    fn translation_colour_swatches() {
+        let hex: Vec<u32> = TranslationColor::ALL.iter().map(|c| c.rgb()).collect();
+        assert_eq!(hex, [0x4A3C94, 0x2F3D80, 0x0B6E83, 0x4F5675, 0x7A5200]);
+        assert_eq!(Settings::default().translation_color, TranslationColor::Indigo);
+        let s: Settings = serde_json::from_str(r#"{"translation_color":"teal"}"#).unwrap();
+        assert_eq!(s.translation_color, TranslationColor::Teal);
+        // Older files have no key.
+        let s: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(s.translation_color, TranslationColor::Indigo);
     }
 
     #[test]

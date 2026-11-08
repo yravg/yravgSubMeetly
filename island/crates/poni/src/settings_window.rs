@@ -29,7 +29,7 @@ use crate::state::AppState;
 use crate::ui::{wid, wid_n, CursorKind, Hit, Input, MouseButton, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use crate::version::VERSION;
 use poni_core::geom::{palette, Color, Point, Rect};
-use poni_core::settings::{IdleStyle, MonitorChoice, Theme};
+use poni_core::settings::{IdleStyle, MonitorChoice, Theme, TranslationColor};
 use std::collections::HashMap;
 
 /// The card, in DIPs. Windows' window gives it room for its shadow and is
@@ -219,6 +219,7 @@ pub enum Key {
     SystemHistory,
     IdleLook,
     HoverDelay,
+    TranslationColor,
     CloseDelay,
     Width,
     Display,
@@ -301,7 +302,7 @@ pub enum Act {
 }
 
 /// How long the pointer rests on the island before it opens (ms).
-const HOVER: [(u32, &str); 3] = [(120, "Quick"), (220, "Normal"), (450, "Slow")];
+const HOVER: [(u32, &str); 4] = [(220, "0.22 s"), (1500, "1.5 s"), (3000, "3 s"), (poni_core::settings::HOVER_OFF_MS, "Off")];
 /// How long it stays open after the pointer leaves (ms).
 const CLOSE: [(u32, &str); 3] = [(0, "At once"), (400, "Short"), (1000, "Long")];
 const DISPLAYS: [(MonitorChoice, &str); 2] = [(MonitorChoice::Primary, "Main display"), (MonitorChoice::Cursor, "Under the pointer")];
@@ -404,6 +405,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                     Some("Opening and closing"),
                     vec![
                         item(Key::HoverDelay, "Opens after", Some("How long the pointer rests on the island first"), Ctl::Choice(names(&HOVER), nearest(&HOVER, s.hover_delay_ms))),
+                        item(Key::TranslationColor, "Translation colour", Some("The translated line on the Live page"), Ctl::Choice(TranslationColor::ALL.iter().map(|c| c.name()).collect(), TranslationColor::ALL.iter().position(|c| *c == s.translation_color))),
                         item(Key::CloseDelay, "Closes", Some("Once the pointer leaves the open island"), Ctl::Choice(names(&CLOSE), nearest(&CLOSE, s.collapse_delay_ms))),
                         item(Key::Width, "Width when open", Some("Wider gives the pages more room"), Ctl::Stepper(format!("{:.0}", s.expanded_width))),
                     ],
@@ -541,6 +543,10 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::HoverDelay => match act {
             Act::Pick(i) if i < HOVER.len() => s.hover_delay_ms = HOVER[i].0,
+            _ => return,
+        },
+        Key::TranslationColor => match act {
+            Act::Pick(i) if i < TranslationColor::ALL.len() => s.translation_color = TranslationColor::ALL[i],
             _ => return,
         },
         Key::CloseDelay => match act {
@@ -1570,11 +1576,15 @@ mod tests {
             Some(Ctl::Choice(_, sel)) => sel,
             _ => None,
         };
-        assert_eq!((pick(&st, Key::HoverDelay), pick(&st, Key::CloseDelay)), (Some(1), Some(0)));
+        assert_eq!((pick(&st, Key::HoverDelay), pick(&st, Key::CloseDelay)), (Some(0), Some(0)));
         st.settings.hover_delay_ms = 2000;
         assert_eq!(pick(&st, Key::HoverDelay), Some(2));
+        st.settings.hover_delay_ms = poni_core::settings::HOVER_OFF_MS;
+        assert_eq!(pick(&st, Key::HoverDelay), Some(3));
         apply(&mut st, Key::HoverDelay, Act::Pick(0));
-        assert_eq!(st.settings.hover_delay_ms, 120);
+        assert_eq!(st.settings.hover_delay_ms, 220);
+        apply(&mut st, Key::TranslationColor, Act::Pick(2));
+        assert_eq!(st.settings.translation_color, TranslationColor::Teal);
         // A pick past the list changes nothing.
         st.cmds.clear();
         apply(&mut st, Key::CloseDelay, Act::Pick(9));

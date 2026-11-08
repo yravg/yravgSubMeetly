@@ -2184,6 +2184,10 @@ impl App {
 
     /// (Re)start the hover dwell from `p`.
     fn arm_hover(&mut self, p: Point) {
+        // Off: the pointer never opens it; a click does.
+        if self.st.settings.hover_delay_ms >= poni_core::settings::HOVER_OFF_MS {
+            return;
+        }
         self.hover_arm = Some(p);
         unsafe {
             SetTimer(self.hwnd, TIMER_HOVER, self.st.settings.hover_delay_ms.max(1), None);
