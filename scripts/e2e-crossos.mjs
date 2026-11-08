@@ -84,7 +84,7 @@ async function main() {
   }
   if (!health) {
     if (HARNESS_ONLY) {
-      warn('crossos-helper', 'Helper hidup', `${HELPER} tidak menjawab — jalankan native/run.sh (run.bat di Windows)`);
+      warn('crossos-helper', 'Helper hidup', `${HELPER} tidak menjawab — jalankan native/run.sh (run.bat di Windows) untuk menyalakan engine Rust`);
       return { status: 'warn', durationMs: Date.now() - t0 };
     }
     fail('crossos-helper', 'Helper hidup', `${HELPER} tidak menjawab`);

@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 /**
+ * ORACLE REMOVED IN S5 (ENG-004): the Python helper this script drove is gone.
+ * The goldens in engine-rs/golden are frozen; this script cannot run any more
+ * and is kept only as a record of how they were captured. No npm script calls it.
+ *
  * Capture the engine HTTP contract as goldens from the Python oracle.
  *
  *   node scripts/gen-engine-golden.mjs            # writes engine-rs/golden/*.json

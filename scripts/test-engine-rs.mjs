@@ -2,8 +2,8 @@
 /**
  * `npm run test:engine-rs` — replay the engine goldens with cargo.
  *
- * A missing cargo is a SKIP, not a failure: the Python helper is still the
- * default engine until step S5. The skip line is printed so CI logs say so.
+ * A missing cargo is a SKIP, not a failure: the Rust engine is the
+ * default engine since S5. The skip line is printed so CI logs say so.
  */
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
