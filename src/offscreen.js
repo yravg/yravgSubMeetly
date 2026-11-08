@@ -681,7 +681,7 @@ async function runOfflineNativeFile({ name, size, config, settings, emit, transl
       'Files over 1.5 GB need the native helper running. Open Settings → Engine → Native and click Start (or run ./scripts/start-native.sh).',
     );
   }
-  if (!health.ffmpeg) {
+  if (!health.ffmpeg && !health.media_decoder) {
     throw new Error(
       'Files over 1.5 GB need ffmpeg on the helper machine (macOS: brew install ffmpeg · Windows: winget install Gyan.FFmpeg · Linux: apt install ffmpeg), then Restart the helper.',
     );
