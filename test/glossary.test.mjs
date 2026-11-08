@@ -104,3 +104,9 @@ test('CSV import merges duplicate terms case-insensitively (last one wins)', () 
   assert.equal(r.entries.length, 1);
   assert.deepEqual(r.entries[0].heard, ['y']);
 });
+
+test('CSV import ignores a leading BOM (Excel adds one) so the header row is still recognised', () => {
+  const r = parseCsv('\uFEFFterm,heard_as,translation\nA,b,\n');
+  assert.deepEqual(r.entries.map((e) => e.term), ['A']);
+  assert.deepEqual(r.errors, []);
+});

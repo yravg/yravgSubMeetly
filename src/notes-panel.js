@@ -20,8 +20,12 @@ import { listMeetings, saveMeeting, deleteMeeting, backendName } from './lib/not
 import { makeT } from './lib/notes-i18n.js';
 import { flagMomentAndSave, addItem, removeItem } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
-import { runAction } from './lib/addins.js';
-import { loadRuntime, stripHtml, recordRun } from './addins-ui.js';
+import { runAction, actionMutates } from './lib/addins.js';
+import {
+  loadRuntime, stripHtml, recordRun, recapLabels, loadGlossary, saveGlossary, syncGlossary, glossaryEntries, glossaryDraft, GLOSSARY_KEY,
+} from './addins-ui.js';
+import { parseCsv, toCsv, GLOSSARY_MAX } from './lib/glossary.js';
+import { I18N } from './lib/i18n.js';
 import { PROJECT_TYPES, normalizeProjectType, sessionLinesToTranscript } from './lib/notes-schema.js';
 
 /* ---- Tipe proyek: preferensi terakhir dipakai untuk rapat berikutnya ---- */
@@ -162,6 +166,15 @@ function flagShortcutHint() {
 // level audio yang memang belum tersedia dari pipeline.
 /** Berapa lama alasan penolakan bertahan di baris status. */
 const NOTICE_MS = 6000;
+
+/** Save text as a file through a temporary link (add-in .ics / .csv). The BOM keeps non-ASCII CSV readable in Excel. */
+function downloadText(name, text, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([mime === 'text/csv' ? `﻿${text}` : text], { type: `${mime};charset=utf-8` }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
 
 const WAVE_BARS = [22, 38, 55, 31, 64, 44, 73, 36, 58, 81, 47, 29, 66, 52, 88, 61, 94, 70, 45, 78];
 
@@ -415,6 +428,10 @@ export function renderNotesPanel(root, state, handlers = {}) {
   root.querySelectorAll('[data-addin]').forEach((btn) => {
     btn.addEventListener('click', () => handlers.onAddin?.(...btn.dataset.addin.split(':')));
   });
+  root.querySelectorAll('[data-ai-act]').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onAddinUi?.(btn.dataset.aiAct, btn.dataset));
+  });
+  root.querySelector('#gl-file')?.addEventListener('change', (e) => handlers.onAddinUi?.('gl-file', {}, e.target.files?.[0]));
   root.querySelector('#btn-notes-sample')?.addEventListener('click', () => handlers.onLoadSample?.());
   root.querySelector('#notes-project-type')?.addEventListener('change', (e) => handlers.onProjectType?.(e.target.value));
   root.querySelector('#btn-notes-txt')?.addEventListener('click', () => handlers.onExportNotes?.('txt'));
@@ -472,9 +489,14 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
   let projectType = await loadProjectTypePref();
   // Add-ins the user trusted (Settings › Add-ins); re-read when the trust store changes.
   let addinRt = await loadRuntime();
+  let glossaryAll = await loadGlossary().catch(() => ({}));
+  let addinResult = null; // result card under the chips: recap / ics / error, for one meeting
+  let glossaryNote = null; // {kind, text} under the glossary editor
+  const tAi = (key, ...args) => { const v = I18N[lang]?.[key] ?? I18N.en[key] ?? key; return typeof v === 'function' ? v(...args) : v; };
   if (root.__addinsListener) chrome.storage.onChanged?.removeListener(root.__addinsListener);
   root.__addinsListener = (ch) => {
     if ('ysmAddinTrust' in ch || 'ysmAddinRemoved' in ch) loadRuntime().then((rt) => { addinRt = rt; redraw(); });
+    if (GLOSSARY_KEY in ch) { glossaryAll = ch[GLOSSARY_KEY].newValue || {}; redraw(); }
   };
   chrome.storage.onChanged?.addListener(root.__addinsListener);
 
@@ -580,10 +602,12 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
       : gen;
     // Keep the spoken lines on the meeting: Draft options reads them before the sample library.
     merged.transcript = [...(active?.transcript || []), ...sessionLinesToTranscript(lines)];
-    const saved = await saveMeeting(merged);
+    // Glossary add-in (meeting.draft hook): fix the draft's terms; each changed item gets a Revision by 'addin:glossary'.
+    const fixed = glossaryDraft(merged);
+    const saved = await saveMeeting(fixed.meeting);
     meetings = await listMeetings();
     activeId = saved?.id || merged.id;
-    say(T('draftFromSession', gen.items.length));
+    say(fixed.changes ? `${T('draftFromSession', gen.items.length)} · ${tAi('aiGlFixed', fixed.changes)}` : T('draftFromSession', gen.items.length));
   };
 
   const flagNow = async () => {
@@ -625,6 +649,8 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
   };
 
   const redraw = () => {
+    const activeMeeting = meetings.find((m) => m.id === activeId) || null;
+    syncGlossary(glossaryAll, addinRt, activeMeeting);
     renderNotesPanel(
       root,
       {
@@ -638,7 +664,11 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
         addingDecision,
         addingAction,
         projectType,
-        addinsHtml: stripHtml(addinRt, meetings.find((m) => m.id === activeId) || null, meetings, { lang }),
+        addinsHtml: stripHtml(addinRt, activeMeeting, meetings, {
+          lang,
+          result: addinResult && addinResult.meetingId === activeId ? addinResult : null,
+          glossary: { entries: glossaryEntries(activeMeeting?.seriesId), note: glossaryNote },
+        }),
         creatingMeeting,
         headMount: document.getElementById('notes-meeting-bar'),
       },
@@ -648,14 +678,82 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
         onAddin: async (addinId, actionId) => {
           const meeting = meetings.find((m) => m.id === activeId) || null;
           const manifest = addinRt.find((m) => m.id === addinId);
-          if (!manifest || !guardEditable(meeting)) return;
+          if (!manifest) return;
+          // Only chips that edit the register wait for an open meeting; recap and calendar only read it.
+          if (!meeting) return say(T('msgNoMeeting'));
+          if (actionMutates(manifest, actionId) && !guardEditable(meeting)) return;
           try {
-            const r = runAction(manifest, actionId, meeting, { lang });
+            const r = runAction(manifest, actionId, meeting, { lang, meetings, labels: recapLabels(lang) });
+            addinResult = null;
             if (r.kind === 'open') window.open(r.url, '_blank', 'noopener,noreferrer');
-            else await persistMeeting(r.meeting);
+            else if (r.kind === 'recap') addinResult = { kind: 'recap', meetingId: meeting.id, recap: r.recap };
+            else if (r.kind === 'ics') {
+              if (r.ics.text) downloadText(r.ics.filename, r.ics.text, 'text/calendar');
+              addinResult = { kind: 'ics', meetingId: meeting.id, ics: r.ics };
+            } else await persistMeeting(r.meeting);
+            if (addinResult) redraw();
             await recordRun(addinId, r.log);
           } catch (e) {
-            say(String(e?.message || e));
+            addinResult = { kind: 'error', meetingId: meeting.id, title: manifest.name, message: String(e?.message || e) };
+            redraw();
+          }
+        },
+        onAddinUi: async (act, data, file) => {
+          const meeting = meetings.find((m) => m.id === activeId) || null;
+          const sid = meeting?.seriesId;
+          const field = (id) => root.querySelector(`#${id}`)?.value?.trim() || '';
+          const setNote = (kind, text) => { glossaryNote = text ? { kind, text } : null; redraw(); };
+          const store = async (entries) => {
+            try {
+              glossaryAll = await saveGlossary(glossaryAll, sid, entries);
+              return true;
+            } catch (e) {
+              setNote('error', tAi('aiGlSaveFail', String(e?.message || e)));
+              return false;
+            }
+          };
+          if (act === 'dismiss') { addinResult = null; redraw(); return; }
+          if (act === 'recap-open' && addinResult?.recap?.url) { window.open(addinResult.recap.url, '_self'); return; }
+          if (act === 'recap-copy' && addinResult?.recap) {
+            const r = addinResult.recap;
+            try {
+              await navigator.clipboard.writeText(`${r.subject}\n\n${r.body}`);
+              addinResult = { ...addinResult, copied: true, copyFailed: false };
+            } catch {
+              addinResult = { ...addinResult, copied: false, copyFailed: true };
+            }
+            redraw();
+            return;
+          }
+          if (!sid) return setNote('error', tAi('aiGlNoMeeting'));
+          const entries = glossaryEntries(sid);
+          if (act === 'gl-add') {
+            const term = field('gl-term');
+            const heard = field('gl-heard').split('|').map((h) => h.trim()).filter(Boolean);
+            const translation = field('gl-trans');
+            if (!term) return setNote('error', tAi('aiGlNeedTerm'));
+            if (term.length > 80 || heard.some((h) => h.length > 80) || translation.length > 120) return setNote('error', tAi('aiGlTooLong'));
+            const i = entries.findIndex((e) => e.term.toLowerCase() === term.toLowerCase());
+            if (i < 0 && entries.length >= GLOSSARY_MAX) return setNote('error', tAi('aiGlFull', GLOSSARY_MAX));
+            const next = i < 0 ? [...entries, { term, heard, translation }] : entries.map((e, k) => (k === i ? { term, heard, translation } : e));
+            glossaryNote = null;
+            await store(next);
+            redraw();
+          } else if (act === 'gl-del') {
+            glossaryNote = null;
+            if (await store(entries.filter((_, k) => k !== Number(data.i)))) redraw();
+          } else if (act === 'gl-export') {
+            downloadText(`glossary-${sid}.csv`, toCsv(entries), 'text/csv');
+          } else if (act === 'gl-import') {
+            root.querySelector('#gl-file')?.click();
+          } else if (act === 'gl-file' && file) {
+            const r = parseCsv(await file.text());
+            if (!r.entries.length && r.errors.length) return setNote('error', tAi('aiGlImportRows', r.errors.length, r.errors[0].line, r.errors[0].msg));
+            const byKey = new Map(entries.map((e) => [e.term.toLowerCase(), e]));
+            for (const e of r.entries) byKey.set(e.term.toLowerCase(), e);
+            if (!(await store([...byKey.values()].slice(0, GLOSSARY_MAX)))) return;
+            const skipped = r.errors.length ? ` ${tAi('aiGlImportRows', r.errors.length, r.errors[0].line, r.errors[0].msg)}` : '';
+            setNote(r.errors.length ? 'error' : 'ok', `${tAi('aiGlImported', r.entries.length)}${skipped}`);
           }
         },
         onExportNotes: (kind) => onExportNotes?.(kind),
