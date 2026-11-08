@@ -1,0 +1,19 @@
+{
+  "name": "POST /notes",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"note\":5}"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "note must be a JSON object"
+    }
+  },
+  "mask": []
+}

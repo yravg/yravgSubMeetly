@@ -1,0 +1,23 @@
+{
+  "name": "POST /engine/device",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/engine/device",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"device\":\"cuda\"}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "supported": true,
+      "device": "cuda",
+      "warning": "CUDA tidak terdeteksi — helper akan jatuh ke CPU saat start",
+      "restart_required": true
+    }
+  },
+  "mask": []
+}

@@ -1,0 +1,20 @@
+{
+  "name": "POST /notes/export",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes/export",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"note\":{\"id\":\"inline-1\",\"title\":\"Rapat & Rencana / 2026\",\"date\":\"2026-11-08\",\"status\":\"issued\",\"generatedAt\":\"2026-11-08T11:00:00Z\",\"summary\":\"Catatan inline.\",\"decisions\":[\"Disetujui\"],\"actions\":[{\"text\":\"Kerjakan A\",\"owner\":\"Sari\",\"due\":\"2026-11-20\",\"status\":\"open\"},{\"text\":\"Kerjakan B\",\"owner\":null,\"due\":null,\"status\":\"closed\"}]},\"format\":\"md\"}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "filename": "Rapat_Rencana_2026.md",
+      "content": "# Rapat & Rencana / 2026\n\n_inline-1_ · 2026-11-08\n\nCatatan inline.\n\n## Decisions\n- Disetujui\n\n## Action items\n- [ ] Kerjakan A — Sari — due 2026-11-20\n- [x] Kerjakan B\n\nDrafted on-device. Nothing left this machine.\n"
+    }
+  },
+  "mask": []
+}

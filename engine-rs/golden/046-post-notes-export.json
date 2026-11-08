@@ -1,0 +1,19 @@
+{
+  "name": "POST /notes/export",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes/export",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"note\":{\"id\":\"inline-1\",\"title\":5,\"date\":\"2026-11-08\",\"status\":\"issued\",\"generatedAt\":\"2026-11-08T11:00:00Z\",\"summary\":\"Catatan inline.\",\"decisions\":[\"Disetujui\"],\"actions\":[{\"text\":\"Kerjakan A\",\"owner\":\"Sari\",\"due\":\"2026-11-20\",\"status\":\"open\"},{\"text\":\"Kerjakan B\",\"owner\":null,\"due\":null,\"status\":\"closed\"}]}}"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "title must be a string"
+    }
+  },
+  "mask": []
+}

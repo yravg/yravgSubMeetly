@@ -1,0 +1,39 @@
+{
+  "name": "POST /notes",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "note": {
+        "id": "note-1794105786",
+        "title": "Notulen sesi",
+        "date": "",
+        "source": "helper",
+        "status": "ready",
+        "generatedAt": "2026-11-08T02:43:06Z",
+        "summary": "",
+        "decisions": [],
+        "actions": [],
+        "transcriptPreview": "",
+        "savedLocally": true,
+        "schemaVersion": 2,
+        "meeting": null,
+        "items": [],
+        "transcript": []
+      }
+    }
+  },
+  "mask": [
+    "note.id",
+    "note.generatedAt"
+  ]
+}

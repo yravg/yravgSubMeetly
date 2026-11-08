@@ -1,0 +1,24 @@
+{
+  "name": "POST /ui-prefs",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/ui-prefs",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"reskin\":\"coretax\"}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "prefs": {
+        "theme": "dark",
+        "reskin": "coretax"
+      },
+      "stored": true
+    }
+  },
+  "mask": []
+}

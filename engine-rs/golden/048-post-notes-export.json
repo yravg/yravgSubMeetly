@@ -1,0 +1,19 @@
+{
+  "name": "POST /notes/export",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes/export",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"id\":\"golden-note-1\",\"format\":\"pdf\"}"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "format must be \"txt\" or \"md\""
+    }
+  },
+  "mask": []
+}

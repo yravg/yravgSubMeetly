@@ -1,0 +1,17 @@
+{
+  "name": "GET /notes",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "GET",
+    "path": "/notes",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "notes": []
+    }
+  },
+  "mask": []
+}

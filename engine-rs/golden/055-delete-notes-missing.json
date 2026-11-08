@@ -1,0 +1,17 @@
+{
+  "name": "DELETE /notes/missing",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "DELETE",
+    "path": "/notes/missing",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "body": {
+      "error": "note not found"
+    }
+  },
+  "mask": []
+}

@@ -1,0 +1,737 @@
+{
+  "name": "POST /notes",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"note\":{\"id\":\"golden-note-actions\",\"title\":\"Batas tindakan\",\"generatedAt\":\"2026-11-08T12:00:00Z\",\"actions\":[{\"id\":\"a-1\",\"text\":\"Tindakan 1\",\"status\":\"closed\"},{\"id\":\"a-2\",\"text\":\"Tindakan 2\",\"status\":\"open\"},{\"id\":\"a-3\",\"text\":\"Tindakan 3\",\"status\":\"open\"},{\"id\":\"a-4\",\"text\":\"Tindakan 4\",\"status\":\"open\"},{\"id\":\"a-5\",\"text\":\"Tindakan 5\",\"status\":\"open\"},{\"id\":\"a-6\",\"text\":\"Tindakan 6\",\"status\":\"open\"},{\"id\":\"a-7\",\"text\":\"Tindakan 7\",\"status\":\"open\"},{\"id\":\"a-8\",\"text\":\"Tindakan 8\",\"status\":\"open\"},{\"id\":\"a-9\",\"text\":\"Tindakan 9\",\"status\":\"open\"},{\"id\":\"a-10\",\"text\":\"Tindakan 10\",\"status\":\"open\"},{\"id\":\"a-11\",\"text\":\"Tindakan 11\",\"status\":\"open\"},{\"id\":\"a-12\",\"text\":\"Tindakan 12\",\"status\":\"open\"},{\"id\":\"a-13\",\"text\":\"Tindakan 13\",\"status\":\"open\"},{\"id\":\"a-14\",\"text\":\"Tindakan 14\",\"status\":\"open\"},{\"id\":\"a-15\",\"text\":\"Tindakan 15\",\"status\":\"open\"},{\"id\":\"a-16\",\"text\":\"Tindakan 16\",\"status\":\"open\"},{\"id\":\"a-17\",\"text\":\"Tindakan 17\",\"status\":\"open\"},{\"id\":\"a-18\",\"text\":\"Tindakan 18\",\"status\":\"open\"},{\"id\":\"a-19\",\"text\":\"Tindakan 19\",\"status\":\"open\"},{\"id\":\"a-20\",\"text\":\"Tindakan 20\",\"status\":\"open\"},{\"id\":\"a-21\",\"text\":\"Tindakan 21\",\"status\":\"open\"},{\"id\":\"a-22\",\"text\":\"Tindakan 22\",\"status\":\"open\"},{\"id\":\"a-23\",\"text\":\"Tindakan 23\",\"status\":\"open\"},{\"id\":\"a-24\",\"text\":\"Tindakan 24\",\"status\":\"open\"},{\"id\":\"a-25\",\"text\":\"Tindakan 25\",\"status\":\"open\"},{\"id\":\"a-26\",\"text\":\"Tindakan 26\",\"status\":\"open\"},{\"id\":\"a-27\",\"text\":\"Tindakan 27\",\"status\":\"open\"},{\"id\":\"a-28\",\"text\":\"Tindakan 28\",\"status\":\"open\"},{\"id\":\"a-29\",\"text\":\"Tindakan 29\",\"status\":\"open\"},{\"id\":\"a-30\",\"text\":\"Tindakan 30\",\"status\":\"open\"},{\"id\":\"a-31\",\"text\":\"Tindakan 31\",\"status\":\"open\"},{\"id\":\"a-32\",\"text\":\"Tindakan 32\",\"status\":\"open\"},{\"id\":\"a-33\",\"text\":\"Tindakan 33\",\"status\":\"open\"},{\"id\":\"a-34\",\"text\":\"Tindakan 34\",\"status\":\"open\"},{\"id\":\"a-35\",\"text\":\"Tindakan 35\",\"status\":\"open\"},{\"id\":\"a-36\",\"text\":\"Tindakan 36\",\"status\":\"open\"},{\"id\":\"a-37\",\"text\":\"Tindakan 37\",\"status\":\"open\"},{\"id\":\"a-38\",\"text\":\"Tindakan 38\",\"status\":\"open\"},{\"id\":\"a-39\",\"text\":\"Tindakan 39\",\"status\":\"open\"},{\"id\":\"a-40\",\"text\":\"Tindakan 40\",\"status\":\"open\"},{\"id\":\"a-41\",\"text\":\"Tindakan 41\",\"status\":\"open\"},{\"id\":\"a-42\",\"text\":\"Tindakan 42\",\"status\":\"open\"},{\"id\":\"a-43\",\"text\":\"Tindakan 43\",\"status\":\"open\"},{\"id\":\"a-44\",\"text\":\"Tindakan 44\",\"status\":\"open\"},{\"id\":\"a-45\",\"text\":\"Tindakan 45\",\"status\":\"open\"},{\"id\":\"a-46\",\"text\":\"Tindakan 46\",\"status\":\"open\"},{\"id\":\"a-47\",\"text\":\"Tindakan 47\",\"status\":\"open\"},{\"id\":\"a-48\",\"text\":\"Tindakan 48\",\"status\":\"open\"},{\"id\":\"a-49\",\"text\":\"Tindakan 49\",\"status\":\"open\"},{\"id\":\"a-50\",\"text\":\"Tindakan 50\",\"status\":\"open\"},{\"id\":\"a-51\",\"text\":\"Tindakan 51\",\"status\":\"open\"},{\"id\":\"a-52\",\"text\":\"Tindakan 52\",\"status\":\"open\"},{\"id\":\"a-53\",\"text\":\"Tindakan 53\",\"status\":\"open\"},{\"id\":\"a-54\",\"text\":\"Tindakan 54\",\"status\":\"open\"},{\"id\":\"a-55\",\"text\":\"Tindakan 55\",\"status\":\"open\"},{\"id\":\"a-56\",\"text\":\"Tindakan 56\",\"status\":\"open\"},{\"id\":\"a-57\",\"text\":\"Tindakan 57\",\"status\":\"open\"},{\"id\":\"a-58\",\"text\":\"Tindakan 58\",\"status\":\"open\"},{\"id\":\"a-59\",\"text\":\"Tindakan 59\",\"status\":\"open\"},{\"id\":\"a-60\",\"text\":\"Tindakan 60\",\"status\":\"open\"},{\"id\":\"a-61\",\"text\":\"Tindakan 61\",\"status\":\"open\"},{\"id\":\"a-62\",\"text\":\"Tindakan 62\",\"status\":\"open\"},{\"id\":\"a-63\",\"text\":\"Tindakan 63\",\"status\":\"open\"},{\"id\":\"a-64\",\"text\":\"Tindakan 64\",\"status\":\"open\"},{\"id\":\"a-65\",\"text\":\"Tindakan 65\",\"status\":\"open\"},{\"id\":\"a-66\",\"text\":\"Tindakan 66\",\"status\":\"open\"},{\"id\":\"a-67\",\"text\":\"Tindakan 67\",\"status\":\"open\"},{\"id\":\"a-68\",\"text\":\"Tindakan 68\",\"status\":\"open\"},{\"id\":\"a-69\",\"text\":\"Tindakan 69\",\"status\":\"open\"},{\"id\":\"a-70\",\"text\":\"Tindakan 70\",\"status\":\"open\"},{\"id\":\"a-71\",\"text\":\"Tindakan 71\",\"status\":\"open\"},{\"id\":\"a-72\",\"text\":\"Tindakan 72\",\"status\":\"open\"},{\"id\":\"a-73\",\"text\":\"Tindakan 73\",\"status\":\"open\"},{\"id\":\"a-74\",\"text\":\"Tindakan 74\",\"status\":\"open\"},{\"id\":\"a-75\",\"text\":\"Tindakan 75\",\"status\":\"open\"},{\"id\":\"a-76\",\"text\":\"Tindakan 76\",\"status\":\"open\"},{\"id\":\"a-77\",\"text\":\"Tindakan 77\",\"status\":\"open\"},{\"id\":\"a-78\",\"text\":\"Tindakan 78\",\"status\":\"open\"},{\"id\":\"a-79\",\"text\":\"Tindakan 79\",\"status\":\"open\"},{\"id\":\"a-80\",\"text\":\"Tindakan 80\",\"status\":\"open\"},{\"id\":\"a-81\",\"text\":\"Tindakan 81\",\"status\":\"open\"},{\"id\":\"a-82\",\"text\":\"Tindakan 82\",\"status\":\"open\"},{\"id\":\"a-83\",\"text\":\"Tindakan 83\",\"status\":\"open\"},{\"id\":\"a-84\",\"text\":\"Tindakan 84\",\"status\":\"open\"},{\"id\":\"a-85\",\"text\":\"Tindakan 85\",\"status\":\"open\"},{\"id\":\"a-86\",\"text\":\"Tindakan 86\",\"status\":\"open\"},{\"id\":\"a-87\",\"text\":\"Tindakan 87\",\"status\":\"open\"},{\"id\":\"a-88\",\"text\":\"Tindakan 88\",\"status\":\"open\"},{\"id\":\"a-89\",\"text\":\"Tindakan 89\",\"status\":\"open\"},{\"id\":\"a-90\",\"text\":\"Tindakan 90\",\"status\":\"open\"},{\"id\":\"a-91\",\"text\":\"Tindakan 91\",\"status\":\"open\"},{\"id\":\"a-92\",\"text\":\"Tindakan 92\",\"status\":\"open\"},{\"id\":\"a-93\",\"text\":\"Tindakan 93\",\"status\":\"open\"},{\"id\":\"a-94\",\"text\":\"Tindakan 94\",\"status\":\"open\"},{\"id\":\"a-95\",\"text\":\"Tindakan 95\",\"status\":\"open\"},{\"id\":\"a-96\",\"text\":\"Tindakan 96\",\"status\":\"open\"},{\"id\":\"a-97\",\"text\":\"Tindakan 97\",\"status\":\"open\"},{\"id\":\"a-98\",\"text\":\"Tindakan 98\",\"status\":\"open\"},{\"id\":\"a-99\",\"text\":\"Tindakan 99\",\"status\":\"open\"},{\"id\":\"a-100\",\"text\":\"Tindakan 100\",\"status\":\"open\"},\"bukan objek\"]}}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "note": {
+        "id": "golden-note-actions",
+        "title": "Batas tindakan",
+        "date": "",
+        "source": "helper",
+        "status": "ready",
+        "generatedAt": "2026-11-08T12:00:00Z",
+        "summary": "",
+        "decisions": [],
+        "actions": [
+          {
+            "id": "a-1",
+            "text": "Tindakan 1",
+            "owner": null,
+            "due": null,
+            "status": "closed"
+          },
+          {
+            "id": "a-2",
+            "text": "Tindakan 2",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-3",
+            "text": "Tindakan 3",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-4",
+            "text": "Tindakan 4",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-5",
+            "text": "Tindakan 5",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-6",
+            "text": "Tindakan 6",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-7",
+            "text": "Tindakan 7",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-8",
+            "text": "Tindakan 8",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-9",
+            "text": "Tindakan 9",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-10",
+            "text": "Tindakan 10",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-11",
+            "text": "Tindakan 11",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-12",
+            "text": "Tindakan 12",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-13",
+            "text": "Tindakan 13",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-14",
+            "text": "Tindakan 14",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-15",
+            "text": "Tindakan 15",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-16",
+            "text": "Tindakan 16",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-17",
+            "text": "Tindakan 17",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-18",
+            "text": "Tindakan 18",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-19",
+            "text": "Tindakan 19",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-20",
+            "text": "Tindakan 20",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-21",
+            "text": "Tindakan 21",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-22",
+            "text": "Tindakan 22",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-23",
+            "text": "Tindakan 23",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-24",
+            "text": "Tindakan 24",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-25",
+            "text": "Tindakan 25",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-26",
+            "text": "Tindakan 26",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-27",
+            "text": "Tindakan 27",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-28",
+            "text": "Tindakan 28",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-29",
+            "text": "Tindakan 29",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-30",
+            "text": "Tindakan 30",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-31",
+            "text": "Tindakan 31",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-32",
+            "text": "Tindakan 32",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-33",
+            "text": "Tindakan 33",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-34",
+            "text": "Tindakan 34",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-35",
+            "text": "Tindakan 35",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-36",
+            "text": "Tindakan 36",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-37",
+            "text": "Tindakan 37",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-38",
+            "text": "Tindakan 38",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-39",
+            "text": "Tindakan 39",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-40",
+            "text": "Tindakan 40",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-41",
+            "text": "Tindakan 41",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-42",
+            "text": "Tindakan 42",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-43",
+            "text": "Tindakan 43",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-44",
+            "text": "Tindakan 44",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-45",
+            "text": "Tindakan 45",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-46",
+            "text": "Tindakan 46",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-47",
+            "text": "Tindakan 47",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-48",
+            "text": "Tindakan 48",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-49",
+            "text": "Tindakan 49",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-50",
+            "text": "Tindakan 50",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-51",
+            "text": "Tindakan 51",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-52",
+            "text": "Tindakan 52",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-53",
+            "text": "Tindakan 53",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-54",
+            "text": "Tindakan 54",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-55",
+            "text": "Tindakan 55",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-56",
+            "text": "Tindakan 56",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-57",
+            "text": "Tindakan 57",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-58",
+            "text": "Tindakan 58",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-59",
+            "text": "Tindakan 59",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-60",
+            "text": "Tindakan 60",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-61",
+            "text": "Tindakan 61",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-62",
+            "text": "Tindakan 62",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-63",
+            "text": "Tindakan 63",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-64",
+            "text": "Tindakan 64",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-65",
+            "text": "Tindakan 65",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-66",
+            "text": "Tindakan 66",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-67",
+            "text": "Tindakan 67",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-68",
+            "text": "Tindakan 68",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-69",
+            "text": "Tindakan 69",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-70",
+            "text": "Tindakan 70",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-71",
+            "text": "Tindakan 71",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-72",
+            "text": "Tindakan 72",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-73",
+            "text": "Tindakan 73",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-74",
+            "text": "Tindakan 74",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-75",
+            "text": "Tindakan 75",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-76",
+            "text": "Tindakan 76",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-77",
+            "text": "Tindakan 77",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-78",
+            "text": "Tindakan 78",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-79",
+            "text": "Tindakan 79",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-80",
+            "text": "Tindakan 80",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-81",
+            "text": "Tindakan 81",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-82",
+            "text": "Tindakan 82",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-83",
+            "text": "Tindakan 83",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-84",
+            "text": "Tindakan 84",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-85",
+            "text": "Tindakan 85",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-86",
+            "text": "Tindakan 86",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-87",
+            "text": "Tindakan 87",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-88",
+            "text": "Tindakan 88",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-89",
+            "text": "Tindakan 89",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-90",
+            "text": "Tindakan 90",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-91",
+            "text": "Tindakan 91",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-92",
+            "text": "Tindakan 92",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-93",
+            "text": "Tindakan 93",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-94",
+            "text": "Tindakan 94",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-95",
+            "text": "Tindakan 95",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-96",
+            "text": "Tindakan 96",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-97",
+            "text": "Tindakan 97",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-98",
+            "text": "Tindakan 98",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-99",
+            "text": "Tindakan 99",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          },
+          {
+            "id": "a-100",
+            "text": "Tindakan 100",
+            "owner": null,
+            "due": null,
+            "status": "open"
+          }
+        ],
+        "transcriptPreview": "",
+        "savedLocally": true,
+        "schemaVersion": 2,
+        "meeting": null,
+        "items": [],
+        "transcript": []
+      }
+    }
+  },
+  "mask": []
+}

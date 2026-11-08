@@ -1,0 +1,36 @@
+{
+  "name": "POST /notes",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "request": {
+    "method": "POST",
+    "path": "/notes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"note\":{\"id\":\"golden-note-3\",\"generatedAt\":\"2026-11-08T10:30:00Z\",\"summary\":{\"en\":\"English summary chosen by the oracle\"}}}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "note": {
+        "id": "golden-note-3",
+        "title": "Notulen sesi",
+        "date": "",
+        "source": "helper",
+        "status": "ready",
+        "generatedAt": "2026-11-08T10:30:00Z",
+        "summary": "English summary chosen by the oracle",
+        "decisions": [],
+        "actions": [],
+        "transcriptPreview": "",
+        "savedLocally": true,
+        "schemaVersion": 2,
+        "meeting": null,
+        "items": [],
+        "transcript": []
+      }
+    }
+  },
+  "mask": []
+}
