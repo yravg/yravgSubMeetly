@@ -474,3 +474,13 @@ fn hidden_phone_addresses_still_connect() {
     let _: SocketAddr = "127.0.0.1:1".parse().unwrap();
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn there_is_no_meeting_server_unless_the_owner_sets_one() {
+    use super::server_from;
+    assert_eq!(server_from(None), None);
+    assert_eq!(server_from(Some("  ")), None);
+    assert_eq!(server_from(Some("http://drop.example.com")), None, "plain http only on this PC");
+    assert_eq!(server_from(Some(" https://drop.example.com/ ")).as_deref(), Some("https://drop.example.com"));
+    assert_eq!(server_from(Some("http://127.0.0.1:8080")).as_deref(), Some("http://127.0.0.1:8080"));
+}
