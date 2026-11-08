@@ -1,5 +1,5 @@
 //! Contract tests for the non-golden parts: origin/host policy, allowed-origin
-//! override, state-dir migration, and the 501 answers for ML routes.
+//! override, state-dir migration, and the ML routes' model-free answers.
 
 use std::fs;
 use std::path::PathBuf;
@@ -37,6 +37,7 @@ fn request(method: &str, path: &str, origin: Option<&str>, host: &str, peer: boo
         headers,
         body: Vec::new(),
         peer_loopback: peer,
+        body_file: None,
     }
 }
 
@@ -174,27 +175,52 @@ fn legacy_state_dir_is_migrated_once() {
 }
 
 #[test]
-fn ml_routes_answer_501() {
+fn ml_routes_answer_without_loading_a_model() {
+    std::env::set_var("TRANSLATE", "off");
     let (app, state) = app_with_state();
-    for path in [
-        "/transcribe",
-        "/transcribe_file",
-        "/transcribe_file_job",
-        "/translate",
-        "/translate_refine",
-        "/draft",
-        "/notes/generate",
-        "/notes/summarize",
-        "/models/pull",
-    ] {
-        let response = app.handle(&request("POST", path, None, "127.0.0.1:17865", true));
+    let post = |path: &str, body: &[u8]| {
+        let mut req = request("POST", path, None, "127.0.0.1:17865", true);
+        req.body = body.to_vec();
+        app.handle(&req)
+    };
+
+    // Too short for ASR: answered before any model loads, like the oracle.
+    let short = post("/transcribe", &[0u8; 400]);
+    assert_eq!((short.status, short.body), (200, Some(json!({ "text": "" }))));
+    let draft = post("/draft?src=en&tgt=de", b"");
+    assert_eq!(draft.body, Some(json!({ "source": "", "translation": "" })));
+
+    for path in ["/translate?tgt=de", "/translate_refine"] {
+        let response = post(path, b"{\"text\":\"hello\"}");
         assert_eq!(response.status, 501, "{path}");
-        assert_eq!(
-            response.body,
-            Some(json!({ "error": "not-implemented-in-rust" })),
-            "{path}"
-        );
     }
+
+    let unknown = post("/jobs/job-1/cancel", b"");
+    assert_eq!(unknown.status, 404);
+
+    // The active ASR model's cache entry is never deletable.
+    let active = app.handle(&request(
+        "DELETE",
+        "/models/cache/openai--whisper-large-v3-turbo?confirm=1",
+        None,
+        "127.0.0.1:17865",
+        true,
+    ));
+    assert_eq!(active.status, 400);
+    assert_eq!(
+        active.body,
+        Some(json!({ "error": "refusing to delete an active inventory model" }))
+    );
+
+    assert!(!app.shutdown_requested());
+    let bye = post("/shutdown", b"");
+    assert_eq!(bye.body, Some(json!({ "ok": true, "shutting_down": true })));
+    assert!(app.shutdown_requested());
+
+    let health = app.handle(&request("GET", "/health", None, "127.0.0.1:17865", true));
+    let body = health.body.expect("health body");
+    assert_eq!(body["loaded"], json!({ "asr": false, "translate": false }));
+    assert_eq!(body["model"], json!("openai/whisper-large-v3-turbo"));
     let _ = fs::remove_dir_all(&state);
 }
 

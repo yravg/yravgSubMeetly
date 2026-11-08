@@ -1,0 +1,51 @@
+{
+  "name": "POST /notes/summarize",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "POST",
+    "path": "/notes/summarize",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"lines\":[{\"text\":\"Halo semua, kita mulai rapat.\"},{\"src\":\"Keputusan: rilis versi 2 ditunda ke Jumat. Lalu lanjut.\"},{\"text\":\"Decision -   pakai Rust untuk engine sekarang!\"},{\"text\":\"decisions are not matched here, keputusan pendek.\"},{\"text\":\"Tindak lanjut: Budi mengirim laporan mingguan\",\"src\":\"ignored\"},{\"text\":\"action item kirim email ke vendor? todo:      abc.\"},{\"text\":\"   \"},{\"text\":42},\"bukan objek\",{\"text\":\"xaction bukan kata. TODO update dokumen rilis\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "summary": "Halo semua, kita mulai rapat. … xaction bukan kata. TODO update dokumen rilis (8 segmen).",
+      "decisions": [
+        "rilis versi 2 ditunda ke Jumat",
+        "pakai Rust untuk engine sekarang"
+      ],
+      "actions": [
+        {
+          "id": "act-1",
+          "text": "Budi mengirim laporan mingguan action item kirim email ke vendor",
+          "owner": null,
+          "due": null,
+          "status": "open"
+        },
+        {
+          "id": "act-2",
+          "text": "abc",
+          "owner": null,
+          "due": null,
+          "status": "open"
+        },
+        {
+          "id": "act-3",
+          "text": "update dokumen rilis",
+          "owner": null,
+          "due": null,
+          "status": "open"
+        }
+      ],
+      "counts": {
+        "segments": 10,
+        "decisions": 2,
+        "actions": 3
+      }
+    }
+  },
+  "mask": []
+}

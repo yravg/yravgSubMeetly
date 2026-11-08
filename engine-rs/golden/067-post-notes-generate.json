@@ -1,0 +1,31 @@
+{
+  "name": "POST /notes/generate",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "POST",
+    "path": "/notes/generate",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"lines\":[{\"text\":\"Satu baris saja.\"}],\"title\":\"\"}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "note": {
+        "title": "Notulen sesi",
+        "source": "helper",
+        "status": "ready",
+        "summary": "Satu baris saja.",
+        "decisions": [],
+        "actions": [],
+        "transcriptPreview": "Satu baris saja.",
+        "savedLocally": false
+      }
+    }
+  },
+  "mask": [
+    "note.id",
+    "note.generatedAt"
+  ]
+}

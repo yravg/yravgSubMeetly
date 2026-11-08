@@ -1,0 +1,27 @@
+{
+  "name": "GET /models",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "GET",
+    "path": "/models",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "cached": [
+        {
+          "id": "org/incomplete",
+          "bytes": 3,
+          "files": 1,
+          "snapshots": 0,
+          "complete": false
+        }
+      ]
+    }
+  },
+  "mask": [
+    "models"
+  ]
+}

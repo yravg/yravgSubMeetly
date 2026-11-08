@@ -1,0 +1,17 @@
+{
+  "name": "DELETE /models/cache/nodash",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "DELETE",
+    "path": "/models/cache/nodash",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "id must look like org--name"
+    }
+  },
+  "mask": []
+}

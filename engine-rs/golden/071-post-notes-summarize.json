@@ -1,0 +1,19 @@
+{
+  "name": "POST /notes/summarize",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "POST",
+    "path": "/notes/summarize",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"lines\":[]}"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "body needs non-empty lines[]"
+    }
+  },
+  "mask": []
+}

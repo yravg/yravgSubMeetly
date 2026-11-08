@@ -1,0 +1,17 @@
+{
+  "name": "DELETE /models/cache/org--missing",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "DELETE",
+    "path": "/models/cache/org--missing",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": "add ?confirm=1 to delete cached model"
+    }
+  },
+  "mask": []
+}

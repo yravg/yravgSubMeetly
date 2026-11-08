@@ -1,0 +1,19 @@
+{
+  "name": "POST /transcribe?language=en",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "POST",
+    "path": "/transcribe?language=en",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "text": ""
+    }
+  },
+  "mask": []
+}

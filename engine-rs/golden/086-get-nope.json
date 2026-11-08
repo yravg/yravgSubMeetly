@@ -1,0 +1,17 @@
+{
+  "name": "GET /nope",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "GET",
+    "path": "/nope",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "body": {
+      "error": "not found"
+    }
+  },
+  "mask": []
+}

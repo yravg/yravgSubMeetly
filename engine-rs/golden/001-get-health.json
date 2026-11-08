@@ -1,6 +1,6 @@
 {
   "name": "GET /health",
-  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
   "request": {
     "method": "GET",
     "path": "/health",
@@ -35,6 +35,8 @@
     "features.transcribe_file_jobs",
     "features.streaming_file_jobs",
     "features.faster_whisper",
-    "features.models"
+    "features.models",
+    "loaded",
+    "media_decoder"
   ]
 }
