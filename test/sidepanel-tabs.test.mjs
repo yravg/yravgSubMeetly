@@ -153,7 +153,7 @@ test('peta fitur: 10 grup berwarna, klik melompat ke tab', async () => {
   await page.waitForFunction(() => !document.getElementById('view-history').classList.contains('hidden'));
 });
 
-test('Settings adalah tab biasa: bukan lapisan tetap, lima kelompok', async () => {
+test('Settings adalah tab biasa: bukan lapisan tetap, enam kelompok (Add-ins dari board T05)', async () => {
   await openView('settings');
   const r = await page.evaluate(() => {
     const m = document.getElementById('settings-modal');
@@ -165,7 +165,7 @@ test('Settings adalah tab biasa: bukan lapisan tetap, lima kelompok', async () =
   });
   assert.notEqual(r.pos, 'fixed');
   assert.equal(r.inMain, true);
-  assert.deepEqual(r.tabs, ['general', 'engine', 'models', 'output', 'about']);
+  assert.deepEqual(r.tabs, ['general', 'engine', 'models', 'output', 'addins', 'about']);
 });
 
 test('tidak ada galat runtime', () => {

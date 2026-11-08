@@ -20,6 +20,8 @@ import { listMeetings, saveMeeting, deleteMeeting, backendName } from './lib/not
 import { makeT } from './lib/notes-i18n.js';
 import { flagMomentAndSave, addItem, removeItem } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
+import { runAction } from './lib/addins.js';
+import { loadRuntime, stripHtml, recordRun } from './addins-ui.js';
 import { PROJECT_TYPES, normalizeProjectType } from './lib/notes-schema.js';
 
 /* ---- Tipe proyek: preferensi terakhir dipakai untuk rapat berikutnya ---- */
@@ -231,7 +233,7 @@ function meetingBarHtml({ meetings, active, T, creating }) {
 }
 
 export function renderNotesPanel(root, state, handlers = {}) {
-  const { meetings, active, lang, T, capture, notice, summaryDraft, addingDecision, addingAction, projectType = 'general' } = state;
+  const { meetings, active, lang, T, capture, notice, summaryDraft, addingDecision, addingAction, projectType = 'general', addinsHtml = '' } = state;
   const stats = active ? meetingStats(active) : null;
   const latest = latestItems(active, lang);
   const decisions = latestByType(active, lang, 'decision');
@@ -253,6 +255,8 @@ export function renderNotesPanel(root, state, handlers = {}) {
         </span>
         <span class="notes-meta" data-density="detail">${escapeHtml(backendName())}</span>
       </div>
+
+      ${addinsHtml}
 
       <div class="notes-block" id="notes-active-block">
         <div class="notes-block-head">
@@ -408,6 +412,9 @@ export function renderNotesPanel(root, state, handlers = {}) {
   root.querySelector('#btn-open-register')?.addEventListener('click', () => handlers.onOpenRegister?.());
   root.querySelector('#btn-end-draft')?.addEventListener('click', () => handlers.onEndAndDraft?.());
   root.querySelector('#btn-flag-moment')?.addEventListener('click', () => handlers.onFlagMoment?.());
+  root.querySelectorAll('[data-addin]').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onAddin?.(...btn.dataset.addin.split(':')));
+  });
   root.querySelector('#btn-notes-sample')?.addEventListener('click', () => handlers.onLoadSample?.());
   root.querySelector('#notes-project-type')?.addEventListener('change', (e) => handlers.onProjectType?.(e.target.value));
   root.querySelector('#btn-notes-txt')?.addEventListener('click', () => handlers.onExportNotes?.('txt'));
@@ -463,6 +470,13 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
   let meetings = await listMeetings();
   let activeId = meetings[0]?.id || null;
   let projectType = await loadProjectTypePref();
+  // Add-ins the user trusted (Settings › Add-ins); re-read when the trust store changes.
+  let addinRt = await loadRuntime();
+  if (root.__addinsListener) chrome.storage.onChanged?.removeListener(root.__addinsListener);
+  root.__addinsListener = (ch) => {
+    if ('ysmAddinTrust' in ch || 'ysmAddinRemoved' in ch) loadRuntime().then((rt) => { addinRt = rt; redraw(); });
+  };
+  chrome.storage.onChanged?.addListener(root.__addinsListener);
 
   if (root.__notesTick) {
     clearInterval(root.__notesTick);
@@ -622,12 +636,26 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
         addingDecision,
         addingAction,
         projectType,
+        addinsHtml: stripHtml(addinRt, meetings.find((m) => m.id === activeId) || null, meetings, { lang }),
         creatingMeeting,
         headMount: document.getElementById('notes-meeting-bar'),
       },
       {
         onOpenRegister: openRegister,
         onFlagMoment: flagNow,
+        onAddin: async (addinId, actionId) => {
+          const meeting = meetings.find((m) => m.id === activeId) || null;
+          const manifest = addinRt.find((m) => m.id === addinId);
+          if (!manifest || !guardEditable(meeting)) return;
+          try {
+            const r = runAction(manifest, actionId, meeting, { lang });
+            if (r.kind === 'open') window.open(r.url, '_blank', 'noopener,noreferrer');
+            else await persistMeeting(r.meeting);
+            await recordRun(addinId, r.log);
+          } catch (e) {
+            say(String(e?.message || e));
+          }
+        },
         onExportNotes: (kind) => onExportNotes?.(kind),
         onPushShared: async () => {
           const meeting = meetings.find((m) => m.id === activeId) || null;

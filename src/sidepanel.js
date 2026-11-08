@@ -50,6 +50,7 @@ import {
 } from './lib/qa-samples.js';
 import { tile as colourTile } from './lib/colour-icons.js';
 import { renderFeatureMap } from './lib/feature-map.js';
+import { mountAddinsPane } from './addins-ui.js';
 import { springProgress, slidingNumber, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -928,7 +929,8 @@ function openSettingsPane() {
   setSettingsTab($('settings-modal').dataset.stab);
 }
 
-const SETTINGS_TABS = ['general', 'engine', 'models', 'output', 'about'];
+let addinsPane = null; // Settings › Add-ins (addins-ui.js), mounted at boot
+const SETTINGS_TABS = ['general', 'engine', 'models', 'output', 'addins', 'about'];
 function setSettingsTab(tab) {
   const next = SETTINGS_TABS.includes(tab) ? tab : 'general';
   $('settings-modal').dataset.stab = next;
@@ -938,6 +940,7 @@ function setSettingsTab(tab) {
     b.setAttribute('aria-selected', String(on));
   });
   for (const id of ['theme-toggle', 'asr-preset-toggle', 'mirror-toggle', 'device-toggle']) syncPill(id, false);
+  if (next === 'addins') addinsPane?.refresh();
 }
 
 /** Pintu dari peta fitur dan tautan "buka tab": captions | notes | history | helper | settings | perf | interp. */
@@ -3157,6 +3160,13 @@ async function init() {
   }
   await refreshTab();
   await refreshExportFolderUi();
+  const addinsMount = $('addins-mount');
+  if (addinsMount) {
+    // lab-only hook: an extension page never reads window state a web page could set
+    const dev = location.protocol !== 'chrome-extension:' && window.__ysmAddinsBundled;
+    addinsPane = mountAddinsPane(addinsMount, dev ? { bundled: dev } : {});
+    await addinsPane.refresh();
+  }
   const notesMount = $('notes-mount');
   if (notesMount) {
     await mountNotesPanel(notesMount, notesMountOptions());
