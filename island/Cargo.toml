@@ -7,8 +7,8 @@ version = "0.2.26"
 edition = "2021"
 publish = false
 license = "MIT"
-repository = "https://github.com/yraverage/yraverageSubMeetly"
-homepage = "https://github.com/yraverage/yraverageSubMeetly"
+repository = "https://github.com/yraveragework/yraveragesub"
+homepage = "https://github.com/yraveragework/yraveragesub"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

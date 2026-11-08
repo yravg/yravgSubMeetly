@@ -18,6 +18,7 @@ use crate::events::{AppEvent, EventSink};
 use crate::services::addons::Job;
 use crate::services::http::Client;
 use poni_core::update::{self, Release};
+pub use super::feed::believe;
 #[cfg(target_os = "macos")]
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "macos")]
@@ -29,6 +30,25 @@ const TIMEOUT: Duration = Duration::from_secs(20);
 /// Budget for the Setup (about 2.5 MB) or the DMG (about 4.3 MB): a slow
 /// line's few minutes.
 const SETUP_TIMEOUT: Duration = Duration::from_secs(300);
+
+/// Debug builds only: with `YRAVG_UPDATE_BASE=http://127.0.0.1:PORT` the feed is read from
+/// `<base>/latest.json` and the Setup from `<base>/download/v<ver>/<file>`, so the update
+/// pop-up can be tried against a local server. Release builds never read the variable.
+// shortcut: a local base is trusted like GitHub (the signature check still runs); a build
+// flag stricter than debug_assertions when someone ships a debug build.
+fn source(url: &str) -> String {
+    if cfg!(debug_assertions) {
+        if let Ok(base) = std::env::var("YRAVG_UPDATE_BASE") {
+            let releases = format!("https://github.com/{}/releases/", update::REPO);
+            let rest = url.strip_prefix(&releases);
+            if let Some(path) = rest.and_then(|r| r.strip_prefix("latest/download/").or_else(|| r.strip_prefix("download/"))) {
+                let dir = if url.contains("/latest/") { "" } else { "download/" };
+                return format!("{}/{dir}{path}", base.trim_end_matches('/'));
+            }
+        }
+    }
+    url.to_string()
+}
 
 /// What the update file said.
 #[derive(Clone, Debug, PartialEq)]
@@ -54,20 +74,11 @@ pub fn check_job(sink: EventSink) -> Job {
 }
 
 fn check(client: &Client) -> Result<Release, String> {
-    let (status, body) = client.get_bytes(update::FEED_URL, TIMEOUT, update::MAX_FILE_BYTES, |_| {}).map_err(|e| e.to_string())?;
+    let (status, body) = client.get_bytes(&source(update::FEED_URL), TIMEOUT, update::MAX_FILE_BYTES, |_| {}).map_err(|e| e.to_string())?;
     if status != 200 {
         return Err(format!("HTTP {status}"));
     }
     believe(std::str::from_utf8(&body).map_err(|_| "not text".to_string())?)
-}
-
-/// The file's text to the release it describes, once its signature checks out.
-pub fn believe(text: &str) -> Result<Release, String> {
-    let signed = update::parse_file(text)?;
-    if !verify(signed.payload.as_bytes(), &signed.signature, &signed.key) {
-        return Err("its signature doesn't match, so it was ignored".into());
-    }
-    update::parse_payload(&signed.payload)
 }
 
 /// A job for the add-on thread: put the Setup `d` at `path`, unless it is
@@ -94,7 +105,7 @@ fn download(client: Result<&Client, &str>, d: &update::Download, path: &std::pat
     if fs::read(path).is_ok_and(|b| d.matches(&b)) {
         return Ok(());
     }
-    let (status, bytes) = client?.get_bytes(&d.url, SETUP_TIMEOUT, d.size + 64 * 1024, |_| {}).map_err(|e| e.to_string())?;
+    let (status, bytes) = client?.get_bytes(&source(&d.url), SETUP_TIMEOUT, d.size + 64 * 1024, |_| {}).map_err(|e| e.to_string())?;
     if status != 200 {
         return Err(format!("HTTP {status}"));
     }
@@ -113,13 +124,13 @@ fn download(client: Result<&Client, &str>, d: &update::Download, path: &std::pat
 /// Run the Setup at `setup` silently, once it still matches `d`. Like any
 /// install it closes this copy (it saves first); it keeps Start with
 /// Windows as it is and opens the new version when done (`/reopen`,
-/// installer/poni.nsi).
+/// installer/yravgsubmeetly.iss).
 #[cfg(windows)]
 pub fn install(setup: &std::path::Path, d: &update::Download) -> Result<(), String> {
     if !std::fs::read(setup).is_ok_and(|b| d.matches(&b)) {
         return Err("the downloaded Setup is gone or changed".into());
     }
-    std::process::Command::new(setup).args(["/S", "/reopen"]).spawn().map(drop).map_err(|e| e.to_string())
+    super::feed::setup_command(setup).spawn().map(drop).map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------- a Mac's own install
@@ -336,73 +347,4 @@ fn output(cmd: &mut Command) -> Result<String, String> {
     }
     let err = String::from_utf8_lossy(&out.stderr);
     Err(err.lines().find(|l| !l.trim().is_empty()).unwrap_or("failed").trim().to_string())
-}
-
-/// ECDSA P-256 over SHA-256: `signature` is r and s, `key` an uncompressed point.
-#[cfg(windows)]
-fn verify(message: &[u8], signature: &[u8; 64], key: &[u8; 65]) -> bool {
-    use windows::Win32::Security::Cryptography::{
-        BCryptCloseAlgorithmProvider, BCryptDestroyKey, BCryptImportKeyPair, BCryptOpenAlgorithmProvider, BCryptVerifySignature, BCRYPT_ALG_HANDLE,
-        BCRYPT_ECCPUBLIC_BLOB, BCRYPT_ECDSA_P256_ALGORITHM, BCRYPT_ECDSA_PUBLIC_P256_MAGIC, BCRYPT_FLAGS, BCRYPT_KEY_HANDLE,
-        BCRYPT_OPEN_ALGORITHM_PROVIDER_FLAGS,
-    };
-    // BCRYPT_ECCKEY_BLOB: magic, key length, then X and Y.
-    let mut blob = Vec::with_capacity(72);
-    blob.extend_from_slice(&BCRYPT_ECDSA_PUBLIC_P256_MAGIC.to_le_bytes());
-    blob.extend_from_slice(&32u32.to_le_bytes());
-    blob.extend_from_slice(&key[1..]);
-    let hash = poni_core::sha256::sha256(message);
-    unsafe {
-        let mut alg = BCRYPT_ALG_HANDLE::default();
-        if BCryptOpenAlgorithmProvider(&mut alg, BCRYPT_ECDSA_P256_ALGORITHM, None, BCRYPT_OPEN_ALGORITHM_PROVIDER_FLAGS(0)).is_err() {
-            return false;
-        }
-        let mut handle = BCRYPT_KEY_HANDLE::default();
-        let ok = BCryptImportKeyPair(alg, BCRYPT_KEY_HANDLE::default(), BCRYPT_ECCPUBLIC_BLOB, &mut handle, &blob, 0).is_ok()
-            && BCryptVerifySignature(handle, None, &hash, signature, BCRYPT_FLAGS(0)).is_ok();
-        if !handle.is_invalid() {
-            let _ = BCryptDestroyKey(handle);
-        }
-        let _ = BCryptCloseAlgorithmProvider(alg, 0);
-        ok
-    }
-}
-
-/// ECDSA P-256 over SHA-256: `signature` is r and s, `key` an uncompressed point.
-#[cfg(target_os = "macos")]
-fn verify(message: &[u8], signature: &[u8; 64], key: &[u8; 65]) -> bool {
-    use p256::ecdsa::signature::Verifier;
-    use p256::ecdsa::{Signature, VerifyingKey};
-    let (Ok(key), Ok(sig)) = (VerifyingKey::from_sec1_bytes(key), Signature::from_slice(signature)) else { return false };
-    key.verify(message, &sig).is_ok()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A real file, signed with the signing key for v0.2.3.
-    const SAMPLE: &str = include_str!("../../../poni-core/data/update-sample.json");
-
-    #[test]
-    fn a_signed_file_is_believed() {
-        let r = believe(SAMPLE).expect("the sample's signature checks out");
-        assert_eq!((r.version.as_str(), r.headline.as_str()), ("0.2.3", "Sing along from the closed island"));
-        assert_eq!(r.windows.as_ref().map(|d| d.size), Some(2457657));
-    }
-
-    #[test]
-    fn a_changed_file_is_not() {
-        // One character of the payload, or of the signature.
-        let changed = SAMPLE.replacen("2457657", "2457658", 1);
-        assert!(believe(&changed).unwrap_err().contains("signature"), "payload changed");
-        let signed = update::parse_file(SAMPLE).unwrap();
-        let mut sig = signed.signature;
-        sig[10] ^= 1;
-        assert!(!verify(signed.payload.as_bytes(), &sig, &signed.key));
-        assert!(verify(signed.payload.as_bytes(), &signed.signature, &signed.key));
-        // The spare key didn't sign it.
-        let spare = update::trusted_key("f835f77c60bd2b7f").unwrap();
-        assert!(!verify(signed.payload.as_bytes(), &signed.signature, &spare));
-    }
 }

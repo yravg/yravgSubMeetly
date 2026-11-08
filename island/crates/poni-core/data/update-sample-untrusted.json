@@ -1,0 +1,6 @@
+{
+  "about": "signed with a throwaway key that is not in update-keys.txt",
+  "payload": "{\"schema\":1,\"version\":\"0.2.3\",\"date\":\"2026-11-08\",\"headline\":\"Sample release for the update tests\",\"notes\":\"https://github.com/yraveragework/yraveragesub/releases/tag/v0.2.3\",\"windows\":{\"url\":\"https://github.com/yraveragework/yraveragesub/releases/download/v0.2.3/yravgSubMeetly-Setup-0.2.3.exe\",\"size\":2457657,\"sha256\":\"8f30919c3c13e7074ae0381d9b478e1ef5fb802476b637f5febefe949d26e26b\"}}",
+  "signature": "grLMP8Qc3u/y2vxk8OcP3qePhG2LkQp6hOyDzcddHH75iAOMQ4jSOVDliHXP9nQBewXDakrCnCae6shxIGFipg==",
+  "key": "88e3f5cedfeefaa3"
+}
