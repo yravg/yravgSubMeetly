@@ -252,7 +252,7 @@ mod tests {
     use super::*;
 
     fn fullscreen_choices(s: &Settings) -> Vec<(String, MenuCmd, bool)> {
-        let items = menu_items(s, false, &OyenzaLink::Off, false, UpdateLine::None);
+        let items = menu_items(s, false, UpdateLine::None);
         let Some(MenuItem::Sub { items, .. }) = items.into_iter().find(|i| matches!(i, MenuItem::Sub { label, .. } if label == "In full-screen apps")) else {
             panic!("no full-screen submenu");
         };
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn the_menu_says_which_version_this_is() {
-        let items = menu_items(&Settings::default(), false, &OyenzaLink::Off, false, UpdateLine::None);
+        let items = menu_items(&Settings::default(), false, UpdateLine::None);
         let labels: Vec<(String, MenuCmd)> = items
             .into_iter()
             .filter_map(|i| match i {
@@ -286,19 +286,19 @@ mod tests {
     #[test]
     fn a_new_version_comes_first_until_it_is_installed() {
         let s = Settings::default();
-        let first = |update: UpdateLine| match menu_items(&s, false, &OyenzaLink::Off, true, update).into_iter().next() {
+        let first = |update: UpdateLine| match menu_items(&s, false, update).into_iter().next() {
             Some(MenuItem::Item { label, cmd, .. }) => Some((label, cmd)),
             _ => None,
         };
         assert_eq!(first(UpdateLine::Offer("0.2.5".into())), Some(("Update to yravgSubMeetly 0.2.5…".to_string(), MenuCmd::Update)));
-        assert_eq!(first(UpdateLine::None).map(|(_, cmd)| cmd), Some(MenuCmd::RecordScreen));
-        assert_eq!(first(UpdateLine::Check).map(|(_, cmd)| cmd), Some(MenuCmd::RecordScreen));
+        assert_eq!(first(UpdateLine::None).map(|(_, cmd)| cmd), Some(MenuCmd::ShowSettings));
+        assert_eq!(first(UpdateLine::Check).map(|(_, cmd)| cmd), Some(MenuCmd::ShowSettings));
     }
 
     #[test]
     fn check_for_updates_sits_under_the_version_line() {
         let cmds = |update: UpdateLine| -> Vec<MenuCmd> {
-            menu_items(&Settings::default(), false, &OyenzaLink::Off, false, update)
+            menu_items(&Settings::default(), false, update)
                 .into_iter()
                 .filter_map(|i| match i {
                     MenuItem::Item { cmd, .. } => Some(cmd),
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn the_way_back_to_the_centre_shows_once_the_island_moved() {
         let cmds = |s: &Settings| -> Vec<MenuCmd> {
-            menu_items(s, false, &OyenzaLink::Off, false, UpdateLine::None)
+            menu_items(s, false, UpdateLine::None)
                 .into_iter()
                 .filter_map(|i| match i {
                     MenuItem::Item { cmd, .. } => Some(cmd),
@@ -333,29 +333,17 @@ mod tests {
 
     #[test]
     fn system_history_is_in_the_menu_only_while_system_is_on() {
-        let has = |s: &Settings| menu_items(s, false, &OyenzaLink::Off, false, UpdateLine::None).iter().position(|i| matches!(i, MenuItem::Item { cmd: MenuCmd::ToggleSystemHistory, .. }));
+        let has = |s: &Settings| menu_items(s, false, UpdateLine::None).iter().position(|i| matches!(i, MenuItem::Item { cmd: MenuCmd::ToggleSystemHistory, .. }));
         let mut s = Settings::default();
         assert_eq!(has(&s), None, "System is off by default");
         s.set_addon(poni_core::addons::SYSTEM.id, true);
         let at = has(&s).expect("no System history item");
         // Right above Sounds, where it always was.
-        let items = menu_items(&s, false, &OyenzaLink::Off, false, UpdateLine::None);
+        let items = menu_items(&s, false, UpdateLine::None);
         assert!(matches!(&items[at + 1], MenuItem::Item { cmd: MenuCmd::ToggleSounds, .. }));
     }
-
-    #[test]
-    fn record_this_screen_shows_only_with_the_recorder() {
-        let s = Settings::default();
-        let first = |recorder: bool| match menu_items(&s, false, &OyenzaLink::Off, recorder, UpdateLine::None).into_iter().next() {
-            Some(MenuItem::Item { label, cmd, .. }) => Some((label, cmd)),
-            _ => None,
-        };
-        assert_eq!(first(true), Some(("Record this screen".to_string(), MenuCmd::RecordScreen)));
-        assert_ne!(first(false).map(|(_, cmd)| cmd), Some(MenuCmd::RecordScreen));
-    }
-
     fn idle_choices(s: &Settings) -> Vec<(String, bool)> {
-        let items = menu_items(s, false, &OyenzaLink::Off, false, UpdateLine::None);
+        let items = menu_items(s, false, UpdateLine::None);
         let Some(MenuItem::Sub { items, .. }) = items.into_iter().find(|i| matches!(i, MenuItem::Sub { label, .. } if label == "Idle look")) else {
             panic!("no idle look submenu");
         };
@@ -376,7 +364,7 @@ mod tests {
         assert_eq!(idle_choices(&pill).last(), Some(&("Status bar".to_string(), true)));
         // Another theme draws the clock for the status bar: Clock is checked,
         // and Status comes back with Pill.
-        for theme in [Theme::Classic, Theme::Oyen, Theme::Glass] {
+        for theme in [Theme::Classic, Theme::Glass] {
             let s = Settings { theme, ..pill.clone() };
             let choices = idle_choices(&s);
             assert_eq!(choices.len(), 4, "{theme:?}");
@@ -388,7 +376,7 @@ mod tests {
     #[test]
     fn start_with_windows_follows_the_full_screen_submenu() {
         // Over maximized windows (Step aside) is gone: nothing sits between them.
-        let items = menu_items(&Settings::default(), false, &OyenzaLink::Off, false, UpdateLine::None);
+        let items = menu_items(&Settings::default(), false, UpdateLine::None);
         let fs = items.iter().position(|i| matches!(i, MenuItem::Sub { label, .. } if label == "In full-screen apps")).expect("full-screen submenu");
         assert!(matches!(items.get(fs + 1), Some(MenuItem::Item { cmd: MenuCmd::ToggleAutostart, .. })));
     }

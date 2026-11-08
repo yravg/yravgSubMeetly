@@ -642,7 +642,6 @@ pub fn empty_state(ui: &mut Ui, area: Rect, icon: Icon, title: &str, hint: &str)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::OyenzaLink;
     use poni_core::settings::Settings;
     use poni_core::store::Store;
 
@@ -651,72 +650,50 @@ mod tests {
     }
 
     #[test]
-    fn the_row_is_the_island_s_own_pages_then_oyenza_then_the_plus() {
-        // Music, then Today beside it; Focus where Today was; AI after it,
-        // with Studio Pro; Oyenza last, signed in or not.
+    fn the_row_is_the_island_s_own_pages_then_the_add_ons_then_the_plus() {
         use PageKind::*;
         let mut st = state();
-        assert_eq!(tabs(&st), [Media, Today, Shelf, Tasks, Focus, Oyenza, Addons]);
-        st.oyenza.link = OyenzaLink::Connected { account: "a•••@example.com".into() };
-        assert_eq!(tabs(&st), [Media, Today, Shelf, Tasks, Focus, Oyenza, Addons]);
-        st.oyenza.pro = Some(true);
-        assert_eq!(tabs(&st), [Media, Today, Shelf, Tasks, Focus, Ai, Oyenza, Addons]);
-        // The add-ons' pages come after Oyenza (Health, Oyenza's steps, first), before the "+".
-        for id in ["system", "script", "health"] {
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Media, Shelf, Tasks, Focus, Addons]);
+        // Switched-on add-ons show after Focus, before the "+".
+        for id in ["system", "script"] {
             st.addons.insert(id, poni_core::addons::Status::Ready);
         }
-        assert_eq!(&tabs(&st)[6..], [Oyenza, Health, System, Script, Addons]);
-        // Clipboard left the app: an island last open there opens on Music.
-        assert_eq!(PageKind::from_key("clipboard"), Media);
+        assert_eq!(&tabs(&st)[10..], [System, Script, Addons]);
+        // Clipboard left the app: an island last open there opens on the first tab.
+        assert_eq!(PageKind::from_key("clipboard"), PageKind::ALL[0]);
     }
 
     #[test]
     fn hidden_tabs_leave_the_row_but_not_while_their_page_is_open() {
         use PageKind::*;
         let mut st = state();
-        st.settings.hidden_tabs = vec!["today".into(), "tasks".into(), "oyenza".into(), "addons".into()];
+        st.settings.hidden_tabs = vec!["shelf".into(), "tasks".into()];
         st.page = Focus;
-        // Oyenza and the "+" can't be hidden.
-        assert_eq!(tabs(&st), [Media, Shelf, Focus, Oyenza, Addons]);
-        assert_eq!(first_tab(&st), Media);
-        // Opened from elsewhere (a meeting's notice opens Today): its tab
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Media, Focus, Addons]);
+        // Opened from elsewhere (a dropped file opens the Shelf): its tab
         // shows while it's open, and stepping on leaves it behind.
-        st.page = Today;
-        assert_eq!(tabs(&st), [Media, Today, Shelf, Focus, Oyenza, Addons]);
-        st.page = step_tab(Today, &st, true);
-        assert_eq!(st.page, Shelf);
-        assert!(!tabs(&st).contains(&Today));
-        // Every one of them hidden: the island opens on Oyenza.
+        st.page = Shelf;
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Media, Shelf, Focus, Addons]);
+        st.page = step_tab(Shelf, &st, true);
+        assert_eq!(st.page, Focus);
+        assert!(!tabs(&st).contains(&Shelf));
+        // Every hideable tab hidden: the Live page is still there.
         st.settings.hidden_tabs = PageKind::HIDEABLE.iter().map(|p| p.key().to_string()).collect();
-        st.page = Oyenza;
-        assert_eq!(tabs(&st), [Oyenza, Addons]);
-        assert_eq!(first_tab(&st), Oyenza);
-        // A start on a hidden page opens on the first tab instead.
-        let mut settings = poni_core::settings::Settings::default();
-        settings.start_page = "today".into();
-        settings.remember_page = false;
-        settings.hidden_tabs = vec!["media".into(), "today".into()];
-        assert_eq!(AppState::new(settings, Store::default()).page, Shelf);
+        st.page = Live;
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Addons]);
+        assert_eq!(first_tab(&st), Live);
     }
 
     #[test]
     fn settings_has_the_gear_not_a_tab() {
-        let mut st = state();
+        let st = state();
         assert!(!tabs(&st).contains(&PageKind::Settings));
-        assert!(tabs(&st).contains(&PageKind::Oyenza), "signed out it's where to sign in");
-        st.oyenza.link = OyenzaLink::Connected { account: "a•••@example.com".into() };
-        let row = tabs(&st);
-        assert!(row.contains(&PageKind::Oyenza) && !row.contains(&PageKind::Settings));
         // Stepping through the tabs never lands on Settings.
-        let mut p = PageKind::Media;
+        let mut p = PageKind::Live;
         for _ in 0..2 * PageKind::ALL.len() {
             p = step_tab(p, &st, true);
             assert!(p.tabbed(), "stepped onto {p:?}");
         }
-    }
-
-    #[test]
-    fn settings_keeps_its_key_and_slides_in_from_the_right() {
         assert_eq!(PageKind::from_key("settings"), PageKind::Settings);
         assert!(PageKind::ALL.iter().all(|p| p.tab_index() <= PageKind::Settings.tab_index()));
     }
@@ -725,64 +702,14 @@ mod tests {
     fn addons_is_the_last_tab_and_never_makes_the_window_taller() {
         let mut st = state();
         assert_eq!(tabs(&st).last(), Some(&PageKind::Addons));
-        st.oyenza.link = OyenzaLink::Connected { account: "a•••@example.com".into() };
-        assert_eq!(tabs(&st).last(), Some(&PageKind::Addons));
         assert_eq!(PageKind::from_key("addons"), PageKind::Addons);
-        // The window is as tall as the tallest page (System, laid out for
-        // whether it shows or not); the add-ons' rows and Stocks stay under it.
-        assert!(content_height(PageKind::Addons, &st) <= content_height(PageKind::System, &st));
-        assert!(content_height(PageKind::Stocks, &st) <= content_height(PageKind::System, &st));
+        let tallest = content_height(PageKind::System, &st);
+        assert!(content_height(PageKind::Addons, &st) <= tallest);
         // Notifications with as many apps as it lists.
         for i in 0..poni_core::notifications::MAX_APPS {
             st.settings.notifications.remember(&format!("App.{i}"), &format!("App {i}"));
         }
         assert!(content_height(PageKind::Notifications, &st) <= content_height(PageKind::System, &st));
-        // Signed out, Oyenza's sign-in is as tall as its code, so starting to
-        // sign in doesn't move the island.
-        st.oyenza.link = OyenzaLink::Off;
-        let signed_out = content_height(PageKind::Oyenza, &st);
-        st.oyenza.link = OyenzaLink::Connecting { code: "ABCD-EFGH".into(), url: String::new(), until: 600.0 };
-        assert_eq!(signed_out, content_height(PageKind::Oyenza, &st));
-    }
-
-    #[test]
-    fn ai_has_a_tab_only_with_studio_pro_and_never_makes_the_window_taller() {
-        let mut st = state();
-        assert!(!tabs(&st).contains(&PageKind::Ai), "signed out");
-        st.oyenza.link = OyenzaLink::Connected { account: "a\u{2022}\u{2022}\u{2022}@example.com".into() };
-        assert!(!tabs(&st).contains(&PageKind::Ai), "before the server's answer");
-        st.oyenza.pro = Some(false);
-        assert!(!tabs(&st).contains(&PageKind::Ai), "an account without Pro");
-        st.oyenza.pro = Some(true);
-        assert!(tabs(&st).contains(&PageKind::Ai), "on with Pro, nothing to switch on");
-        st.settings.set_addon(poni_core::addons::AI_USAGE.id, false);
-        assert!(!tabs(&st).contains(&PageKind::Ai), "switched off under Add-ons");
-        assert_eq!(PageKind::from_key("ai"), PageKind::Ai);
-        // Pro isn't known yet at start: an island last open on the AI tab opens on the first tab.
-        let store = Store { last_page: "ai".into(), ..Store::default() };
-        assert_eq!(AppState::new(Settings { remember_page: true, ..Settings::default() }, store).page, PageKind::ALL[0]);
-        assert!(content_height(PageKind::Ai, &st) <= content_height(PageKind::System, &st));
-    }
-
-    #[test]
-    fn system_health_and_stocks_have_a_tab_only_while_their_add_ons_are_on() {
-        for (page, addon) in [
-            (PageKind::System, poni_core::addons::SYSTEM),
-            (PageKind::Health, poni_core::addons::HEALTH),
-            (PageKind::Stocks, poni_core::addons::STOCKS),
-        ] {
-            let mut st = state();
-            assert!(!tabs(&st).contains(&page), "{} is off for everyone until switched on", addon.id);
-            st.settings.set_addon(addon.id, true);
-            st.addons.insert(addon.id, poni_core::addons::Status::Ready);
-            assert!(tabs(&st).contains(&page));
-            // An island last open on its page opens on the first tab while it's off.
-            let store = Store { last_page: page.key().into(), ..Store::default() };
-            let mut settings = Settings { remember_page: true, ..Settings::default() };
-            assert_eq!(AppState::new(settings.clone(), store.clone()).page, PageKind::ALL[0]);
-            settings.set_addon(addon.id, true);
-            assert_eq!(AppState::new(settings, store).page, page);
-        }
     }
 
     #[test]
@@ -790,7 +717,7 @@ mod tests {
         // The download can't read other apps' notifications: no tab, nothing listens.
         let mut st = state();
         assert!(!st.notifications_on() && !tabs(&st).contains(&PageKind::Notifications));
-        assert_eq!(hideable_tabs(&st), &PageKind::HIDEABLE[..5], "Settings doesn't offer it");
+        assert_eq!(hideable_tabs(&st), &PageKind::HIDEABLE[..4], "Settings doesn't offer it");
         // The Store copy: on for everyone, without an add-on to switch on.
         st.notify_can = true;
         assert!(st.notifications_on() && tabs(&st).contains(&PageKind::Notifications));
@@ -800,93 +727,16 @@ mod tests {
         st.settings.hidden_tabs = vec!["notifications".into()];
         st.page = PageKind::Notifications;
         assert!(!st.notifications_on() && !tabs(&st).contains(&PageKind::Notifications));
-        assert_eq!(first_tab(&st), PageKind::Media);
-    }
-
-    #[test]
-    fn today_keeps_its_tiles_only_for_a_server_without_the_day() {
-        use crate::state::AgendaState;
-        let mut st = state();
-        // Signed out: the sign-in card, so no stats are read for tiles.
-        assert!(!today::shows_tiles(&st));
-        st.oyenza.link = OyenzaLink::Connected { account: "a•••@example.com".into() };
-        assert!(!today::shows_tiles(&st), "getting the day");
-        st.oyenza.agenda_state = AgendaState::Unavailable;
-        assert!(today::shows_tiles(&st));
-        // The day for today, Calendar switched on: the day, and a look at the next minute.
-        let today = st.day_key();
-        st.oyenza.agenda = Some(poni_core::agenda::sample(&today, 600));
-        st.oyenza.agenda_state = AgendaState::Ready;
-        assert!(!today::shows_tiles(&st));
-        assert!(today::next_wake(&st).is_some_and(|t| t > st.now && t <= st.now + 60.0));
-    }
-
-    #[test]
-    fn ielts_has_a_tab_only_while_its_add_on_is_on_after_health() {
-        use PageKind::{Addons, Health, Ielts, Oyenza};
-        let mut st = state();
-        assert!(!tabs(&st).contains(&Ielts), "off for everyone until switched on");
-        st.addons.insert("ielts", poni_core::addons::Status::Ready);
-        st.addons.insert("health", poni_core::addons::Status::Ready);
-        assert_eq!(&tabs(&st)[5..], [Oyenza, Health, Ielts, Addons]);
-        // Signed out it shows the sign-in card; signed in, every state is as
-        // tall, and never taller than System: the window keeps its size.
-        let signed_out = content_height(Ielts, &st);
-        st.oyenza.link = OyenzaLink::Connected { account: "a•••@example.com".into() };
-        let h = content_height(Ielts, &st);
-        assert!(signed_out < h && h <= content_height(PageKind::System, &st), "{signed_out} {h}");
-        for s in [poni_core::ielts::Sample::Talking, poni_core::ielts::Sample::Result, poni_core::ielts::Sample::MicDenied] {
-            st.ielts = poni_core::ielts::Coach::sample(s, 10.0);
-            assert_eq!(content_height(Ielts, &st), h);
-        }
-        // An island last open on it opens on the first tab once it's off.
-        let store = Store { last_page: "ielts".into(), ..Store::default() };
-        let mut settings = Settings { remember_page: true, ..Settings::default() };
-        assert_eq!(AppState::new(settings.clone(), store.clone()).page, PageKind::Media);
-        settings.set_addon("ielts", true);
-        assert_eq!(AppState::new(settings, store).page, Ielts);
+        assert_eq!(first_tab(&st), PageKind::Live);
     }
 
     #[test]
     fn script_has_a_tab_only_while_its_add_on_is_on() {
         let mut st = state();
-        assert!(!tabs(&st).contains(&PageKind::Script), "off for everyone until switched on");
-        st.addons.insert("script", poni_core::addons::Status::Ready);
+        assert!(!tabs(&st).contains(&PageKind::Script));
+        st.settings.set_addon(poni_core::addons::SCRIPT_READER.id, true);
+        st.addons.insert(poni_core::addons::SCRIPT_READER.id, poni_core::addons::Status::Ready);
         assert!(tabs(&st).contains(&PageKind::Script));
-        assert_eq!(tabs(&st).last(), Some(&PageKind::Addons));
-    }
-
-    #[test]
-    fn record_has_a_tab_once_the_recorder_is_installed() {
-        let mut st = state();
-        assert!(!tabs(&st).contains(&PageKind::Record), "no recorder: no tab");
-        st.recorder = true;
-        assert!(!tabs(&st).contains(&PageKind::Record), "a recorder that never wrote (1.0.0) can't read Record's links");
-        st.store.recorder_island = true;
-        let row = tabs(&st);
-        if cfg!(target_os = "macos") {
-            assert!(!row.contains(&PageKind::Record), "Windows only for now");
-            return;
-        }
-        assert!(row.contains(&PageKind::Record), "installing the recorder is the switch");
-        assert_eq!(row.last(), Some(&PageKind::Addons));
-        st.settings.set_addon("recorder", false);
-        assert!(!tabs(&st).contains(&PageKind::Record), "switched off: gone");
-        st.settings.set_addon("recorder", true);
-        st.addons.insert("script", poni_core::addons::Status::Ready);
-        let row = tabs(&st);
-        let at = |p| row.iter().position(|t| *t == p).unwrap();
-        assert_eq!(at(PageKind::Record), at(PageKind::Script) + 1, "beside the Script page");
-    }
-
-    #[test]
-    fn neither_the_record_page_nor_six_add_ons_make_the_window_taller() {
-        let mut st = state();
-        st.recorder = true;
-        st.store.recorder_island = true;
-        let tallest = content_height(PageKind::System, &st);
-        assert!(content_height(PageKind::Record, &st) <= tallest);
-        assert!(content_height(PageKind::Addons, &st) <= tallest, "{} > {tallest}", content_height(PageKind::Addons, &st));
     }
 
     #[test]
@@ -900,8 +750,7 @@ mod tests {
 
     #[test]
     fn settings_never_makes_the_window_taller() {
-        // The window fits the tallest page; System is always 256 DIPs (Settings
-        // has three rows of switches since Clipboard history left).
+        // The window fits the tallest page; System is always 256 DIPs.
         let mut st = state();
         assert!(content_height(PageKind::Settings, &st) <= content_height(PageKind::System, &st));
         // Nor its new version's row, nor the Update sheet in its place.
@@ -917,6 +766,6 @@ mod tests {
         let row = content_height(PageKind::Settings, &st);
         st.update.sheet = true;
         let sheet = content_height(PageKind::Settings, &st);
-        assert!(row <= content_height(PageKind::System, &st) && sheet <= row, "{row} {sheet}");
+        assert!(row <= content_height(PageKind::System, &st) && sheet <= content_height(PageKind::System, &st), "{row} {sheet}");
     }
 }

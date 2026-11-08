@@ -755,6 +755,7 @@ mod tests {
     /// Music playing 12 s into a song, with these lyrics found for it.
     fn playing(lrc: Option<&str>) -> AppState {
         let mut st = AppState::new(Settings::default(), Store::default());
+        st.settings.theme = poni_core::settings::Theme::Classic;
         let key = MediaSession::make_track_key("Paper Boats", "The Lanterns", "");
         st.media = Some(MediaSession {
             app_id: "Spotify.exe".into(),
@@ -805,7 +806,7 @@ mod tests {
         let mut st = playing(Some("[00:10.00]紙の舟よ\n[00:14.00]Paper boats\n"));
         assert_eq!(geom(&media, &st).h, 32.0, "no readings: one row");
         st.lyrics.ruby = vec![vec![Ruby { text: "紙の舟よ".into(), roman: "kami no fune yo".into() }], Vec::new()];
-        for theme in [Theme::Classic, Theme::Oyen, Theme::Glass, Theme::Pill] {
+        for theme in [Theme::Classic, Theme::Paper, Theme::Glass, Theme::Pill] {
             st.settings.theme = theme;
             assert_eq!(geom(&media, &st).h, crate::pill::media::H_READS, "{theme:?}: the line over its reading");
         }
@@ -831,24 +832,6 @@ mod tests {
         st.notify(Icon::Download, palette::GREEN, "Saved", "", 5.0, None);
         st.hud = Some(crate::state::Hud { kind: HudKind::Volume { level: 0.5, muted: false }, until: st.now + 2.0 });
         st.game.active = true;
-        assert_eq!(collapsed_mode(&st), Mode::Notice);
-    }
-
-    #[test]
-    fn a_notice_that_stays_waits_under_a_recording() {
-        let mut st = AppState::new(Settings::default(), Store::default());
-        st.recorder = true;
-        st.store.recorder_island = true;
-        st.notify(Icon::Download, palette::GREEN, "Update available", "", f64::INFINITY, None);
-        st.rec.phase = Some(poni_core::recorder::Phase::Recording);
-        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Recording), "Stop stays one click away");
-        st.rec.phase = Some(poni_core::recorder::Phase::Paused);
-        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Recording));
-        st.rec.phase = None;
-        assert_eq!(collapsed_mode(&st), Mode::Notice, "and back once the recording ends");
-        // A notice with a time limit still shows over it.
-        st.rec.phase = Some(poni_core::recorder::Phase::Recording);
-        st.notify(Icon::Download, palette::GREEN, "Saved", "", 5.0, None);
         assert_eq!(collapsed_mode(&st), Mode::Notice);
     }
 
