@@ -1,0 +1,10 @@
+# Rehearsal: submeetly-island
+Gold: dynamic-island (kept: one shape whose box springs, grow with a small overshoot, shrink critically damped and 120ms late, content as separate layers that blur out and sharpen in). Borrowed: Stream word-by-word from ai-chat, Collapse/Check/Button from the kit. Changed: black phone island replaced by the white SubMeetly paper island on a blurred light Minutes register (real screenshot, desk.png) with a Windows taskbar of filler; five modes (idle, pill, live, meet, done); a ring that fills 1.5 s on hover; tab labels that open by grid-template-columns, not by stretching text.
+Beats (loop about 16 s): 0 idle pill; 1.1 captions start (rec dot, timer, streamed line, then translation); 3.6 cursor on the pill, ring fills 1.5 s; 6.0 opens to Live (poster); 8.1 Meeting tab; 9.8 Accept clicked, row leaves, "Accepted in register"; 12.9 cursor leaves, folds to live pill; 14.4 captions stop, pill draws in to idle (cause of the seam: captions stopped), snap reset unseen.
+Captured: widths 900 and 390 (compact 358 design), light only, reduced-motion poster (--reduced), loop at 1 s contact sheets.
+Gate: rehearsal passed (film.mjs --gate, widths 900 and 390; last runs)
+Film: half-pixel glyph on span.si-tab during the tab label opening (width animates, so the box is odd mid-transition; it settles on even-box icons) -> stands, candidate not a never-intentional line. jump: si-shape width -2.2px at the loop end (spring tail) -> seen only in an earlier run, absent in the last.
+Review: no independent fresh-eye review run.
+Assumptions: translation colour is the product token --ai (#4A3C94, indigo) to match the canvas island; the brief said no purple, so this is the one place to confirm with the owner. Timer starts at 00:00 on caption start (canvas shows 12:04).
+Unresolved: compact pill omits the Pause/Stop and date; compact Live card has spare height under the lines.
+Not checked: a real phone/touch, other browsers, live frame rate (the GIF was recorded with Playwright video in Chrome at 25 fps source, 15 fps GIF), dark theme (out of scope), fresh-eye review.
