@@ -805,6 +805,8 @@ html.gesturing .panel, html.gesturing .viewdock, html.gesturing [data-split] { t
 @keyframes float-in { from { opacity: 0; transform: scale(0.97) translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* drawer inherits .panel; its width comes from the layout (docked) or the float box */
+/* Dok mengambang tidak boleh menutup aksi formulir (Add item, Save): laci selalu di atas dok. */
+.workspace .panel.drawer, .main.overlay .drawer { z-index: calc(var(--z-dock) + 1); }
 .drawer { width: auto; }
 .drawer.wide { width: auto; }
 
@@ -1140,6 +1142,8 @@ html[data-theme="coretax"] :focus-visible { outline-color: #FFC91B; }
    ========================================================================== */
 .do-panel { width: min(1100px, 100%); }
 .do-head h2 { margin-right: 2px; }
+/* sempit: tombol Use/Close wajib terlihat, jadi kepala boleh membungkus */
+@media (max-width: 520px) { .do-head { flex-wrap: wrap; row-gap: 8px; } .do-head h2 { flex: 1 1 auto; min-width: 0; } }
 .do-src { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 16px 0; }
 .do-chip { font-size: var(--text-xs); color: var(--muted); background: var(--card2); border: 1px solid var(--border); border-radius: var(--radius-full); padding: 1px 9px; font-variant-numeric: tabular-nums; }
 .do-tabs { display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid var(--border); overflow-x: auto; }

@@ -178,4 +178,32 @@ test('T03: rapat terbit baca-saja — pakai dan aksi Diff nonaktif', async () =>
   await closeDraft();
 });
 
+test('dok tidak menutup tombol aksi formulir (#d-save) di empat ukuran layar', async () => {
+  // dok mengambang pernah jatuh tepat di atas "Add item" pada 1280x800 (QA TC010)
+  const sizes = [[1440, 900], [1280, 800], [1024, 768], [390, 844]];
+  const fresh = await browser.newPage();
+  fresh.on('dialog', (d) => d.accept());
+  try {
+    for (const [w, h, open] of sizes.flatMap(([a, b]) => [[a, b, false], [a, b, true]])) {
+      await fresh.setViewport({ width: w, height: h });
+      await fresh.goto(`${ORIGIN}/dist/minutes.html`, { waitUntil: 'networkidle0' });
+      await fresh.waitForSelector('#btn-add-item');
+      if (open) { await fresh.evaluate(() => document.querySelector('#dock-mini')?.click()); await wait(600); } // dok dibuka penuh
+      await fresh.evaluate(() => document.querySelector('#btn-add-item').click());
+      await fresh.waitForSelector('#d-save', { visible: true });
+      await wait(700); // animasi float-in dan dok selesai
+      const r = await fresh.evaluate(() => {
+        const b = document.querySelector('#d-save').getBoundingClientRect();
+        const pts = [[0.5, 0.5], [0.15, 0.5], [0.85, 0.5], [0.5, 0.15], [0.5, 0.85]];
+        return pts.map(([fx, fy]) => {
+          const x = b.left + b.width * fx; const y = b.top + b.height * fy;
+          const el = document.elementFromPoint(x, y);
+          return { ok: !!el && !!el.closest('#d-save'), hit: el ? (el.id || el.className || el.tagName) : null };
+        });
+      });
+      for (const p of r) assert.ok(p.ok, `${w}x${h}${open ? ' dok terbuka' : ''}: #d-save tertutup oleh ${p.hit}`);
+    }
+  } finally { await fresh.close(); }
+});
+
 test('tanpa galat halaman', () => assert.deepEqual(pageErrors, []));
