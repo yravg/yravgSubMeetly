@@ -1,0 +1,139 @@
+{
+  "id": "run-20261108-143515",
+  "at": 1794119715887,
+  "commit": "3b07370",
+  "results": [
+    {
+      "case": "TC001",
+      "status": "pass",
+      "durationMs": 3830,
+      "evidence": [
+        "run-20261108-143515/TC001-1.png",
+        "run-20261108-143515/TC001-2.webm"
+      ]
+    },
+    {
+      "case": "TC002",
+      "status": "pass",
+      "durationMs": 1331,
+      "evidence": [
+        "run-20261108-143515/TC002-1.png",
+        "run-20261108-143515/TC002-2.webm"
+      ]
+    },
+    {
+      "case": "TC003",
+      "status": "pass",
+      "durationMs": 1355,
+      "evidence": [
+        "run-20261108-143515/TC003-1.png",
+        "run-20261108-143515/TC003-2.webm"
+      ]
+    },
+    {
+      "case": "TC004",
+      "status": "pass",
+      "durationMs": 2255,
+      "evidence": [
+        "run-20261108-143515/TC004-1.png",
+        "run-20261108-143515/TC004-2.webm"
+      ]
+    },
+    {
+      "case": "TC005",
+      "status": "pass",
+      "durationMs": 4922,
+      "evidence": [
+        "run-20261108-143515/TC005-1.png",
+        "run-20261108-143515/TC005-2.webm"
+      ]
+    },
+    {
+      "case": "TC006",
+      "status": "pass",
+      "durationMs": 1668,
+      "evidence": [
+        "run-20261108-143515/TC006-1.png",
+        "run-20261108-143515/TC006-2.webm"
+      ]
+    },
+    {
+      "case": "TC007",
+      "status": "pass",
+      "durationMs": 3053,
+      "evidence": [
+        "run-20261108-143515/TC007-1.png",
+        "run-20261108-143515/TC007-2.png",
+        "run-20261108-143515/TC007-3.webm",
+        "run-20261108-143515/TC007-4.webm"
+      ]
+    },
+    {
+      "case": "TC008",
+      "status": "pass",
+      "durationMs": 1157,
+      "evidence": [
+        "run-20261108-143515/TC008-1.png",
+        "run-20261108-143515/TC008-2.webm"
+      ]
+    },
+    {
+      "case": "TC009",
+      "status": "pass",
+      "durationMs": 899,
+      "evidence": [
+        "run-20261108-143515/TC009-1.png",
+        "run-20261108-143515/TC009-2.webm"
+      ]
+    },
+    {
+      "case": "TC010",
+      "status": "fail",
+      "durationMs": 1569,
+      "note": "Error: Add item (#d-save) is covered by another element",
+      "evidence": [
+        "run-20261108-143515/TC010-1.png",
+        "run-20261108-143515/TC010-2.webm"
+      ]
+    },
+    {
+      "case": "TC011",
+      "status": "pass",
+      "durationMs": 2066,
+      "evidence": [
+        "run-20261108-143515/TC011-1.png",
+        "run-20261108-143515/TC011-2.webm"
+      ]
+    },
+    {
+      "case": "TC012",
+      "status": "pass",
+      "durationMs": 2143,
+      "evidence": [
+        "run-20261108-143515/TC012-1.png",
+        "run-20261108-143515/TC012-2.webm"
+      ]
+    },
+    {
+      "case": "TC013",
+      "status": "pass",
+      "durationMs": 3530,
+      "evidence": [
+        "run-20261108-143515/TC013-1.png",
+        "run-20261108-143515/TC013-2.webm"
+      ]
+    },
+    {
+      "case": "TC014",
+      "status": "pass",
+      "durationMs": 46,
+      "evidence": []
+    },
+    {
+      "case": "TC015",
+      "status": "pass",
+      "durationMs": 26,
+      "evidence": []
+    }
+  ]
+}

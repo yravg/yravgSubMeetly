@@ -48,3 +48,6 @@ __pycache__/
 
 # Rust engine build output (Cargo target dir is usually external)
 engine-rs/target/
+qa/.pw-output/
+qa/evidence/*
+!qa/evidence/.gitkeep
