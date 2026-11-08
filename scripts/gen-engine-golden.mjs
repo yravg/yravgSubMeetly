@@ -364,9 +364,9 @@ get('/health', { headers: { Origin: 'null' } });
 get('/health', { headers: { Origin: 'file://' } });
 
 let port = 0;
-raw('GET', '/health', { host: `evil.example:${'{port}'}` });
-raw('GET', '/health', { host: `localhost:${'{port}'}`, mask: HEALTH_MASK });
-raw('GET', '/health', { host: `[::1]:${'{port}'}`, mask: HEALTH_MASK });
+raw('GET', '/health', { host: 'evil.example:17865' });
+raw('GET', '/health', { host: 'localhost:17865', mask: HEALTH_MASK });
+raw('GET', '/health', { host: '[::1]:17865', mask: HEALTH_MASK });
 
 get('/health', { mask: HEALTH_MASK });
 
@@ -377,6 +377,19 @@ function slug(name) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 48);
+}
+
+// Remove masked fields from the stored body too, so re-running the capture is
+// byte-stable. The mask list still documents what varies.
+function stripPath(value, dotted) {
+  if (value === null || typeof value !== 'object') return;
+  const dot = dotted.indexOf('.');
+  const head = dot === -1 ? dotted : dotted.slice(0, dot);
+  if (dot === -1) {
+    delete value[head];
+    return;
+  }
+  stripPath(value[head], dotted.slice(dot + 1));
 }
 
 function freePort() {
@@ -478,12 +491,6 @@ Object.assign(env, {
 
 port = await freePort();
 env.PORT = String(port);
-for (const item of requests) {
-  item.name = item.name.replaceAll('{port}', String(port));
-  for (const [key, value] of Object.entries(item.request.headers)) {
-    item.request.headers[key] = value.replaceAll('{port}', String(port));
-  }
-}
 
 const child = spawn(PYTHON, [bootstrapPath], {
   cwd: ROOT,
@@ -539,6 +546,7 @@ for (const name of fs.readdirSync(GOLDEN_DIR)) {
 }
 results.forEach((item, index) => {
   const file = path.join(GOLDEN_DIR, `${String(index + 1).padStart(3, '0')}-${slug(item.name)}.json`);
+  for (const maskPath of item.mask) stripPath(item.response.body, maskPath);
   const golden = {
     name: item.name,
     capturedFrom: 'native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)',

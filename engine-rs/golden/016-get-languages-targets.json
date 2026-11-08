@@ -66,8 +66,7 @@
           "via": "none",
           "local": false
         }
-      ],
-      "engine": "faster-whisper"
+      ]
     }
   },
   "mask": [

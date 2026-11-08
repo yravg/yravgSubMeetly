@@ -1,11 +1,11 @@
 {
-  "name": "GET /health (Host: [::1]:{port})",
+  "name": "GET /health (Host: [::1]:17865)",
   "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; ML routes not captured)",
   "request": {
     "method": "GET",
     "path": "/health",
     "headers": {
-      "Host": "[::1]:59665"
+      "Host": "[::1]:17865"
     },
     "body": null
   },
@@ -13,27 +13,11 @@
     "status": 200,
     "body": {
       "ok": true,
-      "engine": "faster-whisper",
-      "engine_label": "faster-whisper",
-      "model": "large-v3-turbo",
-      "ffmpeg": false,
       "translate": false,
-      "translate_model": null,
-      "draft_model": null,
-      "device": "cpu",
-      "compute": "int8",
       "engine_mode": "accurate",
-      "platform": "windows",
       "features": {
-        "fast_translate": true,
-        "translate_refine": false,
-        "draft": false,
         "notes": true,
-        "transcribe_file_jobs": true,
-        "streaming_file_jobs": true,
-        "faster_whisper": true,
-        "ui_prefs": true,
-        "models": true
+        "ui_prefs": true
       }
     }
   },

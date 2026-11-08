@@ -18,7 +18,8 @@ Each file is one request:
 - `request` — method, path, the headers the capture set, raw body (or null).
 - `response` — oracle status and JSON body.
 - `mask` — response fields that legitimately vary between machines/engines.
-  Dotted paths; they are removed from both sides before comparing.
+  Dotted paths; they are stripped from the stored body and from the Rust reply
+  before comparing, so re-running the capture is byte-stable.
 
 Files replay in filename order against one Rust `App`, because note/device/
 mode/UI-pref state carries across requests exactly as it did during capture.

@@ -11,8 +11,6 @@
     "status": 200,
     "body": {
       "device": "auto",
-      "active": "cpu",
-      "compute": "int8",
       "cuda_available": false,
       "supported": true,
       "applied": true
