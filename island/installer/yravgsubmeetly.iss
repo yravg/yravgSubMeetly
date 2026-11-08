@@ -226,7 +226,7 @@ begin
   { Same content native/install-host.bat writes, pointing at this install's launcher. }
   Json := '{' + #13#10 +
     '  "name": "{#HostName}",' + #13#10 +
-    '  "description": "yraverageSubMin native helper launcher",' + #13#10 +
+    '  "description": "yravgSubMeetly native helper launcher",' + #13#10 +
     '  "path": "' + Wrapper + '",' + #13#10 +
     '  "type": "stdio",' + #13#10 +
     '  "allowed_origins": [' + #13#10 +

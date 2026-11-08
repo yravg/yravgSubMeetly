@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draws the installer's own art into installer/art/: the setup icon and the wizard images.
 
-Our wordmark only: "yraverage" plus the SubMeetly pill with its left notch (see
+Our wordmark only: "yravg" plus the SubMeetly pill with its left notch (see
 .brand-pill in src/sidepanel.css), in the Coretax paper tokens of src/tokens.css /
 src/minutes.css (navy #212C5F, gold #FFC91B, paper #F5F4EF). Nothing here comes from
 Oyenza Studio. Needs Pillow; the outputs are committed, run this only to change them.
@@ -63,8 +63,8 @@ def wizard(w, h, name):
     d.rectangle([0, 0, w * SS, int(8 * k)], fill=NAVY)
     d.rectangle([0, int(8 * k), w * SS, int(12 * k)], fill=GOLD)
     f = font("segoeuib.ttf", 12.5 * k)
-    d.text((14 * k, 70 * k), "yraverage", font=f, fill=INK, anchor="lm")
-    pw = d.textlength("yraverage", font=f)
+    d.text((14 * k, 70 * k), "yravg", font=f, fill=INK, anchor="lm")
+    pw = d.textlength("yravg", font=f)
     ph = 19 * k
     pill(d, 14 * k + pw + 11 * k, 70 * k - ph / 2 + 1.5 * k, ph, NAVY, "SubMeetly", PAPER, font("segoeuib.ttf", 10 * k))
     d.text((14 * k, 112 * k), "Transkripsi dan notulen\nrapat, langsung di\ntepi layar Anda.", font=font("segoeui.ttf", 11 * k), fill=MUTED, anchor="la", spacing=6 * k)
