@@ -28,6 +28,7 @@ import { seedSampleData } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
 import { slidingNumber, springProgress, autoHeight, highlight } from './lib/motion.js';
 import { mountExtras } from './minutes-extras.js';
+import { mountDraftOptions } from './minutes-draft.js';
 import { mountDock } from './minutes-dock.js';
 import { migrateLegacyLocalKeys } from './lib/legacy-keys.js';
 
@@ -1546,6 +1547,7 @@ function wireEvents() {
     b.parentNode.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     syncPill('.langsw');
     paintStaticStrings();
+    document.dispatchEvent(new Event('ysm-lang'));
     // Every label just changed length, so the register tabs re-measure.
     resyncPills(false);
     paint();
@@ -1557,6 +1559,16 @@ function wireEvents() {
     activeMeeting,
     reload: () => reloadAll(true),
     setActive: (id) => { state.activeId = id; state.sel = null; },
+    paint,
+    toast,
+  });
+
+  mountDraftOptions({
+    lang: () => state.lang,
+    activeMeeting,
+    replaceActive,
+    save: saveMeeting,
+    me: () => state.me,
     paint,
     toast,
   });
