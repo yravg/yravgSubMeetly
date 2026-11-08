@@ -199,10 +199,10 @@ def der_to_raw(der):
 
 def sign(text):
     pem = os.environ.get("UPDATE_FEED_KEY", "")
-    if "PRIVATE KEY" not in pem and os.path.exists(KEY_FILE):
+    if "-----BEGIN" not in pem and os.path.exists(KEY_FILE):
         with open(KEY_FILE, encoding="ascii") as f:
             pem = f.read()
-    if "PRIVATE KEY" not in pem:
+    if "-----BEGIN" not in pem:
         die(f"no signing key: set UPDATE_FEED_KEY (the release environment's secret) or create {KEY_FILE} with --keygen")
     with tempfile.TemporaryDirectory() as tmp:
         key = os.path.join(tmp, "key.pem")
