@@ -1252,3 +1252,71 @@ html[data-theme="coretax"] .sum-stack { background: var(--stack-bg); }
 html[data-theme="coretax"] .sum-stats .is-ok dd, html[data-theme="coretax"] .sum-stats .is-up dd { color: var(--ok-ink); }
 html[data-theme="coretax"] .sum-stats .is-warn dd { color: var(--warn-ink); }
 @media (prefers-reduced-motion: reduce) { .sum-stack i { transition: none; } }
+
+/* ==========================================================================
+   Threads boards: Inbox, Projects, Highlights (minutes-threads.js)
+   Only existing tokens, so the Coretax and dark themes follow without overrides.
+   ========================================================================== */
+.th-board { max-width: 880px; margin: 0 auto; padding: var(--space-4) var(--space-5) var(--space-12); }
+.th-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
+.th-head h2 { font-size: 16px; font-weight: var(--font-semibold); color: var(--text); }
+.th-sub { color: var(--text2); font-size: var(--text-sm); margin-top: 2px; }
+.th-head-act, .th-chips, .th-act, .th-snooze { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.th-sec { margin-top: var(--space-4); }
+.th-sec h3 { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--text2); margin-bottom: var(--space-2); }
+.th-n { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+.th-archive { margin-left: auto; }
+.th-fold { all: unset; cursor: pointer; display: inline-flex; gap: var(--space-2); align-items: center; font: inherit; color: var(--text2); }
+.th-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.th-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden; }
+.th-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); cursor: default; }
+.th-row:first-child { border-top: 0; }
+.th-row[data-ref][data-mid] { cursor: pointer; }
+.th-row[data-ref][data-mid]:hover { background: var(--card2); }
+.th-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.th-row.is-done .th-text { color: var(--muted); text-decoration: line-through; }
+.th-tile { flex: none; width: 10px; height: 28px; border-radius: 3px; background: var(--c); }
+.th-main { flex: 1; min-width: 0; }
+.th-text { color: var(--text); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.th-meta { color: var(--text2); font-size: 11.5px; margin-top: 2px; overflow-wrap: anywhere; }
+.th-ref, .th-tc { font-family: var(--mono); }
+.th-none, .th-faint, .th-lock { color: var(--text2); font-size: 11.5px; }
+.th-banner { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-3) 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--card2); color: var(--text2); font-size: var(--text-sm); }
+.th-banner[hidden] { display: none; }
+.th-banner.err { border-color: var(--danger); color: var(--danger); }
+.th-banner.need { border-color: var(--warn-text); color: var(--warn-ink, var(--warn-text)); }
+.th-zero { text-align: center; padding: var(--space-12) var(--space-4); color: var(--text2); }
+.th-zero h3 { font-size: 18px; color: var(--text); margin-bottom: var(--space-2); }
+.th-zero.small { padding: var(--space-4); text-align: left; border: 1px dashed var(--border); border-radius: var(--radius-md); margin-top: var(--space-3); }
+.th-zero .th-next { margin-top: var(--space-3); color: var(--text2); }
+.th-undo { position: sticky; bottom: var(--space-3); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-2) var(--space-3); background: var(--card3); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); font-size: var(--text-sm); }
+.th-card { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); padding: var(--space-4); margin-bottom: var(--space-3); }
+.th-card-h { display: flex; gap: var(--space-2); align-items: baseline; margin-bottom: var(--space-2); }
+.th-meetline { color: var(--text); font-size: var(--text-sm); margin-bottom: var(--space-2); }
+.th-fields { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-3); font-size: var(--text-sm); margin-bottom: var(--space-3); }
+.th-fields dt { color: var(--muted); }
+.th-fields dd { color: var(--text); margin: 0; }
+.th-why { color: var(--text2); font-size: var(--text-sm); margin-top: var(--space-3); }
+.th-form { display: grid; gap: var(--space-2); margin-bottom: var(--space-2); }
+.th-form label { display: grid; gap: 2px; color: var(--muted); font-size: 11.5px; }
+.th-form input, .th-form select { background: var(--card2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 6px 8px; font: inherit; }
+.th-looks { margin: 0; padding-left: var(--space-5); color: var(--text2); font-size: var(--text-sm); display: grid; gap: var(--space-1); }
+.th-out { font-weight: var(--font-semibold); }
+.th-out.dismissed { color: var(--muted); }
+.th-out.accepted { color: var(--accent-soft); }
+.th-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+.th-count { border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: var(--radius-md); background: var(--card); padding: var(--space-3); display: grid; }
+.th-count b { font-size: 22px; color: var(--text); }
+.th-count span { color: var(--text2); font-size: 11.5px; }
+.th-three { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.th-plain { margin: 0; padding-left: var(--space-4); color: var(--text2); font-size: var(--text-sm); overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .th-board { padding: var(--space-3); }
+  .th-counts { grid-template-columns: repeat(2, 1fr); }
+  .th-three { grid-template-columns: 1fr; }
+  .th-row { flex-wrap: wrap; }
+  .th-act { width: 100%; justify-content: flex-end; }
+}
+body[data-thv] #src-panel { display: none; }
+body[data-thv="inbox"] #top-panel, body[data-thv="projects"] #top-panel { display: none; }
+body[data-thv="highlights"] #strip, body[data-thv="highlights"] .prov { display: none; }

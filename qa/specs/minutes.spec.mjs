@@ -118,3 +118,52 @@ test('TC013 view dock minimises to an icon and opens again', async ({ page }) =>
   await expect(page.locator('#dock-full')).toBeVisible();
   await expect(page.locator('#tabs button[data-view]').first()).toBeVisible();
 });
+
+test('TC016 inbox: close an open item, undo it, count follows', async ({ page }) => {
+  await openMinutesWithSample(page);
+  await page.locator('.navitem[data-view="inbox"]').click();
+  const count = page.locator('#th-open-count');
+  await expect(count).toBeVisible();
+  const before = Number(await count.textContent());
+  expect(before).toBeGreaterThan(0);
+  await page.locator('#th-inbox [data-th="close"]').first().click();
+  await expect(count).toHaveText(String(before - 1));
+  await page.locator('#th-inbox [data-th="undo"]').click();
+  await expect(count).toHaveText(String(before));
+});
+
+test('TC017 projects: librarian can be paused and resumed; nothing changes without Accept', async ({ page }) => {
+  await openMinutesWithSample(page);
+  await page.locator('.navitem[data-view="projects"]').click();
+  await expect(page.locator('#th-projects')).toBeVisible();
+  const cardsBefore = await page.locator('#th-projects .th-card').count();
+  await page.locator('#th-projects [data-th="pause"]').click();
+  await expect(page.locator('#th-projects .th-card')).toHaveCount(0);
+  await expect(page.locator('#th-projects')).toContainText('Librarian is paused');
+  await page.locator('#th-projects [data-th="pause"]').click();
+  await expect(page.locator('#th-projects .th-card')).toHaveCount(cardsBefore);
+});
+
+test('TC018 highlights: counts, needs you and source line for the open meeting', async ({ page }) => {
+  await openMinutesWithSample(page);
+  await page.locator('.navitem[data-view="highlights"]').click();
+  const board = page.locator('#th-highlights');
+  await expect(board).toBeVisible();
+  for (const ty of ['decision', 'action', 'question', 'risk']) await expect(board.locator(`[data-count="${ty}"]`)).toBeVisible();
+  await expect(board.locator('[data-sec="source"]')).toContainText('items have a source line');
+  await expect(board.locator('[data-th="issue"]')).toBeVisible();
+});
+
+test('TC019 draft options say which transcript they used', async ({ page }) => {
+  await openMinutesWithSample(page);
+  await page.evaluate(() => {
+    const env = JSON.parse(localStorage.getItem('minutesRegister'));
+    const m = env.meetings.sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+    m.transcript = [{ t0: 1, t1: 4, speaker: '', source: 'Please send the revised plan by Friday', translation: '' }];
+    localStorage.setItem('minutesRegister', JSON.stringify(env));
+  });
+  await page.reload();
+  await page.locator('#workspace').waitFor({ state: 'visible' });
+  await page.locator('#btn-draft').click();
+  await expect(page.locator('.do-panel .do-chip', { hasText: /^Source:/ })).toHaveText("Source: this meeting's transcript");
+});

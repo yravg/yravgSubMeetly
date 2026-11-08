@@ -59,10 +59,18 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const mmss = (s) => `${String(Math.floor((s || 0) / 60)).padStart(2, '0')}:${String(Math.floor((s || 0) % 60)).padStart(2, '0')}`;
 const PAIRS = [{ src: 'en', tgt: 'id' }, { src: 'id', tgt: 'en' }];
 const pairKey = (p) => (p ? `${p.src}-${p.tgt}` : '');
+const ORIGIN_LABEL = { 'this meeting': "Source: this meeting's transcript", 'sample-library': 'Source: sample library', register: 'Source: register quotes' };
 const TYPE_LABEL = { decision: 'Decision', action: 'Action', risk: 'Risk', question: 'Question', info: 'Info', metric: 'Metric' };
 
 /** Baris sesi untuk satu rapat + pasangan bahasa bawaan (hanya bila baris memuat terjemahan). */
 export function linesForMeeting(m) {
+  // The meeting's own spoken lines (written by End & draft) come first.
+  if (m.transcript?.length) {
+    const lines = m.transcript.map((l) => ({ ...l, text: l.source }));
+    const other = m.locale === 'en' ? 'id' : m.locale === 'id' ? 'en' : null;
+    const withTr = other && lines.some((l) => l.translation);
+    return { lines, pair: withTr ? { src: m.locale, tgt: other } : null, origin: 'this meeting' };
+  }
   try {
     const tr = buildTranscript(m.id);
     if (tr?.lines?.length) {
@@ -209,7 +217,7 @@ export function mountDraftOptions(ctx) {
   function sourceStrip() {
     const ls = S.src.lines;
     const p = S.pair;
-    return `<span class="do-chip">${ls.length} segments</span><span class="do-chip">${mmss(ls[0]?.t0)}–${mmss(ls[ls.length - 1]?.t1)}</span>${p ? `<span class="do-chip">${esc(p.src)} to ${esc(p.tgt)}</span>` : ''}<span class="do-chip">${esc(S.src.origin)}</span>`;
+    return `<span class="do-chip">${ls.length} segments</span><span class="do-chip">${mmss(ls[0]?.t0)}–${mmss(ls[ls.length - 1]?.t1)}</span>${p ? `<span class="do-chip">${esc(p.src)} to ${esc(p.tgt)}</span>` : ''}<span class="do-chip" title="Where the draft lines come from">${esc(ORIGIN_LABEL[S.src.origin] || S.src.origin)}</span>`;
   }
 
   function body(m, locked) {

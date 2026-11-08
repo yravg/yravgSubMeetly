@@ -22,7 +22,7 @@ import { flagMomentAndSave, addItem, removeItem } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
 import { runAction } from './lib/addins.js';
 import { loadRuntime, stripHtml, recordRun } from './addins-ui.js';
-import { PROJECT_TYPES, normalizeProjectType } from './lib/notes-schema.js';
+import { PROJECT_TYPES, normalizeProjectType, sessionLinesToTranscript } from './lib/notes-schema.js';
 
 /* ---- Tipe proyek: preferensi terakhir dipakai untuk rapat berikutnya ---- */
 const PT_PREF_KEY = 'notesProjectType';
@@ -578,6 +578,8 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
           items: [...active.items, ...gen.items],
         }
       : gen;
+    // Keep the spoken lines on the meeting: Draft options reads them before the sample library.
+    merged.transcript = [...(active?.transcript || []), ...sessionLinesToTranscript(lines)];
     const saved = await saveMeeting(merged);
     meetings = await listMeetings();
     activeId = saved?.id || merged.id;
