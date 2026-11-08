@@ -1317,6 +1317,6 @@ html[data-theme="coretax"] .sum-stats .is-warn dd { color: var(--warn-ink); }
   .th-row { flex-wrap: wrap; }
   .th-act { width: 100%; justify-content: flex-end; }
 }
-body[data-th] #src-panel { display: none; }
-body[data-th="inbox"] #top-panel, body[data-th="projects"] #top-panel { display: none; }
-body[data-th="highlights"] #strip, body[data-th="highlights"] .prov { display: none; }
+body[data-thv] #src-panel { display: none; }
+body[data-thv="inbox"] #top-panel, body[data-thv="projects"] #top-panel { display: none; }
+body[data-thv="highlights"] #strip, body[data-thv="highlights"] .prov { display: none; }
