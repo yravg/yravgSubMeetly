@@ -9,6 +9,7 @@ import {
   TRUST_KEY, REMOVED_KEY, listAddins, mayCall, visibleActions, visiblePanels, panelRows,
 } from './lib/addins.js';
 import { BUNDLED } from './addins/index.js';
+import { I18N } from './lib/i18n.js';
 
 const RUNS_KEY = 'ysmAddinRuns';
 const STORE_KEYS = [TRUST_KEY, REMOVED_KEY, RUNS_KEY];
@@ -55,35 +56,41 @@ export function stripHtml(enabled, active, meetings, { lang = 'en', now } = {}) 
 }
 
 /* ---------- Settings › Add-ins ---------- */
-const STATE_LABEL = { 'needs-trust': 'Needs trust', enabled: 'Enabled', changed: 'Changed', broken: 'Broken', removed: 'Removed' };
+/** Side-panel i18n lookup (lib/i18n.js); English is the fallback for every missing key. */
+const tr = (lang, key, ...args) => {
+  const v = I18N[lang]?.[key] ?? I18N.en[key] ?? key;
+  return typeof v === 'function' ? v(...args) : v;
+};
+const STATE_KEY = { 'needs-trust': 'aiStNeeds', enabled: 'aiStEnabled', changed: 'aiStChanged', broken: 'aiStBroken', removed: 'aiStRemoved' };
 const SECTIONS = [
-  ['Needs trust', (e) => ['needs-trust', 'changed', 'broken'].includes(e.state)],
-  ['Enabled', (e) => e.state === 'enabled'],
-  ['Removed', (e) => e.state === 'removed'],
+  ['aiStNeeds', (e) => ['needs-trust', 'changed', 'broken'].includes(e.state)],
+  ['aiStEnabled', (e) => e.state === 'enabled'],
+  ['aiStRemoved', (e) => e.state === 'removed'],
 ];
 
-function scopeText(a) {
-  if (a === 'always') return 'always';
+// projectType / seriesId are manifest field names, quoted as written
+function scopeText(a, T) {
+  if (a === 'always') return T('aiAlways');
   return [a.projectType && `projectType ${a.projectType.join(', ')}`, a.seriesId && `seriesId ${a.seriesId.join(', ')}`].filter(Boolean).join(' · ');
 }
-const doText = (d) => (d.call === 'addItem' ? `Register addItem (${d.type})` : `open ${d.url}`);
+const doText = (d, T) => (d.call === 'addItem' ? T('aiDoAddItem', d.type) : T('aiDoOpen', d.url));
 
-function kindText(e) {
-  if (e.state === 'broken') return 'manifest error · never run';
-  if (e.state === 'changed') return 'changed since you trusted it';
+function kindText(e, T) {
+  if (e.state === 'broken') return T('aiKindBroken');
+  if (e.state === 'changed') return T('aiKindChanged');
   const m = e.manifest;
-  return `${[m.actions?.length && 'action chip', m.panels?.length && 'panel', m.hooks?.length && 'hook'].filter(Boolean).join(' + ') || 'empty'} · appliesTo ${scopeText(m.appliesTo)}`;
+  return `${[m.actions?.length && T('aiKAction'), m.panels?.length && T('aiKPanel'), m.hooks?.length && T('aiKHook')].filter(Boolean).join(' + ') || T('aiKEmpty')} · appliesTo ${scopeText(m.appliesTo, T)}`;
 }
 const iconOf = (e) => (e.state === 'broken' ? 'warn' : e.state === 'changed' ? 'diff' : e.manifest?.panels?.length && !e.manifest?.actions?.length ? 'pages' : 'bolt');
 
-function rowHtml(e, ui) {
+function rowHtml(e, ui, T) {
   const name = e.manifest?.name || String(e.raw?.name || e.id);
   return `<button type="button" class="ai-row" data-ai="open" data-id="${esc(e.id)}" aria-pressed="${ui.sel === e.id}">
     <i class="ai-un${e.state === 'needs-trust' || e.state === 'changed' || e.state === 'broken' ? '' : ' off'}"></i>${tile(iconOf(e), 30)}
-    <span class="ai-tt"><b>${esc(name)}</b><span>${esc(kindText(e))}</span></span><span class="ai-ver">v${esc(e.manifest?.version || e.raw?.version || '?')}</span></button>`;
+    <span class="ai-tt"><b>${esc(name)}</b><span>${esc(kindText(e, T))}</span></span><span class="ai-ver">v${esc(e.manifest?.version || e.raw?.version || '?')}</span></button>`;
 }
 
-function quoteHtml(e) {
+function quoteHtml(e, T) {
   const m = e.manifest;
   const line = (k, v) => `<p><span class="ai-k">${esc(k)}</span> ${v}</p>`;
   const lines = [];
@@ -91,73 +98,76 @@ function quoteHtml(e) {
     lines.push(line('error', `<span class="ai-low">${esc(e.error)}</span>`));
     for (const k of ['appliesTo', 'actions', 'panels', 'hooks']) if (e.raw && e.raw[k] !== undefined) lines.push(line(k, esc(JSON.stringify(e.raw[k]))));
   } else {
-    lines.push(line('appliesTo', esc(scopeText(m.appliesTo))));
-    for (const a of m.actions || []) lines.push(line('actions', esc(`${a.label} → ${doText(a.do)}`)), ...(a.badge ? [line('badge', esc(`count of ${a.badge}`))] : []));
-    for (const p of m.panels || []) lines.push(line('panels', esc(`page “${p.title}”, items from ${p.source}`)), ...(p.when ? [line('when', esc(p.when))] : []));
-    for (const h of m.hooks || []) lines.push(line('hooks', esc(`on ${h.on} → ${doText(h.do)} (declared, not fired in v0)`)));
+    lines.push(line('appliesTo', esc(scopeText(m.appliesTo, T))));
+    for (const a of m.actions || []) lines.push(line('actions', esc(`${a.label} → ${doText(a.do, T)}`)), ...(a.badge ? [line('badge', esc(T('aiCountOf', a.badge)))] : []));
+    for (const p of m.panels || []) lines.push(line('panels', esc(T('aiPanelLine', p.title, p.source))), ...(p.when ? [line('when', esc(p.when))] : []));
+    for (const h of m.hooks || []) lines.push(line('hooks', esc(`${T('aiHookOn', h.on)} → ${doText(h.do, T)} ${T('aiHookNote')}`)));
   }
   const chips = (m?.actions || []).map((a) => `<span class="ai-chb ai-chb-demo">${tile('bolt', 20)}<span>${esc(a.label)}</span></span>`)
     .concat((m?.panels || []).map((p) => `<span class="ai-chb ai-chb-demo">${tile('pages', 20)}<span>${esc(p.title)}</span></span>`));
   return `<div class="ai-quote"><div class="ai-qh">${tile('bolt', 20)}<b>${esc(m?.name || e.raw?.name || e.id)}</b><span class="ai-grow"></span><span class="ai-mono">manifest v0</span></div>${lines.join('')}</div>${chips.length ? `<div class="ai-chips">${chips.join('')}</div>` : ''}`;
 }
 
-function gateHtml(e, ui, locked) {
+function gateHtml(e, ui, locked, T) {
   const b = (act, label, cls = '', extra = '') => `<button type="button" class="mini-btn ${cls}" data-ai="${act}" data-id="${esc(e.id)}"${extra}>${label}</button>`;
   const lk = locked ? ' disabled' : '';
-  const review = b('review', e.state === 'broken' ? 'Open error' : 'Review manifest', '', ` aria-expanded="${ui.review === e.id}"`);
-  const json = ui.review === e.id ? `<pre class="ai-json">${esc(JSON.stringify(e.raw, null, 2))}</pre><p class="ai-dim">${e.hash ? `hash ${esc(e.hash)}. Nothing has run from this manifest.` : 'Never run: this manifest is invalid.'}</p>` : '';
+  const review = b('review', e.state === 'broken' ? T('aiOpenError') : T('aiReview'), '', ` aria-expanded="${ui.review === e.id}"`);
+  const json = ui.review === e.id ? `<pre class="ai-json">${esc(JSON.stringify(e.raw, null, 2))}</pre><p class="ai-dim">${e.hash ? T('aiHashNote', esc(e.hash)) : T('aiInvalidNote')}</p>` : '';
   const cards = {
-    'needs-trust': ['Trust this add-in to make only the calls listed under May call? Nothing has run yet.', [b('trust', 'Trust and enable', 'ai-primary', lk), review, b('remove', 'Remove')]],
-    changed: ['The file changed after you trusted it. It is disabled until you review it.', [b('trust', 'Trust the change', 'ai-primary', lk), review, b('remove', 'Remove')]],
-    broken: [`${esc(e.error)} It is listed but never executed.`, [review, b('remove', 'Remove')]],
-    enabled: ['Enabled. Disable or remove it any time.', [b('disable', 'Disable'), review, b('remove', 'Remove')]],
-    removed: ['Removed. It never runs.', [b('restore', 'Restore', '', lk)]],
+    'needs-trust': [T('aiGateNeeds'), [b('trust', T('aiTrustEnable'), 'ai-primary', lk), review, b('remove', T('aiRemove'))]],
+    changed: [T('aiGateChanged'), [b('trust', T('aiTrustChange'), 'ai-primary', lk), review, b('remove', T('aiRemove'))]],
+    broken: [`${esc(e.error)} ${T('aiGateBroken')}`, [review, b('remove', T('aiRemove'))]],
+    enabled: [T('aiGateEnabled'), [b('disable', T('aiDisable')), review, b('remove', T('aiRemove'))]],
+    removed: [T('aiGateRemoved'), [b('restore', T('aiRestore'), '', lk)]],
   }[e.state];
-  return `<div class="ai-gate ai-gate-${e.state}"><div class="ai-gh">${tile('lock', 20)}<b>${e.state === 'enabled' || e.state === 'removed' ? STATE_LABEL[e.state] : 'Trust gate'}</b></div><p>${cards[0]}</p><div class="ai-btns">${cards[1].join('')}</div>${json}</div>`;
+  return `<div class="ai-gate ai-gate-${e.state}"><div class="ai-gh">${tile('lock', 20)}<b>${e.state === 'enabled' || e.state === 'removed' ? T(STATE_KEY[e.state]) : T('aiTrustGate')}</b></div><p>${cards[0]}</p><div class="ai-btns">${cards[1].join('')}</div>${json}</div>`;
 }
 
-function sideHtml(e, runs) {
-  const rows = e.manifest ? mayCall(e.manifest) : [{ ok: false, label: 'Everything (invalid manifest)' }];
+function sideHtml(e, runs, T) {
+  const rows = e.manifest ? mayCall(e.manifest) : [{ ok: false, label: T('aiEverything') }];
   const log = runs[e.id] || [];
-  const never = e.state === 'broken' ? 'Never run: manifest invalid' : e.state === 'needs-trust' ? 'Never run: not trusted yet' : e.state === 'changed' ? 'Disabled: file hash changed' : e.state === 'removed' ? 'Removed: it never runs' : 'No runs yet';
-  return `<div class="ai-blk"><div class="ai-sl">May call</div>${rows.map((r) => `<div class="ai-li"><i class="ai-yn ${r.ok ? 'y' : 'n'}" aria-hidden="true">${r.ok ? '✓' : '✕'}</i><span><span class="ai-sr">${r.ok ? 'Allowed: ' : 'Refused: '}</span>${esc(r.label)}</span></div>`).join('')}</div>
-    <div class="ai-blk"><div class="ai-sl">Last runs</div>${log.length ? log.map((r) => `<div class="ai-li"><span class="ai-dim">${esc(r.at.slice(11, 16))}</span><span>${esc(r.text)}</span></div>`).join('') : `<div class="ai-li ai-dim">${never}</div>`}</div>`;
+  const never = T({ broken: 'aiNeverBroken', 'needs-trust': 'aiNeverNeeds', changed: 'aiNeverChanged', removed: 'aiNeverRemoved' }[e.state] || 'aiNoRuns');
+  return `<div class="ai-blk"><div class="ai-sl">${T('aiMayCall')}</div>${rows.map((r) => `<div class="ai-li"><i class="ai-yn ${r.ok ? 'y' : 'n'}" aria-hidden="true">${r.ok ? '✓' : '✕'}</i><span><span class="ai-sr">${r.ok ? T('aiAllowed') : T('aiRefused')}</span>${esc(r.label)}</span></div>`).join('')}</div>
+    <div class="ai-blk"><div class="ai-sl">${T('aiLastRuns')}</div>${log.length ? log.map((r) => `<div class="ai-li"><span class="ai-dim">${esc(r.at.slice(11, 16))}</span><span>${esc(r.text)}</span></div>`).join('') : `<div class="ai-li ai-dim">${never}</div>`}</div>`;
 }
 
-/** Pure: model + ui state -> HTML. model = { entries, runs, meeting, error }. */
+/** Pure: model + ui state -> HTML. model = { entries, runs, meeting, error }; ui.lang = side-panel UI language. */
 export function paneHtml(model, ui) {
+  const T = (key, ...args) => tr(ui.lang, key, ...args);
   const { entries, runs, error } = model;
   const locked = !!model.meeting?.issuedAt;
   const waiting = entries.filter((e) => ['needs-trust', 'changed', 'broken'].includes(e.state)).length;
   const state = error ? 'error' : locked ? 'locked' : waiting ? 'needs' : entries.length ? 'normal' : 'empty';
   const sel = entries.find((e) => e.id === ui.sel);
   const banner = {
-    error: `<div class="ai-banner ai-er" role="alert"><span>Could not list add-ins (${esc(error)}). Nothing was run.</span><button type="button" class="mini-btn" data-ai="retry">Retry</button></div>`,
-    locked: '<div class="ai-banner ai-lk" role="status"><span>Locked: the open meeting is issued. Trusting is off; Disable and Remove still work.</span></div>',
-    needs: `<div class="ai-banner ai-nd" role="status"><span>${waiting} add-in${waiting > 1 ? 's wait' : ' waits'} for trust and ${waiting > 1 ? 'have' : 'has'} not run.</span></div>`,
+    error: `<div class="ai-banner ai-er" role="alert"><span>${esc(T('aiListError', error))}</span><button type="button" class="mini-btn" data-ai="retry">${T('aiRetry')}</button></div>`,
+    locked: `<div class="ai-banner ai-lk" role="status"><span>${T('aiLocked')}</span></div>`,
+    needs: `<div class="ai-banner ai-nd" role="status"><span>${T('aiWaiting', waiting)}</span></div>`,
   }[state] || '';
-  const list = SECTIONS.map(([title, pick], i) => {
+  const list = SECTIONS.map(([titleKey, pick], i) => {
     const rows = entries.filter(pick);
     if (i === 2 && !rows.length) return '';
-    const head = `<div class="ai-sh"><b>${title}</b><span class="ai-count">${rows.length}</span>${i === 1 && rows.length ? '<span class="ai-grow"></span><button type="button" class="ai-lnk" data-ai="archive-all">Archive all</button>' : ''}${i === 2 ? `<span class="ai-grow"></span><button type="button" class="ai-lnk" data-ai="toggle-removed" aria-expanded="${ui.showRemoved}">${ui.showRemoved ? 'Hide' : 'Show'}</button>` : ''}</div>`;
+    const head = `<div class="ai-sh"><b>${T(titleKey)}</b><span class="ai-count">${rows.length}</span>${i === 1 && rows.length ? `<span class="ai-grow"></span><button type="button" class="ai-lnk" data-ai="archive-all">${T('aiArchiveAll')}</button>` : ''}${i === 2 ? `<span class="ai-grow"></span><button type="button" class="ai-lnk" data-ai="toggle-removed" aria-expanded="${ui.showRemoved}">${ui.showRemoved ? T('aiHide') : T('aiShow')}</button>` : ''}</div>`;
     if (i === 2 && !ui.showRemoved) return head;
-    const zero = i === 0 && !rows.length && entries.length ? '<div class="ai-zero"><b>All add-ins reviewed</b><span>Nothing waits on trust. v0 add-ins ship inside the extension.</span></div>' : '';
-    return head + rows.map((e) => rowHtml(e, ui)).join('') + zero;
+    const zero = i === 0 && !rows.length && entries.length ? `<div class="ai-zero"><b>${T('aiAllReviewed')}</b><span>${T('aiAllReviewedHint')}</span></div>` : '';
+    return head + rows.map((e) => rowHtml(e, ui, T)).join('') + zero;
   }).join('');
-  const empty = '<div class="ai-zero"><b>No add-ins</b><span>None ships with this build. v0 add-ins are bundled with the extension.</span></div>';
+  const empty = `<div class="ai-zero"><b>${T('aiNone')}</b><span>${T('aiNoneHint')}</span></div>`;
   const detail = sel
-    ? `<div class="ai-main"><div class="ai-mh"><h4>${esc(sel.manifest?.name || sel.raw?.name || sel.id)}</h4><span class="ai-pill ai-pill-${sel.state}">${STATE_LABEL[sel.state]}</span></div>${quoteHtml(sel)}${gateHtml(sel, ui, locked)}</div><div class="ai-side">${sideHtml(sel, runs)}</div>`
-    : '<div class="ai-main ai-hint">Pick an add-in to see exactly what it may call, and its last runs.</div>';
-  const toast = ui.toast ? `<div class="ai-toast" role="status"><span>${esc(ui.toast.text)}</span><button type="button" class="ai-lnk" data-ai="undo">Undo</button></div>` : '';
+    ? `<div class="ai-main"><div class="ai-mh"><h4>${esc(sel.manifest?.name || sel.raw?.name || sel.id)}</h4><span class="ai-pill ai-pill-${sel.state}">${T(STATE_KEY[sel.state])}</span></div>${quoteHtml(sel, T)}${gateHtml(sel, ui, locked, T)}</div><div class="ai-side">${sideHtml(sel, runs, T)}</div>`
+    : `<div class="ai-main ai-hint">${T('aiPick')}</div>`;
+  const toast = ui.toast ? `<div class="ai-toast" role="status"><span>${esc(ui.toast.text)}</span><button type="button" class="ai-lnk" data-ai="undo">${T('aiUndo')}</button></div>` : '';
   return `<div class="ai-wrap" data-state="${state}">${banner}<div class="ai-list">${entries.length ? list : empty}</div>${entries.length ? detail : ''}${toast}</div>`;
 }
 
-export function mountAddinsPane(root, { bundled = BUNDLED, getMeetings = listMeetings } = {}) {
-  const ui = { sel: '', review: '', showRemoved: false, toast: null };
+export function mountAddinsPane(root, { bundled = BUNDLED, getMeetings = listMeetings, lang = () => 'en' } = {}) {
+  const ui = { sel: '', review: '', showRemoved: false, toast: null, lang: 'en' };
+  const T = (key, ...args) => tr(lang(), key, ...args);
   let model = { entries: [], runs: {}, meeting: null, error: null };
   let store = { trusted: {}, removed: [] };
   let timer = null;
   const draw = () => {
+    ui.lang = lang();
     root.innerHTML = paneHtml(model, ui);
   };
 
@@ -207,24 +217,24 @@ export function mountAddinsPane(root, { bundled = BUNDLED, getMeetings = listMee
     } else if (act === 'retry') {
       await refresh();
     } else if (act === 'trust' && e?.hash && !locked) {
-      await change(`“${e.manifest.name}” enabled`, (s) => {
+      await change(T('aiToastEnabled', e.manifest.name), (s) => {
         s.trusted[e.id] = e.hash;
         s.removed = s.removed.filter((x) => x !== e.id);
       });
     } else if (act === 'disable' && e) {
-      await change(`“${e.manifest.name}” disabled`, (s) => delete s.trusted[e.id]);
+      await change(T('aiToastDisabled', e.manifest.name), (s) => delete s.trusted[e.id]);
     } else if (act === 'remove' && e) {
-      await change(`“${e.manifest?.name || e.id}” removed`, (s) => {
+      await change(T('aiToastRemoved', e.manifest?.name || e.id), (s) => {
         delete s.trusted[e.id];
         s.removed = [...new Set([...s.removed, e.id])];
       });
     } else if (act === 'restore' && e && !locked) {
-      await change(`“${e.manifest?.name || e.id}” restored`, (s) => {
+      await change(T('aiToastRestored', e.manifest?.name || e.id), (s) => {
         s.removed = s.removed.filter((x) => x !== e.id);
       });
     } else if (act === 'archive-all') {
       const ids = model.entries.filter((x) => x.state === 'enabled').map((x) => x.id);
-      await change(`${ids.length} add-in${ids.length === 1 ? '' : 's'} removed`, (s) => {
+      await change(T('aiToastArchived', ids.length), (s) => {
         for (const id of ids) delete s.trusted[id];
         s.removed = [...new Set([...s.removed, ...ids])];
       });

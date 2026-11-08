@@ -167,3 +167,26 @@ test('empty and no page errors', async () => {
   assert.equal(await state(), 'empty');
   assert.deepEqual(pageErrors, []);
 });
+
+test('UI language switch translates the Add-ins tab (en default, id, zh)', async () => {
+  await boot(`(${SEED})()`);
+  await openAddins();
+  assert.match(await text('.ai-sh b'), /^Needs trust$/, 'English is the default');
+  const setLang = async (code) => {
+    await page.evaluate((c) => {
+      const el = document.getElementById('ui-lang-toggle');
+      el.value = c;
+      el.dispatchEvent(new Event('change'));
+    }, code);
+    await page.waitForFunction((c) => document.documentElement.lang === c, {}, code);
+  };
+  await setLang('id');
+  await page.waitForFunction(() => /^Perlu dipercaya$/.test(document.querySelector('.ai-sh b')?.textContent));
+  await click('.ai-row');
+  assert.match(await text('.ai-gate'), /Percayai dan aktifkan/);
+  assert.match(await text('.ai-side'), /Boleh memanggil/);
+  await setLang('zh');
+  await page.waitForFunction(() => /^待信任$/.test(document.querySelector('.ai-sh b')?.textContent));
+  await setLang('en');
+  await page.waitForFunction(() => /^Needs trust$/.test(document.querySelector('.ai-sh b')?.textContent));
+});

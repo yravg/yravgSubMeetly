@@ -1123,6 +1123,7 @@ function renderUiLangToggle() {
       updateWarning();
       renderHistory();
       redrawHelperGuide?.();
+      addinsPane?.refresh();
       renderQaSampleBar();
       renderModelLists();
     });
@@ -3164,7 +3165,7 @@ async function init() {
   if (addinsMount) {
     // lab-only hook: an extension page never reads window state a web page could set
     const dev = location.protocol !== 'chrome-extension:' && window.__ysmAddinsBundled;
-    addinsPane = mountAddinsPane(addinsMount, dev ? { bundled: dev } : {});
+    addinsPane = mountAddinsPane(addinsMount, { ...(dev ? { bundled: dev } : {}), lang: () => state.settings.uiLang || 'en' });
     await addinsPane.refresh();
   }
   const notesMount = $('notes-mount');
