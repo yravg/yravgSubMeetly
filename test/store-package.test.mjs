@@ -54,3 +54,15 @@ test('setiap izin manifest dibahas di MV3-AUDIT.md (bahan justifikasi review)', 
   const missing = perms.filter((p) => !audit.includes(p));
   assert.deepEqual(missing, [], `izin tanpa justifikasi tertulis: ${missing.join(', ')}`);
 });
+
+test('manifest sumber membawa key tetap; paket toko tidak', async () => {
+  const { stripKey, extensionIdFromKey } = await import('../scripts/store-manifest.mjs');
+  assert.ok(manifestSrc.key, 'src/manifest.json harus punya "key" supaya ID ekstensi tetap di muatan unpacked');
+  assert.equal(extensionIdFromKey(manifestSrc.key), 'llhpkcjflnepbpgldhbceifjbjgcbapi');
+  assert.equal('key' in stripKey(manifestSrc), false);
+  assert.equal(stripKey(manifestSrc).version, manifestSrc.version);
+});
+
+test('manifest di dalam zip toko tanpa "key"', { skip }, () => {
+  assert.equal('key' in JSON.parse(read('manifest.json')), false);
+});
