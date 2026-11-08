@@ -302,6 +302,34 @@ export function createRevision(partial = {}) {
   };
 }
 
+/** Cap on stored transcript lines: a long session must not fill the store. */
+export const TRANSCRIPT_CAP = 3000;
+
+/**
+ * One transcript line shape for a meeting: {t0,t1,speaker,source,translation}.
+ * Accepts the side panel's {src,tgt} too. Lines with no source text are dropped.
+ */
+export function normalizeTranscript(lines) {
+  const out = [];
+  for (const l of Array.isArray(lines) ? lines : []) {
+    const source = str(l?.source ?? l?.src ?? l?.text).trim();
+    if (!source) continue;
+    const t0 = num(l?.t0, 0);
+    out.push({
+      t0,
+      t1: num(l?.t1, t0),
+      speaker: str(l?.speaker),
+      source,
+      translation: str(l?.translation ?? l?.tgt).trim(),
+    });
+    if (out.length >= TRANSCRIPT_CAP) break;
+  }
+  return out;
+}
+
+/** Side panel session lines ({t0,t1,src,tgt}) -> meeting transcript. */
+export const sessionLinesToTranscript = normalizeTranscript;
+
 /** @returns {Meeting} */
 export function createMeeting(partial = {}) {
   const locale = str(partial.locale || 'en');
@@ -341,6 +369,7 @@ export function createMeeting(partial = {}) {
           durationSec: partial.engine.durationSec == null ? null : num(partial.engine.durationSec, 0),
         }
       : null,
+    transcript: normalizeTranscript(partial.transcript),
     generatedAt: str(partial.generatedAt || new Date().toISOString()),
     issuedAt: strOrNull(partial.issuedAt),
     locale,
