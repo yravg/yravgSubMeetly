@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Linux-only installer for Chrome/Chromium Native Messaging host.
-# Usage: ./install-host-linux.sh <chrome-extension-id>
+# Usage: ./install-host-linux.sh <chrome-extension-id> [path/to/submeetly-engine]
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -11,8 +11,8 @@ fi
 
 EXT_ID="${1:-}"
 if [[ -z "$EXT_ID" ]]; then
-  echo "Usage: ./install-host-linux.sh <chrome-extension-id>"
+  echo "Usage: ./install-host-linux.sh <chrome-extension-id> [path/to/submeetly-engine]"
   exit 1
 fi
 
-exec ./install-host.sh "$EXT_ID"
+exec ./install-host.sh "$@"

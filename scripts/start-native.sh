@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the native helper if it is not already listening on 127.0.0.1:17865.
+# Start the native helper (the Rust engine) if it is not already listening on 127.0.0.1:17865.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 NATIVE="$ROOT/native"
@@ -17,11 +17,9 @@ if lsof -ti "tcp:${PORT}" >/dev/null 2>&1; then
   "$ROOT/scripts/stop-native.sh" || true
 fi
 
-echo "[start-native] Starting native helper on port ${PORT}…"
-cd "$NATIVE"
-# shellcheck disable=SC1091
-source .venv/bin/activate 2>/dev/null || true
-nohup bash run.sh >>"$ROOT/.native-server.log" 2>&1 &
+echo "[start-native] Starting native helper (Rust engine) on port ${PORT}…"
+ENGINE="$(bash "$NATIVE/engine-path.sh")"
+PORT="$PORT" nohup "$ENGINE" >>"$ROOT/.native-server.log" 2>&1 &
 
 for _ in $(seq 1 120); do
   if curl -sf "$URL" >/dev/null 2>&1; then

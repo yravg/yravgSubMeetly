@@ -3,7 +3,7 @@
  *   node --test test/shared-register.test.mjs
  *
  * Rantainya: Minutes Register (ekstensi) → meetingToDoc → POST /notes →
- * _normalize_note_doc (helper) → ~/.yraveragesubmin/notes.json → HelperSharedNotes.swift.
+ * normalize_note_doc (engine Rust) → ~/.yraveragesubmin/notes.json → HelperSharedNotes.swift.
  *
  * Yang dijaga:
  *  - Dokumen bersama benar-benar membawa register, bukan hanya keputusan dan
@@ -17,7 +17,7 @@
  *  - Helper menjinakkan masukan ngawur: endpoint-nya loopback, tapi apa pun
  *    di mesin itu bisa mengirim POST.
  */
-import test from 'node:test';
+import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
@@ -35,7 +35,9 @@ import {
 } from '../src/lib/notes-schema.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PY = existsSync(`${ROOT}native/.venv/bin/python`) ? 'native/.venv/bin/python' : 'python3';
+let engine = null;
+before(async () => { if (!engineSkip) engine = await startEngine(); });
+after(() => engine?.stop());
 
 /** Rapat contoh dengan keenam tipe butir dan metadata yang lengkap. */
 function sampleMeeting() {
@@ -89,21 +91,13 @@ function sampleMeeting() {
   return m;
 }
 
-/** Jalankan _normalize_note_doc helper pada dokumen, kembalikan hasilnya. */
-function normalizeViaHelper(doc) {
-  const home = mkdtempSync(`${tmpdir()}/ysm-notes-`);
-  const out = execFileSync(
-    PY,
-    ['-c', [
-      'import sys, json',
-      'sys.path.insert(0, "native")',
-      'import server',
-      'doc, err = server._normalize_note_doc(json.load(sys.stdin))',
-      'print(json.dumps({"doc": doc, "err": err}))',
-    ].join('\n')],
-    { cwd: ROOT, input: JSON.stringify(doc), env: { ...process.env, HOME: home }, encoding: 'utf8' },
-  );
-  return JSON.parse(out.trim().split('\n').at(-1));
+/** POST /notes ke engine Rust dan kembalikan dokumen yang dinormalkan (atau galatnya). */
+async function normalizeViaHelper(doc) {
+  const res = await fetch(`${engine.url}/notes`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(doc),
+  });
+  const body = await res.json();
+  return res.ok ? { doc: body.note, err: null } : { doc: null, err: body.error };
 }
 
 test('dokumen bersama membawa keenam tipe butir, bukan hanya keputusan dan tindak lanjut', () => {
@@ -211,8 +205,8 @@ test('nama field persis seperti yang didekode HelperSharedNotes.swift', () => {
   for (const i of doc.items) assert.ok(swift.has(i.type), `tipe "${i.type}" tidak dikenal Swift`);
 });
 
-test('helper menyimpan register apa adanya setelah dinormalkan', () => {
-  const { doc, err } = normalizeViaHelper(meetingToDoc(sampleMeeting()));
+test('helper menyimpan register apa adanya setelah dinormalkan', { skip: engineSkip }, async () => {
+  const { doc, err } = await normalizeViaHelper(meetingToDoc(sampleMeeting()));
   assert.equal(err, null);
   assert.equal(doc.schemaVersion, 2);
   assert.equal(doc.items.length, 6, 'helper membuang butir register');
@@ -227,8 +221,8 @@ test('helper menyimpan register apa adanya setelah dinormalkan', () => {
   assert.equal(doc.actions.length, 1);
 });
 
-test('helper menjinakkan masukan ngawur alih-alih meneruskannya', () => {
-  const { doc, err } = normalizeViaHelper({
+test('helper menjinakkan masukan ngawur alih-alih meneruskannya', { skip: engineSkip }, async () => {
+  const { doc, err } = await normalizeViaHelper({
     id: 'X', title: 'T',
     items: [
       { ref: 'a', type: 'bukan-tipe', text: 'x', status: 'ngawur', confidence: 'abc' },
@@ -253,10 +247,10 @@ test('helper menjinakkan masukan ngawur alih-alih meneruskannya', () => {
   assert.deepEqual(doc.meeting.attendees, [], 'peserta yang bukan daftar tidak boleh lolos');
 });
 
-test('dokumen v1 tanpa items tetap sah melewati helper', () => {
+test('dokumen v1 tanpa items tetap sah melewati helper', { skip: engineSkip }, async () => {
   // Aplikasi macOS menyusun ulang registernya dari decisions/actions
   // (SharedNoteDoc.register), jadi dokumen lama tidak boleh ditolak.
-  const { doc, err } = normalizeViaHelper({
+  const { doc, err } = await normalizeViaHelper({
     id: 'lama', title: 'Dokumen lama', summary: 'S',
     decisions: ['Keputusan lama'],
     actions: [{ id: 'act-1', text: 'Tindak lanjut lama', owner: 'Citra', status: 'open' }],
@@ -289,8 +283,8 @@ function probeRegister(doc) {
   return JSON.parse(out.trim().split('\n').at(-1));
 }
 
-test('aplikasi macOS mendekode register v2 yang ditulis helper', { skip: macSkip }, () => {
-  const { doc } = normalizeViaHelper(meetingToDoc(sampleMeeting()));
+test('aplikasi macOS mendekode register v2 yang ditulis helper', { skip: macSkip || engineSkip }, async () => {
+  const { doc } = await normalizeViaHelper(meetingToDoc(sampleMeeting()));
   const seen = probeRegister(doc).docs[0];
 
   assert.equal(seen.schemaVersion, 2);
@@ -318,10 +312,10 @@ test('aplikasi macOS mendekode register v2 yang ditulis helper', { skip: macSkip
   assert.equal(seen.meeting.asr, 'whisper-large-v3-turbo');
 });
 
-test('aplikasi macOS menyusun register dari dokumen v1 lama', { skip: macSkip }, () => {
+test('aplikasi macOS menyusun register dari dokumen v1 lama', { skip: macSkip || engineSkip }, async () => {
   // Berkas v1 tidak ditulis ulang saat helper diperbarui, jadi dokumen lama
   // harus tetap terbaca — dengan ref buatan dan ditandai apa adanya.
-  const { doc } = normalizeViaHelper({
+  const { doc } = await normalizeViaHelper({
     id: 'lama', title: 'Dokumen lama',
     decisions: ['Keputusan lama'],
     actions: [{ id: 'act-1', text: 'Tindak lanjut lama', owner: 'Citra', status: 'open' }],
@@ -356,10 +350,10 @@ test('aplikasi macOS mundur ke berkas nama lama bila yang baru belum ada', { ski
   assert.equal(seen.docs[0].title, 'Dari direktori lama');
 });
 
-test('transkrip sesi macOS dipertahankan helper dan dibaca aplikasi', { skip: macSkip }, () => {
+test('transkrip sesi macOS dipertahankan helper dan dibaca aplikasi', { skip: macSkip || engineSkip }, async () => {
   // Dokumen dari ekstensi tidak membawa transkrip; yang direkam aplikasi mac
   // membawanya, dan itulah isi panel kiri workspace rapat.
-  const { doc, err } = normalizeViaHelper({
+  const { doc, err } = await normalizeViaHelper({
     id: 'MOM-MAC-1', title: 'Rekaman mac', source: 'mac',
     transcript: [
       { t0: 0, t1: 4.2, source: 'Selamat pagi semua.', translation: 'Good morning all.' },
@@ -377,8 +371,8 @@ test('transkrip sesi macOS dipertahankan helper dan dibaca aplikasi', { skip: ma
   assert.equal(seen.transcriptLines, 2, 'aplikasi macOS tidak membaca transkrip');
 });
 
-test('dokumen tanpa transkrip (dari ekstensi) tetap sah', () => {
-  const { doc, err } = normalizeViaHelper(meetingToDoc(sampleMeeting()));
+test('dokumen tanpa transkrip (dari ekstensi) tetap sah', { skip: engineSkip }, async () => {
+  const { doc, err } = await normalizeViaHelper(meetingToDoc(sampleMeeting()));
   assert.equal(err, null);
   assert.deepEqual(doc.transcript, []);
 });

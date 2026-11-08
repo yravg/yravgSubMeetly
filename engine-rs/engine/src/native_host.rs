@@ -1,13 +1,16 @@
 //! Chrome Native Messaging host: 4-byte little-endian length framing + `ping`.
 //!
-//! Mirrors native/messaging_host.py framing and the `ping` reply. Start/stop
-//! actions stay with the Python oracle until the Rust engine owns the ML routes.
+//! Actions: `ping` (instant, never waits on the HTTP helper), `status`, `start`,
+//! `stop`, `restart`, `ensure_lab`. `start` launches this same executable without
+//! arguments (the HTTP helper), detached, logging to `engine.log` in the state dir.
 
 use std::env;
+use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
-use std::time::Duration;
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
@@ -62,8 +65,197 @@ pub fn handle_message(message: &Value) -> Value {
             "host": host_info(),
             "helper_port_open": helper_port_open(),
         }),
+        "status" => {
+            let health = health();
+            json!({
+                "ok": true,
+                "running": health.is_some(),
+                "health": health,
+                "connected": true,
+                "host": host_info(),
+            })
+        }
+        "start" => start_server(),
+        "stop" => {
+            let ok = force_stop();
+            json!({ "ok": ok, "running": health().is_some() })
+        }
+        "restart" => {
+            force_stop();
+            start_server()
+        }
+        // The lab is a dev static server (scripts/lab-server.py); the engine
+        // only reports whether it answers, it never launches Python.
+        "ensure_lab" => match health() {
+            None => {
+                json!({ "ok": false, "error": "native helper not running", "lab": lab_running() })
+            }
+            Some(health) => {
+                let lab = lab_running();
+                json!({ "ok": lab, "lab": lab, "running": true, "health": health })
+            }
+        },
         other => json!({ "ok": false, "error": format!("unknown action: {other}") }),
     }
+}
+
+/// Seconds to wait for a freshly started engine to answer `/health`.
+fn start_wait() -> Duration {
+    Duration::from_secs(env_secs("NATIVE_START_WAIT", 30))
+}
+
+fn port_free_wait() -> Duration {
+    Duration::from_secs(env_secs("NATIVE_PORT_FREE_WAIT", 15))
+}
+
+fn env_secs(name: &str, default: u64) -> u64 {
+    env::var(name)
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(default)
+}
+
+/// One HTTP exchange with the engine, `Connection: close`. Body of a 2xx only.
+fn http(method: &str, host: &str, port: u16, path: &str, timeout: Duration) -> Option<String> {
+    let target = format!("{host}:{port}").to_socket_addrs().ok()?.next()?;
+    let mut stream = TcpStream::connect_timeout(&target, timeout).ok()?;
+    stream.set_read_timeout(Some(timeout)).ok()?;
+    stream.set_write_timeout(Some(timeout)).ok()?;
+    let request = format!(
+        "{method} {path} HTTP/1.1\r\nHost: {host}:{port}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    );
+    stream.write_all(request.as_bytes()).ok()?;
+    let mut raw = Vec::new();
+    // A read timeout after the response arrived still leaves usable bytes.
+    let _ = stream.read_to_end(&mut raw);
+    let text = String::from_utf8_lossy(&raw).into_owned();
+    let (head, body) = text.split_once("\r\n\r\n")?;
+    head.starts_with("HTTP/1.1 2").then(|| body.to_string())
+}
+
+fn health() -> Option<Value> {
+    let body = http(
+        "GET",
+        &host(),
+        port(),
+        "/health",
+        Duration::from_millis(1500),
+    )?;
+    serde_json::from_str(&body).ok()
+}
+
+fn lab_running() -> bool {
+    let lab_port = env_secs("LAB_PORT", 8799) as u16;
+    http(
+        "GET",
+        "127.0.0.1",
+        lab_port,
+        "/lab.html",
+        Duration::from_millis(1500),
+    )
+    .is_some()
+}
+
+fn wait_port_free(timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        if !helper_port_open() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    !helper_port_open()
+}
+
+/// Ask the engine to exit; on macOS/Linux fall back to SIGTERM on whatever
+/// still holds the port (a hung helper, or an older one without `/shutdown`).
+fn force_stop() -> bool {
+    let _ = http("POST", &host(), port(), "/shutdown", Duration::from_secs(3));
+    if wait_port_free(port_free_wait()) {
+        return true;
+    }
+    #[cfg(unix)]
+    if let Ok(found) = Command::new("lsof")
+        .args(["-ti", &format!("tcp:{}", port())])
+        .stderr(Stdio::null())
+        .output()
+    {
+        for pid in String::from_utf8_lossy(&found.stdout).split_whitespace() {
+            let _ = Command::new("kill").arg(pid).status();
+        }
+        std::thread::sleep(Duration::from_millis(400));
+    }
+    wait_port_free(Duration::from_secs(8))
+}
+
+fn log_path() -> PathBuf {
+    crate::state::default_state_dir().join("engine.log")
+}
+
+fn log_tail(lines: usize) -> String {
+    let text = std::fs::read_to_string(log_path()).unwrap_or_default();
+    let all: Vec<&str> = text.lines().collect();
+    all[all.len().saturating_sub(lines)..].join("\n")
+}
+
+fn spawn_engine() -> io::Result<Child> {
+    let log = log_path();
+    if let Some(dir) = log.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let out = OpenOptions::new().create(true).append(true).open(&log)?;
+    let err = out.try_clone()?;
+    let mut command = Command::new(env::current_exe()?);
+    command.stdin(Stdio::null()).stdout(out).stderr(err);
+    // Detach so the engine outlives the short-lived native host that started it.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
+        command.creation_flags(0x0000_0008 | 0x0000_0200 | 0x0800_0000);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    command.spawn()
+}
+
+fn start_server() -> Value {
+    if let Some(health) = health() {
+        return json!({ "ok": true, "running": true, "health": health, "already": true });
+    }
+    if helper_port_open() && !force_stop() {
+        return json!({ "ok": false, "running": false, "error": "port is held by another program" });
+    }
+    let mut child = match spawn_engine() {
+        Ok(child) => child,
+        Err(error) => {
+            return json!({ "ok": false, "running": false, "error": format!("cannot start engine: {error}") })
+        }
+    };
+    let deadline = Instant::now() + start_wait();
+    while Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(250));
+        if let Some(health) = health() {
+            return json!({ "ok": true, "running": true, "health": health });
+        }
+        if let Ok(Some(_)) = child.try_wait() {
+            let mut error = "helper process exited early".to_string();
+            let tail = log_tail(8);
+            if !tail.is_empty() {
+                error += &format!(" — see engine.log:\n{tail}");
+            }
+            return json!({ "ok": false, "running": false, "error": error });
+        }
+    }
+    let mut error = format!("timeout waiting for helper ({}s)", start_wait().as_secs());
+    let tail = log_tail(8);
+    if !tail.is_empty() {
+        error += &format!(" — see engine.log:\n{tail}");
+    }
+    json!({ "ok": false, "running": false, "error": error })
 }
 
 fn host_info() -> Value {
@@ -135,9 +327,9 @@ mod tests {
 
     #[test]
     fn unknown_action_is_reported_and_eof_is_none() {
-        let reply = handle_message(&json!({ "action": "start" }));
+        let reply = handle_message(&json!({ "action": "frobnicate" }));
         assert_eq!(reply["ok"], json!(false));
-        assert_eq!(reply["error"], json!("unknown action: start"));
+        assert_eq!(reply["error"], json!("unknown action: frobnicate"));
 
         let mut empty = Cursor::new(Vec::new());
         assert!(read_frame(&mut empty).expect("read").is_none());

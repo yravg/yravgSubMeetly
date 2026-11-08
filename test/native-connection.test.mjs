@@ -4,7 +4,7 @@
  *
  * Dua sisi diuji:
  *  - klasifikasi galat + nativeHostConnection() di ekstensi (chrome dipalsukan)
- *  - host Python sungguhan (native/messaging_host.py) lewat framing 4-byte,
+ *  - host Rust sungguhan (`submeetly-engine native-host`) lewat framing 4-byte,
  *    supaya kontraknya tidak bisa lepas diam-diam di satu sisi saja.
  */
 import test from 'node:test';
@@ -128,9 +128,8 @@ test('host lama yang belum kenal ping tetap dihitung terhubung', async () => {
 });
 
 /* -------------------------------------------------------------------------
- * Host Python sungguhan: bicara framing Native Messaging yang sebenarnya.
+ * Host Rust sungguhan: bicara framing Native Messaging yang sebenarnya.
  */
-const PY = existsSync('native/.venv/bin/python') ? 'native/.venv/bin/python' : 'python3';
 
 function talkToHost(messages) {
   const chunks = messages.map((m) => {
@@ -139,7 +138,12 @@ function talkToHost(messages) {
     len.writeUInt32LE(b.length);
     return Buffer.concat([len, b]);
   });
-  const r = spawnSync(PY, ['native/messaging_host.py'], { input: Buffer.concat(chunks), timeout: 20_000 });
+  const r = spawnSync(engineBinary(), ['native-host'], {
+    input: Buffer.concat(chunks),
+    timeout: 20_000,
+    // Port tak terpakai: tes ini tidak boleh bergantung pada helper pemilik.
+    env: { ...process.env, PORT: '9' },
+  });
   assert.equal(r.error, undefined, String(r.error));
   const out = [];
   let buf = r.stdout;
@@ -152,17 +156,17 @@ function talkToHost(messages) {
   return out;
 }
 
-test('host Python menjawab ping dengan identitas dirinya', () => {
+test('host Rust menjawab ping dengan identitas dirinya', { skip: engineSkip }, () => {
   const [ping] = talkToHost([{ action: 'ping' }]);
   assert.equal(ping.ok, true);
   assert.equal(ping.connected, true);
   assert.equal(ping.host.host, 'com.yraveragesubmin.helper');
   assert.equal(typeof ping.host.protocol, 'number');
-  assert.equal(typeof ping.host.python, 'string');
+  assert.equal(typeof ping.host.rust, 'string');
   assert.equal(typeof ping.helper_port_open, 'boolean');
 });
 
-test('ping tidak menunggu helper, dan status tetap membawa health', () => {
+test('ping tidak menunggu helper, dan status tetap membawa health', { skip: engineSkip }, () => {
   const [ping, status] = talkToHost([{ action: 'ping' }, { action: 'status' }]);
   assert.equal(ping.ok, true);
   assert.ok(!('health' in ping), 'ping harus murah — jangan panggil /health');
@@ -174,7 +178,7 @@ test('ping tidak menunggu helper, dan status tetap membawa health', () => {
   assert.equal(status.host.host, 'com.yraveragesubmin.helper');
 });
 
-test('aksi tak dikenal ditolak jelas, dan ping terdaftar di kontrak', () => {
+test('aksi tak dikenal ditolak jelas, dan ping terdaftar di kontrak', { skip: engineSkip }, () => {
   const [r] = talkToHost([{ action: 'tidak-ada' }]);
   assert.equal(r.ok, false);
   assert.match(r.error, /unknown action/);
