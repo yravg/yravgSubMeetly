@@ -68,3 +68,26 @@ add-in list, "ySub" label and theme names.
   (lazy section regex). Before fix checked in Playwright on the offline page (all three visible).
   Not yet re-checked inside Claude Design: the canvas page stopped loading after v8 (service 503s,
   "content fetch failed in transit"); retry D02 Before there.
+- Owner decisions applied on canvas v12-v13 (2026-11-08): hover 0.22 s default (1.5 s option, film keeps 1.5 s);
+  translation colour setting with 5 swatches (indigo default; contrast 5.44-10.00:1) on I08 and D02;
+  D02 one tab row by default with "Tab rows: One | Two". Verified inside Claude Design: I08 hover opens the
+  island, Teal swatch recolours the sample line. Found and fixed: Story index artboard was empty since the
+  section-split fix (last section cut at the first `</main>`); now `lastIndexOf`. Index re-check inside
+  Claude Design not done (canvas page loading very slowly at the time); offline export holds the stories.
+
+## Wave 2 (2026-11-08, owner: "keep on doing the work until all finish", /testsprite-test)
+
+Canvas committed on main 3b07370. S4 Opus worker reported 598bae4: 101 goldens 0 mismatch, WER <= 0.071 on 5 clips,
+but en-3 segment-start gate fails (2.0 s, boundary difference), Qwen not smoke-tested, /health ffmpeg=false, no CUDA build (no nvcc).
+Five Sonnet Orca workers (specs in scratchpad specs/w-*.md, common rules w-common.md):
+
+| Worker | Dispatch | Worktree / branch | PRD rows |
+|---|---|---|---|
+| s4fix | ctx_00df3435961e | sm-s4 / yravg/sm-s4 | ENG-002, ENG-003 |
+| qa (TestSprite-style, local Playwright) | ctx_fe025b27d994 | sm-qa / yravg/sm-qa | qa/ cases for all surfaces |
+| island2 | ctx_19304829a6b2 | sm-island2 / yravg/sm-island2 | ISL-002, ISL-004, ISL-005, light look |
+| sidepanel | ctx_ad01f11ef081 | sm-sidepanel / yravg/sm-sidepanel | UI-003 (D02, D03), UI-004, UI-005 |
+| minutes | ctx_d660a26755a6 | sm-minutes / yravg/sm-minutes | UI-003 (D01), THB T03 |
+
+Next wave after these merge: T01/T02/T04 in Minutes (after minutes), T05 + S8 add-ins (after island2 + sidepanel),
+then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
