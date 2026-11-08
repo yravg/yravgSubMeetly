@@ -1543,11 +1543,24 @@ body:not([data-tabrows='two']) .view-tabs { display: none; }
 .tcolor-sw { width: 28px; height: 28px; padding: 0; border-radius: var(--radius-full); border: 2px solid var(--border); background: var(--card); cursor: pointer; display: grid; place-items: center; }
 .tcolor-sw i { width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--sw); display: block; }
 .tcolor-sw.active { border-color: var(--text); }
-.tcolor-sw[data-tcolor='indigo'] { --sw: #4A3C94; }
-.tcolor-sw[data-tcolor='navy'] { --sw: #2F3D80; }
-.tcolor-sw[data-tcolor='teal'] { --sw: #0B6E83; }
-.tcolor-sw[data-tcolor='neutral'] { --sw: #4F5675; }
-.tcolor-sw[data-tcolor='bronze'] { --sw: #7A5200; }
+/* Titik swatch = warna --tc tema itu, supaya terbaca (>= 3:1) di atas tombol kartu gelap maupun terang */
+.tcolor-sw[data-tcolor='indigo'] { --sw: #B5A8F5; }
+.tcolor-sw[data-tcolor='navy'] { --sw: #9DB0F2; }
+.tcolor-sw[data-tcolor='teal'] { --sw: #5CC7DD; }
+.tcolor-sw[data-tcolor='neutral'] { --sw: #B4BAD6; }
+.tcolor-sw[data-tcolor='bronze'] { --sw: #E0B35A; }
+:root.theme-light .tcolor-sw[data-tcolor='indigo'] { --sw: #4A3C94; }
+:root.theme-light .tcolor-sw[data-tcolor='navy'] { --sw: #2F3D80; }
+:root.theme-light .tcolor-sw[data-tcolor='teal'] { --sw: #0B6E83; }
+:root.theme-light .tcolor-sw[data-tcolor='neutral'] { --sw: #4F5675; }
+:root.theme-light .tcolor-sw[data-tcolor='bronze'] { --sw: #7A5200; }
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) .tcolor-sw[data-tcolor='indigo'] { --sw: #4A3C94; }
+  :root:not(.theme-dark) .tcolor-sw[data-tcolor='navy'] { --sw: #2F3D80; }
+  :root:not(.theme-dark) .tcolor-sw[data-tcolor='teal'] { --sw: #0B6E83; }
+  :root:not(.theme-dark) .tcolor-sw[data-tcolor='neutral'] { --sw: #4F5675; }
+  :root:not(.theme-dark) .tcolor-sw[data-tcolor='bronze'] { --sw: #7A5200; }
+}
 .tcolor-preview { margin: var(--space-2) 0; }
 
 /* Peta fitur */
