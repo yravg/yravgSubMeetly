@@ -102,4 +102,4 @@ then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
   `npm run qa` after merge: run-20261108-145858 (before spec update) 10 pass 5 fail; run-20261108-151018 14 pass, 1 fail (TC010, minutes worker).
 - island2 merged (2026-11-08) 17c98db: see S7 row.
 - s4 merged (2026-11-08) a595096: see S4 row. Worker stopped. To close ENG-003 run (needs a faster network): `HF_HOME=engine-rs/.hf-cache TRANSLATE_TEST_MODEL=Qwen/Qwen2.5-0.5B-Instruct cargo test --release --manifest-path engine-rs/Cargo.toml --test ml_golden qwen_translation -- --ignored --nocapture`.
-- Still running: minutes (ctx_d660a26755a6, also fixes TC010).
+- Still running: minutes (ctx_d660a26755a6, also fixes TC010); addins (Sonnet ctx_9e65c01cd0dc, worktree sm-addins, branch yravg/sm-addins, spec scratchpad specs/w-addins.md: board T05 Side panel › Settings › Add-ins + Add-in API v0 as declarative MV3 manifests, two examples Flag decision and Actions; ADD-001, THB step 5); lead runs the Qwen property test in the sm-s4 worktree (model download).
