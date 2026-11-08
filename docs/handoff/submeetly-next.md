@@ -60,6 +60,7 @@ add-in list, "ySub" label and theme names.
 - 5be78f3: Minutes at 390 px overflowed sideways (Add item, Export, Issue MoM off screen). Toolbar now wraps under 560 px; folded buttons keep their icon tile. `test/dock-motion.test.mjs` gained width 390 and a reachability check; failed before the CSS change.
 - c3679ae: store capture shot 03 timed out because the notes sample opens Minutes in a new tab and the panel tab ran in the background. Capture closes extra tabs and refocuses; shot 03 is the Helper tab.
 - 8962ef5: the Native Helper card hardcoded Indonesian. Strings in i18n (en/zh/id), OS steps en+id via `guideFor(os, lang)`. `test/helper-status-i18n.test.mjs` 20 (failed first). Re-check button no longer wraps.
+- ENG-003: Qwen2.5-0.5B download stalled at 952/988 MB; resumed with curl, sha256 matched the blob name. `qwen_translation_properties` (ignored test, HF_HUB_OFFLINE=1) pass in 58.6 s. Meaning errors seen: en->ja tense, refine en->id Friday -> Sabtu. Next: compare with the Python helper on the same lines before S5.
 - Checked and not a bug: History > Export "OS default" with a real mouse at 800x600, 1280x800, 390x844.
 - On the branch: `npm run build` ok, `npm test` 427: 410 pass, 0 fail, 17 skipped; `npm run qa` 19/19 (qa/runs/run-20261108-222243.json); store PNGs viewed.
 
