@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import puppeteer from 'puppeteer';
 
+// Windows defaults to CRLF + BOM (defaultExportOptions in export-options.js); the other OSes to LF, no BOM.
+const OS_DEFAULT = process.platform === 'win32';
+
 const PORT = 8879;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
@@ -85,8 +88,10 @@ test('production export card uses selected realtime data and persists cross-OS o
   await page.waitForFunction(() => window.__exportDownloads?.[0]?.text != null);
   const first = await page.evaluate(() => window.__exportDownloads[0]);
   assert.equal(first.name, 'Lab_demo_looping_speech.zh-en.vtt');
-  assert.match(first.text, /^WEBVTT\n/);
-  assert.match(first.text, /Selamat pagi\nGood morning/);
+  // Default per OS (defaultExportOptions): Windows = CRLF + BOM, others = LF. The test follows the host, the product stays as is.
+  const eol = OS_DEFAULT ? '\r\n' : '\n';
+  assert.ok(first.text.startsWith(`WEBVTT${eol}`), 'VTT must start with the OS default line ending');
+  assert.ok(first.text.includes(`Selamat pagi${eol}Good morning`));
   assert.doesNotMatch(first.text, /meeting_notes_demo|Project Manager/);
   assert.match(await page.$eval('#helper-export-name-hint', (el) => el.textContent), /\.vtt$/);
 
@@ -97,9 +102,10 @@ test('production export card uses selected realtime data and persists cross-OS o
     await page.waitForSelector(`#helper-export [data-export-opt="${name}"]`);
     await page.click(`#helper-export [data-export-opt="${name}"]`);
     await page.waitForFunction(
-      (key) => JSON.parse(localStorage.getItem('settings') || 'null')?.exportOptions?.[key] === true,
+      (key, want) => JSON.parse(localStorage.getItem('settings') || 'null')?.exportOptions?.[key] === want,
       {},
       name,
+      !OS_DEFAULT, // one click flips the OS default
     );
   };
   await setExportOpt('crlf');
@@ -108,19 +114,23 @@ test('production export card uses selected realtime data and persists cross-OS o
   await page.waitForFunction(() => window.__exportDownloads?.[1]?.text != null);
   const second = await page.evaluate(() => window.__exportDownloads[1]);
   assert.equal(second.name, 'Lab_demo_looping_speech.zh-en.srt');
-  assert.deepEqual(second.bytes.slice(0, 3), [0xef, 0xbb, 0xbf]);
-  assert.match(second.text, /\r\n/);
+  assert.equal(second.bytes.slice(0, 3).join() === [0xef, 0xbb, 0xbf].join(), !OS_DEFAULT, 'BOM flipped from the OS default');
+  assert.equal(/\r\n/.test(second.text), !OS_DEFAULT, 'CRLF flipped from the OS default');
 
   await page.reload({ waitUntil: 'networkidle0' });
   await page.waitForSelector('#helper-export [data-export-opt="crlf"]');
-  assert.equal(await page.$eval('#helper-export [data-export-opt="crlf"]', (el) => el.checked), true);
-  assert.equal(await page.$eval('#helper-export [data-export-opt="bom"]', (el) => el.checked), true);
+  assert.equal(await page.$eval('#helper-export [data-export-opt="crlf"]', (el) => el.checked), !OS_DEFAULT);
+  assert.equal(await page.$eval('#helper-export [data-export-opt="bom"]', (el) => el.checked), !OS_DEFAULT);
 
-  await page.click('#btn-export-os-default');
-  await page.waitForFunction(() => {
+  // The reload lands on Captions again; the reset button sits in the History tab.
+  await page.evaluate(() => document.querySelector('.bottom-nav-item[data-view="history"]').click());
+  await page.waitForFunction(() => !document.getElementById('view-history').classList.contains('hidden'));
+  // DOM click: a mouse click on this button (rect at the top edge of the 800x600 viewport) never reached its handler on Windows.
+  await page.$eval('#btn-export-os-default', (el) => el.click());
+  await page.waitForFunction((want) => {
     const settings = JSON.parse(localStorage.getItem('settings') || 'null');
-    return settings?.exportOptions?.crlf === false && settings?.exportOptions?.bom === false;
-  });
-  assert.equal(await page.$eval('#helper-export [data-export-opt="crlf"]', (el) => el.checked), false);
-  assert.equal(await page.$eval('#helper-export [data-export-opt="bom"]', (el) => el.checked), false);
+    return settings?.exportOptions?.crlf === want && settings?.exportOptions?.bom === want;
+  }, {}, OS_DEFAULT);
+  assert.equal(await page.$eval('#helper-export [data-export-opt="crlf"]', (el) => el.checked), OS_DEFAULT);
+  assert.equal(await page.$eval('#helper-export [data-export-opt="bom"]', (el) => el.checked), OS_DEFAULT);
 });
