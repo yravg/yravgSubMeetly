@@ -17,7 +17,7 @@ export function detectOs() {
 export const OS_GUIDES = {
   macos: {
     label: 'macOS',
-    engine: 'mlx-whisper (Apple Silicon) / faster-whisper',
+    engine: 'Rust engine (candle, CPU)',
     steps: {
       en: [
         'Run ./scripts/ensure-native.sh or native/run.sh',
@@ -33,16 +33,16 @@ export const OS_GUIDES = {
   },
   windows: {
     label: 'Windows',
-    engine: 'faster-whisper (CPU/CUDA)',
+    engine: 'Rust engine (candle, CPU/CUDA)',
     steps: {
       en: [
-        'Install Python 3, then run native\\run.bat (or native\\run.sh in Git Bash)',
+        'Install the engine (Setup installer) or build it, then run native\\run.bat',
         'Register the Native Messaging host for Chrome (manifest in native/)',
         'Open http://127.0.0.1:17865/health — it must answer {ok:true}',
         'In the extension choose Engine → Native helper',
       ],
       id: [
-        'Install Python 3 + jalankan native\\run.sh (Git Bash) atau native\\run.bat bila ada',
+        'Pasang engine (installer Setup) atau bangun, lalu jalankan native\\run.bat',
         'Daftarkan Native Messaging Host untuk Chrome (manifest di native/)',
         'Buka http://127.0.0.1:17865/health — harus {ok:true}',
         'Di ekstensi pilih Engine → Native helper',
@@ -51,16 +51,16 @@ export const OS_GUIDES = {
   },
   linux: {
     label: 'Linux',
-    engine: 'faster-whisper (CPU/CUDA)',
+    engine: 'Rust engine (candle, CPU/CUDA)',
     steps: {
       en: [
-        'Create a venv with python3 -m venv in native/, then run ./native/run.sh',
+        'Build the engine (cargo build --release -p submeetly-engine), then run ./native/run.sh',
         'Install the Native Messaging host (JSON in ~/.config/google-chrome/NativeMessagingHosts/)',
         'Check with curl -sf http://127.0.0.1:17865/health',
         'Side Panel → Native helper',
       ],
       id: [
-        'python3 -m venv di native/ lalu ./native/run.sh',
+        'Bangun engine (cargo build --release -p submeetly-engine), lalu ./native/run.sh',
         'Pasang host Native Messaging (JSON di ~/.config/google-chrome/NativeMessagingHosts/)',
         'Verifikasi curl -sf http://127.0.0.1:17865/health',
         'Side Panel → Native helper',
@@ -69,7 +69,7 @@ export const OS_GUIDES = {
   },
   unknown: {
     label: { en: 'this OS', id: 'OS ini', zh: '此系统' },
-    engine: 'faster-whisper / mlx-whisper',
+    engine: 'Rust engine (candle)',
     steps: {
       en: ['Follow the Native Helper README', 'Make sure port 17865 answers /health'],
       id: ['Ikuti README Native Helper', 'Pastikan port 17865 menjawab /health'],

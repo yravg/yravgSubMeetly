@@ -78,11 +78,11 @@ test('troubleshooting: unique ids, bilingual, cmd maps only to known OS keys', (
   assert.ok(troubleshootingFor('windows').some((e) => e.id === 'cpu-slow'));
   assert.ok(!troubleshootingFor('macos').some((e) => e.id === 'cpu-slow'));
   assert.ok(!troubleshootingFor('linux').some((e) => e.id === 'firewall'));
-  assert.equal(cmdFor(TROUBLESHOOTING.find((e) => e.id === 'ffmpeg'), 'windows'), 'winget install Gyan.FFmpeg');
+  assert.equal(cmdFor(TROUBLESHOOTING.find((e) => e.id === 'engine-missing'), 'windows'), 'cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml');
   assert.equal(cmdFor(TROUBLESHOOTING.find((e) => e.id === 'engine-browser'), 'linux'), '');
 });
 
-test('guideOsFor: unknown UA falls back to linux (faster-whisper path)', () => {
+test('guideOsFor: unknown UA falls back to linux (engine path)', () => {
   assert.equal(guideOsFor('unknown'), 'linux');
   assert.equal(guideOsFor('macos'), 'macos');
   assert.equal(pickLang({ en: 'a', id: 'b' }, 'id'), 'b');
@@ -143,7 +143,7 @@ test('relevantTroubleshooting: entries tied to failing checks float to the top a
   assert.equal(tips[0].id, 'not-running');
   assert.equal(tips[0].flagged, 'fail');
   const flaggedFail = tips.filter((t) => t.flagged === 'fail').map((t) => t.id);
-  assert.deepEqual(flaggedFail, ['not-running', 'port-busy', 'firewall', 'python-missing']);
+  assert.deepEqual(flaggedFail, ['not-running', 'port-busy', 'firewall', 'engine-missing']);
   assert.equal(tips.find((t) => t.id === 'host-missing').flagged, 'warn');
   assert.equal(tips.find((t) => t.id === 'model-download').flagged, null);
   // fail group precedes warn group precedes null group
@@ -169,7 +169,7 @@ test('diagnostik host: keadaan sambungan membedakan ditolak / gagal jalan / belu
 
   const crashed = hostCheck({ ...base, hostConnection: { state: 'crashed' }, hostInstalled: true });
   assert.equal(crashed.state, 'fail');
-  assert.match(crashed.detail, /Python/);
+  assert.match(crashed.detail, /engine path/);
 
   assert.equal(hostCheck({ ...base, hostConnection: { state: 'not-installed' } }).state, 'warn');
   assert.equal(hostCheck({ ...base, hostConnection: { state: 'timeout' } }).state, 'warn');

@@ -246,7 +246,7 @@ const en = {
   nativeHostMissing:
     'Native launcher not installed. Run: ./scripts/ensure-native.sh  — or manually: cd native && ./run.sh',
   nativeNote:
-    'Native engine: Whisper Large v3 Turbo on the Apple Silicon GPU (MLX). The helper downloads its own models on first run (~1.6 GB). Use Start/Stop above once the launcher is installed.',
+    'Native engine: Whisper Large v3 Turbo in the Rust engine (CPU; CUDA if built with it). The helper downloads its own models on first run (~1.6 GB). Use Start/Stop above once the launcher is installed.',
   check: 'Refresh',
   theme: 'Theme',
   themeAuto: 'Auto',
@@ -320,7 +320,7 @@ const en = {
   helperDeviceAuto_hint: 'Auto picks CUDA when an NVIDIA GPU + CUDA runtime is found, otherwise CPU (int8).',
   helperDeviceCpu_hint: 'CPU only (int8). Works everywhere; large models are slow — prefer Whisper small/base here.',
   helperDeviceCuda_hint: 'NVIDIA GPU via CUDA 12 (float16). Needs the driver + cuBLAS/cuDNN; falls back to CPU if unavailable.',
-  helperDeviceApple: 'Apple Silicon runs on the GPU/Neural Engine through MLX — no CPU/GPU switch needed.',
+  helperDeviceApple: 'On macOS the Rust engine runs on the CPU (Metal is untested) — no CPU/GPU switch needed.',
   helperDeviceRestart: 'Saved — Restart the helper to apply.',
   helperDeviceManual: (d) => `This helper build has no device setting yet — restart it with DEVICE=${d} (e.g. DEVICE=${d} ./run.sh).`,
   helperDeviceNoCuda: 'No CUDA device detected on the helper — CUDA will fall back to CPU.',
@@ -567,7 +567,7 @@ const zh = {
   nativeHostMissing:
     '未安装原生启动器。请运行：./scripts/ensure-native.sh  — 或手动：cd native && ./run.sh',
   nativeNote:
-    '原生引擎：在 Apple Silicon GPU（MLX）上运行 Whisper Large v3 Turbo。助手首次运行时自行下载模型（约 1.6 GB）。安装启动器后可使用上方启动/停止按钮。',
+    '原生引擎：在 Rust 引擎中运行 Whisper Large v3 Turbo（CPU；若以 CUDA 构建则可用 GPU）。助手首次运行时自行下载模型（约 1.6 GB）。安装启动器后可使用上方启动/停止按钮。',
   pickManually: '🖥 手动选择标签页 / 窗口',
   pickHint:
     '在选择器中选择正在播放视频的 Chrome 标签页，并勾选“同时共享标签页音频”。（macOS 不支持窗口/屏幕的系统音频，请选择标签页。）',
@@ -622,7 +622,7 @@ const zh = {
   helperDeviceAuto_hint: '自动：检测到 NVIDIA GPU + CUDA 时用 CUDA，否则用 CPU（int8）。',
   helperDeviceCpu_hint: '仅 CPU（int8）。随处可用，但大模型较慢——建议 Whisper small/base。',
   helperDeviceCuda_hint: 'NVIDIA GPU，CUDA 12（float16）。需要驱动 + cuBLAS/cuDNN；不可用时回退到 CPU。',
-  helperDeviceApple: 'Apple Silicon 通过 MLX 使用 GPU/神经引擎——无需切换 CPU/GPU。',
+  helperDeviceApple: 'macOS 上 Rust 引擎使用 CPU（Metal 尚未测试）——无需切换 CPU/GPU。',
   helperDeviceRestart: '已保存——重启助手后生效。',
   helperDeviceManual: (d) => `此助手版本尚无设备设置——请用 DEVICE=${d} 重启（如 DEVICE=${d} ./run.sh）。`,
   helperDeviceNoCuda: '助手上未检测到 CUDA 设备——CUDA 将回退到 CPU。',
@@ -909,7 +909,7 @@ export const I18N = {
     helperDeviceAuto_hint: 'Otomatis memakai CUDA bila ada GPU NVIDIA + runtime CUDA, selain itu CPU (int8).',
     helperDeviceCpu_hint: 'Hanya CPU (int8). Jalan di mana saja; model besar lambat — pakai Whisper small/base.',
     helperDeviceCuda_hint: 'GPU NVIDIA lewat CUDA 12 (float16). Butuh driver + cuBLAS/cuDNN; mundur ke CPU bila tak tersedia.',
-    helperDeviceApple: 'Apple Silicon memakai GPU/Neural Engine lewat MLX — tidak perlu saklar CPU/GPU.',
+    helperDeviceApple: 'Di macOS engine Rust memakai CPU (Metal belum diuji) — tidak perlu saklar CPU/GPU.',
     helperDeviceRestart: 'Tersimpan — Restart helper untuk menerapkan.',
     helperDeviceManual: (d) => `Build helper ini belum punya pengaturan device — jalankan ulang dengan DEVICE=${d} (mis. DEVICE=${d} ./run.sh).`,
     helperDeviceNoCuda: 'CUDA tidak terdeteksi di helper — CUDA akan mundur ke CPU.',
