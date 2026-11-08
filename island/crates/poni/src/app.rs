@@ -1221,6 +1221,7 @@ impl App {
                         VK_BACK => Some(KeyInput::Backspace),
                         VK_DELETE => Some(KeyInput::Delete),
                         VK_RETURN => Some(KeyInput::Enter),
+                        VK_TAB => Some(KeyInput::Tab),
                         VK_ESCAPE => Some(KeyInput::Escape),
                         VK_LEFT => Some(KeyInput::Left),
                         VK_RIGHT => Some(KeyInput::Right),

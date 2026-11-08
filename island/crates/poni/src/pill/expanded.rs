@@ -65,6 +65,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, body: Rect, page: PageKind, transiti
     if tr.is_some() {
         ui.c.pop_shape_mask();
     }
+    pages::menu::draw_list(ui, st, body, header, page);
     // Hover labels sit on top of the page, outside the content clip.
     if let Some(tip) = tip {
         draw_tip(ui, body, header, &tip);
