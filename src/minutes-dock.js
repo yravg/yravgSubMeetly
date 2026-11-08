@@ -48,7 +48,10 @@ export function defaultLayout() {
     left: { mode: 'docked', size: 232, x: 60, y: 80, w: 260, h: 440 },
     right: { mode: 'docked', size: 520, x: 700, y: 60, w: 520, h: 600 },
     bottom: { mode: 'docked', size: 190, x: 260, y: 300, w: 760, h: 260 },
-    dock: { pos: 'bottom', x: 300, y: 300, mini: false },
+    // Navigator terbuka secara bawaan, jadi dok mulai sebagai ikon (D01): satu-satunya
+    // permukaan besar adalah register. Hover/klik tetap membukanya; yang sudah
+    // menyimpan tata letak sendiri tidak berubah.
+    dock: { pos: 'bottom', x: 300, y: 300, mini: true },
   };
 }
 
