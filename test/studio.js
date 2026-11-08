@@ -7,7 +7,7 @@ import {
   simulateFallback,
 } from './studio-lib.js';
 import { generateSrt, generateVtt, generateTxt } from './studio-export.js';
-import { exportBasename, detectOs, OS_GUIDES } from '../src/lib/helper-status.js';
+import { exportBasename, detectOs, guideFor } from '../src/lib/helper-status.js';
 import { saveExportFile } from '../src/lib/export.js';
 
 const $ = (id) => document.getElementById(id);
@@ -119,7 +119,7 @@ function setEngine(e, note = '') {
 async function probeHelper() {
   const pill = $('helper-pill');
   const os = detectOs();
-  const guide = OS_GUIDES[os] || OS_GUIDES.unknown;
+  const guide = guideFor(os, 'id');
   let online = false;
   let health = null;
   try {

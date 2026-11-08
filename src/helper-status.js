@@ -1,7 +1,7 @@
 /**
  * Kartu status helper lintas platform + indikator mode + berkas besar (stub UI).
  */
-import { detectOs, OS_GUIDES, STUB_LARGE_FILE, formatBytes } from './lib/helper-status.js';
+import { detectOs, guideFor, STUB_LARGE_FILE, formatBytes } from './lib/helper-status.js';
 import { formatSrt, formatVtt, formatTxt } from './lib/transcript-cache.js';
 import { STUB_TRANSCRIPT } from './lib/notes-stub.js';
 import { I18N } from './lib/i18n.js';
@@ -41,7 +41,7 @@ function escapeHtml(s) {
  */
 export function renderHelperStatusCard(root, opts) {
   const os = opts.os || detectOs();
-  const guide = OS_GUIDES[os] || OS_GUIDES.unknown;
+  const guide = guideFor(os, opts.lang || 'en');
   const online = !!opts.online;
   const health = opts.health || null;
   const engine = opts.engine || 'browser';
@@ -78,15 +78,15 @@ export function renderHelperStatusCard(root, opts) {
     <div class="helper-status" data-os="${escapeHtml(os)}">
       <div class="notes-status-row">
         <span class="notes-pill ${online ? 'ready' : 'error'}" id="helper-conn-pill">
-          ${online ? 'Helper terhubung' : 'Helper terputus'}
+          ${escapeHtml(tt(online ? 'hsConnected' : 'hsDisconnected'))}
         </span>
         <span class="notes-meta">${escapeHtml(guide.label)} · ${escapeHtml(guide.engine)}</span>
       </div>
 
       <div class="helper-indicators" id="helper-mode-indicators">
-        <span class="notes-pill idle">Mode: <strong>${escapeHtml(mode)}</strong></span>
-        <span class="notes-pill idle">Tugas: <strong>${escapeHtml(task)}</strong></span>
-        <span class="notes-pill idle">Mesin: <strong>${escapeHtml(engine)}</strong></span>
+        <span class="notes-pill idle">${escapeHtml(tt('hsMode'))}: <strong>${escapeHtml(mode)}</strong></span>
+        <span class="notes-pill idle">${escapeHtml(tt('hsTask'))}: <strong>${escapeHtml(task)}</strong></span>
+        <span class="notes-pill idle">${escapeHtml(tt('hsEngine'))}: <strong>${escapeHtml(engine)}</strong></span>
         ${
           health
             ? `<span class="notes-pill ready">${escapeHtml(health.engine || 'asr')} · ${escapeHtml((health.model || '').split('/').pop() || '')}</span>`
@@ -102,12 +102,11 @@ export function renderHelperStatusCard(root, opts) {
       </div>
 
       <div id="helper-disconnect-banner" class="helper-banner ${online || engine !== 'native' ? 'hidden' : ''}">
-        <strong>Helper terputus</strong> — subtitel tab lewat mesin native tidak bisa berjalan.
-        Beralih ke Browser di Settings, atau ikuti panduan ${escapeHtml(guide.label)} di bawah.
+        <strong>${escapeHtml(tt('hsDisconnected'))}</strong> — ${escapeHtml(tt('hsDisconnectedBody', guide.label))}
       </div>
 
       <div class="notes-block">
-        <h3>Panduan ${escapeHtml(guide.label)}</h3>
+        <h3>${escapeHtml(tt('hsGuideTitle', guide.label))}</h3>
         <ol class="helper-steps">
           ${guide.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}
         </ol>

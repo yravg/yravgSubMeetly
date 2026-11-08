@@ -13,45 +13,77 @@ export function detectOs() {
   return 'unknown';
 }
 
+// Steps per UI language; `guideFor` falls back to English (zh reads commands and paths fine in English).
 export const OS_GUIDES = {
   macos: {
     label: 'macOS',
     engine: 'mlx-whisper (Apple Silicon) / faster-whisper',
-    steps: [
-      'Jalankan ./scripts/ensure-native.sh atau native/run.sh',
-      'Pastikan Native Messaging Host com.yraveragesubmin.helper terpasang',
-      'Side Panel → Settings → Engine → Native helper',
-    ],
+    steps: {
+      en: [
+        'Run ./scripts/ensure-native.sh or native/run.sh',
+        'Make sure the Native Messaging host com.yraveragesubmin.helper is installed',
+        'Side Panel → Settings → Engine → Native helper',
+      ],
+      id: [
+        'Jalankan ./scripts/ensure-native.sh atau native/run.sh',
+        'Pastikan Native Messaging Host com.yraveragesubmin.helper terpasang',
+        'Side Panel → Settings → Engine → Native helper',
+      ],
+    },
   },
   windows: {
     label: 'Windows',
     engine: 'faster-whisper (CPU/CUDA)',
-    steps: [
-      'Install Python 3 + jalankan native\\run.sh (Git Bash) atau native\\run.bat bila ada',
-      'Daftarkan Native Messaging Host untuk Chrome (manifest di native/)',
-      'Buka http://127.0.0.1:17865/health — harus {ok:true}',
-      'Di ekstensi pilih Engine → Native helper',
-    ],
+    steps: {
+      en: [
+        'Install Python 3, then run native\\run.bat (or native\\run.sh in Git Bash)',
+        'Register the Native Messaging host for Chrome (manifest in native/)',
+        'Open http://127.0.0.1:17865/health — it must answer {ok:true}',
+        'In the extension choose Engine → Native helper',
+      ],
+      id: [
+        'Install Python 3 + jalankan native\\run.sh (Git Bash) atau native\\run.bat bila ada',
+        'Daftarkan Native Messaging Host untuk Chrome (manifest di native/)',
+        'Buka http://127.0.0.1:17865/health — harus {ok:true}',
+        'Di ekstensi pilih Engine → Native helper',
+      ],
+    },
   },
   linux: {
     label: 'Linux',
     engine: 'faster-whisper (CPU/CUDA)',
-    steps: [
-      'python3 -m venv di native/ lalu ./native/run.sh',
-      'Pasang host Native Messaging (JSON di ~/.config/google-chrome/NativeMessagingHosts/)',
-      'Verifikasi curl -sf http://127.0.0.1:17865/health',
-      'Side Panel → Native helper',
-    ],
+    steps: {
+      en: [
+        'Create a venv with python3 -m venv in native/, then run ./native/run.sh',
+        'Install the Native Messaging host (JSON in ~/.config/google-chrome/NativeMessagingHosts/)',
+        'Check with curl -sf http://127.0.0.1:17865/health',
+        'Side Panel → Native helper',
+      ],
+      id: [
+        'python3 -m venv di native/ lalu ./native/run.sh',
+        'Pasang host Native Messaging (JSON di ~/.config/google-chrome/NativeMessagingHosts/)',
+        'Verifikasi curl -sf http://127.0.0.1:17865/health',
+        'Side Panel → Native helper',
+      ],
+    },
   },
   unknown: {
-    label: 'OS ini',
-    engine: 'faster-whisper atau mlx-whisper',
-    steps: [
-      'Ikuti README Native Helper',
-      'Pastikan port 17865 menjawab /health',
-    ],
+    label: { en: 'this OS', id: 'OS ini', zh: '此系统' },
+    engine: 'faster-whisper / mlx-whisper',
+    steps: {
+      en: ['Follow the Native Helper README', 'Make sure port 17865 answers /health'],
+      id: ['Ikuti README Native Helper', 'Pastikan port 17865 menjawab /health'],
+    },
   },
 };
+
+const pick = (v, lang) => (typeof v === 'string' ? v : v[lang] || v.en);
+
+/** The guide for one OS in one UI language: { label, engine, steps[] }. */
+export function guideFor(os, lang = 'en') {
+  const g = OS_GUIDES[os] || OS_GUIDES.unknown;
+  return { label: pick(g.label, lang), engine: g.engine, steps: pick(g.steps, lang) };
+}
 
 /** Nama unduhan seragam lintas OS (tanpa karakter bermasalah). */
 export function exportBasename(title, kind) {
