@@ -26,3 +26,8 @@ str0m = { version = "0.24.1", default-features = false, features = ["wincrypto"]
 
 [target.'cfg(not(windows))'.dependencies]
 str0m = { version = "0.24.1", default-features = false, features = ["rust-crypto"] }
+
+# tests/update_feed.rs runs the app's own signature check (CNG), the one in poni's services/feed.rs.
+[target.'cfg(windows)'.dev-dependencies.windows]
+version = "=0.58.0"
+features = ["Win32_Foundation", "Win32_Security_Cryptography"]

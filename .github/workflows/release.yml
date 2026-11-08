@@ -1,0 +1,53 @@
+# DRAFT. Nothing has run this: it starts only when a tag v* is pushed, and pushing it is the
+# owner's step (island/docs/updates.md, "Publishing a release"). It needs the repository
+# secret UPDATE_FEED_KEY (the PEM text of the private signing key) in the `release`
+# environment; the secret is not set anywhere yet.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches the version in island/Cargo.toml
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path island/Cargo.toml -Pattern '^version = "([0-9.]+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          if ("v$v" -ne $env:GITHUB_REF_NAME) { throw "tag $env:GITHUB_REF_NAME does not match Cargo.toml version $v" }
+          "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Tests
+        working-directory: island
+        run: cargo test -p poni-core
+
+      # Builds poni.exe and submeetly-engine.exe, then runs ISCC (Inno Setup 6 is on the runner image).
+      - name: Build the Setup
+        shell: pwsh
+        run: island/tools/build-installer.ps1
+
+      - name: Publish the release with the Setup
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create $env:GITHUB_REF_NAME "island/dist/yravgSubMeetly-Setup-$env:VERSION.exe" --title $env:GITHUB_REF_NAME --generate-notes
+
+      # latest.json describes the release just published (it reads the asset's size and
+      # SHA-256 from GitHub) and is signed with the secret key; the app trusts only the
+      # public keys in crates/poni-core/data/update-keys.txt.
+      - name: Sign latest.json and attach it
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPDATE_FEED_KEY: ${{ secrets.UPDATE_FEED_KEY }}
+        run: |
+          python island/tools/make_update_feed.py latest.json
+          gh release upload $env:GITHUB_REF_NAME latest.json --clobber

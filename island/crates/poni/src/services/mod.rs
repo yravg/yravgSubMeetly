@@ -25,6 +25,7 @@ pub mod sound;
 pub mod notifications;
 pub mod sysmon;
 pub mod sysstats;
+pub mod feed;
 pub mod update;
 
 use crate::commands::MediaCmd;

@@ -1,4 +1,4 @@
-//! New versions (docs/updates.md): https://github.com/yraverage/yraverageSubMeetly/releases/latest/download/latest.json says
+//! New versions (docs/updates.md): REPO's releases/latest/download/latest.json says
 //! which release is the latest, signed with a key from data/update-keys.txt.
 //! The app checks the signature with the system's own crypto
 //! (`services::update`); this module reads the file, refuses anything that
@@ -7,11 +7,19 @@
 
 use serde::{Deserialize, Serialize};
 
+/// The one repository whose releases this app trusts for updates. Change it
+/// here and in tools/make_update_feed.py (REPO) when the release repo moves.
+macro_rules! repo {
+    () => {
+        "yraveragework/yraveragesub"
+    };
+}
+pub const REPO: &str = repo!();
 /// Where every copy looks.
-pub const FEED_URL: &str = "https://github.com/yraverage/yraverageSubMeetly/releases/latest/download/latest.json";
+pub const FEED_URL: &str = concat!("https://github.com/", repo!(), "/releases/latest/download/latest.json");
 /// Downloads only ever come from this repository's releases.
-const DOWNLOADS: &str = "https://github.com/yraverage/yraverageSubMeetly/releases/download/v";
-const RELEASE_PAGE: &str = "https://github.com/yraverage/yraverageSubMeetly/releases/tag/v";
+const DOWNLOADS: &str = concat!("https://github.com/", repo!(), "/releases/download/v");
+const RELEASE_PAGE: &str = concat!("https://github.com/", repo!(), "/releases/tag/v");
 /// The file's layout this version reads. A file with a newer one is ignored
 /// (a later version of the app will read it).
 pub const SCHEMA: u64 = 1;
@@ -247,7 +255,7 @@ fn hex(s: &str) -> Option<Vec<u8>> {
 }
 
 /// Standard base64 (with or without padding).
-pub(crate) fn base64(s: &str) -> Option<Vec<u8>> {
+pub fn base64(s: &str) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(s.len() * 3 / 4);
     let (mut acc, mut bits) = (0u32, 0u32);
     for c in s.trim_end_matches('=').bytes() {
@@ -272,21 +280,26 @@ pub(crate) fn base64(s: &str) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sha256;
 
     const V: &str = "0.2.3";
     const SHA: &str = "8f30919c3c13e7074ae0381d9b478e1ef5fb802476b637f5febefe949d26e26b";
 
     fn payload(version: &str, extra: &str) -> String {
         format!(
-            r#"{{"schema":1,"version":"{version}","date":"2026-10-25","headline":"Sing along from the closed island","notes":"https://github.com/yraverage/yraverageSubMeetly/releases/tag/v{version}","windows":{{"url":"https://github.com/yraverage/yraverageSubMeetly/releases/download/v{version}/yravgSubMeetly-Setup-{version}.exe","size":2457657,"sha256":"{SHA}"}}{extra}}}"#
+            r#"{{"schema":1,"version":"{version}","date":"2026-10-25","headline":"Sing along from the closed island","notes":"https://github.com/yraveragework/yraveragesub/releases/tag/v{version}","windows":{{"url":"https://github.com/yraveragework/yraveragesub/releases/download/v{version}/yravgSubMeetly-Setup-{version}.exe","size":2457657,"sha256":"{SHA}"}}{extra}}}"#
         )
     }
 
     #[test]
     fn the_built_in_keys_are_trusted_and_others_are_not() {
-        let k = trusted_key("4cb3280eaea65b50").expect("signing key");
+        let k = trusted_key("ad662e29df0544ce").expect("signing key");
         assert_eq!(k[0], 4);
-        assert!(trusted_key("f835f77c60bd2b7f").is_some(), "spare key");
+        // Another vendor's keys (Oyenza Studio's two, which this file once listed) are not ours to trust.
+        assert_eq!(trusted_key("4cb3280eaea65b50"), None);
+        assert_eq!(trusted_key("f835f77c60bd2b7f"), None);
+        // The id is the first 16 hex digits of the point's SHA-256, as the signing script computes it.
+        assert_eq!(&sha256::hex(&sha256::sha256(&k))[..16], "ad662e29df0544ce");
         assert_eq!(trusted_key("0000000000000000"), None);
         assert_eq!(trusted_key(""), None);
     }
@@ -294,11 +307,11 @@ mod tests {
     #[test]
     fn the_file_reads_its_signature_and_key() {
         let sig = "A".repeat(85) + "Q==";
-        let file = format!(r#"{{"about":"…","payload":"{{}}","signature":"{sig}","key":"4cb3280eaea65b50"}}"#);
+        let file = format!(r#"{{"about":"…","payload":"{{}}","signature":"{sig}","key":"ad662e29df0544ce"}}"#);
         let s = parse_file(&file).unwrap();
         assert_eq!(s.payload, "{}");
         assert_eq!(s.signature.len(), 64);
-        assert!(parse_file(&file.replace("4cb3280eaea65b50", "deadbeefdeadbeef")).unwrap_err().contains("doesn't trust"));
+        assert!(parse_file(&file.replace("ad662e29df0544ce", "deadbeefdeadbeef")).unwrap_err().contains("doesn't trust"));
         assert!(parse_file(&file.replace(&sig, "AAAA")).is_err());
         assert!(parse_file("<html>").is_err());
     }
@@ -309,7 +322,7 @@ mod tests {
         assert_eq!((r.version.as_str(), r.date.as_str(), r.headline.as_str()), (V, "2026-10-25", "Sing along from the closed island"));
         assert_eq!(r.download(false).map(|d| d.size), Some(2457657));
         assert_eq!(r.download(true), None, "no DMG yet");
-        let mac = r#","mac":{"url":"https://github.com/yraverage/yraverageSubMeetly/releases/download/v0.2.3/yravgSubMeetly-0.2.3-mac.dmg","size":3667341,"sha256":"fabc80efc387be83d7f82702bede7c3d2470f7aa6ef62cc2a8cd095a425f3fb9"}"#;
+        let mac = r#","mac":{"url":"https://github.com/yraveragework/yraveragesub/releases/download/v0.2.3/yravgSubMeetly-0.2.3-mac.dmg","size":3667341,"sha256":"fabc80efc387be83d7f82702bede7c3d2470f7aa6ef62cc2a8cd095a425f3fb9"}"#;
         let r = parse_payload(&payload(V, mac)).unwrap();
         assert_eq!(r.download(true).map(|d| d.size), Some(3667341));
         // Each download knows its release's version (a Mac checks the app in the DMG against it).
@@ -323,7 +336,7 @@ mod tests {
     fn a_payload_pointing_elsewhere_is_refused() {
         let p = payload(V, "");
         // Downloads from another place, another version's folder, or a path that climbs out.
-        assert!(parse_payload(&p.replace("https://github.com/yraverage/yraverageSubMeetly/releases/download", "https://example.com/x")).is_err());
+        assert!(parse_payload(&p.replace("https://github.com/yraveragework/yraveragesub/releases/download", "https://example.com/x")).is_err());
         assert!(parse_payload(&p.replace("download/v0.2.3/", "download/v0.2.2/")).is_err());
         assert!(parse_payload(&p.replace("yravgSubMeetly-Setup-0.2.3.exe", "../../x/evil.exe")).is_err());
         // Notes elsewhere, a bad hash, a newer layout, not a version.

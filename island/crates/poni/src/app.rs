@@ -86,7 +86,7 @@ const WTS_SESSION_LOCK_: usize = 7;
 const WTS_SESSION_UNLOCK_: usize = 8;
 
 /// Steps for copying the Apple Music token (README).
-const APPLE_MUSIC_HELP_URL: &str = "https://github.com/yraverage/yraverageSubMeetly#apple-music-lyrics";
+const APPLE_MUSIC_HELP_URL: &str = "https://github.com/yraveragework/yraveragesub#apple-music-lyrics";
 /// Phone drop closes itself after this long without a request from a phone.
 const PHONE_IDLE_S: f64 = 600.0;
 
