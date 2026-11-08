@@ -2,7 +2,7 @@
 
 Ekstensi Chrome berjalan **sama** di Windows, Linux, dan macOS — panduan
 ekstensi berlaku penuh. Yang berbeda di Windows/Linux hanya **Native Helper**:
-mesin ASR-nya `faster-whisper` (CPU, atau GPU NVIDIA lewat CUDA), dan cara
+mesin ASR-nya engine Rust `submeetly-engine` (CPU, atau GPU NVIDIA lewat CUDA bila dibangun dengannya), dan cara
 mendaftarkan *Native Messaging host* mengikuti aturan tiap sistem operasi.
 
 > **Status verifikasi — jujur:** skrip Windows (`run.bat`, `install-host.bat`)
@@ -26,12 +26,9 @@ terjemahan LLM lokal.
 
 ### Prasyarat
 
-- **Python 3.10+** dari python.org — centang **Add python.exe to PATH**.
-  Hindari stub *Microsoft Store* bernama `python.exe`; peluncur `py` lebih
-  bisa dipercaya, dan skrip di bawah memakainya bila ada.
-- **ffmpeg** di PATH — `winget install Gyan.FFmpeg`, atau unduh manual lalu
-  tambahkan foldernya ke PATH. Tanpa ffmpeg helper tetap hidup, tetapi berkas
-  media tidak bisa didekode.
+- **`submeetly-engine.exe`** — ikut installer **yravgSubMeetly Setup**, atau bangun
+  sendiri: `cargo build --release -p submeetly-engine --manifest-path engine-rsCargo.toml`.
+- Tidak perlu Python dan tidak perlu ffmpeg: media didekode di dalam engine.
 
 ### Menjalankan helper
 
@@ -41,7 +38,7 @@ Buka **Command Prompt** (bukan Git Bash) di folder `native`:
 run.bat
 ```
 
-Pertama kali, `run.bat` membuat `.venv`, memasang `faster-whisper`, lalu
+`run.bat` menjalankan `submeetly-engine.exe`; pertama kali dipakai ia
 mengunduh bobot model (~1,6 GB untuk `large-v3-turbo`). Jaringan lambat?
 
 ```bat
@@ -49,8 +46,7 @@ set WHISPER_MODEL=base
 run.bat
 ```
 
-Jangan pakai `run.sh` di Windows — ia skrip bash dengan tata letak venv POSIX
-dan model bawaan MLX khusus Apple yang tidak bisa dimuat faster-whisper.
+Gunakan `run.bat` di Windows; `run.sh` adalah skrip bash untuk Linux/macOS.
 
 ### Mendaftarkan Native Messaging host
 
@@ -88,19 +84,15 @@ mati. Pilihan juga bisa disimpan dari Side Panel → **Settings → Helper compu
 ### Prasyarat
 
 ```bash
-# Debian / Ubuntu
-sudo apt install python3 python3-venv ffmpeg
-# Fedora
-sudo dnf install python3 python3-virtualenv ffmpeg
-# Arch
-sudo pacman -S python ffmpeg
+# Tidak ada paket sistem yang dibutuhkan: bangun engine dengan Rust stable
+cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml
 ```
 
 ### Menjalankan helper dan mendaftarkan host
 
 ```bash
 cd native
-./run.sh                      # membuat .venv, memasang faster-whisper, mengunduh model
+./run.sh                      # menjalankan submeetly-engine; model diunduh saat pertama dipakai
 ./install-host.sh <EXT_ID>    # mendaftarkan host untuk browser yang terpasang
 curl -sf http://127.0.0.1:17865/health | head -c 200
 ```
@@ -118,7 +110,7 @@ Mencabut: `./uninstall-host.sh`.
 
 ### GPU NVIDIA
 
-Bila driver dan pustaka CUDA/cuDNN sudah ada, helper mendeteksinya sendiri.
+Hanya bila engine dibangun dengan `--features cuda` dan driver NVIDIA ada, engine memakai GPU.
 Paksa dengan `DEVICE=cuda ./run.sh`, atau simpan pilihannya dari Side Panel →
 **Settings → Helper compute**. Periksa: `curl -s 127.0.0.1:17865/engine/device`.
 
@@ -131,7 +123,7 @@ Tiga hal yang harus hijau:
 | Yang diperiksa | Cara | Diharapkan |
 | --- | --- | --- |
 | Helper hidup | `curl -s 127.0.0.1:17865/health` | JSON berisi `engine` dan `model` |
-| ffmpeg terbaca | `curl -s 127.0.0.1:17865/health` | `"ffmpeg": true` |
+| Dekoder media | `curl -s 127.0.0.1:17865/health` | `media_decoder` terisi (`"ffmpeg": false` itu normal) |
 | Bridge Native Messaging | Side Panel → kartu **Native Helper** → **Panduan & diagnostik** | pemeriksaan **host** = OK |
 
 Diagnostik di Side Panel membedakan penyebabnya, bukan hanya "gagal":
@@ -139,7 +131,7 @@ Diagnostik di Side Panel membedakan penyebabnya, bukan hanya "gagal":
 - **belum terdaftar** — jalankan installer host;
 - **ditolak** — ID ekstensi tidak ada di `allowed_origins` manifest (ID berubah
   setelah ekstensi dimuat ulang); jalankan ulang installer dengan ID yang benar;
-- **gagal jalan** — path Python di dalam manifest/pembungkus salah.
+- **gagal jalan** — path `submeetly-engine` di dalam manifest salah atau biner dipindah.
 
 ---
 
@@ -157,14 +149,12 @@ bawaan sistem operasi Anda.
 
 | Gejala | Sebabnya | Perbaikan |
 | --- | --- | --- |
-| `Python 3 tidak ditemukan` dari `run.bat` | Python belum di PATH, atau hanya stub Store | Pasang dari python.org, centang *Add to PATH*, buka Command Prompt baru |
+| `submeetly-engine not built` dari `run.bat`/`run.sh` | biner engine belum ada | pasang lewat Setup, atau `cargo build --release -p submeetly-engine` |
 | Helper hidup tapi tombol Start/Stop mati | host Native Messaging belum terdaftar | `install-host.bat <EXT_ID>` / `./install-host.sh <EXT_ID>` |
 | Start/Stop ditolak sesudah ekstensi dimuat ulang | ID ekstensi berubah | jalankan ulang installer host |
-| `"ffmpeg": false` di `/health` | ffmpeg tidak ada di PATH | pasang ffmpeg, buka terminal baru, jalankan ulang helper |
-| Unduhan model tertahan | jaringan memblokir Xet/CAS Hugging Face | peluncur sudah memaksa HTTP klasik; coba `WHISPER_MODEL=base` |
-| `python: not found` saat `./run.sh` (Linux) | venv dibuat di folder lain lalu proyek dipindah | `run.sh` membuat ulang venv sendiri; bila tetap gagal hapus `native/.venv` |
+| Unduhan model tertahan | jaringan memblokir Xet/CAS Hugging Face | coba `WHISPER_MODEL=base` atau set `HF_ENDPOINT` ke mirror |
 | Port 17865 sudah dipakai | helper lama masih jalan | matikan prosesnya, atau `curl -X POST 127.0.0.1:17865/shutdown` |
-| GPU tidak terpakai | CUDA/cuDNN tidak terdeteksi CTranslate2 | `curl -s 127.0.0.1:17865/engine/device` → `cuda_available`; pasang pustaka CUDA yang cocok |
+| GPU tidak terpakai | engine dibangun tanpa `--features cuda`, atau CUDA tidak terdeteksi | `curl -s 127.0.0.1:17865/engine/device` → `cuda_available`; pasang pustaka CUDA yang cocok |
 
 Pemeriksaan otomatis untuk kesiapan lintas OS bisa dijalankan dari repo:
 

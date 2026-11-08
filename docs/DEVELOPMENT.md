@@ -6,7 +6,7 @@ akun atau layanan awan.
 | Komponen | Folder | Toolchain | Keluaran |
 | --- | --- | --- | --- |
 | Ekstensi Chrome (MV3) | `src/` | Node 20+ (diuji Node 24), esbuild | `dist/` |
-| Native Helper | `native/` | Python 3.10+, ffmpeg; mlx-whisper (Apple Silicon) / faster-whisper | server HTTP di `127.0.0.1:17865` |
+| Native Helper | `native/` (peluncur), `engine-rs/` (kode) | Rust stable (candle); tanpa Python, tanpa ffmpeg | `submeetly-engine`: HTTP di `127.0.0.1:17865` + host Native Messaging |
 | Aplikasi macOS | `mac/` | macOS 26+, Swift 6 (Command Line Tools cukup) | `mac/build/yraverageSubMin.app` |
 
 ---
@@ -53,7 +53,7 @@ dan profil sekali pakai (`.dev-profile/`).
 
 ```bash
 cd native
-./run.sh                 # macOS/Linux: buat .venv, pasang dependensi, unduh model, jalankan
+./run.sh                 # macOS/Linux: jalankan submeetly-engine (model diunduh saat pertama dipakai)
 run.bat                  # Windows (Command Prompt)
 ./install-host.sh <EXT_ID>   # daftarkan Native Messaging host (Windows: install-host.bat)
 ```
@@ -63,12 +63,14 @@ Atau dari root repo: `./scripts/start-native.sh`, `./scripts/stop-native.sh`,
 
 Catatan yang menggigit:
 
-- `run.sh` **tidak** memakai `source .venv/bin/activate` — skrip aktivasi menyimpan path
-  absolut dan rusak begitu folder dipindah. Interpreter venv dipanggil langsung, dan venv
-  dibuat ulang bila interpreternya hilang.
-- Model bawaan `run.sh` adalah bobot **MLX khusus Apple Silicon**; di Linux/Windows
-  faster-whisper memakai `large-v3-turbo` (CTranslate2). Jangan menyilangkannya.
-- Variabel: `WHISPER_MODEL`, `ENGINE=mlx|faster`, `DEVICE=cpu|cuda`, `COMPUTE=int8|float16`,
+- Bangun engine sekali: `cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml`.
+  `run.sh`/`run.bat`/`install-host.*` mencarinya lewat `native/engine-path.sh` (`$SUBMEETLY_ENGINE`,
+  sebelah skrip, `$CARGO_TARGET_DIR/release`, `engine-rs/target/release`); tidak ditemukan → "submeetly-engine not built".
+- Di macOS engine berjalan di CPU (candle). Fitur `metal` ada di `Cargo.toml` tetapi **belum diuji**.
+- Tes Rust: `cd engine-rs && cargo fmt --check && cargo clippy -D warnings && cargo test --release`
+  (termasuk replay golden dan host Native Messaging nyata). Tes JS yang butuh engine memakai
+  `test/engine-bin.mjs` (port bebas, tidak pernah 17865) dan dilewati bila biner belum dibangun.
+- Variabel: `WHISPER_MODEL`, `DEVICE=cpu|cuda`,
   `TRANSLATE=off`, `PORT`, `HOST` (menolak non-loopback kecuali `ALLOW_REMOTE=1`),
   `ALLOWED_ORIGINS`, `STREAM_CHUNK_SEC`, `STREAM_OVERLAP_SEC`, `STREAM_MIN_BYTES`.
 - Berkas helper: `~/.yraveragesubmin/{device,engine-mode,ui-prefs,notes}.json`,

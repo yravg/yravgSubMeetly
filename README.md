@@ -10,8 +10,9 @@ This repo holds two clients built on that same idea:
 | **Browser extension** (`src/`) | Realtime floating subtitles over any Chrome/Edge tab, plus file transcription to SRT/VTT. Documented below. |
 | **macOS app** (`mac/`) | Menu-bar app putting subtitles over *any* application's audio — not just a browser tab — with file transcription and hold-to-talk dictation. See **[mac/README.md](mac/README.md)**. |
 
-An optional **native helper** (`native/`) runs Whisper large-v3-turbo on the Apple
-Silicon GPU via MLX, giving both clients a faster and more accurate engine.
+An optional **native helper** — the Rust engine `submeetly-engine` (`engine-rs/`, launched
+from `native/`) — runs Whisper large-v3-turbo locally, giving both clients a faster and
+more accurate engine. No Python needed.
 
 Inspired by the "Local AI Subtitle" extension, rebuilt from scratch on an open stack.
 
@@ -49,8 +50,8 @@ inference runs **locally** after models are downloaded and cached.
     Tiny / Base / Small (WASM or WebGPU), **Whisper Large v3 Turbo** (~565 MB, WebGPU)
     and **Voxtral Mini 3B** (~2.7 GB, WebGPU, the model the original extension uses).
   - *Native helper* — a tiny localhost server (`native/`) running **Whisper Large v3
-    Turbo on the Apple Silicon GPU via MLX** (faster-whisper on other machines). This
-    is by far the fastest and most accurate option (≈10–20× realtime), and it adds an
+    Turbo in the Rust engine** (candle: CPU everywhere, CUDA if built with it; on macOS
+    CPU, Metal behind a feature and untested). It is the most accurate option, and it adds an
     on-device **LLM translator** (Qwen2.5) for high-quality en ↔ zh / ja translation.
     See *Native helper* below.
 - **Model manager** — download / delete browser models with per-model progress bars
@@ -94,15 +95,16 @@ used automatically, so translation still works fully offline.
 ## Native helper (recommended on a Mac — fastest & most accurate)
 
 The browser engine is limited to single-threaded WASM or WebGPU. The native helper
-runs the best Whisper model on your machine's GPU and the extension talks to it over
+runs the best Whisper model on your machine and the extension talks to it over
 `http://127.0.0.1:17865` — still 100 % local, nothing leaves the computer.
 
 ```bash
 cd native && ./run.sh
 ```
 
-First run creates a virtualenv, installs `mlx-whisper` (+ `mlx-lm` for translation)
-and downloads `whisper-large-v3-turbo` (~1.6 GB) into `~/.cache/huggingface`. Then in the extension:
+`run.sh` starts the prebuilt `submeetly-engine` (build it once with
+`cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml`, or use the
+Setup installer, which ships it). First use downloads `whisper-large-v3-turbo` (~1.6 GB) into `~/.cache/huggingface`. Then in the extension:
 **Settings → Engine → Native helper** — the status dot shows online/offline, and you
 can **Start / Stop / Restart** the helper (after a one-time launcher install):
 
@@ -114,13 +116,13 @@ cd native && ./install-host.sh YOUR_EXTENSION_ID
 
 Or start manually: `cd native && ./run.sh` and leave the terminal open.
 
-- Offline (file) mode decodes audio in the browser and streams PCM to the helper, so
-  **no ffmpeg is required**.
+- Media files are decoded inside the engine, so **no ffmpeg and no Python are required**.
 - Options: `TRANSLATE=off ./run.sh` skips the translation LLM (~1.8 GB, downloaded on
-  first translation); `WHISPER_MODEL=mlx-community/whisper-small-mlx ./run.sh` for a
+  first translation); `WHISPER_MODEL=base ./run.sh` for a
   smaller model; `PORT=… ./run.sh` to change the port (update it in Settings).
-- Requires Python 3.9+ and macOS 13.5+ on Apple Silicon. On Intel/Linux/Windows the
-  script installs `faster-whisper` instead (CPU/CUDA).
+- Runs on Windows, Linux and macOS. The engine uses candle: CPU everywhere, CUDA when built
+  with `--features cuda`; on macOS the `metal` feature exists but is untested, so macOS runs on CPU.
+  See [`native/SETUP.md`](native/SETUP.md).
 
 ## Usage
 
@@ -161,7 +163,7 @@ side panel (UI) ──► service worker ── tabCapture streamId ──► of
 
 - `npm run watch` — rebuild on change.
 - **`./scripts/run-lab.sh`** — Translation Lab at `http://127.0.0.1:8799/lab.html` (media player + automated zh↔en / ja↔en benchmark against the native helper). See `test/README.md`.
-- `python3 scripts/bench-lab.py --json test/last-bench.json` — headless benchmark (no browser).
+- `python3 scripts/bench-lab.py --json test/last-bench.json` — headless benchmark (no browser; needs numpy and ffmpeg for the CC0 samples; measures whichever helper answers on :17865).
 - `node scripts/smoke.mjs` — Node smoke test of the exact transformers.js calls
   (model IDs, dtypes, output shapes) used by the extension.
 - `test/overlay-test.html`, `test/panel-test.html` — visual harnesses that run the real
@@ -177,7 +179,7 @@ side panel (UI) ──► service worker ── tabCapture streamId ──► of
 |---|---|
 | OpenAI Whisper (onnx-community exports) | MIT |
 | Mistral Voxtral Mini (onnx-community export) | Apache 2.0 |
-| Apple MLX · mlx-whisper · mlx-lm (native helper) | MIT |
+| candle · symphonia (Rust engine) | Apache-2.0 / MPL-2.0 |
 | Qwen2.5 Instruct (native translation LLM) | Apache 2.0 |
 | Hugging Face transformers.js | Apache-2.0 |
 | Microsoft ONNX Runtime Web | MIT |
