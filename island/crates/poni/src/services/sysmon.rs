@@ -162,6 +162,11 @@ impl SysMon {
         let _ = self.tx.send(Msg::Game(on));
     }
 
+    /// Measure the process listening on this loopback port on its own (None stops).
+    pub fn watch(port: Option<u16>) {
+        WATCH_PORT.store(port.map_or(0, u32::from), Ordering::Relaxed);
+    }
+
     pub fn rest(&self, rest: Rest) {
         let _ = self.tx.send(Msg::Rest(rest));
     }
@@ -345,6 +350,10 @@ pub fn probe() -> Probe {
 
 // Each failing source is logged once per run, not once a second.
 static WARNED: AtomicU32 = AtomicU32::new(0);
+/// The loopback port whose listener (the engine) is measured on its own, 0 for none.
+static WATCH_PORT: AtomicU32 = AtomicU32::new(0);
+/// How long a found engine process id is trusted before the port is asked again.
+const ENGINE_PID_TTL: Duration = Duration::from_secs(10);
 
 fn warn_once(bit: u32, what: &str) {
     if WARNED.fetch_or(bit, Ordering::Relaxed) & bit == 0 {
@@ -365,6 +374,8 @@ struct Sampler {
     cores_buf: Vec<u64>,
     cpu: Option<CpuTimes>,
     apps: AppTracker,
+    /// The engine's process id and when it was looked up.
+    engine: Option<(Instant, Option<u32>)>,
     /// The process list buffer (u64 keeps the entries 8-byte aligned).
     procs: Vec<u64>,
     /// Image name → (path, display name), for apps that made a top list.
@@ -411,6 +422,7 @@ impl Sampler {
             cores_buf: Vec::new(),
             cpu: None,
             apps: AppTracker::default(),
+            engine: None,
             procs: vec![0u64; PROC_BUF / 8],
             names: HashMap::new(),
             pdh: Pdh::open(),
@@ -440,6 +452,19 @@ impl Sampler {
             s.net = Some((Instant::now(), adapters.into_iter().map(|(luid, rx, tx)| (luid, (rx, tx))).collect()));
         }
         s
+    }
+
+    /// The process listening on the watched port, looked up every [`ENGINE_PID_TTL`].
+    fn engine_pid(&mut self) -> Option<u32> {
+        let port = WATCH_PORT.load(Ordering::Relaxed) as u16;
+        if port == 0 {
+            self.engine = None;
+            return None;
+        }
+        if self.engine.is_none_or(|(at, pid)| at.elapsed() >= if pid.is_some() { ENGINE_PID_TTL } else { Duration::from_secs(2) }) {
+            self.engine = Some((Instant::now(), listener_pid(port)));
+        }
+        self.engine.and_then(|(_, pid)| pid)
     }
 
     /// A fresh process list to measure the next full reading's app CPU and I/O against.
@@ -496,6 +521,7 @@ impl Sampler {
             if let Some(mc) = procs.iter().find(|p| p.image.eq_ignore_ascii_case("Memory Compression")) {
                 self.compressed = mc.memory;
             }
+            self.apps.watch = self.engine_pid().map(u64::from);
             let apps = self.apps.update(self.started.elapsed().as_secs_f64(), self.logical, &procs);
             top = (self.named(top_cpu(&apps, TOP_APPS)), self.named(top_memory(&apps, TOP_APPS)), self.named(top_io(&apps, TOP_APPS)));
         }
@@ -568,7 +594,7 @@ impl Sampler {
         // A laptop's battery page already says what it draws.
         let power = (full && battery.is_none()).then(|| self.power_reading(cpu.as_ref(), gpu.as_ref())).flatten();
         let (top_cpu, top_memory, top_io) = top;
-        Reading { cpu, gpu, memory, drives: self.drive_list.clone(), disk, network, battery, power, top_cpu, top_memory, top_io }
+        Reading { cpu, gpu, memory, drives: self.drive_list.clone(), disk, network, battery, power, top_cpu, top_memory, top_io, watched_cpu: self.apps.watched }
     }
 
     /// The whole PC's draw: what a power supply that reports over USB says,
@@ -1644,4 +1670,36 @@ unsafe fn query_battery(h: HANDLE) -> Option<BatteryDetails> {
         d.rate_mw = Some(st.Rate);
     }
     Some(d)
+}
+
+/// The id of the process listening on this IPv4 TCP port (loopback or any), if one is.
+fn listener_pid(port: u16) -> Option<u32> {
+    use windows::Win32::NetworkManagement::IpHelper::{GetExtendedTcpTable, MIB_TCPROW_OWNER_PID, TCP_TABLE_OWNER_PID_LISTENER};
+    use windows::Win32::Networking::WinSock::AF_INET;
+    let mut size = 0u32;
+    unsafe {
+        // The first call only reports the size; the table can grow before the second.
+        GetExtendedTcpTable(None, &mut size, false, AF_INET.0 as u32, TCP_TABLE_OWNER_PID_LISTENER, 0);
+        let mut buf = vec![0u32; (size as usize).div_ceil(4) + 64];
+        size = (buf.len() * 4) as u32;
+        if GetExtendedTcpTable(Some(buf.as_mut_ptr().cast()), &mut size, false, AF_INET.0 as u32, TCP_TABLE_OWNER_PID_LISTENER, 0) != 0 {
+            return None;
+        }
+        let n = buf[0] as usize;
+        let rows = std::slice::from_raw_parts(buf.as_ptr().add(1).cast::<MIB_TCPROW_OWNER_PID>(), n);
+        rows.iter().find(|r| u16::from_be(r.dwLocalPort as u16) == port).map(|r| r.dwOwningPid)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_listener_of_a_port_is_this_process() {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        assert_eq!(super::listener_pid(port), Some(std::process::id()));
+        drop(l);
+        assert_eq!(super::listener_pid(port), None, "nobody listens once it closed");
+    }
 }

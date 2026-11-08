@@ -19,7 +19,7 @@ use crate::ui::{wid, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Point, Rect};
 use poni_core::helper::{self, PageState};
 
-const HEIGHT: f32 = 168.0;
+const HEIGHT: f32 = 176.0;
 const BARS_MAX: usize = 5;
 
 pub fn height(_st: &AppState) -> f32 {
@@ -136,7 +136,9 @@ pub fn draw_engine(ui: &mut Ui, st: &mut AppState, area: Rect) {
         (d, "") => d.to_string(),
         (d, c) => format!("{d} \u{b7} {c}"),
     };
-    let rows = [("Engine", h.engine.clone()), ("Model", h.model.clone()), ("Device", dev), ("Translation", (if h.translate { "on" } else { "off" }).to_string())];
+    let rows = [("Engine", h.engine.clone()), ("Model", h.model.clone()), ("Device", dev), ("Translation", (if h.translate { "on" } else { "off" }).to_string()),
+        ("CPU", engine_cpu_text(st.system.latest.as_ref().and_then(|r| r.watched_cpu))),
+        ("Speed", engine_rtf_text(st.helper.snap.live.as_ref()))];
     let col = 96.0;
     for (i, (k, v)) in rows.iter().enumerate() {
         let y = area.y + i as f32 * 22.0;
@@ -146,7 +148,7 @@ pub fn draw_engine(ui: &mut Ui, st: &mut AppState, area: Rect) {
         ui.c.text(v, Rect::new(area.x + col, y, (area.w * 0.55 - col).max(0.0), 20.0), &TextStyle::body().color(tone));
     }
     if state == PageState::Needs {
-        ui.c.text("This engine cannot translate. Install the fast model to turn it on.", Rect::new(area.x, area.y + 92.0, area.w * 0.55, 34.0), &TextStyle::footnote().color(palette::ORANGE).wrap().top());
+        ui.c.text("This engine cannot translate. Install the fast model to turn it on.", Rect::new(area.x, area.y + rows.len() as f32 * 22.0 + 4.0, area.w * 0.55, 34.0), &TextStyle::footnote().color(palette::ORANGE).wrap().top());
     }
     // The last round trips, newest on the right.
     let box_ = Rect::new(area.x + area.w * 0.6, area.y, area.w * 0.4, 96.0);
@@ -161,5 +163,34 @@ pub fn draw_engine(ui: &mut Ui, st: &mut AppState, area: Rect) {
         let hgt = (*ms as f32 / top * 48.0).clamp(3.0, 48.0);
         let x = box_.x + (helper::RTT_KEPT - st.helper.rtt.len() + i) as f32 * slot;
         ui.c.fill_rrect(Rect::new(x + 1.0, base - hgt, (slot - 2.0).max(2.0), hgt), 1.5, accent);
+    }
+}
+
+/// The engine process's share of the whole PC's processor, as measured; a dash when nothing was.
+fn engine_cpu_text(share: Option<f32>) -> String {
+    share.map_or_else(|| "\u{2014}".to_string(), |s| format!("{:.1} % of the PC", s * 100.0))
+}
+
+/// The last clip's compute time over its audio length (`/live`); a dash until the engine has heard one.
+fn engine_rtf_text(live: Option<&helper::Live>) -> String {
+    match live.filter(|l| l.seq > 0).and_then(|l| l.rtf) {
+        Some(r) => format!("{r:.2} \u{d7} real time (last clip)"),
+        None => "\u{2014} (no clip heard yet)".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_engine_rows_show_only_what_was_measured() {
+        assert_eq!(engine_cpu_text(None), "\u{2014}");
+        assert_eq!(engine_cpu_text(Some(0.0312)), "3.1 % of the PC");
+        assert_eq!(engine_rtf_text(None), "\u{2014} (no clip heard yet)");
+        let idle = helper::Live::default();
+        assert_eq!(engine_rtf_text(Some(&idle)), "\u{2014} (no clip heard yet)");
+        let heard = helper::Live { seq: 3, rtf: Some(0.3456), ..helper::Live::default() };
+        assert_eq!(engine_rtf_text(Some(&heard)), "0.35 \u{d7} real time (last clip)");
     }
 }

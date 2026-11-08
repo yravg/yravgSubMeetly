@@ -2959,7 +2959,9 @@ impl App {
         }
         let dt = dt.clamp(0.0, 0.05) as f32;
         // Today's tiles need the readings only while they show (signed out it has the sign-in card, signed in the day).
-        self.set_sysmon(self.mode == Mode::Expanded(PageKind::System));
+        let engine_open = self.mode == Mode::Expanded(PageKind::Engine);
+        services::sysmon::SysMon::watch(engine_open.then(poni_core::helper::configured_port));
+        self.set_sysmon(engine_open || self.mode == Mode::Expanded(PageKind::System));
         // The Pill theme floats the island below the top edge.
         self.island.set_floating(pill::on(self.st.settings.theme).then_some(pill::TOP_GAP));
         self.island.step(dt, now);
@@ -3515,7 +3517,7 @@ impl App {
             } else {
                 crate::autostart::report(self.sink.clone(), None);
             }
-            self.set_sysmon(p == PageKind::System && self.expanded);
+            self.set_sysmon(matches!(p, PageKind::System | PageKind::Engine) && self.expanded);
             if self.text_focus {
                 self.blur_text();
             }

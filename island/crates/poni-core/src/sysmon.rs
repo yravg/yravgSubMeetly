@@ -311,6 +311,8 @@ pub struct Reading {
     pub top_cpu: Vec<AppUse>,
     pub top_memory: Vec<AppUse>,
     pub top_io: Vec<AppUse>,
+    /// CPU share of all logical processors (0..=1) of the one process [`AppTracker::watch`] names, once measured against an earlier list.
+    pub watched_cpu: Option<f32>,
 }
 
 impl Reading {
@@ -615,6 +617,10 @@ pub struct AppTracker {
     /// pid → (lower-case image, cpu time, I/O bytes) at the previous call.
     prev: HashMap<u64, (String, u64, u64)>,
     prev_at: Option<f64>,
+    /// A process to measure alone (the engine), whatever its image shares with others.
+    pub watch: Option<u64>,
+    /// Its CPU share at the last call; None when not watched or not yet measurable.
+    pub watched: Option<f32>,
 }
 
 impl AppTracker {
@@ -628,6 +634,7 @@ impl AppTracker {
         let mut groups: HashMap<String, AppUse> = HashMap::new();
         let mut lead: HashMap<String, u64> = HashMap::new();
         let mut next = HashMap::with_capacity(procs.len());
+        self.watched = None;
         for p in procs {
             let image = p.image.to_lowercase();
             next.insert(p.pid, (image.clone(), p.cpu_time, p.io));
@@ -643,6 +650,9 @@ impl AppTracker {
                 (Some(d), Some((_, _, io))) if p.io >= *io => (p.io - io) as f64 / d,
                 _ => 0.0,
             };
+            if Some(p.pid) == self.watch && ticks.is_some() && before.is_some() {
+                self.watched = Some(cpu.clamp(0.0, 1.0));
+            }
             let g = groups
                 .entry(image.clone())
                 .or_insert_with(|| AppUse { image: image.clone(), name: display_name(&p.image), pid: p.pid, ..AppUse::default() });
@@ -1104,6 +1114,18 @@ mod tests {
         assert_eq!(top.iter().map(|a| a.image.as_str()).collect::<Vec<_>>(), ["chrome.exe", "code.exe"]);
         let top = top_memory(&apps, 3);
         assert_eq!(top.iter().map(|a| a.image.as_str()).collect::<Vec<_>>(), ["chrome.exe", "code.exe", "new.exe"]);
+    }
+
+    #[test]
+    fn a_watched_process_is_measured_alone() {
+        let mut t = AppTracker { watch: Some(10), ..AppTracker::default() };
+        t.update(10.0, 4, &[proc(10, "python.exe", 0, 1), proc(11, "python.exe", 0, 1)]);
+        assert_eq!(t.watched, None, "the first list has nothing to compare with");
+        // 1 s on 4 processors = 4e7 ticks; pid 10 spent 1e7, its image-mate 3e7.
+        t.update(11.0, 4, &[proc(10, "python.exe", 10_000_000, 1), proc(11, "python.exe", 30_000_000, 1)]);
+        assert!((t.watched.unwrap() - 0.25).abs() < 1e-6, "{:?}", t.watched);
+        t.update(12.0, 4, &[proc(11, "python.exe", 30_000_000, 1)]);
+        assert_eq!(t.watched, None, "a process that left is not measured");
     }
 
     #[test]
