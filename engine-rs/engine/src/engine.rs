@@ -54,8 +54,8 @@ impl Ml {
         let translate_model = (env::var("TRANSLATE").unwrap_or_default() != "off").then(|| {
             env::var("TRANSLATE_MODEL").unwrap_or_else(|_| DEFAULT_TRANSLATE_MODEL.to_string())
         });
-        let want = env::var("DEVICE").unwrap_or_else(|_| device_pref.to_string());
-        let device = crate::ml::pick_device(want != "cpu");
+        let device =
+            crate::ml::pick_device(wants_gpu(env::var("DEVICE").ok().as_deref(), device_pref));
         Self {
             asr_model: repo_for(&model),
             translate_model,
@@ -203,6 +203,106 @@ fn merge_window(
     }
 }
 
+pub enum JobError {
+    Cancelled,
+    Failed(anyhow::Error),
+}
+
+impl From<anyhow::Error> for JobError {
+    fn from(error: anyhow::Error) -> Self {
+        JobError::Failed(error)
+    }
+}
+
+pub fn segments_json(segs: &[Segment]) -> Value {
+    Value::Array(
+        segs.iter()
+            .map(|s| json!({ "start": s.start, "end": s.end, "text": s.text }))
+            .collect(),
+    )
+}
+
+/// `/jobs/<id>` table, shared with the worker threads.
+pub type Jobs = Arc<Mutex<HashMap<String, Value>>>;
+
+pub fn job_update(jobs: &Jobs, id: &str, patch: Value) {
+    if let (Some(Value::Object(job)), Value::Object(patch)) = (lock(jobs).get_mut(id), patch) {
+        job.extend(patch);
+    }
+}
+
+pub fn job_cancelled(jobs: &Jobs, id: &str) -> bool {
+    lock(jobs)
+        .get(id)
+        .and_then(|job| job.get("cancel"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+pub fn jobs_lock(jobs: &Jobs) -> MutexGuard<'_, HashMap<String, Value>> {
+    lock(jobs)
+}
+
+/// Body of `/transcribe_file_job`: runs on its own thread, deletes `path` at the end.
+pub fn run_job(
+    ml: Arc<Ml>,
+    jobs: Jobs,
+    id: String,
+    path: std::path::PathBuf,
+    language: Option<String>,
+    task: Task,
+    size: u64,
+) {
+    let language = language.as_deref();
+    let result = (|| -> Result<(), JobError> {
+        if job_cancelled(&jobs, &id) {
+            return Err(JobError::Cancelled);
+        }
+        job_update(&jobs, &id, json!({ "progress": 0.1 }));
+        let segs = if size >= ml.stream_min_bytes {
+            job_update(&jobs, &id, json!({ "streaming": true }));
+            ml.file_streaming(
+                &path,
+                language,
+                task,
+                |fraction, partial| {
+                    let mut patch = json!({
+                        "segments": segments_json(partial),
+                        "partialSegments": partial.len(),
+                    });
+                    if let Some(fraction) = fraction {
+                        patch["progress"] = json!(fraction.max(0.1));
+                    }
+                    job_update(&jobs, &id, patch);
+                },
+                || job_cancelled(&jobs, &id),
+            )?
+        } else {
+            job_update(&jobs, &id, json!({ "progress": 0.2 }));
+            ml.file(&path, language, task)?
+        };
+        if job_cancelled(&jobs, &id) {
+            return Err(JobError::Cancelled);
+        }
+        job_update(
+            &jobs,
+            &id,
+            json!({ "status": "done", "progress": 1.0, "segments": segments_json(&segs) }),
+        );
+        Ok(())
+    })();
+    match result {
+        Ok(()) => {}
+        Err(JobError::Cancelled) => job_update(&jobs, &id, json!({ "status": "cancelled" })),
+        Err(JobError::Failed(error)) => job_update(
+            &jobs,
+            &id,
+            json!({ "status": "error", "error": error.to_string() }),
+        ),
+    }
+    let _ = std::fs::remove_file(&path);
+}
+
 #[cfg(test)]
 mod merge_tests {
     use super::*;
@@ -319,104 +419,4 @@ mod merge_tests {
         );
         assert_eq!(pairs(&out), [(0.2, 5.0), (5.0, 10.0)]);
     }
-}
-
-pub enum JobError {
-    Cancelled,
-    Failed(anyhow::Error),
-}
-
-impl From<anyhow::Error> for JobError {
-    fn from(error: anyhow::Error) -> Self {
-        JobError::Failed(error)
-    }
-}
-
-pub fn segments_json(segs: &[Segment]) -> Value {
-    Value::Array(
-        segs.iter()
-            .map(|s| json!({ "start": s.start, "end": s.end, "text": s.text }))
-            .collect(),
-    )
-}
-
-/// `/jobs/<id>` table, shared with the worker threads.
-pub type Jobs = Arc<Mutex<HashMap<String, Value>>>;
-
-pub fn job_update(jobs: &Jobs, id: &str, patch: Value) {
-    if let (Some(Value::Object(job)), Value::Object(patch)) = (lock(jobs).get_mut(id), patch) {
-        job.extend(patch);
-    }
-}
-
-pub fn job_cancelled(jobs: &Jobs, id: &str) -> bool {
-    lock(jobs)
-        .get(id)
-        .and_then(|job| job.get("cancel"))
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-}
-
-pub fn jobs_lock(jobs: &Jobs) -> MutexGuard<'_, HashMap<String, Value>> {
-    lock(jobs)
-}
-
-/// Body of `/transcribe_file_job`: runs on its own thread, deletes `path` at the end.
-pub fn run_job(
-    ml: Arc<Ml>,
-    jobs: Jobs,
-    id: String,
-    path: std::path::PathBuf,
-    language: Option<String>,
-    task: Task,
-    size: u64,
-) {
-    let language = language.as_deref();
-    let result = (|| -> Result<(), JobError> {
-        if job_cancelled(&jobs, &id) {
-            return Err(JobError::Cancelled);
-        }
-        job_update(&jobs, &id, json!({ "progress": 0.1 }));
-        let segs = if size >= ml.stream_min_bytes {
-            job_update(&jobs, &id, json!({ "streaming": true }));
-            ml.file_streaming(
-                &path,
-                language,
-                task,
-                |fraction, partial| {
-                    let mut patch = json!({
-                        "segments": segments_json(partial),
-                        "partialSegments": partial.len(),
-                    });
-                    if let Some(fraction) = fraction {
-                        patch["progress"] = json!(fraction.max(0.1));
-                    }
-                    job_update(&jobs, &id, patch);
-                },
-                || job_cancelled(&jobs, &id),
-            )?
-        } else {
-            job_update(&jobs, &id, json!({ "progress": 0.2 }));
-            ml.file(&path, language, task)?
-        };
-        if job_cancelled(&jobs, &id) {
-            return Err(JobError::Cancelled);
-        }
-        job_update(
-            &jobs,
-            &id,
-            json!({ "status": "done", "progress": 1.0, "segments": segments_json(&segs) }),
-        );
-        Ok(())
-    })();
-    match result {
-        Ok(()) => {}
-        Err(JobError::Cancelled) => job_update(&jobs, &id, json!({ "status": "cancelled" })),
-        Err(JobError::Failed(error)) => job_update(
-            &jobs,
-            &id,
-            json!({ "status": "error", "error": error.to_string() }),
-        ),
-    }
-    let _ = std::fs::remove_file(&path);
 }
