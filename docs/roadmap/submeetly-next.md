@@ -44,10 +44,11 @@ Owner request 2026-11-08. Handoff: `docs/handoff/submeetly-next.md`.
 | S8 | Add-ins | Add-on system kept; meeting add-ins (list fixed after S9 spec) |
 | S9 | Threadbear mapping spec | `docs/roadmap/threadbear-mapping.md`: each Threadbear feature → meeting feature, kept/dropped with reason |
 | S10 | De-slop canvas | Scan + critique of the 3 pages, Before/After canvas, owner sign-off |
+| S12 | Windows installer + signed updates with pop-up (owner 2026-11-08, like Oyenza Studio) | Inno Setup per-user Setup installs island + Rust engine + native host; app reads a signed latest.json from the release repo and shows an update pop-up; our own signing key (Oyenza keys removed) |
 | S11 | De-slop build | Per board, slop scan 0 errors, viewed at 1440/1024/390, dark |
 
 Order: S1, S2, S6, S9, S10 run in parallel. S3 after S2. S4 after library decision. S7 after S3+S6.
-S8 after S9. S11 after S10 sign-off. S5 last.
+S8 after S9. S11 after S10 sign-off. S12 after S6 (needs the engine binary; ships Python until S5). S5 last.
 
 ## PRD rows
 
@@ -73,6 +74,8 @@ Status words: `missing`, `partial`, `done`. The handoff holds the evidence for e
 | UI-004 | P2 | Translation colour selectable (indigo default, 4-5 swatches) | Setting in island Settings and side panel Settings; every swatch >= 4.5:1 on its card | done (side panel bb86286, island ff6a90b; 5 swatches, contrast 5.44-10.00:1 on canvas) |
 | UI-005 | P1 | Side panel shows one tab row by default; a toggle brings back the second row | Default one row; "Tab rows: One / Two" toggle; nothing removed | done (bb86286; Settings > General > Tab rows, viewed in lab) |
 | ISL-005 | P2 | Island carries only meeting features | Prayer module, `site/places` data (6.8 MB), sholat/ja/downloader add-ons and Gmail/Calendar icons removed from `island/` | done (dc9e181 in 17c98db; site/places removed) |
+| REL-001 | P1 | Windows installer, like Oyenza Studio | Per-user Setup (no admin) installs island exe, engine binary, native messaging host, Start menu, optional start at sign-in; uninstaller keeps notes; our own art | missing (S12) |
+| REL-002 | P1 | Signed auto-update with an "update available" pop-up | App checks latest.json in the release repo, believes it only with our key, shows Install / Later / notes; download size + SHA-256 checked; silent install and relaunch; Oyenza keys removed from update-keys.txt | missing (S12; publishing releases is an owner gate) |
 
 ## Decisions (owner, 2026-11-08)
 
@@ -91,3 +94,4 @@ Status words: `missing`, `partial`, `done`. The handoff holds the evidence for e
 ## Open questions (owner)
 
 - S8: final add-in list after S9.
+- S12: which GitHub repo hosts releases (default: origin yraveragework/yraveragesub; must be public for the app to download), and who keeps the offline backup signing key.
