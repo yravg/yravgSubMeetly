@@ -26,8 +26,9 @@ import {
 } from './lib/notes-actions.js';
 import { seedSampleData } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
-import { slidingNumber, springProgress, autoHeight, highlight } from './lib/motion.js';
+import { slidingNumber, autoHeight, highlight } from './lib/motion.js';
 import { mountExtras } from './minutes-extras.js';
+import { mountDraftOptions } from './minutes-draft.js';
 import { mountDock } from './minutes-dock.js';
 import { migrateLegacyLocalKeys } from './lib/legacy-keys.js';
 
@@ -328,15 +329,17 @@ function cellStatus(it) {
 function cellSrc(it) {
   if (!it.src) return `<span class="src none">${esc(T('noSource'))}</span>`;
   const low = isLow(it);
-  const revLabel = it.review === 'ai' && low ? T('aiDraftPct', pct(it.confidence)) : T(it.review);
+  // Satu penanda keyakinan per baris: bendera ⚑ ASR n% menggantikan batang dan persen.
+  const conf = low
+    ? `<span class="pill-warn src-flag" title="${esc(T('lowAsr'))}">${flagIcon(10)} ${esc(T('asr'))} ${pct(it.confidence)}%</span>`
+    : `<span class="conf" title="${esc(T('asr'))} ${pct(it.confidence)}%"><i style="width:${pct(it.confidence)}%;background:${confColor(it.confidence)}"></i></span>`;
   return `<span class="src ${low ? 'lit' : ''}" data-play="${esc(it.src.tc)}">▶ ${esc(it.src.tc)}</span>
-    <span class="conf" title="${esc(T('asr'))} ${pct(it.confidence)}%"><i style="width:${pct(it.confidence)}%;background:${confColor(it.confidence)}"></i></span>
-    <span class="rev ${low ? 'low' : ''}" data-r="${it.review}">${esc(revLabel)}</span>`;
+    ${conf}
+    <span class="rev ${low ? 'low' : ''}" data-r="${it.review}">${esc(T(it.review))}</span>`;
 }
 function cellItem(it) {
   const alt = state.dual && itemAltText(it) ? `<span class="alt">${esc(itemAltText(it))}</span>` : '';
-  const flag = isLow(it) ? `<span class="pill-warn">${flagIcon(11)} ${esc(T('lowAsr'))}</span>` : '';
-  return `<span class="itemtext">${it.agenda ? `<span class="agenda">${esc(it.agenda)}</span>` : ''}${textWithFlag(it)}${flag}${it.type === 'metric' && it.metric ? metricLine(it) : ''}${alt}</span>`;
+  return `<span class="itemtext">${it.agenda ? `<span class="agenda">${esc(it.agenda)}</span>` : ''}${textWithFlag(it)}${it.type === 'metric' && it.metric ? metricLine(it) : ''}${alt}</span>`;
 }
 function metricLine(it) {
   const mt = it.metric;
@@ -389,10 +392,10 @@ function viewTable(rows) {
     <tbody>${groupRows(rows).map(({ label, count, items }) => `
       ${label == null ? '' : `<tr class="ghead"><td colspan="8">${esc(label)}<span class="cnt">${count}</span></td></tr>`}
       ${items.map((it) => `
-      <tr data-ref="${esc(it.ref)}" aria-selected="${state.sel === it.ref}">
+      <tr data-ref="${esc(it.ref)}" aria-selected="${state.sel === it.ref}"${it.review === 'ai' || isLow(it) ? ' class="needs-review"' : ''}>
         <td class="c-ref">${cellRef(it)}</td>
         <td class="c-type">${cellType(it)}</td>
-        <td class="c-topic"><span class="topic">${esc(topicLabel(it.topic))}</span></td>
+        <td class="c-topic"><span class="topic${!it.topic || it.topic === 'general' ? ' plain' : ''}">${esc(topicLabel(it.topic))}</span></td>
         <td class="c-item">${cellItem(it)}</td>
         <td class="c-owner">${cellOwner(it)}</td>
         <td class="c-due">${cellDue(it)}</td>
@@ -798,80 +801,66 @@ function paintHeader() {
   $('#btn-amend').hidden = !m.issuedAt;
   $('#btn-add-item').hidden = !!m.issuedAt;
 
-  const v = stats.variance;
-  paintStrip([
-    { k: 'items', n: stats.total, l: T('sItems') },
-    { k: 'actions', n: stats.actionsOpen, sub: `/${stats.actionsTotal}`, l: T('sActions') },
-    { k: 'overdue', n: stats.overdue, l: T('sOverdue'), cls: stats.overdue ? 'is-alert' : '' },
-    { k: 'questions', n: stats.questionsOpen, l: T('sQuestions') },
-    { k: 'unreviewed', n: stats.unreviewed, l: T('sUnreviewed'), cls: stats.unreviewed ? 'is-warn' : 'is-ok' },
-    v != null
-      ? { k: 'sixth', n: v, signed: true, unit: stats.varianceUnit, l: T('sVariance'), cls: v >= 0 ? 'is-up' : 'is-alert' }
-      : { k: 'sixth', n: stats.decisions, l: T('sDecisions') },
-    { k: 'coverage', n: stats.agendaPct, unit: '%', l: T('sCoverage'), bar: stats.agendaPct },
-  ]);
+  paintSummary(stats);
 }
 
 /* --------------------------------------------------------------------------
-   MP-01 + MP-02 — the header figures count up and the coverage bar springs.
+   D01 — ringkasan register yang lebih tenang.
 
-   Like the download rows in the side panel, the cells are built once and then
-   updated in place: re-rendering the strip on every paint would destroy the
-   odometers and restart every figure from zero on an unrelated filter change.
+   Tujuh kartu angka diganti satu ringkasan: total besar (odometer MP-01, 250 ms),
+   batang bertumpuk per tipe, daftar peringkat, blok statistik, dan tombol
+   "Review N". Rangka dibangun sekali dan diperbarui di tempat, supaya odometer
+   tidak mulai dari nol tiap filter berubah. Ketujuh angka tetap terlihat:
+   butir (total), tindak lanjut, lewat tenggat, pertanyaan (baris peringkat),
+   belum ditinjau, keputusan/varians (peringkat atau blok), cakupan agenda.
    -------------------------------------------------------------------------- */
-const stripCells = new Map();
+let sum = null;
 
-function stripCell(spec) {
-  let cell = stripCells.get(spec.k);
-  const decimals = odoDecimals(spec.n);
-  // The odometer's precision is fixed when it is built, and the sixth cell
-  // swaps between a decimal variance and a whole decision count.
-  if (cell && (cell.decimals !== decimals || cell.signed !== !!spec.signed)) {
-    cell.odo.destroy();
-    cell.el.remove();
-    stripCells.delete(spec.k);
-    cell = null;
-  }
-  if (cell) return cell;
-
-  const el = document.createElement('div');
-  el.className = 'stat';
-  el.innerHTML = `
-    <span class="n"><span class="mo-num"></span><span class="sub"></span><span class="unit"></span></span>
-    <span class="l"></span>
-    ${spec.bar != null ? '<span class="bar"><i></i></span>' : ''}`;
-  cell = {
-    el,
-    decimals,
-    signed: !!spec.signed,
-    sub: el.querySelector('.sub'),
-    unit: el.querySelector('.unit'),
-    label: el.querySelector('.l'),
-    odo: slidingNumber(el.querySelector('.mo-num'), {
-      decimals,
-      signed: !!spec.signed,
-      ...odoSeparators(spec.n),
-    }),
-    bar: spec.bar != null ? springProgress(el.querySelector('.bar i')) : null,
+function buildSummary(host) {
+  host.innerHTML = `<div class="sum">
+    <div class="sum-total"><span class="n"><span class="mo-num"></span></span><span class="l"></span></div>
+    <div class="sum-mid"><div class="sum-stack" role="img"></div><ul class="sum-rank"></ul></div>
+    <div class="sum-side"><dl class="sum-stats"></dl><button type="button" class="btn sm sum-review" id="btn-sum-review"></button></div>
+  </div>`;
+  sum = {
+    host,
+    total: slidingNumber(host.querySelector('.mo-num'), { decimals: 0, groupSeparator: '', decimalSeparator: '.' }),
+    label: host.querySelector('.sum-total .l'),
+    stack: host.querySelector('.sum-stack'),
+    rank: host.querySelector('.sum-rank'),
+    stats: host.querySelector('.sum-stats'),
+    review: host.querySelector('.sum-review'),
   };
-  stripCells.set(spec.k, cell);
-  return cell;
+  sum.review.addEventListener('click', () => $('#btn-review-only').click());
 }
 
-function paintStrip(specs) {
+function paintSummary(stats) {
   const host = $('#strip');
-  for (const spec of specs) {
-    const cell = stripCell(spec);
-    if (cell.el.parentElement !== host) host.appendChild(cell.el);
-    cell.el.className = `stat ${spec.cls || ''}`;
-    cell.sub.textContent = spec.sub || '';
-    cell.unit.textContent = spec.unit || '';
-    cell.label.textContent = spec.l;
-    cell.odo.to(Number.isFinite(spec.n) ? spec.n : 0);
-    if (cell.bar) cell.bar.to(spec.bar);
-  }
-  // Keep DOM order matching the spec even when a cell was rebuilt.
-  for (const spec of specs) host.appendChild(stripCells.get(spec.k).el);
+  if (!sum || sum.host !== host || !host.contains(sum.stack)) buildSummary(host);
+  const m = activeMeeting();
+  sum.total.to(stats.total);
+  sum.label.textContent = T('sTotal');
+  const counts = ITEM_TYPES.map((t) => [t, m.items.filter((i) => i.type === t).length]).filter(([, n]) => n).sort((x, y) => y[1] - x[1]);
+  const share = (n) => (stats.total ? Math.round((n / stats.total) * 100) : 0);
+  sum.stack.setAttribute('aria-label', counts.map(([t, n]) => `${T(t)} ${n}`).join(', '));
+  sum.stack.innerHTML = counts.map(([t, n]) => `<i style="flex:${n};background:${TYPE_COLOR[t]}" title="${esc(T(t))} ${n}"></i>`).join('');
+  sum.rank.innerHTML = counts.map(([t, n]) => `<li><span class="sw" style="background:${TYPE_COLOR[t]}"></span><span class="nm">${esc(T(t))}${t === 'question' && stats.questionsOpen !== n ? ` <em>${esc(T('openN', stats.questionsOpen))}</em>` : ''}</span><span class="v mono">${n}</span><span class="sh mono">${share(n)}%</span></li>`).join('');
+  const rows = [
+    [T('sActions'), `${stats.actionsOpen}<span class="of">/${stats.actionsTotal}</span>`, ''],
+    [T('sOverdue'), String(stats.overdue), stats.overdue ? 'is-alert' : ''],
+    [T('sCoverage'), `${stats.agendaPct}%`, ''],
+    [T('sUnreviewed'), String(stats.unreviewed), stats.unreviewed ? 'is-warn' : 'is-ok'],
+  ];
+  if (stats.variance != null) rows.push([T('sVariance'), `${sign(stats.variance)}${esc(fmtMeasure(stats.variance))}${esc(stats.varianceUnit || '')}`, stats.variance >= 0 ? 'is-up' : 'is-alert']);
+  sum.stats.innerHTML = rows.map(([l, v, c]) => `<div class="${c}"><dt>${esc(l)}</dt><dd class="mono">${v}</dd></div>`).join('');
+  sum.review.hidden = !stats.lowConfidence;
+  sum.review.textContent = T('reviewN', stats.lowConfidence);
+}
+
+/** Pelarut 180 ms saat filter "needs review" berganti; hormati reduce-motion. */
+function fadeRows() {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelector('#pane tbody')?.animate?.([{ opacity: 0.35 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
 }
 
 function paintChips() {
@@ -1514,7 +1503,7 @@ function wireEvents() {
     if (state.types.has(t)) state.types.delete(t); else state.types.add(t);
     paint();
   });
-  $('#btn-review-only').addEventListener('click', () => { state.reviewOnly = !state.reviewOnly; paint(); });
+  $('#btn-review-only').addEventListener('click', () => { state.reviewOnly = !state.reviewOnly; paint(); fadeRows(); });
 
   $('#q').addEventListener('input', (e) => { state.q = e.target.value; paint(); });
   $('#group-by').addEventListener('change', (e) => { state.group = e.target.value; paint(); });
@@ -1546,6 +1535,7 @@ function wireEvents() {
     b.parentNode.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     syncPill('.langsw');
     paintStaticStrings();
+    document.dispatchEvent(new Event('ysm-lang'));
     // Every label just changed length, so the register tabs re-measure.
     resyncPills(false);
     paint();
@@ -1557,6 +1547,16 @@ function wireEvents() {
     activeMeeting,
     reload: () => reloadAll(true),
     setActive: (id) => { state.activeId = id; state.sel = null; },
+    paint,
+    toast,
+  });
+
+  mountDraftOptions({
+    lang: () => state.lang,
+    activeMeeting,
+    replaceActive,
+    save: saveMeeting,
+    me: () => state.me,
     paint,
     toast,
   });

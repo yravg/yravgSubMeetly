@@ -85,6 +85,10 @@ before(async () => {
   await wait(3500);
   await page.evaluate(() => document.getElementById('lt-close').click());
   await wait(300);
+  // D01: dok mulai sebagai ikon saat navigator terbuka; tes animasi mulai dari dok terbuka.
+  assert.equal(await page.$eval('#viewdock', (el) => el.classList.contains('mini')), true, 'dok harus mulai mini');
+  await page.evaluate(() => document.getElementById('dock-mini').click());
+  await wait(500);
   const width = await page.$eval('#viewdock', (el) => el.getBoundingClientRect().width);
   assert.ok(width > 100, `dok tidak terlihat (lebar ${width}) — sisa tes tak berarti`);
 });
