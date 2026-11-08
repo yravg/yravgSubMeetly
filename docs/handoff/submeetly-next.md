@@ -91,3 +91,6 @@ Five Sonnet Orca workers (specs in scratchpad specs/w-*.md, common rules w-commo
 
 Next wave after these merge: T01/T02/T04 in Minutes (after minutes), T05 + S8 add-ins (after island2 + sidepanel),
 then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
+- qa merged (2026-11-08): `yravg/sm-qa` 0871ead + lead run; `npm run qa` re-run by the lead = 14 pass, 1 fail
+  (TC010: floating dock at src/minutes.css:879 covers #d-save at 1280x800, a real bug; sent to the minutes worker).
+  Needs python3 on PATH (QA_PYTHON), `npm run build` first, PUPPETEER_EXECUTABLE_PATH; cargo for TC014-015.

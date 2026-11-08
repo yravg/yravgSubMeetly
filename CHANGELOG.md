@@ -3,6 +3,7 @@
 ## Unreleased — feat/notes-v2
 - **Nama tampilan:** yraverageSubMin menjadi **yravgSubMeetly** di ekstensi, helper native, aplikasi macOS, panduan, dan listing toko; wordmark kini yravg + SubMeetly. ID internal (ysm*, ~/.yraveragesubmin, com.yraveragesubmin.helper, bundle id) tidak berubah, tanpa migrasi
 - **Engine Rust (`engine-rs/`)** untuk rute non-ML helper: 79 golden direkam dari oracle Python (`scripts/gen-engine-golden.mjs`), replay 0 selisih, kebijakan loopback/Origin, migrasi direktori state, host Native Messaging `ping`; rute ML menjawab 501 sampai port candle (S4). `npm run test:engine-rs`
+- **Suite QA Playwright (`npm run qa`)** ala TestSprite: strategi, 15 kasus (TC001–TC015) untuk lab shell, Minutes Register, dan engine Rust, run bertanggal dengan screenshot dan video; run pertama 14 lulus, 1 gagal karena bug nyata (dock menutup tombol Add item di 1280×800)
 - **Island Windows (`island/`)**: pill di tepi atas layar, fork Oyenza Studio (MIT) dengan tampilan SubMeetly; `cargo build -p poni` jalan, 429 tes `poni-core` lulus. Masih gelap saja, belum ada halaman SubMeetly (S7)
 - **Peta Threadbear → rapat** (`docs/roadmap/threadbear-mapping.md`): fitur dipetakan ke register/island/add-in, lima langkah pertama dengan kriteria terima
 - **Rencana besar yravgSubMeetly** (`docs/roadmap/submeetly-next.md`, `docs/handoff/submeetly-next.md`): island ala Oyenza, add-in, engine Rust, de-slop halaman
