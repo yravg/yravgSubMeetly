@@ -10,6 +10,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+
+// Windows tidak punya bit eksekusi di disk; bit yang dibagikan ke Mac/Linux ada di mode git (100755).
+const executable = (p) => (process.platform === 'win32'
+  ? execFileSync('git', ['ls-files', '-s', p], { encoding: 'utf8' }).startsWith('100755')
+  : (statSync(p).mode & 0o111) !== 0);
 
 const doc = readFileSync('native/SETUP.md', 'utf8');
 const runSh = readFileSync('native/run.sh', 'utf8');
@@ -20,7 +26,7 @@ const installBat = readFileSync('native/install-host.bat', 'utf8');
 test('setiap skrip yang disebut dokumen benar-benar ada dan bisa dieksekusi', () => {
   for (const f of ['run.sh', 'install-host.sh', 'install-host-linux.sh', 'uninstall-host.sh']) {
     assert.ok(existsSync(`native/${f}`), `native/${f} disebut SETUP.md tapi tidak ada`);
-    assert.ok(statSync(`native/${f}`).mode & 0o111, `native/${f} tidak bisa dieksekusi`);
+    assert.ok(executable(`native/${f}`), `native/${f} tidak bisa dieksekusi`);
   }
   for (const f of ['run.bat', 'install-host.bat', 'uninstall-host.bat']) {
     assert.ok(existsSync(`native/${f}`), `native/${f} disebut SETUP.md tapi tidak ada`);

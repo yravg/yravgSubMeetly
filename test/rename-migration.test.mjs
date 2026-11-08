@@ -78,6 +78,12 @@ test('daftar kunci lama mencakup seluruh kunci yang benar-benar bertahan di disk
   assert.ok(Object.keys(LEGACY_LOCAL_KEYS).length >= 6);
 });
 
+const RUN_MIGRATION = `src = open('native/server.py', encoding='utf-8').read()
+m = '\\n_migrate_state_dir()\\n'
+assert m in src, 'panggilan _migrate_state_dir() hilang dari server.py'
+exec(compile(src.split(m)[0] + m, 'server.py', 'exec'))
+`;
+// USERPROFILE: Path.home() di Windows membaca itu, bukan HOME (Mac/Linux mengabaikannya).
 test('direktori state helper ~/.localtranssub dipindah beserta isinya', () => {
   const home = mkdtempSync(join(tmpdir(), 'ysm-home-'));
   const lama = join(home, '.localtranssub');
@@ -85,12 +91,13 @@ test('direktori state helper ~/.localtranssub dipindah beserta isinya', () => {
   writeFileSync(join(lama, 'notes.json'), '{"notes":[{"id":"rapat-1"}]}');
   writeFileSync(join(lama, 'device.json'), '{"device":"mlx"}');
 
-  // server.py menjalankan migrasi saat impor, sebelum dependensi berat dimuat;
-  // impornya boleh gagal di numpy — yang diuji efeknya pada berkas.
+  // server.py menjalankan migrasi saat impor, sebelum dependensi berat dimuat. Yang dijalankan di sini hanya
+  // kepala berkas sampai pemanggilan itu (stdlib saja): mengimpor seluruh server.py ikut menarik numpy/
+  // faster-whisper dan, dengan HOME kosong, mencoba mengunduh dari HF Hub — menit, bukan detik.
   const root = fileURLToPath(new URL('..', import.meta.url));
   execFileSync('python3', ['-c',
-    'import sys\nsys.path.insert(0, "native")\ntry:\n    import server\nexcept Exception:\n    pass\n'],
-    { cwd: root, env: { ...process.env, HOME: home } });
+    RUN_MIGRATION],
+    { cwd: root, env: { ...process.env, HOME: home, USERPROFILE: home } });
 
   const baru = join(home, '.yraveragesubmin');
   assert.ok(existsSync(baru), 'direktori baru tidak terbentuk');
@@ -109,8 +116,8 @@ test('direktori baru yang sudah ada tidak ditimpa direktori lama', () => {
 
   const root = fileURLToPath(new URL('..', import.meta.url));
   execFileSync('python3', ['-c',
-    'import sys\nsys.path.insert(0, "native")\ntry:\n    import server\nexcept Exception:\n    pass\n'],
-    { cwd: root, env: { ...process.env, HOME: home } });
+    RUN_MIGRATION],
+    { cwd: root, env: { ...process.env, HOME: home, USERPROFILE: home } });
 
   assert.equal(readFileSync(join(home, '.yraveragesubmin', 'notes.json'), 'utf8'), '{"baru":true}',
     'notulen yang lebih baru tertimpa yang lama');
