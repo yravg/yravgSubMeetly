@@ -2108,6 +2108,8 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Paired(e) => self.on_paired(e),
             AppEvent::Autostart(on) => self.st.ui.autostart = Some(on),
+            AppEvent::Helper(r) => self.st.helper.apply(r),
+            AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::Addon { id, status } => {
                 // A late report from before a switch-off doesn't bring it back.
                 if self.st.settings.addon_on(id) || status == AddonStatus::Off {
@@ -3617,6 +3619,16 @@ impl App {
                 Command::Phone(c) => self.phone_cmd(c),
                 Command::Pair(c) => self.pair_cmd(c),
                 Command::Notify(c) => self.notify_cmd(c),
+                Command::HelperPost(body) => {
+                    if let Some(s) = self.services.as_ref() {
+                        s.helper_post(body);
+                    }
+                }
+                Command::HelperPoll => {
+                    if let Some(s) = self.services.as_ref() {
+                        s.helper_poll();
+                    }
+                }
             }
         }
         self.sync_phone_offer();

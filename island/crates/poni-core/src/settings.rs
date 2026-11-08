@@ -224,7 +224,7 @@ impl Settings {
 
     /// Is the add-on `id` switched on?
     pub fn addon_on(&self, id: &str) -> bool {
-        self.addons.get(id).copied().unwrap_or(false)
+        self.addons.get(id).copied().unwrap_or_else(|| crate::addons::on_by_default(id))
     }
 
     pub fn set_addon(&mut self, id: &str, on: bool) {

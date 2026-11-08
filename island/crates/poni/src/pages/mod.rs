@@ -12,13 +12,18 @@
 pub mod addons;
 pub mod card;
 pub mod focus;
+pub mod hkit;
+pub mod inbox;
+pub mod live;
 pub mod media;
+pub mod meeting;
 pub mod notifications;
 pub mod script;
 pub mod settings;
 pub mod shelf;
 pub mod system;
 pub mod tasks;
+pub mod tools;
 
 use crate::commands::Command;
 use crate::gfx::{TextStyle, Weight};
@@ -45,6 +50,18 @@ pub fn header_rect(body: Rect) -> Rect {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PageKind {
+    /// The helper's newest line (board I02).
+    Live,
+    /// The newest meeting's decisions (I03).
+    Meeting,
+    /// Open items across meetings (I04).
+    Inbox,
+    /// Agenda timer add-in (I06).
+    Timer,
+    /// Talk time add-in (I06).
+    Talk,
+    /// Engine monitor add-in (I07).
+    Engine,
     Media,
     Shelf,
     Tasks,
@@ -66,7 +83,13 @@ pub enum PageKind {
 impl PageKind {
     /// The tab row's order: the island's own pages, Oyenza, then the
     /// add-ons' pages and the "+".
-    pub const ALL: [PageKind; 9] = [
+    pub const ALL: [PageKind; 15] = [
+        PageKind::Live,
+        PageKind::Meeting,
+        PageKind::Inbox,
+        PageKind::Timer,
+        PageKind::Talk,
+        PageKind::Engine,
         PageKind::Media,
         PageKind::Shelf,
         PageKind::Tasks,
@@ -80,6 +103,12 @@ impl PageKind {
 
     pub fn key(self) -> &'static str {
         match self {
+            PageKind::Live => "live",
+            PageKind::Meeting => "meeting",
+            PageKind::Inbox => "inbox",
+            PageKind::Timer => "timer",
+            PageKind::Talk => "talk",
+            PageKind::Engine => "engine",
             PageKind::Media => "media",
             PageKind::Focus => "focus",
             PageKind::Shelf => "shelf",
@@ -94,11 +123,17 @@ impl PageKind {
 
     pub fn from_key(s: &str) -> PageKind {
         let s = s.trim();
-        Self::ALL.into_iter().find(|p| p.key().eq_ignore_ascii_case(s)).unwrap_or(PageKind::Media)
+        Self::ALL.into_iter().find(|p| p.key().eq_ignore_ascii_case(s)).unwrap_or(PageKind::Live)
     }
 
     pub fn title(self) -> &'static str {
         match self {
+            PageKind::Live => "Live",
+            PageKind::Meeting => "Meeting",
+            PageKind::Inbox => "Inbox",
+            PageKind::Timer => "Agenda timer",
+            PageKind::Talk => "Talk time",
+            PageKind::Engine => "Engine",
             PageKind::Media => "Music",
             PageKind::Focus => "Focus",
             PageKind::Shelf => "Shelf",
@@ -113,6 +148,12 @@ impl PageKind {
 
     pub fn icon(self) -> Icon {
         match self {
+            PageKind::Live => Icon::Lyrics,
+            PageKind::Meeting => Icon::Clipboard,
+            PageKind::Inbox => Icon::Tray,
+            PageKind::Timer => Icon::Clock,
+            PageKind::Talk => Icon::Volume,
+            PageKind::Engine => Icon::Cpu,
             PageKind::Media => Icon::Music,
             PageKind::Focus => Icon::Timer,
             PageKind::Shelf => Icon::Tray,
@@ -187,6 +228,9 @@ fn row(st: &AppState, open: Option<PageKind>) -> Vec<PageKind> {
     PageKind::ALL
         .into_iter()
         .filter(|&p| match p {
+            PageKind::Timer => st.addon(poni_core::addons::AGENDA_TIMER.id) == poni_core::addons::Status::Ready,
+            PageKind::Talk => st.addon(poni_core::addons::TALK_TIME.id) == poni_core::addons::Status::Ready,
+            PageKind::Engine => st.addon(poni_core::addons::ENGINE_MONITOR.id) == poni_core::addons::Status::Ready,
             PageKind::System => st.system_on(),
             PageKind::Script => st.script_on(),
             PageKind::Notifications => st.notifications_on(),
@@ -206,6 +250,10 @@ pub fn step_tab(p: PageKind, st: &AppState, forward: bool) -> PageKind {
 
 pub fn content_height(p: PageKind, st: &AppState) -> f32 {
     match p {
+        PageKind::Live => live::height(st),
+        PageKind::Meeting => meeting::height(st),
+        PageKind::Inbox => inbox::height(st),
+        PageKind::Timer | PageKind::Talk | PageKind::Engine => tools::height(st),
         PageKind::Media => media::height(st),
         PageKind::Focus => focus::height(st),
         PageKind::Shelf => shelf::height(st),
@@ -228,6 +276,7 @@ pub fn next_wake(page: PageKind, st: &AppState) -> Option<f64> {
         PageKind::Shelf => shelf::next_wake(st),
         PageKind::Settings => settings::next_wake(st),
         PageKind::Script => script::next_wake(st),
+        PageKind::Timer => tools::timer_wake(st),
         _ => None,
     }
 }
@@ -325,6 +374,12 @@ pub(crate) fn draw_pages(ui: &mut Ui, st: &mut AppState, body: Rect, header: Rec
 
 pub(crate) fn draw_page(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKind) {
     match page {
+        PageKind::Live => live::draw(ui, st, area),
+        PageKind::Meeting => meeting::draw(ui, st, area),
+        PageKind::Inbox => inbox::draw(ui, st, area),
+        PageKind::Timer => tools::draw_timer(ui, st, area),
+        PageKind::Talk => tools::draw_talk(ui, st, area),
+        PageKind::Engine => tools::draw_engine(ui, st, area),
         PageKind::Media => media::draw(ui, st, area),
         PageKind::Focus => focus::draw(ui, st, area),
         PageKind::Shelf => shelf::draw(ui, st, area),

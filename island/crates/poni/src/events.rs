@@ -130,6 +130,10 @@ pub enum AppEvent {
     Notify(crate::services::notifications::NotifyEvent),
     /// Start with Windows is on (true) or off, read for the Settings page.
     Autostart(bool),
+    /// The helper's answer: notes and health with the round trip in ms, or why not.
+    Helper(Result<(poni_core::helper::Snapshot, u32), String>),
+    /// A decision the helper refused or could not be reached for.
+    HelperNotice(String),
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

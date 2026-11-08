@@ -10,6 +10,7 @@ pub mod bluetooth;
 pub mod clipboard;
 pub mod frames;
 pub mod fullscreen;
+pub mod helper;
 pub mod http;
 pub mod imaging;
 pub mod lyrics;
@@ -41,6 +42,7 @@ pub struct Services {
     fullscreen: Option<fullscreen::FullscreenWatcher>,
     pairdrop: Option<pairdrop::PairDropService>,
     addons: Option<addons::AddonService>,
+    helper: Option<helper::HelperService>,
 }
 
 fn started<T, E: std::fmt::Display>(name: &str, r: Result<T, E>) -> Option<T> {
@@ -68,7 +70,8 @@ impl Services {
         // Asleep unless an add-on with files is on; then it only checks the files it has.
         let on = poni_core::addons::ALL.iter().filter(|a| settings.addon_on(a.id)).map(|a| a.id).collect();
         let addons = started("add-ons", addons::AddonService::start(sink.clone(), on));
-        Self { media, lyrics, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons }
+        let helper = started("helper link", helper::HelperService::start(sink.clone()));
+        Self { media, lyrics, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons, helper }
     }
 
     pub fn stop(self, _helper: HWND) {
@@ -88,6 +91,19 @@ impl Services {
     pub fn set_addon(&self, id: &'static str, on: bool) {
         if let Some(a) = &self.addons {
             a.set(id, on);
+        }
+    }
+
+    /// `POST /notes` to the helper, then ask it again.
+    pub fn helper_post(&self, body: String) {
+        if let Some(h) = &self.helper {
+            h.post(body);
+        }
+    }
+
+    pub fn helper_poll(&self) {
+        if let Some(h) = &self.helper {
+            h.poll();
         }
     }
 

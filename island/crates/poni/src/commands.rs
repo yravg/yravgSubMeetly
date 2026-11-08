@@ -114,4 +114,8 @@ pub enum Command {
     Pair(PairCmd),
     /// Notifications.
     Notify(NotifyCmd),
+    /// `POST /notes` to the helper with this body (a decision on a page).
+    HelperPost(String),
+    /// Ask the helper again now.
+    HelperPoll,
 }

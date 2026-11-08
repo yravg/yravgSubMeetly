@@ -70,6 +70,9 @@ fn icon(a: &Addon) -> Icon {
     match a.id {
         "script" => Icon::Script,
         "system" => Icon::Gauge,
+        "timer" => Icon::Clock,
+        "talk" => Icon::Volume,
+        "engine" => Icon::Cpu,
         _ => Icon::Addons,
     }
 }

@@ -154,9 +154,49 @@ pub const SYSTEM: Addon = Addon {
 /// does. Part of Studio Pro: its tools download, and it downloads, only for
 /// an account the server says has Pro. Each app has its own tools: this
 
-/// Every add-on, in the order the Add-ons page lists them. Both are in the app:
+/// Agenda timer (board I06): a ring of the agenda items covered and a
+/// stopwatch. In the app already; on for everyone until switched off.
+pub const AGENDA_TIMER: Addon = Addon {
+    id: "timer",
+    title: "Agenda timer",
+    blurb: "A ring of the agenda items covered, and a stopwatch for the meeting.",
+    mac_blurb: None,
+    tag: "",
+    files: &[],
+    pro: false,
+};
+
+/// Talk time (board I06): who owns how many items of the meeting.
+pub const TALK_TIME: Addon = Addon {
+    id: "talk",
+    title: "Talk time",
+    blurb: "Bars of who owns how many items in the meeting.",
+    mac_blurb: None,
+    tag: "",
+    files: &[],
+    pro: false,
+};
+
+/// Engine monitor (board I07): what the helper reports about its engine.
+pub const ENGINE_MONITOR: Addon = Addon {
+    id: "engine",
+    title: "Engine monitor",
+    blurb: "The helper's engine, model and device, and how fast it answers.",
+    mac_blurb: None,
+    tag: "",
+    files: &[],
+    pro: false,
+};
+
+/// Add-ons that start on for a settings file that never mentioned them: the
+/// meeting add-ins. Script reader and System stay off until switched on.
+pub fn on_by_default(id: &str) -> bool {
+    [AGENDA_TIMER.id, TALK_TIME.id, ENGINE_MONITOR.id].contains(&id)
+}
+
+/// Every add-on, in the order the Add-ons page lists them. All are in the app:
 /// nothing downloads (the download machinery stays for a future add-on).
-pub const ALL: [&Addon; 2] = [&SCRIPT_READER, &SYSTEM];
+pub const ALL: [&Addon; 5] = [&AGENDA_TIMER, &TALK_TIME, &ENGINE_MONITOR, &SCRIPT_READER, &SYSTEM];
 
 /// Where an add-on stands, as the Add-ons page shows it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -232,6 +272,13 @@ mod tests {
             assert_eq!(Status::Ready.line(a, false), "On");
             assert!(!Settings::default().addon_on(a.id), "{} is off for everyone until they switch it on", a.id);
         }
+        // The meeting add-ins start on, and a saved "off" wins.
+        for a in [&AGENDA_TIMER, &TALK_TIME, &ENGINE_MONITOR] {
+            assert!(!a.downloads() && Settings::default().addon_on(a.id), "{}", a.id);
+            let mut s = Settings::default();
+            s.set_addon(a.id, false);
+            assert!(!s.addon_on(a.id));
+        }
         // Not meeting features, gone with ISL-005: no add-on by these ids.
         for gone in ["clipboard", "notifications", "sholat", "ja", "downloader"] {
             assert_eq!(Addon::find(gone), None, "{gone}");
@@ -241,7 +288,7 @@ mod tests {
     #[test]
     fn add_ons_are_listed_in_order_each_with_its_own_id() {
         let ids: Vec<&str> = ALL.iter().map(|a| a.id).collect();
-        assert_eq!(ids, ["script", "system"]);
+        assert_eq!(ids, ["timer", "talk", "engine", "script", "system"]);
         for (i, a) in ALL.iter().enumerate() {
             assert!(!a.id.is_empty() && a.id.bytes().all(|b| b.is_ascii_lowercase()), "{}", a.id);
             assert!(ALL[..i].iter().all(|b| b.id != a.id && b.title != a.title), "{} twice", a.id);
