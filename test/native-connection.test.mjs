@@ -17,6 +17,7 @@ import {
   NATIVE_HOST_ACTIONS,
   NATIVE_CONNECTION_STATES,
 } from '../src/lib/native-protocol.js';
+import { engineBinary, engineSkip } from './engine-bin.mjs';
 
 test('galat Chrome dipetakan ke keadaan yang perbaikannya berbeda', () => {
   const cases = {

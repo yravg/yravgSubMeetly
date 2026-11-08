@@ -34,6 +34,7 @@ import {
   LOW_CONFIDENCE,
 } from '../src/lib/notes-schema.js';
 
+import { engineSkip, startEngine } from './engine-bin.mjs';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 let engine = null;
 before(async () => { if (!engineSkip) engine = await startEngine(); });
