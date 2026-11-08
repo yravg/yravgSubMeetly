@@ -55,6 +55,14 @@ the four canvas agents, merge their build.mjs edits, run build + lint + render, 
 boards, resolve threads; commit docs/design/ (still untracked). Owner gates: S5, D02 tab rows,
 add-in list, "ySub" label and theme names.
 
+## Lead check-and-fix pass 2026-11-08 (branch yravg/lead-fixes, fast-forwarded to main)
+
+- 5be78f3: Minutes at 390 px overflowed sideways (Add item, Export, Issue MoM off screen). Toolbar now wraps under 560 px; folded buttons keep their icon tile. `test/dock-motion.test.mjs` gained width 390 and a reachability check; failed before the CSS change.
+- c3679ae: store capture shot 03 timed out because the notes sample opens Minutes in a new tab and the panel tab ran in the background. Capture closes extra tabs and refocuses; shot 03 is the Helper tab.
+- 8962ef5: the Native Helper card hardcoded Indonesian. Strings in i18n (en/zh/id), OS steps en+id via `guideFor(os, lang)`. `test/helper-status-i18n.test.mjs` 20 (failed first). Re-check button no longer wraps.
+- Checked and not a bug: History > Export "OS default" with a real mouse at 800x600, 1280x800, 390x844.
+- On the branch: `npm run build` ok, `npm test` 427: 410 pass, 0 fail, 17 skipped; `npm run qa` 19/19 (qa/runs/run-20261108-222243.json); store PNGs viewed.
+
 ## Verification 2026-11-08 (lead)
 
 - main after merge (f901339): `npm ci` ok, `npm run build` ok, `npm run test:engine-rs` ok (11 unit + 6 contract + golden replay 0 mismatches).
