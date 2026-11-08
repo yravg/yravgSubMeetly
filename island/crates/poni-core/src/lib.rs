@@ -15,6 +15,7 @@ pub mod frametime;
 pub mod geom;
 pub mod glass;
 pub mod hdr;
+pub mod helper;
 pub mod look;
 pub mod lrc;
 pub mod lrclib;
