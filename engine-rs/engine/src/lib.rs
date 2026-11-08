@@ -13,6 +13,7 @@ pub mod server;
 pub mod state;
 pub mod translate;
 pub mod whisper;
+mod whisper_model;
 
 pub use app::App;
 pub use protocol::{Request, Response};

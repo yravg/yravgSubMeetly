@@ -3211,6 +3211,7 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "hf-hub",
+ "realfft",
  "rubato",
  "serde",
  "serde_json",

@@ -1,10 +1,13 @@
 //! Whisper ASR on candle: model load from the hub, log-mel, greedy decode
 //! with Whisper's timestamp rules, 30 s seek loop, language detection.
+//! Feature path follows faster-whisper (the Python oracle), see `transcribe`.
 
+use crate::whisper_model::Whisper;
 use anyhow::{anyhow, Context, Result};
 use candle_core::{Device, IndexOp, Tensor};
 use candle_nn::VarBuilder;
-use candle_transformers::models::whisper::{self as w, audio, model::Whisper, Config};
+use candle_transformers::models::whisper::{self as w, Config};
+use realfft::RealFftPlanner;
 use tokenizers::Tokenizer;
 
 use crate::audio::SAMPLE_RATE;
@@ -103,6 +106,54 @@ pub fn mel_filters(n_mels: usize) -> Vec<f32> {
         }
     }
     out
+}
+
+/// Whisper's log-mel (`torch.stft(center=True, reflect)` → mel → log10 →
+/// clamp to max-8 → (x+4)/4), `n_mels x (len/160)` row-major. candle's own
+/// `pcm_to_mel` is whisper.cpp's: frames are not centred (200 samples late)
+/// and power is folded to twice the reference, which moved timestamp choices.
+pub fn log_mel(samples: &[f32], filters: &[f32], n_mels: usize) -> Vec<f32> {
+    let (n_fft, hop) = (w::N_FFT, w::HOP_LENGTH);
+    let bins = n_fft / 2 + 1;
+    let n = samples.len();
+    assert!(
+        n > n_fft / 2,
+        "log_mel needs more than {} samples",
+        n_fft / 2
+    );
+    let frames = n / hop;
+    let half = n_fft / 2;
+    let mut x = Vec::with_capacity(n + n_fft);
+    x.extend((1..=half).rev().map(|i| samples[i]));
+    x.extend_from_slice(samples);
+    x.extend((1..=half).map(|i| samples[n - 1 - i]));
+    let hann: Vec<f32> = (0..n_fft)
+        .map(|i| 0.5 - 0.5 * (2.0 * std::f32::consts::PI * i as f32 / n_fft as f32).cos())
+        .collect();
+    let fft = RealFftPlanner::<f32>::new().plan_fft_forward(n_fft);
+    let mut input = fft.make_input_vec();
+    let mut spectrum = fft.make_output_vec();
+    let mut scratch = fft.make_scratch_vec();
+    let mut power = vec![0f32; bins];
+    let mut mel = vec![0f32; n_mels * frames];
+    for f in 0..frames {
+        for (k, v) in input.iter_mut().enumerate() {
+            *v = x[f * hop + k] * hann[k];
+        }
+        fft.process_with_scratch(&mut input, &mut spectrum, &mut scratch)
+            .expect("fft size is fixed");
+        for (p, c) in power.iter_mut().zip(&spectrum) {
+            *p = c.re * c.re + c.im * c.im;
+        }
+        for m in 0..n_mels {
+            let row = &filters[m * bins..(m + 1) * bins];
+            let sum: f32 = row.iter().zip(&power).map(|(a, b)| a * b).sum();
+            mel[m * frames + f] = sum.max(1e-10).log10();
+        }
+    }
+    let floor = mel.iter().copied().fold(f32::NEG_INFINITY, f32::max) - 8.0;
+    mel.iter_mut().for_each(|v| *v = (v.max(floor) + 4.0) / 4.0);
+    mel
 }
 
 fn token(tokenizer: &Tokenizer, text: &str) -> Result<u32> {
@@ -336,10 +387,13 @@ impl WhisperAsr {
         task: Task,
     ) -> Result<Vec<Segment>> {
         let content_frames = pcm.len() / w::HOP_LENGTH;
+        // faster-whisper: log-mel of the audio plus 160 samples only; a short
+        // last window is zero-padded in mel space (not log-mel silence).
         let mut padded = pcm.to_vec();
-        padded.extend(std::iter::repeat_n(0f32, w::N_SAMPLES));
+        padded.extend(std::iter::repeat_n(0f32, 160));
+        padded.resize(padded.len().max(w::N_FFT + 1), 0.0);
         let n_mels = self.model.config.num_mel_bins;
-        let mel = audio::pcm_to_mel(&self.model.config, &padded, &self.filters);
+        let mel = log_mel(&padded, &self.filters, n_mels);
         let frames = mel.len() / n_mels;
         let mel = Tensor::from_vec(mel, (1, n_mels, frames), &self.device)?;
 
@@ -351,7 +405,12 @@ impl WhisperAsr {
         let mut out = Vec::new();
         let mut seek = 0usize;
         while seek < content_frames {
-            let window = mel.narrow(2, seek, w::N_FRAMES)?;
+            let segment_frames = (content_frames - seek).min(w::N_FRAMES);
+            let window = mel.narrow(2, seek, segment_frames)?.pad_with_zeros(
+                2,
+                0,
+                w::N_FRAMES - segment_frames,
+            )?;
             let features = self.model.encoder.forward(&window, true)?;
             let lang = match lang_token {
                 Some(id) => id,
@@ -361,7 +420,6 @@ impl WhisperAsr {
                     id
                 }
             };
-            let segment_frames = (content_frames - seek).min(w::N_FRAMES);
             let (sampled, avg, no_speech) =
                 self.decode_window(&features, &[self.sot, lang, task_token])?;
             let offset = seek as f64 / FRAMES_PER_SEC;
@@ -428,6 +486,21 @@ impl WhisperAsr {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn log_mel_has_one_frame_per_hop_and_tracks_energy() {
+        let tone: Vec<f32> = (0..16_000)
+            .map(|i| (i as f32 * 2.0 * std::f32::consts::PI * 1000.0 / 16_000.0).sin())
+            .collect();
+        let m = log_mel(&tone, &mel_filters(80), 80);
+        assert_eq!(m.len(), 80 * 100);
+        // 1 kHz sits in a mid mel band: louder than band 0 at every frame.
+        assert!((10..90).all(|f| (0..80)
+            .max_by(|a, b| m[a * 100 + f].total_cmp(&m[b * 100 + f]))
+            .unwrap()
+            > 20));
+        assert!(m.iter().all(|v| (-1.0..=3.0).contains(v)));
+    }
 
     #[test]
     fn mel_filters_match_librosa_shape_and_norm() {

@@ -59,7 +59,12 @@ impl MonoStream {
             .format(
                 &hint,
                 mss,
-                &FormatOptions::default(),
+                // Trim MP3 encoder delay/padding like ffmpeg does, or every
+                // timestamp is late by the delay.
+                &FormatOptions {
+                    enable_gapless: true,
+                    ..FormatOptions::default()
+                },
                 &MetadataOptions::default(),
             )
             .map_err(|e| anyhow!("unsupported media: {e}"))?;
