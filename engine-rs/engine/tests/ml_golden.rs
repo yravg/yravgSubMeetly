@@ -117,7 +117,16 @@ fn candle_whisper_base_matches_faster_whisper() {
                 .map(|got| (jaccard(&want.text, &got.text), got))
                 .max_by(|a, b| a.0.total_cmp(&b.0));
             if let Some((score, got)) = best {
-                if score >= 0.5 {
+                // Mutual best only: a merged Rust segment must not count against
+                // the later Python segment it swallowed.
+                let mutual = clip
+                    .segments
+                    .iter()
+                    .max_by(|a, b| {
+                        jaccard(&a.text, &got.text).total_cmp(&jaccard(&b.text, &got.text))
+                    })
+                    .is_some_and(|back| std::ptr::eq(back, want));
+                if score >= 0.5 && mutual {
                     matched += 1;
                     worst = worst.max((got.start - want.start).abs());
                 }
@@ -143,8 +152,12 @@ fn candle_whisper_base_matches_faster_whisper() {
         }
         if worst > 0.5 {
             failures.push(format!(
-                "{}: matched segment start off by {worst:.2}s",
-                clip.id
+                "{}: matched segment start off by {worst:.2}s
+  rs: {:?}",
+                clip.id,
+                segs.iter()
+                    .map(|s| (s.start, s.text.as_str()))
+                    .collect::<Vec<_>>()
             ));
         }
         if matched == 0 {

@@ -396,7 +396,16 @@ impl WhisperAsr {
                     }
                 }
             }
-            if !text_ids.is_empty() {
+            // Single trailing timestamp = window fully used; a pair ending
+            // mid-window resumes at the last pair.
+            let single_end = sampled.last().is_some_and(|t| *t >= self.ts_begin)
+                && !(sampled.len() >= 2 && sampled[sampled.len() - 2] >= self.ts_begin);
+            let advance = match last_pair_end {
+                Some(t) if !single_end => ((ts(t) * FRAMES_PER_SEC) as usize).min(segment_frames),
+                _ => segment_frames,
+            };
+            // Unclosed text after a resume point is decoded again by the next window.
+            if !text_ids.is_empty() && advance == segment_frames {
                 let text = self.text(&text_ids)?;
                 if !text.is_empty() {
                     out.push(Segment {
@@ -406,14 +415,6 @@ impl WhisperAsr {
                     });
                 }
             }
-            // Single trailing timestamp = window fully used; a pair ending
-            // mid-window resumes at the last pair.
-            let single_end = sampled.last().is_some_and(|t| *t >= self.ts_begin)
-                && !(sampled.len() >= 2 && sampled[sampled.len() - 2] >= self.ts_begin);
-            let advance = match last_pair_end {
-                Some(t) if !single_end => ((ts(t) * FRAMES_PER_SEC) as usize).min(segment_frames),
-                _ => segment_frames,
-            };
             seek += advance.max(1);
         }
         Ok(out)

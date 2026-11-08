@@ -11,7 +11,7 @@ Updated 2026-11-08 by the lead session.
 | S1 rename | done on branch, not merged | `yravg/sm-rename` a597757 (38 files). npm build ok; npm test 235 pass / 54 fail, all env (python3 absent: 53, run.sh exec bit: 1), same on HEAD per worker. Open: overlay label "ySub", reskin names "Yraverage Klasik/Modern", store PNGs still old wordmark, Swift not built here |
 | S2 goldens | done on branch, not merged | `yravg/sm-engine` 0458bf2: 79 goldens from native/server.py (ML imports stubbed), `scripts/gen-engine-golden.mjs` |
 | S3 non-ML routes | done on branch, not merged | `yravg/sm-engine` 75323f1: engine-rs/engine, 79/79 goldens 0 mismatch, 11 unit + 6 contract tests; fmt + clippy -D warnings clean (worker); lead re-ran cargo test: all pass. Not ported: GET /models, DELETE /models/cache, POST /shutdown (404 in Rust). ML routes 501. |
-| S4 ASR/translate | open | owner chose candle 2026-11-08; needs disk space to build |
+| S4 ASR/translate | in progress (yravg/sm-s4) | candle Whisper+Qwen routes, 101 goldens 0 mismatch; whisper-base WER <=0.071 on 5 clips, en-3 segment boundaries differ (start gate fails); Qwen not smoke-tested (download speed); cuda needs nvcc |
 | S5 switch | open | |
 | S6 island fork | in progress | worker `island` |
 | S7 island pages | open | |
