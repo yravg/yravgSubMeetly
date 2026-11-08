@@ -284,3 +284,25 @@ fn preflight_is_no_content_and_respects_origin() {
 
     let _ = fs::remove_dir_all(&state);
 }
+
+#[test]
+fn live_keeps_the_last_caption_and_its_rtf() {
+    let (app, state) = app_with_state();
+    let get = || {
+        app.handle(&request("GET", "/live", None, "127.0.0.1:17865", true))
+            .body
+            .expect("body")
+    };
+    assert_eq!(get()["seq"], 0);
+
+    app.record_live("  halo dunia ", "", 100, 32000); // 2 s of audio in 100 ms
+    let live = get();
+    assert_eq!(live["seq"], 1);
+    assert_eq!(live["source"], "halo dunia");
+    assert_eq!(live["audio_s"], 2.0);
+    assert_eq!(live["rtf"], 0.05);
+
+    app.record_live("   ", "", 5, 32000); // silence is not a line
+    assert_eq!(get()["seq"], 1);
+    let _ = fs::remove_dir_all(&state);
+}

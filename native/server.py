@@ -660,6 +660,28 @@ NOTES_PATH = Path(os.environ.get("NOTES_PATH", STATE_DIR / "notes.json"))
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 
+# Latest caption the engine produced (GET /live): what the island shows.
+# Kept in memory only; `seq` counts lines since start so a reader can tell
+# a new line from the same one. `rtf` = compute seconds / audio seconds.
+_live: dict = {"seq": 0, "source": "", "translation": "", "ms": None, "audio_s": None, "rtf": None, "at": None}
+_live_lock = threading.Lock()
+
+
+def _live_record(source: str, translation: str, ms: int, samples: int) -> None:
+    if not source.strip():
+        return
+    audio_s = samples / 16000.0
+    with _live_lock:
+        _live.update(
+            seq=_live["seq"] + 1,
+            source=source.strip(),
+            translation=(translation or "").strip(),
+            ms=ms,
+            audio_s=round(audio_s, 3),
+            rtf=round(ms / 1000.0 / audio_s, 3) if audio_s > 0 else None,
+            at=int(time.time() * 1000),
+        )
+
 
 def _load_notes() -> list:
     try:
@@ -1357,6 +1379,9 @@ class Handler(BaseHTTPRequestHandler):
                     },
                 },
             )
+        if u.path == "/live":
+            with _live_lock:
+                return self._json(200, dict(_live))
         if u.path == "/notes":
             return self._json(200, {"notes": _load_notes()})
         if u.path == "/models":
@@ -1431,7 +1456,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(200, {"text": ""})
                 t0 = time.time()
                 text = asr_array(audio, language, task)
-                return self._json(200, {"text": text, "ms": int((time.time() - t0) * 1000)})
+                ms = int((time.time() - t0) * 1000)
+                _live_record(text, "", ms, audio.size)
+                return self._json(200, {"text": text, "ms": ms})
 
             if u.path == "/transcribe_file":
                 if not FFMPEG:
@@ -1481,6 +1508,7 @@ class Handler(BaseHTTPRequestHandler):
                 out = draft_pipeline(audio, language, src, tgt)
                 if "ms" not in out:
                     out["ms"] = int((time.time() - t0) * 1000)
+                _live_record(out.get("source") or "", out.get("translation") or "", out["ms"], audio.size)
                 return self._json(200, out)
 
             if u.path == "/translate_refine":
