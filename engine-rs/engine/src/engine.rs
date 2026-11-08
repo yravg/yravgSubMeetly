@@ -105,7 +105,12 @@ impl Ml {
         f(guard.as_mut().expect("loaded above"))
     }
 
-    pub fn segments(&self, pcm: &[f32], language: Option<&str>, task: Task) -> Result<Vec<Segment>> {
+    pub fn segments(
+        &self,
+        pcm: &[f32],
+        language: Option<&str>,
+        task: Task,
+    ) -> Result<Vec<Segment>> {
         self.with_asr(|asr| asr.transcribe(pcm, language, task))
     }
 
@@ -219,7 +224,15 @@ pub fn jobs_lock(jobs: &Jobs) -> MutexGuard<'_, HashMap<String, Value>> {
 }
 
 /// Body of `/transcribe_file_job`: runs on its own thread, deletes `path` at the end.
-pub fn run_job(ml: Arc<Ml>, jobs: Jobs, id: String, path: std::path::PathBuf, language: Option<String>, task: Task, size: u64) {
+pub fn run_job(
+    ml: Arc<Ml>,
+    jobs: Jobs,
+    id: String,
+    path: std::path::PathBuf,
+    language: Option<String>,
+    task: Task,
+    size: u64,
+) {
     let language = language.as_deref();
     let result = (|| -> Result<(), JobError> {
         if job_cancelled(&jobs, &id) {

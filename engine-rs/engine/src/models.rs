@@ -70,7 +70,12 @@ pub fn scan_model_cache(cache: &Path) -> Vec<Value> {
     let mut dirs: Vec<(String, PathBuf)> = entries
         .flatten()
         .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
-        .map(|entry| (entry.file_name().to_string_lossy().to_string(), entry.path()))
+        .map(|entry| {
+            (
+                entry.file_name().to_string_lossy().to_string(),
+                entry.path(),
+            )
+        })
         .filter(|(name, _)| name.starts_with("models--"))
         .collect();
     dirs.sort();
@@ -129,7 +134,10 @@ pub fn delete_cached(cache: &Path, slug: &str, active: &[String], confirm: bool)
     if let Err(error) = fs::remove_dir_all(&target) {
         return (500, json!({ "error": format!("delete failed: {error}") }));
     }
-    (200, json!({ "ok": true, "id": model_id, "freedBytes": freed }))
+    (
+        200,
+        json!({ "ok": true, "id": model_id, "freedBytes": freed }),
+    )
 }
 
 /// Download a whole repo snapshot into the hub cache; returns (path, bytes).

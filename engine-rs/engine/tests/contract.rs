@@ -186,7 +186,10 @@ fn ml_routes_answer_without_loading_a_model() {
 
     // Too short for ASR: answered before any model loads, like the oracle.
     let short = post("/transcribe", &[0u8; 400]);
-    assert_eq!((short.status, short.body), (200, Some(json!({ "text": "" }))));
+    assert_eq!(
+        (short.status, short.body),
+        (200, Some(json!({ "text": "" })))
+    );
     let draft = post("/draft?src=en&tgt=de", b"");
     assert_eq!(draft.body, Some(json!({ "source": "", "translation": "" })));
 

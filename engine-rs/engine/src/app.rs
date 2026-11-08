@@ -13,13 +13,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Map, Value};
 
-use crate::notes::{
-    export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
-};
 use crate::audio::pcm_f32_le;
 use crate::engine::{segments_json, Jobs, Ml, ASR_ENGINE, MT_ENGINE};
 use crate::heuristic::heuristic_notes;
 use crate::models::{delete_cached, hub_cache_dir, scan_model_cache};
+use crate::notes::{
+    export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
+};
 use crate::protocol::{Request, Response};
 use crate::state::now_utc_iso;
 use crate::translate::norm_lang;
@@ -256,14 +256,20 @@ impl App {
                 self.shutdown.store(true, Ordering::Relaxed);
                 self.json_response(request, 200, json!({ "ok": true, "shutting_down": true }))
             }
-            "/transcribe" | "/transcribe_file" | "/transcribe_file_job" | "/translate"
-            | "/draft" | "/translate_refine" => {
+            "/transcribe"
+            | "/transcribe_file"
+            | "/transcribe_file_job"
+            | "/translate"
+            | "/draft"
+            | "/translate_refine" => {
                 // The oracle answers any exception in these routes with 500.
                 match self.ml_route(request, path) {
                     Ok(response) => response,
-                    Err(error) => {
-                        self.json_response(request, 500, json!({ "error": format!("Error: {error:#}") }))
-                    }
+                    Err(error) => self.json_response(
+                        request,
+                        500,
+                        json!({ "error": format!("Error: {error:#}") }),
+                    ),
                 }
             }
             _ => {
@@ -329,8 +335,10 @@ impl App {
                     return Ok(self.json_response(request, 501, json!({ "error": NO_TRANSLATE })));
                 }
                 let text = String::from_utf8_lossy(&request.body).to_string();
-                let fast = matches!(q.get("fast").map(String::as_str), Some("1" | "true" | "yes"))
-                    && !accurate;
+                let fast = matches!(
+                    q.get("fast").map(String::as_str),
+                    Some("1" | "true" | "yes")
+                ) && !accurate;
                 if text.trim().is_empty() {
                     return Ok(self.json_response(request, 200, json!({ "text": "" })));
                 }
@@ -386,7 +394,11 @@ impl App {
         let ms = || started.elapsed().as_millis() as u64;
         let pcm = pcm_f32_le(&request.body);
         if pcm.len() < 1600 {
-            return Ok(self.json_response(request, 200, json!({ "source": "", "translation": "" })));
+            return Ok(self.json_response(
+                request,
+                200,
+                json!({ "source": "", "translation": "" }),
+            ));
         }
         let language = q.get("language").map(String::as_str).unwrap_or(src);
         let language = (!language.is_empty() && language != "auto").then_some(language);
@@ -441,10 +453,8 @@ impl App {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        let target = env::temp_dir().join(format!(
-            "ysm-upload-{}-{nanos}.{ext}",
-            std::process::id()
-        ));
+        let target =
+            env::temp_dir().join(format!("ysm-upload-{}-{nanos}.{ext}", std::process::id()));
         match &request.body_file {
             // Rename takes ownership: the server's own cleanup then finds nothing.
             Some(file) => {
@@ -503,9 +513,7 @@ impl App {
         };
         let get = |key: &str| payload.get(key).filter(|v| py_truthy(v));
         let text = |key: &str, fallback: &str| {
-            get(key)
-                .map(py_str)
-                .unwrap_or_else(|| fallback.to_string())
+            get(key).map(py_str).unwrap_or_else(|| fallback.to_string())
         };
         let lines: Vec<Value> = match get("lines") {
             Some(Value::Array(items)) => items.clone(),
@@ -639,7 +647,6 @@ impl App {
         }
         self.json_response(request, 404, json!({ "error": "not found" }))
     }
-
 
     fn health(&self) -> Value {
         let mt = self.ml.translate_available();

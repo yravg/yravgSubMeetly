@@ -17,8 +17,8 @@ const LANGUAGES: [&str; 100] = [
     "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn",
     "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si",
     "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo",
-    "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln", "ha",
-    "ba", "jw", "su", "yue",
+    "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln",
+    "ha", "ba", "jw", "su", "yue",
 ];
 /// Seconds per timestamp token.
 const TS_STEP: f64 = 0.02;
@@ -142,7 +142,8 @@ impl WhisperAsr {
         };
         let config: Config = serde_json::from_slice(&std::fs::read(fetch("config.json")?)?)
             .context("whisper config")?;
-        let tokenizer = Tokenizer::from_file(fetch("tokenizer.json")?).map_err(|e| anyhow!("{e}"))?;
+        let tokenizer =
+            Tokenizer::from_file(fetch("tokenizer.json")?).map_err(|e| anyhow!("{e}"))?;
         let weights = fetch("model.safetensors")?;
         // SAFETY: the hub cache file is not modified while mapped.
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights], w::DTYPE, &device)? };
@@ -197,7 +198,12 @@ impl WhisperAsr {
             .ok_or_else(|| anyhow!("'{code}' is not a valid language code"))
     }
 
-    fn logits_last(&mut self, tokens: &[u32], features: &Tensor, flush: bool) -> Result<(Vec<f32>, Tensor)> {
+    fn logits_last(
+        &mut self,
+        tokens: &[u32],
+        features: &Tensor,
+        flush: bool,
+    ) -> Result<(Vec<f32>, Tensor)> {
         let input = Tensor::new(tokens, &self.device)?.unsqueeze(0)?;
         let ys = self.model.decoder.forward(&input, features, flush)?;
         let n = tokens.len();
@@ -265,12 +271,20 @@ impl WhisperAsr {
                 if penult_ts {
                     logits[ts_begin..].iter_mut().for_each(|v| *v = neg);
                 } else {
-                    logits[..self.eot as usize].iter_mut().for_each(|v| *v = neg);
+                    logits[..self.eot as usize]
+                        .iter_mut()
+                        .for_each(|v| *v = neg);
                 }
             }
             if let Some(last) = sampled.iter().rev().find(|t| is_ts(t)) {
-                let floor = if last_ts && !penult_ts { *last } else { *last + 1 } as usize;
-                logits[ts_begin..floor.min(vocab)].iter_mut().for_each(|v| *v = neg);
+                let floor = if last_ts && !penult_ts {
+                    *last
+                } else {
+                    *last + 1
+                } as usize;
+                logits[ts_begin..floor.min(vocab)]
+                    .iter_mut()
+                    .for_each(|v| *v = neg);
             }
             if sampled.is_empty() {
                 logits[..ts_begin].iter_mut().for_each(|v| *v = neg);
@@ -315,7 +329,12 @@ impl WhisperAsr {
     /// shortcut: greedy only (beam_size from engine mode ignored), no
     /// temperature fallback and no conditioning on previous text; add beam
     /// search when accuracy mode needs to match faster-whisper's beam 5.
-    pub fn transcribe(&mut self, pcm: &[f32], language: Option<&str>, task: Task) -> Result<Vec<Segment>> {
+    pub fn transcribe(
+        &mut self,
+        pcm: &[f32],
+        language: Option<&str>,
+        task: Task,
+    ) -> Result<Vec<Segment>> {
         let content_frames = pcm.len() / w::HOP_LENGTH;
         let mut padded = pcm.to_vec();
         padded.extend(std::iter::repeat_n(0f32, w::N_SAMPLES));

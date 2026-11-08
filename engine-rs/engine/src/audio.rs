@@ -24,8 +24,10 @@ const RESAMPLE_CHUNK: usize = 1024;
 
 /// Little-endian f32 PCM body (the `/transcribe` and `/draft` wire format).
 pub fn pcm_f32_le(body: &[u8]) -> Vec<f32> {
-    body.chunks_exact(4)
-        .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    body.as_chunks::<4>()
+        .0
+        .iter()
+        .map(|b| f32::from_le_bytes(*b))
         .collect()
 }
 
@@ -65,13 +67,13 @@ impl MonoStream {
         let track = format
             .tracks()
             .iter()
-            .find(|t| t.codec_params.codec != CODEC_TYPE_NULL && t.codec_params.sample_rate.is_some())
+            .find(|t| {
+                t.codec_params.codec != CODEC_TYPE_NULL && t.codec_params.sample_rate.is_some()
+            })
             .ok_or_else(|| anyhow!("no audio track"))?;
         let params = track.codec_params.clone();
         let rate = params.sample_rate.unwrap_or(SAMPLE_RATE as u32) as usize;
-        let duration_sec = params
-            .n_frames
-            .map(|frames| frames as f64 / rate as f64);
+        let duration_sec = params.n_frames.map(|frames| frames as f64 / rate as f64);
         let decoder = symphonia::default::get_codecs()
             .make(&params, &DecoderOptions::default())
             .map_err(|e| anyhow!("unsupported codec: {e}"))?;
@@ -336,15 +338,24 @@ mod tests {
         // 2.5 s of a 440 Hz tone at 44.1 kHz.
         let rate = 44_100u32;
         let samples: Vec<i16> = (0..(rate as usize * 5 / 2))
-            .map(|i| ((i as f32 * 440.0 * std::f32::consts::TAU / rate as f32).sin() * 8000.0) as i16)
+            .map(|i| {
+                ((i as f32 * 440.0 * std::f32::consts::TAU / rate as f32).sin() * 8000.0) as i16
+            })
             .collect();
         write_wav(&path, rate, &samples);
 
         let pcm = decode_file(&path).unwrap();
         let expected = SAMPLE_RATE * 5 / 2;
-        assert!(pcm.len().abs_diff(expected) <= 2, "{} vs {expected}", pcm.len());
+        assert!(
+            pcm.len().abs_diff(expected) <= 2,
+            "{} vs {expected}",
+            pcm.len()
+        );
         let rms = (pcm.iter().map(|x| x * x).sum::<f32>() / pcm.len() as f32).sqrt();
-        assert!((rms - 8000.0 / 32768.0 / 2f32.sqrt()).abs() < 0.02, "rms {rms}");
+        assert!(
+            (rms - 8000.0 / 32768.0 / 2f32.sqrt()).abs() < 0.02,
+            "rms {rms}"
+        );
 
         let mut windows = Windows::new(MonoStream::open(&path).unwrap(), 1.0, 0.25);
         let mut seen = Vec::new();

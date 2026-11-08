@@ -8,10 +8,17 @@ node scripts/gen-engine-golden.mjs
 
 The capture harness stubs `faster_whisper` and `ctranslate2` in a throwaway
 bootstrap module so the Python helper starts without downloading a Whisper
-model. Only non-ML routes are captured: the Rust engine answers
-`/transcribe*`, `/translate`, `/translate_refine`, `/draft`, `/notes/generate`,
-`/notes/summarize` and `/models/pull` with `501 {"error":"not-implemented-in-rust"}`
-by design, so those have no goldens (the Rust test asserts the 501 directly).
+model. Captured routes are the ones that answer without a model: state,
+notes, the heuristic `/notes/generate` and `/notes/summarize`, `/models`
+(with `HF_HUB_CACHE` pointed at a copy of `fixtures/hf-cache`), the
+`DELETE /models/cache/...` guard, `/models/pull` validation, and the
+short-body answers of `/transcribe` and `/draft`. Replay runs with
+`TRANSLATE=off`, matching the oracle on a machine without MLX.
+
+ASR is compared separately against real models: `ml/whisper-base.json` comes
+from `node scripts/gen-engine-ml-golden.mjs` (faster-whisper `base`) and is
+checked by the ignored test `engine-rs/engine/tests/ml_golden.rs` (WER and
+segment start times).
 
 Each file is one request:
 

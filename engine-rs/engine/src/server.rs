@@ -99,12 +99,13 @@ fn handle_connection(stream: TcpStream, app: &App) -> io::Result<()> {
                 body.resize(content_length, 0);
                 reader.read_exact(&mut body)?;
             } else if upload {
-                let path = std::env::temp_dir().join(format!(
-                    "ysm-body-{}-{:?}.bin",
-                    std::process::id(),
-                    thread::current().id()
-                ))
-                .with_extension("bin");
+                let path = std::env::temp_dir()
+                    .join(format!(
+                        "ysm-body-{}-{:?}.bin",
+                        std::process::id(),
+                        thread::current().id()
+                    ))
+                    .with_extension("bin");
                 let mut file = std::fs::File::create(&path)?;
                 io::copy(&mut (&mut reader).take(content_length as u64), &mut file)?;
                 body_file = Some(path);

@@ -68,7 +68,11 @@ pub fn clip_fast_text(text: &str) -> String {
         None => cut.trim().to_string(),
     };
     if cut.is_empty() {
-        text.chars().take(limit).collect::<String>().trim().to_string()
+        text.chars()
+            .take(limit)
+            .collect::<String>()
+            .trim()
+            .to_string()
     } else {
         cut
     }
@@ -148,9 +152,10 @@ pub struct Translator {
 impl Translator {
     pub fn load(repo_id: &str, device: Device) -> Result<Self> {
         let fetch = |name: &str| crate::ml::hub_file(repo_id, None, name);
-        let config: Config =
-            serde_json::from_slice(&std::fs::read(fetch("config.json")?)?).context("qwen config")?;
-        let tokenizer = Tokenizer::from_file(fetch("tokenizer.json")?).map_err(|e| anyhow!("{e}"))?;
+        let config: Config = serde_json::from_slice(&std::fs::read(fetch("config.json")?)?)
+            .context("qwen config")?;
+        let tokenizer =
+            Tokenizer::from_file(fetch("tokenizer.json")?).map_err(|e| anyhow!("{e}"))?;
         let weights = match fetch("model.safetensors.index.json") {
             Ok(index) => {
                 let index: Value = serde_json::from_slice(&std::fs::read(index)?)?;
@@ -162,14 +167,15 @@ impl Translator {
                     .collect();
                 names.sort();
                 names.dedup();
-                names
-                    .iter()
-                    .map(|n| fetch(n))
-                    .collect::<Result<Vec<_>>>()?
+                names.iter().map(|n| fetch(n)).collect::<Result<Vec<_>>>()?
             }
             Err(_) => vec![fetch("model.safetensors")?],
         };
-        let dtype = if device.is_cpu() { DType::F32 } else { DType::BF16 };
+        let dtype = if device.is_cpu() {
+            DType::F32
+        } else {
+            DType::BF16
+        };
         // SAFETY: the hub cache files are not modified while mapped.
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&weights, dtype, &device)? };
         let model = ModelForCausalLM::new(&config, vb)?;
@@ -215,7 +221,9 @@ impl Translator {
             out.push(next);
             input = vec![next];
         }
-        self.tokenizer.decode(&out, true).map_err(|e| anyhow!("{e}"))
+        self.tokenizer
+            .decode(&out, true)
+            .map_err(|e| anyhow!("{e}"))
     }
 
     pub fn translate(&mut self, text: &str, src: &str, tgt: &str, fast: bool) -> Result<String> {

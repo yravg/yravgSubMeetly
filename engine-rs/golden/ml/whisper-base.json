@@ -1,0 +1,156 @@
+{
+  "capturedFrom": "faster-whisper base, CPU int8, beam 1 (native/server.py asr_file, fast mode)",
+  "model": "base",
+  "clips": [
+    {
+      "id": "en-1",
+      "file": "test/samples/cc0/en-1.mp3",
+      "language": "en",
+      "license": "CC0-1.0",
+      "duration": 20,
+      "elapsedSec": 2.773,
+      "rtf": 0.1386,
+      "segments": [
+        {
+          "start": 0,
+          "end": 7.08,
+          "text": "the approval of the administration, and be finally ratified by the Senate."
+        },
+        {
+          "start": 7.08,
+          "end": 13.4,
+          "text": "It was naturally supposed by the Army that there would be no more fighting, and officers"
+        },
+        {
+          "start": 13.4,
+          "end": 19.96,
+          "text": "and men were, of course, anxious to get home, but knowing there must be delay they contended"
+        }
+      ]
+    },
+    {
+      "id": "en-2",
+      "file": "test/samples/cc0/en-2.mp3",
+      "language": "en",
+      "license": "CC0-1.0",
+      "duration": 20,
+      "elapsedSec": 1.453,
+      "rtf": 0.0727,
+      "segments": [
+        {
+          "start": 0,
+          "end": 7.44,
+          "text": "One connecting Memphis and the Mississippi River with the East and the other leading South"
+        },
+        {
+          "start": 7.44,
+          "end": 9.84,
+          "text": "to all the cotton states."
+        },
+        {
+          "start": 9.84,
+          "end": 15.88,
+          "text": "Still another railroad connects Corinth with Jackson in West Tennessee."
+        },
+        {
+          "start": 15.88,
+          "end": 19.98,
+          "text": "If we obtain possession of Corinth, the enemy would have..."
+        }
+      ]
+    },
+    {
+      "id": "en-3",
+      "file": "test/samples/cc0/en-3.mp3",
+      "language": "en",
+      "license": "CC0-1.0",
+      "duration": 20,
+      "elapsedSec": 3.171,
+      "rtf": 0.1585,
+      "segments": [
+        {
+          "start": 0,
+          "end": 3.5,
+          "text": "and immediately assumed command in the field."
+        },
+        {
+          "start": 3.5,
+          "end": 9.84,
+          "text": "On the 21st, General Pope arrived with an army of 30,000 strong,"
+        },
+        {
+          "start": 9.84,
+          "end": 13.46,
+          "text": "fresh from the capture of Island No. 10"
+        },
+        {
+          "start": 13.46,
+          "end": 18.46,
+          "text": "in the Mississippi River. He went into camp at Hamburg Landing"
+        },
+        {
+          "start": 18.46,
+          "end": 22.46,
+          "text": "five miles above."
+        }
+      ]
+    },
+    {
+      "id": "de-1",
+      "file": "test/samples/cc0/de-1.mp3",
+      "language": "de",
+      "license": "Public Domain",
+      "duration": 20,
+      "elapsedSec": 1.116,
+      "rtf": 0.0558,
+      "segments": [
+        {
+          "start": 0,
+          "end": 4,
+          "text": "mit den langen, beleuchte den Fenstern emporagt."
+        },
+        {
+          "start": 4,
+          "end": 8.4,
+          "text": "Mit dem Kirchenfeste ist auch ein häusliches Verbunden."
+        },
+        {
+          "start": 8.4,
+          "end": 13.6,
+          "text": "Es hat sich fast in allen christlichen Ländern verbreitet, dass man den Kindern die Ankunft"
+        },
+        {
+          "start": 13.6,
+          "end": 20,
+          "text": "des Christkindleins, auch eines Kindes, des wunderbarsten, das je auf der Welt war,"
+        }
+      ]
+    },
+    {
+      "id": "es-1",
+      "file": "test/samples/cc0/es-1.mp3",
+      "language": "es",
+      "license": "Public Domain",
+      "duration": 20,
+      "elapsedSec": 0.942,
+      "rtf": 0.0471,
+      "segments": [
+        {
+          "start": 0,
+          "end": 8.44,
+          "text": "de Asuero. El Asuero que reinó desde la India hasta la Etyopia, sobre 120 y 7 provincias."
+        },
+        {
+          "start": 8.44,
+          "end": 14.52,
+          "text": "Quena que ellos días, asentado que fue el rey Asuero en la silla de Surreino, la cual"
+        },
+        {
+          "start": 14.52,
+          "end": 19.72,
+          "text": "estaba en su san, capital del reino, en el tercer año de Surreinado."
+        }
+      ]
+    }
+  ]
+}
