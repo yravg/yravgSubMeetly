@@ -48,6 +48,8 @@ import {
   firstSampleForPair,
   fetchSampleFile,
 } from './lib/qa-samples.js';
+import { tile as colourTile } from './lib/colour-icons.js';
+import { renderFeatureMap } from './lib/feature-map.js';
 import { springProgress, slidingNumber, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -56,7 +58,7 @@ const state = {
   sessionTab: null, // tab yang sedang disubtitle selagi sesi realtime hidup
   mode: 'realtime', // 'realtime' | 'offline'
   task: 'translate', // 'transcribe' | 'translate'
-  view: 'captions', // 'captions' | 'notes'
+  view: 'captions', // 'captions' | 'notes' | 'history' | 'helper' | 'settings'
   srcLang: 'zh',
   tgtLang: 'en',
   settings: {
@@ -70,6 +72,8 @@ const state = {
     engine: 'browser',
     nativeUrl: DEFAULT_NATIVE_URL,
     nativeDevice: 'auto', // helper compute: 'auto' | 'cpu' | 'cuda' (Win/Linux faster-whisper)
+    tabRows: 'one', // 'one' = hanya bar bawah, 'two' = baris Captions/Notes di atas juga
+    translationColour: 'indigo', // indigo | navy | teal | neutral | bronze — warna baris terjemahan langsung
     theme: 'auto', // 'auto' | 'light' | 'dark'
     reskin: 'yraverage', // 'yraverage' | 'coretax' | 'modern' — pola interaksi lokal
     // Two-way (consecutive) interpreting is opt-in; 'simultaneous' is the
@@ -511,6 +515,7 @@ function filterSettings(query) {
   const modal = $('settings-modal');
   if (!modal) return;
   let visible = 0;
+  modal.toggleAttribute('data-searching', !!q);
   modal.querySelectorAll('.setting-row, .m-item').forEach((el) => {
     const hit = !q || el.textContent.toLowerCase().includes(q);
     el.classList.toggle('search-hidden', !hit);
@@ -538,6 +543,10 @@ function filterSettings(query) {
     if (h.id === 'settings-no-match') return;
     h.classList.toggle('search-hidden', !!q);
   });
+  modal.querySelectorAll('.set-card').forEach((card) => {
+    const any = !q || [...card.querySelectorAll('.setting-row, .m-item')].some((r) => !r.classList.contains('search-hidden'));
+    card.classList.toggle('search-hidden', !any);
+  });
   const none = $('settings-no-match');
   none.classList.toggle('hidden', !q || visible > 0);
   if (q && visible === 0) none.textContent = t('settingsNoMatch', query.trim());
@@ -560,22 +569,37 @@ async function restoreUiPrefs() {
   }
 }
 
+const VIEWS = ['captions', 'notes', 'history', 'helper', 'settings'];
+let prevView = 'captions';
+
 function setView(view) {
-  state.view = view === 'notes' ? 'notes' : view === 'settings' ? 'settings' : 'captions';
+  const next = VIEWS.includes(view) ? view : 'captions';
+  if (next !== state.view && state.view !== 'settings') prevView = state.view;
+  const wasNative = state.view === 'settings' || state.view === 'helper';
+  state.view = next;
   document.querySelectorAll('#view-tabs button').forEach((b) => {
     const active = b.dataset.view === state.view;
     b.classList.toggle('active', active);
     if (active) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   });
-  $('view-captions')?.classList.toggle('hidden', state.view !== 'captions');
-  $('view-notes')?.classList.toggle('hidden', state.view !== 'notes');
+  for (const v of VIEWS) $(`view-${v}`)?.classList.toggle('hidden', v !== state.view);
   syncBottomNav();
-  
+  // Helper dan Settings membaca status helper; di luar keduanya polling berhenti.
+  if (state.view === 'helper') {
+    checkNative({ allowAutoStart: true });
+    startNativePoll();
+    syncPill('native-device-toggle', false);
+  } else if (state.view === 'settings') {
+    openSettingsPane();
+  } else if (wasNative) {
+    stopNativePoll();
+  }
+
   // Putar ulang animasi reveal di view yang baru tampil: kelas dilepas,
   // reflow dipaksa, lalu dipasang lagi dengan stagger. Tanpa ini CSS tidak
   // mengulang animasi yang sudah selesai sehingga pindah tab tanpa transisi.
-  const visibleView = state.view === 'notes' ? $('view-notes') : $('view-captions');
+  const visibleView = $(`view-${state.view}`);
   if (visibleView) {
     const items = [...visibleView.querySelectorAll('.reveal')];
     for (const el of items) el.classList.remove('reveal');
@@ -591,17 +615,15 @@ function setView(view) {
   syncPill('captions-subtabs');
 }
 
+/** Tab Settings terbuka. */
+const settingsOpen = () => state.view === 'settings';
+
 function syncBottomNav() {
-  // Kontekstual: bila modal Settings terbuka (dari topbar gear, tombol About,
-  // atau bottom nav), item Settings yang aktif; kalau tidak, ikut view aktif.
-  const settingsOpen = !($('settings-modal')?.classList.contains('hidden') ?? true);
   document.querySelectorAll('.bottom-nav-item').forEach((b) => {
-    const active =
-      b.dataset.view === 'settings' ? settingsOpen : b.dataset.view === state.view && !settingsOpen;
+    const active = b.dataset.view === state.view;
     b.classList.toggle('active', active);
     if (active) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
-    if (b.dataset.view === 'settings') b.setAttribute('aria-pressed', String(settingsOpen));
   });
 }
 
@@ -883,29 +905,54 @@ function updateWarning() {
   });
 }
 
-// Satu pintu membuka Settings agar banner, topbar, nav bawah, dan tombol
-// About selalu sinkron (lihat syncBottomNav).
+// Satu pintu membuka Settings (topbar, nav bawah, About, peta fitur).
 function openSettings({ about = false } = {}) {
+  if (!settingsOpen()) setView('settings');
+  setSettingsTab(about ? 'about' : $('settings-modal').dataset.stab || 'general');
+  if (about) $('about-block').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Dipanggil setView('settings'): isi yang hanya bisa diukur setelah terlihat.
+function openSettingsPane() {
   const search = $('settings-search');
   if (search) {
     search.value = '';
     filterSettings('');
     setTimeout(() => search.focus({ preventScroll: true }), 30);
   }
-  $('settings-modal').classList.remove('hidden');
-  // Nothing inside a display:none modal has a width or a height to measure, so
-  // the groups and panels living in here are placed the moment it opens.
-  for (const id of ['theme-toggle', 'asr-preset-toggle', 'mirror-toggle', 'device-toggle', 'native-device-toggle']) {
-    syncPill(id, false);
-  }
   lastNativeAutoStartMs = 0;
   labEnsureAttempted = false;
   checkNative({ allowAutoStart: true });
   startNativePoll();
-  $('about-block').classList.toggle('hidden', !about);
-  if (about) $('about-block').scrollIntoView({ behavior: 'smooth' });
   renderModelLists();
-  syncBottomNav();
+  setSettingsTab($('settings-modal').dataset.stab);
+}
+
+const SETTINGS_TABS = ['general', 'engine', 'models', 'output', 'about'];
+function setSettingsTab(tab) {
+  const next = SETTINGS_TABS.includes(tab) ? tab : 'general';
+  $('settings-modal').dataset.stab = next;
+  document.querySelectorAll('#settings-tabs button').forEach((b) => {
+    const on = b.dataset.stab === next;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
+  });
+  for (const id of ['theme-toggle', 'asr-preset-toggle', 'mirror-toggle', 'device-toggle']) syncPill(id, false);
+}
+
+/** Pintu dari peta fitur dan tautan "buka tab": captions | notes | history | helper | settings | perf | interp. */
+function jumpTo(tab) {
+  if (tab === 'perf') {
+    setView('captions');
+    applyDensity('detail');
+    setSubview('perf');
+  } else if (tab === 'interp') {
+    setView('captions');
+    $('btn-interpreter')?.click();
+  } else {
+    setView(tab);
+    if (tab === 'captions') setSubview('live');
+  }
 }
 
 // Remembered so the right-click context-menu start can reuse the last choices.
@@ -1107,7 +1154,7 @@ function renderEngineToggle() {
         lastNativeAutoStartMs = 0;
         labEnsureAttempted = false;
         checkNative({ allowAutoStart: true });
-        if (!$('settings-modal').classList.contains('hidden')) startNativePoll();
+        if (settingsOpen()) startNativePoll();
       } else {
         stopNativePoll();
       }
@@ -1263,12 +1310,71 @@ function modelRow(key, name, sub, { mtPair = null } = {}) {
   div.querySelector('.test-btn')?.addEventListener('click', async () => {
     const pair = div.querySelector('.test-btn').dataset.pair;
     const sample = firstSampleForPair(state.qaCatalog, pair);
-    $('settings-modal').classList.add('hidden');
-    stopNativePoll();
-    syncBottomNav();
+    setView('captions');
     await runQaSample(sample, { autoStart: true });
   });
   return div;
+}
+
+// ---------------------------------------------------------------------------
+// Tab rows (One | Two) dan Translation colour — dua pengaturan baru board D02.
+const TCOLOURS = ['indigo', 'navy', 'teal', 'neutral', 'bronze'];
+
+function applyTabRows() {
+  const rows = state.settings.tabRows === 'two' ? 'two' : 'one';
+  document.body.dataset.tabrows = rows;
+  document.querySelectorAll('#tabrows-toggle button').forEach((b) => {
+    const on = b.dataset.tabrows === rows;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+}
+
+async function setTabRows(rows) {
+  state.settings.tabRows = rows === 'two' ? 'two' : 'one';
+  await saveSettings();
+  applyTabRows();
+}
+
+function applyTranslationColour() {
+  const c = TCOLOURS.includes(state.settings.translationColour) ? state.settings.translationColour : 'indigo';
+  document.documentElement.dataset.tcolor = c;
+  document.querySelectorAll('#tcolor-toggle button').forEach((b) => {
+    const on = b.dataset.tcolor === c;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+}
+
+async function setTranslationColour(c) {
+  state.settings.translationColour = TCOLOURS.includes(c) ? c : 'indigo';
+  await saveSettings();
+  applyTranslationColour();
+}
+
+/** Baris "Engine · perangkat" di Captions; teks diisi ulang tiap status helper/engine berubah. */
+function renderEngineLine() {
+  const el = $('engine-line-text');
+  if (!el) return;
+  if (state.settings.engine !== 'native') {
+    el.textContent = t('engineLineBrowser', state.settings.device || 'auto');
+    return;
+  }
+  const dev = nativeInfo ? (nativeInfo.device || state.settings.nativeDevice || 'auto') : null;
+  el.textContent = nativeInfo
+    ? t('engineLineNative', `${dev}${nativeInfo.model ? ' · ' + nativeInfo.model : ''}`)
+    : t('engineLineOffline');
+}
+
+/** Ubin ikon berwarna (data-ctile) — satu sumber ikon untuk nav bawah, kartu, dan peta fitur. */
+function paintTiles() {
+  document.querySelectorAll('[data-ctile]').forEach((el) => {
+    if (el.dataset.painted) return;
+    try {
+      el.innerHTML = colourTile(el.dataset.ctile, Number(el.dataset.size) || 24);
+      el.dataset.painted = '1';
+    } catch { /* nama ikon tak dikenal: biarkan kosong */ }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1297,6 +1403,14 @@ async function setTheme(theme) {
 // dikenal diabaikan; nilai sama dilewati agar tak ada putaran umpan-balik.
 function applyExternalSettings(next) {
   if (!next || typeof next !== 'object') return;
+  if (['one', 'two'].includes(next.tabRows) && next.tabRows !== state.settings.tabRows) {
+    state.settings.tabRows = next.tabRows;
+    applyTabRows();
+  }
+  if (TCOLOURS.includes(next.translationColour) && next.translationColour !== state.settings.translationColour) {
+    state.settings.translationColour = next.translationColour;
+    applyTranslationColour();
+  }
   if (['auto', 'light', 'dark'].includes(next.theme) && next.theme !== state.settings.theme) {
     state.settings.theme = next.theme;
     applyTheme();
@@ -1391,6 +1505,11 @@ async function loadSettings() {
     state.settings.reskin = 'yraverage';
   }
   applyReskin();
+  if (!['one', 'two'].includes(state.settings.tabRows)) state.settings.tabRows = 'one';
+  applyTabRows();
+  if (!TCOLOURS.includes(state.settings.translationColour)) state.settings.translationColour = 'indigo';
+  applyTranslationColour();
+  renderEngineLine();
   document.querySelectorAll('#mirror-toggle button').forEach((b) =>
     b.classList.toggle('active', b.dataset.mirror === state.settings.mirror),
   );
@@ -1567,6 +1686,7 @@ async function checkNative({ allowAutoStart = false } = {}) {
   }
   updateWarning();
   updateNativeHostHint();
+  renderEngineLine();
   redrawHelperStatus?.();
   redrawHelperGuide?.();
   renderNativeModels();
@@ -2734,6 +2854,7 @@ chrome.runtime.onMessage.addListener((msg) => {
 // ---------------------------------------------------------------------------
 // wiring
 function wire() {
+  paintTiles();
   mountPills();
   mountPanels();
   // Label widths change with the UI language and with the panel width.
@@ -2745,14 +2866,7 @@ function wire() {
     b.addEventListener('click', () => applyDensity(b.dataset.densityMode)),
   );
   document.querySelectorAll('.bottom-nav-item').forEach((b) =>
-    b.addEventListener('click', () => {
-      if (b.dataset.view === 'settings') {
-        openSettings();
-      } else {
-        setView(b.dataset.view);
-      }
-      syncBottomNav();
-    }),
+    b.addEventListener('click', () => setView(b.dataset.view)),
   );
   // ⌘⇧F / Ctrl+Shift+F — tandai momen. Hanya saat tampilan Notulen terlihat
   // dan ada tugas tangkap yang berjalan; tombolnya sendiri yang menyimpan,
@@ -2863,26 +2977,30 @@ function wire() {
   });
 
   $('btn-settings').addEventListener('click', () => openSettings());
-  $('btn-close-settings').addEventListener('click', () => {
-    $('settings-modal').classList.add('hidden');
-    stopNativePoll();
-    syncBottomNav();
-  });
+  document.querySelectorAll('#settings-tabs button').forEach((b) =>
+    b.addEventListener('click', () => setSettingsTab(b.dataset.stab)),
+  );
+  document.querySelectorAll('#tabrows-toggle button').forEach((b) =>
+    b.addEventListener('click', () => setTabRows(b.dataset.tabrows)),
+  );
+  document.querySelectorAll('#tcolor-toggle button').forEach((b) =>
+    b.addEventListener('click', () => setTranslationColour(b.dataset.tcolor)),
+  );
+  document.querySelectorAll('[data-open-view]').forEach((b) =>
+    b.addEventListener('click', () => jumpTo(b.dataset.openView)),
+  );
+  renderFeatureMap($('feature-map'), jumpTo);
+  $('btn-close-settings').addEventListener('click', () => setView(prevView));
   $('btn-about').addEventListener('click', () => openSettings({ about: true }));
   // Esc menutup modal yang terbuka agar kedua nav kembali ke menu aktif.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.isComposing) return;
-    let closed = false;
-    if (!$('settings-modal').classList.contains('hidden')) {
-      $('settings-modal').classList.add('hidden');
-      stopNativePoll();
-      closed = true;
-    }
+    // Modal Interpreter menutup dulu; Esc berikutnya keluar dari tab Settings.
     if (!$('interpreter-modal').classList.contains('hidden')) {
       $('interpreter-modal').classList.add('hidden');
-      closed = true;
+    } else if (settingsOpen() && !e.target.closest?.('input,select,textarea')) {
+      setView(prevView);
     }
-    if (closed) syncBottomNav();
   });
 
   document.querySelectorAll('#mirror-toggle button').forEach((b) =>
