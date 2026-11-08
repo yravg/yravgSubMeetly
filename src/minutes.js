@@ -1208,6 +1208,8 @@ function paint() {
   // lama memakai .main. Cari keduanya supaya render tidak batal di tengah jalan.
   ($('.main') || $('#center'))?.classList.toggle('overlay', state.view === 'series' || state.view === 'doc');
   const pane = $('#pane');
+  // The boards own the whole centre: CSS hides the register's header strip and source panel for them.
+  document.body.dataset.th = THREAD_VIEWS.has(state.view) ? state.view : '';
   pane.innerHTML = state.view === 'table' ? viewTable(rows)
     : state.view === 'topic' ? viewTopic(rows)
     : state.view === 'doc' ? viewDoc()
