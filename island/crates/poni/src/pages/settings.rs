@@ -82,7 +82,7 @@ const CHIP_ICON_GAP: f32 = 5.0;
 const CHIP_GAP: f32 = 6.0;
 
 // Glass: on Windows from a copy of the screen, on a Mac macOS's own glass.
-const THEMES: [(Theme, &str); 3] = [(Theme::Classic, "Classic"), (Theme::Glass, "Glass"), (Theme::Pill, "Pill")];
+const THEMES: [(Theme, &str); 4] = [(Theme::Classic, "Classic"), (Theme::Glass, "Glass"), (Theme::Paper, "Paper"), (Theme::Pill, "Pill")];
 
 /// An idle look's name in the picker.
 fn idle_name(s: IdleStyle, eyes: &'static str) -> &'static str {

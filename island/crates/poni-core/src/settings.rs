@@ -31,8 +31,11 @@ pub enum Theme {
     /// Pill: the island floats a little below the top edge as a black
     /// capsule, with its own layouts: the time and battery at rest, the song
     /// while music plays, a rounded card when it opens.
-    #[default]
     Pill,
+    /// Paper: the Pill in the SubMeetly paper look (white, navy ink). The
+    /// default.
+    #[default]
+    Paper,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,7 +47,7 @@ pub enum MonitorChoice {
 }
 
 /// Bumped when defaults change in a way existing files should pick up.
-pub const SETTINGS_VERSION: u32 = 5;
+pub const SETTINGS_VERSION: u32 = 6;
 
 fn version_zero() -> u32 {
     0
@@ -126,7 +129,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             settings_version: SETTINGS_VERSION,
-            theme: Theme::Pill,
+            theme: Theme::Paper,
             idle_style: IdleStyle::Clock,
             use_24h: true,
             hover_delay_ms: 220,
@@ -227,6 +230,10 @@ impl Settings {
         if self.settings_version < 5 && self.addons.get("notifications") == Some(&false) && !self.hidden_tabs.iter().any(|k| k == "notifications") {
             self.hidden_tabs.push("notifications".into());
         }
+        // v6: Paper became the default theme; the old default, Pill, moves.
+        if self.settings_version < 6 && self.theme == Theme::Pill {
+            self.theme = Theme::Paper;
+        }
         self.settings_version = self.settings_version.max(SETTINGS_VERSION);
         // Step aside is no longer offered: the island stays over maximized windows.
         self.step_aside = false;
@@ -294,16 +301,27 @@ mod tests {
     }
 
     #[test]
-    fn theme_defaults_to_pill() {
-        // Files written before themes existed get the floating pill.
+    fn theme_defaults_to_paper() {
+        // Files written before themes existed get the paper pill.
         let s: Settings = serde_json::from_str(r#"{"idle_style":"eyes"}"#).unwrap();
-        assert_eq!(s.theme, Theme::Pill);
+        assert_eq!(s.theme, Theme::Paper);
         let s: Settings = serde_json::from_str(r#"{"theme":"classic"}"#).unwrap();
         assert_eq!(s.theme, Theme::Classic);
         let s: Settings = serde_json::from_str(r#"{"theme":"glass"}"#).unwrap();
         assert_eq!(s.theme, Theme::Glass);
         let s: Settings = serde_json::from_str(r#"{"theme":"pill"}"#).unwrap();
         assert_eq!(s.theme, Theme::Pill);
+        let s: Settings = serde_json::from_str(r#"{"theme":"paper"}"#).unwrap();
+        assert_eq!(s.theme, Theme::Paper);
+    }
+
+    #[test]
+    fn old_pill_default_moves_to_paper_once() {
+        let old = serde_json::from_str::<Settings>(r#"{"settings_version":5,"theme":"pill"}"#).unwrap().sanitized();
+        assert_eq!(old.theme, Theme::Paper);
+        // A Pill chosen after v6 stays.
+        let kept = serde_json::from_str::<Settings>(r#"{"settings_version":6,"theme":"pill"}"#).unwrap().sanitized();
+        assert_eq!(kept.theme, Theme::Pill);
     }
 
     #[test]

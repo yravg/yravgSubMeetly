@@ -306,10 +306,11 @@ const HOVER: [(u32, &str); 3] = [(120, "Quick"), (220, "Normal"), (450, "Slow")]
 const CLOSE: [(u32, &str); 3] = [(0, "At once"), (400, "Short"), (1000, "Long")];
 const DISPLAYS: [(MonitorChoice, &str); 2] = [(MonitorChoice::Primary, "Main display"), (MonitorChoice::Cursor, "Under the pointer")];
 const FULLSCREEN: [(bool, &str); 2] = [(true, "Hide"), (false, "Stay on top")];
-const THEMES: [(Theme, &str, &str); 3] = [
+const THEMES: [(Theme, &str, &str); 4] = [
     (Theme::Classic, "Classic", "A black island at the top edge"),
     (Theme::Glass, "Glass", "Frosted glass over your screen"),
-    (Theme::Pill, "Pill", "Floats just below the top edge"),
+    (Theme::Paper, "Paper", "Light card, floats below the top edge"),
+    (Theme::Pill, "Pill", "Dark capsule, floats below the top edge"),
 ];
 /// Start with Windows, or at login on a Mac (its menu bar says so).
 const AUTOSTART: (&str, &str) = if cfg!(target_os = "macos") {
@@ -1481,7 +1482,7 @@ fn draw_theme_preview(c: &mut Canvas, theme: Theme, screen: Rect) {
             c.notch(body, 9.0, 5.0, fill, border);
             c.text("10:08", body, &clock.color(palette::TEXT));
         }
-        Theme::Pill => {
+        Theme::Pill | Theme::Paper => {
             let body = Rect::new(cx - 36.0, screen.y + 7.0, 72.0, 20.0);
             c.fill_rrect(body.offset(0.0, 2.0), 10.0, Color::black(0.25));
             c.fill_rrect(body, 10.0, palette::ISLAND);

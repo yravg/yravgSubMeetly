@@ -41,7 +41,7 @@ use poni_core::settings::Theme;
 pub const TOP_GAP: f32 = 8.0;
 
 pub fn on(theme: Theme) -> bool {
-    theme == Theme::Pill
+    matches!(theme, Theme::Pill | Theme::Paper)
 }
 
 /// The island's size for `m` in the Pill theme, or `None` for Classic's.
