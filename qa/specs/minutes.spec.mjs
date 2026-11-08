@@ -67,6 +67,8 @@ test('TC011 type chips and search narrow the list', async ({ page }) => {
   await chip.click();
   await expect(rows(page)).toHaveCount(all);
 
+  // Board D01: the dock starts as an icon while the navigator is open; open it to reach search.
+  await page.locator('#dock-mini').click();
   await page.locator('#btn-search-open').click();
   await expect(page.locator('#q')).toBeVisible();
   const firstWord = (await rows(page).first().locator('td').nth(3).innerText()).match(/[A-Za-z]{6,}/)?.[0];
@@ -104,6 +106,9 @@ test('TC012 export Markdown, CSV and JSON', async ({ page }) => {
 test('TC013 view dock minimises to an icon and opens again', async ({ page }) => {
   await openMinutesWithSample(page);
   const dock = page.locator('#viewdock');
+  // Board D01: the dock starts minimised while the navigator is open.
+  await expect(dock).toHaveClass(/\bmini\b/);
+  await page.locator('#dock-mini').click();
   await expect(page.locator('#dock-full')).toBeVisible();
   await page.locator('#btn-dock-mini').click();
   await expect(dock).toHaveClass(/\bmini\b/);
