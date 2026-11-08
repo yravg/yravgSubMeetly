@@ -181,7 +181,7 @@ fn wer_counts_word_edits() {
 ///
 ///   HF_HOME=engine-rs/.hf-cache TRANSLATE_TEST_MODEL=Qwen/Qwen2.5-0.5B-Instruct \
 ///     cargo test --release --manifest-path engine-rs/Cargo.toml --test ml_golden \
-///     translate -- --ignored --nocapture
+///     qwen_translation -- --ignored --nocapture
 type Case<'a> = (&'a str, &'a str, &'a str, bool, &'a dyn Fn(char) -> bool);
 
 #[test]
