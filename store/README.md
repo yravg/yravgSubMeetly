@@ -39,4 +39,4 @@ npm run pack:store
 Canonical upload path: **`store/releases/yraverage-submin-1.1.1.zip`**.
 
 ## Short blurb
-yraverageSubMin — on-device realtime subtitles & translation. No yraverageSubMin cloud inference; models download once when you choose them.
+yravgSubMeetly — on-device realtime subtitles & translation. No yravgSubMeetly cloud inference; models download once when you choose them.

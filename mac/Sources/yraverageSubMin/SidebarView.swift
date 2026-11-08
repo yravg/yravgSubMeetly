@@ -85,7 +85,7 @@ struct SidebarView: View {
                 Button { ui.showAbout = true } label: { Wordmark(size: 15) }
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .help("About yraverageSubMin")
+                    .help("About yravgSubMeetly")
 
                 searchField
             }
@@ -234,7 +234,7 @@ struct SidebarView: View {
                     .clipShape(RoundedRectangle(cornerRadius: DS.Radius.lg))
             }
             .buttonStyle(.plain)
-            .help("About yraverageSubMin")
+            .help("About yravgSubMeetly")
 
             railButton("house", active: ui.route == .home, help: "Home") { ui.route = .home }
 

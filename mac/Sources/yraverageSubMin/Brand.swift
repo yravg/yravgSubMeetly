@@ -56,18 +56,18 @@ extension Brand {
     }
 }
 
-/// The wordmark, redrawn as text so it scales crisply: "yraverage" + a teal
-/// "SubMin" tag, matching the logo's construction.
+/// The wordmark, redrawn as text so it scales crisply: "yravg" + a teal
+/// "SubMeetly" tag, matching the logo's construction.
 struct Wordmark: View {
     var size: CGFloat = 17
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: 0) {
-            Text("yraverage")
+            Text("yravg")
                 .font(.system(size: size, weight: .bold))
                 .foregroundStyle(scheme == .dark ? Color.white.opacity(0.92) : Brand.charcoal)
-            Text("SubMin")
+            Text("SubMeetly")
                 .font(.system(size: size, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, size * 0.3)
@@ -78,6 +78,6 @@ struct Wordmark: View {
                 )
                 .padding(.leading, size * 0.06)
         }
-        .accessibilityLabel("yraverageSubMin")
+        .accessibilityLabel("yravgSubMeetly")
     }
 }

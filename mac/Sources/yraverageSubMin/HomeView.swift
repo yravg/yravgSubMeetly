@@ -159,7 +159,7 @@ struct HomeView: View {
     private var permissionAlert: some View {
         DSCallout(tone: .warning, title: "Screen Recording permission required", icon: "exclamationmark.triangle") {
             VStack(alignment: .leading, spacing: 8) {
-                Text("yraverageSubMin captures other apps' audio through ScreenCaptureKit. Without this permission it can still transcribe the microphone, but not what other participants say.")
+                Text("yravgSubMeetly captures other apps' audio through ScreenCaptureKit. Without this permission it can still transcribe the microphone, but not what other participants say.")
                     .fixedSize(horizontal: false, vertical: true)
                 if app.needsRelaunch {
                     Text("Already switched it on? macOS only applies it to a freshly launched app.")
@@ -236,7 +236,7 @@ struct HomeView: View {
                 Text("Speak, or play audio in the captured app, to see live subtitles")
                     .font(.system(size: 12)).foregroundStyle(DS.Colors.textFaint)
             } else {
-                Text("Welcome to yraverageSubMin")
+                Text("Welcome to yravgSubMeetly")
                     .font(.system(size: 18, weight: .semibold)).foregroundStyle(DS.Colors.textStrong)
                 Text("Start recording to see live subtitles. Everything runs on this Mac.")
                     .font(.system(size: 12)).foregroundStyle(DS.Colors.textSubtle)

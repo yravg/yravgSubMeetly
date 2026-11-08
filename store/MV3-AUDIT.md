@@ -1,4 +1,4 @@
-# Manifest V3 permission audit — yraverageSubMin 1.1.1
+# Manifest V3 permission audit — yravgSubMeetly 1.1.1
 
 Use these justifications in the Chrome Web Store “single purpose” / permission justification fields.
 
@@ -22,6 +22,6 @@ Use these justifications in the Chrome Web Store “single purpose” / permissi
 - First-run model downloads are user-triggered and documented in privacy + listing copy.
 
 ## Store review talking points
-1. Audio and transcripts are not uploaded to a yraverageSubMin backend.
+1. Audio and transcripts are not uploaded to a yravgSubMeetly backend.
 2. “On-device” means inference after weights are local; HF/mirror downloads are explicit user actions.
 3. `<all_urls>` exists so the overlay can attach to the media page being captioned.

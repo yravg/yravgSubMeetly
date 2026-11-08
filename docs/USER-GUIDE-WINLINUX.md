@@ -1,4 +1,4 @@
-# Panduan pengguna — yraverageSubMin di Windows dan Linux
+# Panduan pengguna — yravgSubMeetly di Windows dan Linux
 
 Ekstensi Chrome berjalan **sama** di Windows, Linux, dan macOS — panduan
 ekstensi berlaku penuh. Yang berbeda di Windows/Linux hanya **Native Helper**:

@@ -16,7 +16,7 @@ warn() { printf '  \033[33m!\033[0m %s\n     → %s\n' "$1" "$2"; }
 FAILED=0
 
 echo
-echo "yraverageSubMin doctor"
+echo "yravgSubMeetly doctor"
 echo "──────────────────────────────────────────────"
 
 # --- toolchain --------------------------------------------------------------
@@ -83,7 +83,7 @@ if [ -d "$APP" ]; then
     if [ -f /tmp/transsub-perms.txt ]; then
         grep -q "screen preflight: true" /tmp/transsub-perms.txt \
             && ok "Screen Recording granted" \
-            || bad "Screen Recording not granted" "System Settings → Privacy & Security → Screen Recording → enable yraverageSubMin, then reopen the app"
+            || bad "Screen Recording not granted" "System Settings → Privacy & Security → Screen Recording → enable yravgSubMeetly, then reopen the app"
         grep -q "shareable content: OK" /tmp/transsub-perms.txt \
             && ok "audio capture works ($(sed -n 's/.*OK — \([0-9]*\) targets.*/\1/p' /tmp/transsub-perms.txt) sources)" \
             || warn "capture not verified" "grant Screen Recording, then reopen the app"

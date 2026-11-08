@@ -2,7 +2,7 @@
   "name": "yraverage-submin",
   "version": "1.1.1",
   "private": true,
-  "description": "yraverageSubMin \u2014 on-device realtime subtitle & translation Chrome extension. Inference stays local after models download.",
+  "description": "yravgSubMeetly \u2014 on-device realtime subtitle & translation Chrome extension. Inference stays local after models download.",
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs",

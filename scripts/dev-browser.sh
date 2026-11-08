@@ -66,7 +66,7 @@ if [[ -x "$CHROME_BIN" ]]; then
 fi
 echo "[dev-browser] Extension: $DIST"
 echo "[dev-browser] Profile:   $PROFILE"
-echo "[dev-browser] Open chrome://extensions -> yraverageSubMin -> side panel icon"
+echo "[dev-browser] Open chrome://extensions -> yravgSubMeetly -> side panel icon"
 echo "[dev-browser] Right-click the side panel -> Inspect"
 
   open -na "$CHROME_APP" --args \

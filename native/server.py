@@ -1797,7 +1797,7 @@ def warmup():
 
 if __name__ == "__main__":
     draft_note = f" draft={DRAFT_MODEL}" if _draft_available else ""
-    print(f"yraverageSubMin native helper — engine={ENGINE} model={MODEL}{draft_note} ffmpeg={FFMPEG} "
+    print(f"yravgSubMeetly native helper — engine={ENGINE} model={MODEL}{draft_note} ffmpeg={FFMPEG} "
           f"translate={'on' if _translate_available else 'off'}")
     srv = ReuseHTTPServer((HOST, PORT), Handler)
     print(f"listening on http://{HOST}:{PORT}   (Ctrl-C to stop)", flush=True)

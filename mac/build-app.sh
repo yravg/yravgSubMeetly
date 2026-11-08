@@ -16,6 +16,7 @@ cd "$(dirname "$0")"
 
 CONFIG="${CONFIG:-release}"
 APP_NAME="yraverageSubMin"
+DISPLAY_NAME="yravgSubMeetly"
 # Bundle id deliberately stable: macOS ties Screen Recording / Accessibility /
 # Input Monitoring grants to it. Changing it forces the user to re-grant.
 BUNDLE_ID="com.yraveragesubmin.app"
@@ -50,8 +51,8 @@ cat > "$SAPP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>$APP_NAME</string>
-    <key>CFBundleDisplayName</key><string>$APP_NAME</string>
+    <key>CFBundleName</key><string>$DISPLAY_NAME</string>
+    <key>CFBundleDisplayName</key><string>$DISPLAY_NAME</string>
     <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
     <key>CFBundleVersion</key><string>$VERSION</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
@@ -63,9 +64,9 @@ cat > "$SAPP/Contents/Info.plist" <<PLIST
          policy to .accessory at runtime instead of hard-coding LSUIElement. -->
     <key>NSHighResolutionCapable</key><true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>yraverageSubMin transcribes your voice on-device for dictation. Audio never leaves your Mac.</string>
+    <string>yravgSubMeetly transcribes your voice on-device for dictation. Audio never leaves your Mac.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>yraverageSubMin uses on-device speech recognition to generate subtitles and dictation. Nothing is uploaded.</string>
+    <string>yravgSubMeetly uses on-device speech recognition to generate subtitles and dictation. Nothing is uploaded.</string>
 </dict>
 </plist>
 PLIST
