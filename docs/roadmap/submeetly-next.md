@@ -49,10 +49,44 @@ Owner request 2026-11-08. Handoff: `docs/handoff/submeetly-next.md`.
 Order: S1, S2, S6, S9, S10 run in parallel. S3 after S2. S4 after library decision. S7 after S3+S6.
 S8 after S9. S11 after S10 sign-off. S5 last.
 
+## PRD rows
+
+Status words: `missing`, `partial`, `done`. The handoff holds the evidence for each row.
+
+| ID | P | Row | Acceptance (observable) | Status |
+|---|---|---|---|---|
+| BRAND-001 | P0 | Display name yravgSubMeetly everywhere users look | No user-visible "yraverageSubMin" in extension, helper, macOS app, guides, store listing | done (merged 35f47ce; store PNGs open) |
+| ENG-001 | P0 | Rust engine serves every non-ML route like Python | 79 goldens, 0 mismatches, `npm run test:engine-rs` | done (merged 6da5720) |
+| ENG-002 | P0 | Rust engine speech-to-text (candle Whisper) | WER <= 0.10 vs Python faster-whisper per clip on 5 CC0 clips; segment starts within 0.5 s; RTF reported | missing (S4 running) |
+| ENG-003 | P1 | Rust engine translation (candle Qwen2.5) | Same prompts as Python; non-empty, target script, no prompt leakage on fixed set | missing (S4 running) |
+| ENG-004 | P0 | Rust is the default engine, Python removed | Owner sign-off; installers start Rust binary; e2e + e2e:native pass | missing (S5, owner gate) |
+| ISL-001 | P0 | Island at top of screen (Windows) | `island/` builds and runs, pill theme default, our tokens, no Oyenza brand/account pages | partial (S6 on branch e48c6a6: builds, 429 core tests pass, runs; dark only, no SubMeetly pages) |
+| ISL-002 | P0 | Island pages: Live, Meeting, Record | Live line + start/stop in pill; decisions Accept; talks to engine over loopback | missing (S7) |
+| ISL-003 | P1 | Every Oyenza pill/island feature mapped and drawn | `docs/design/submeetly-canvas/inventory-island.md` each line on a board or "not ported" with reason; boards interactive, animations checked frame by frame | done on canvas v10 (inventory files, interactive boards) |
+| ADD-001 | P1 | Meeting add-ins in the island | Add-on system kept; list fixed by owner (proposed: Agenda timer, Quick capture on by default) | missing (S8, owner list) |
+| THB-001 | P1 | Threadbear map to meetings | `docs/roadmap/threadbear-mapping.md`, first five steps with acceptance | done (merged 92f2ef5) |
+| THB-002 | P1 | Threadbear boards show the full three-pane layout with working interactions | `inventory-threadbear-boards.md`; open thread, reply, done, archive, inbox zero clickable on T-boards | done on canvas v10 (inventory files, interactive boards) |
+| UI-001 | P0 | Canvas of every redesigned screen, light theme, Before/After, reference strips | Claude Design canvas Un8sDJNJmo7Fu2yivL6Qxh; lint + per-board check pass; owner comments resolved | partial (v11 published; owner comments answered, sign-off open) |
+| UI-002 | P0 | No feature lost in redesign of side panel, lab shell, draft options | `inventory-D02-D03-T03.md`: every control of today's code lands on a board | done on canvas v10 (inventory files, interactive boards) |
+| UI-003 | P1 | De-slop build of Minutes register, side panel, app.html | Per board: slop scan 0 errors, viewed at 1440/1024/390, built same as drawn | missing (S11, after owner sign-off) |
+| ISL-004 | P1 | Island opens on hover after 0.22 s by default, as in Oyenza; 1.5 s selectable | Default dwell 0.22 s in island settings and boards; option kept | missing (canvas update running; build in S7) |
+| UI-004 | P2 | Translation colour selectable (indigo default, 4-5 swatches) | Setting in island Settings and side panel Settings; every swatch >= 4.5:1 on its card | missing (canvas update running) |
+| UI-005 | P1 | Side panel shows one tab row by default; a toggle brings back the second row | Default one row; "Tab rows: One / Two" toggle; nothing removed | missing (canvas update running) |
+| ISL-005 | P2 | Island carries only meeting features | Prayer module, `site/places` data (6.8 MB), sholat/ja/downloader add-ons and Gmail/Calendar icons removed from `island/` | missing (follow-up after S6 merge) |
+
 ## Decisions (owner, 2026-11-08)
 
 - S4: **candle** (pure Rust) for ASR and translation. whisper-rs rejected (needs cmake + libclang).
 - S6: **"UI in Rust" exception accepted for the island only.** Main pages stay web.
+- Canvas: always a Claude Design canvas, light theme only, interactive boards (canvas-to-app-html),
+  colorful icon tiles like Solvarium, uiux.yraveragehub catalogue pieces, no feature removed for a look.
+- Canvas UI design work runs on Sonnet workers (owner, 2026-11-08).
+- Every change also updates these PRD rows, this roadmap when scope moves, and the handoff (owner, 2026-11-08).
+- Hover delay: same as Oyenza (0.22 s) by default (owner, 2026-11-08).
+- Translation colour: keep indigo `--ai`, with an option for users to change it (owner, 2026-11-08).
+- Merge `yravg/sm-island` into main: yes (owner, 2026-11-08; merged fe8ca90).
+- Side panel tab rows: keep both, simplified to one by default, with a toggle (owner, 2026-11-08).
+- Workers: Sonnet 5.5 first, then Cursor, Antigravity Gemini, OpenCode Go (owner, 2026-11-08).
 
 ## Open questions (owner)
 

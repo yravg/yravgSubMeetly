@@ -8,16 +8,19 @@ Updated 2026-11-08 by the lead session.
 
 | Step | State | Evidence |
 |---|---|---|
-| S1 rename | done on branch, not merged | `yravg/sm-rename` a597757 (38 files). npm build ok; npm test 235 pass / 54 fail, all env (python3 absent: 53, run.sh exec bit: 1), same on HEAD per worker. Open: overlay label "ySub", reskin names "Yraverage Klasik/Modern", store PNGs still old wordmark, Swift not built here |
-| S2 goldens | done on branch, not merged | `yravg/sm-engine` 0458bf2: 79 goldens from native/server.py (ML imports stubbed), `scripts/gen-engine-golden.mjs` |
-| S3 non-ML routes | done on branch, not merged | `yravg/sm-engine` 75323f1: engine-rs/engine, 79/79 goldens 0 mismatch, 11 unit + 6 contract tests; fmt + clippy -D warnings clean (worker); lead re-ran cargo test: all pass. Not ported: GET /models, DELETE /models/cache, POST /shutdown (404 in Rust). ML routes 501. |
-| S4 ASR/translate | open | owner chose candle 2026-11-08; needs disk space to build |
+PRD rows with acceptance: roadmap section "PRD rows" (BRAND, ENG, ISL, ADD, THB, UI).
+
+| S1 rename | done, merged | merge 35f47ce (branch a597757). npm test on main after merge not run (node_modules nearly empty). Open: overlay label "ySub", reskin names "Yraverage Klasik/Modern", store PNGs still old wordmark, Swift not built here |
+| S2 goldens | done, merged | merge 6da5720 (0458bf2): 79 goldens, `scripts/gen-engine-golden.mjs` |
+| S3 non-ML routes | done, merged | merge 6da5720 (75323f1): 79/79 goldens 0 mismatch; GET /models, DELETE /models/cache, POST /shutdown not ported (go to S4). ML routes 501. |
+| S4 ASR/translate | in progress | Claude worker on Opus 5.5, effort low (owner decision 2026-11-08, overrides the OpenCode-first worker rule for S4), dispatch ctx_fa4448d709c1; earlier OpenCode dispatches ctx_67550f45a226 and ctx_872375276a6c stopped, worktree sm-s4, branch yravg/sm-s4, spec scratchpad specs/s4.md. candle-transformers 0.11.1 chosen. Stops on OpenCode "external directory" prompts; `permission.external_directory: allow` added to `~/.config/opencode/opencode.json` 2026-11-08 (backup `.bak-2026-11-08`), takes effect for new sessions |
 | S5 switch | open | |
-| S6 island fork | in progress | worker `island` |
+| S6 island fork | done, merged fe8ca90 (owner yes 2026-11-08) | `yravg/sm-island` e48c6a6 (Sonnet worker ctx_999d4e8149cd after two OpenCode workers stalled). Lead verified: `cargo build -p poni` ok (103 dead-code warnings), `cargo test -p poni-core` 429 pass. Pill runs on Windows (island/docs/pill-first-run.png, cropped by lead: the worker shot included a personal browser tab). Open: island still dark (owner wants light first), no SubMeetly pages (S7), mac-only code still shows "Oyenza" strings (menu, sign-in), crate names poni/poni-core kept |
 | S7 island pages | open | |
 | S8 add-ins | open | |
-| S9 threadbear spec | done on branch, not merged | `yravg/sm-threadbear` db2eb95, docs/roadmap/threadbear-mapping.md (390 lines, first 5 ordered with acceptance) |
-| S10 canvas (all boards) | done, awaiting owner sign-off | `docs/design/submeetly-canvas/submeetly-canvas.html` (build.mjs), 12 boards / 30 stories, lint 1/1 + per-board check, render 0 errors 0 overflow. Owner chose Before+After and reference strips. Built by lead (canvas-to-app-nohtml), not a worker. Also on Claude Design for comments: https://claude.ai/artifact/Un8sDJNJmo7Fu2yivL6Qxh (15 artboards; regenerate with `node build.mjs --dc <root>` after `heights.json`, images = uploaded assets in `blobs.json`). |
+| S9 threadbear spec | done, merged | merge 92f2ef5 (db2eb95), docs/roadmap/threadbear-mapping.md |
+| S10b canvas rework (owner comments v4) | in progress | Sonnet agents, files under docs/design/submeetly-canvas: D02/D03/T03 (inventory-D02-D03-T03.md, icons/), I-boards (inventory-island.md), T-boards except T03 DONE and published v5 2026-11-08 (threads.mjs, inventory-threadbear-boards.md 37 rows/36 landed, T04 + T05 new, interactive, render 0 errors 0 overflow, slop threads.mjs 100 A; lint_boards not run, DC runtime clicks not verified; T01 threads resolved), island film DONE 2026-11-08 (stageshow gold dynamic-island, film.mjs --gate "rehearsal passed" at 900 and 390; shots/island-demo.gif 1.9 MB 16 s, poster png; source docs/design/island-demo/; uploaded as /_blob/af4958e4..., /_blob/19053ddc..., in blobs.json; not yet placed on a board). Checkpoints `.checkpoints/canvas-*.md`, `island-demo.md`. Open comment threads: D02, D03, T03, T01 x4, I01, I02. Lead publishes and resolves threads. |
+| S10 canvas (all boards) | v4 published, owner comments open | `docs/design/submeetly-canvas/submeetly-canvas.html` (build.mjs), 12 boards / 30 stories, lint 1/1 + per-board check, render 0 errors 0 overflow. Owner chose Before+After and reference strips. Built by lead (canvas-to-app-nohtml), not a worker. Also on Claude Design for comments: https://claude.ai/artifact/Un8sDJNJmo7Fu2yivL6Qxh (15 artboards; regenerate with `node build.mjs --dc <root>` after `heights.json`, images = uploaded assets in `blobs.json`). |
 | S11 de-slop build | open | |
 
 Known: Rust 1.99.1 at `%USERPROFILE%\.cargo\bin` (not on Git Bash PATH). MSVC Build Tools 2022
@@ -44,4 +47,24 @@ Oyenza clone) so workers need no outside folders. Cargo builds go to `E:\cargo-t
 Worktrees `sm-deslop`, `sm-deslop2` are unused (the canvas replaced that task) and can be removed.
 OpenCode `external_directory` permission still not set (owner must edit its config).
 
-Next: collect worker results, update this table, ask owner the S4/S6 decisions.
+Merged 2026-11-08: rename, engine, threadbear into main (HEAD f901339); their worktrees removed.
+
+Next: collect S4 and S6 worker reports and verify (cargo test, test:engine-rs, WER/RTF); collect
+the four canvas agents, merge their build.mjs edits, run build + lint + render, publish changed
+boards, resolve threads; commit docs/design/ (still untracked). Owner gates: S5, D02 tab rows,
+add-in list, "ySub" label and theme names.
+
+## Verification 2026-11-08 (lead)
+
+- main after merge (f901339): `npm ci` ok, `npm run build` ok, `npm run test:engine-rs` ok (11 unit + 6 contract + golden replay 0 mismatches).
+- `npm test`: 309 tests, 285 pass, 4 fail, 20 skipped, run with a `python3` shim (venv in scratchpad) and
+  `PUPPETEER_EXECUTABLE_PATH` = Chrome for Testing 154 (Puppeteer could not download its pinned 152).
+  The same 4 fail on the pre-merge commit 6e79f44, so they are not from the merge. All are Windows-only:
+  CRLF default export on Windows (export-browser x2), no exec bit for native/run.sh (setup-docs),
+  ~/.localtranssub migration test (rename-migration). Without the shim, 54 fail (python3 absent, no Chrome).
+- Canvas: T01 clicks verified inside Claude Design (open thread, Done moves to Finished with Undo toast).
+  D02 feature-map click verified there. Found and fixed: Before view was blank on D02, D03, T03
+  (pane CSS lacked the `ba:before` rule; build.mjs paneCss) and DC export dropped notes/aside cards
+  (lazy section regex). Before fix checked in Playwright on the offline page (all three visible).
+  Not yet re-checked inside Claude Design: the canvas page stopped loading after v8 (service 503s,
+  "content fetch failed in transit"); retry D02 Before there.
