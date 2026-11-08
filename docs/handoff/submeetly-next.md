@@ -118,6 +118,7 @@ then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
   and left nothing (no files, no uninstall key, Oyenza folders unchanged, compared file by file). The retry
   install was refused by the session's permission classifier (persistence), so the installed run, uninstall,
   /EXTID page and autostart are still unverified: owner runs `yravgSubMeetly-Setup-<v>.exe` once.
+- threads merged (2026-11-08): yravg/sm-threads 2a8c215. Lead verified: build ok; npm test 405 tests, 381 pass, 4 Windows-only fail, 20 skipped (a first full run showed 10 more failures in draft-ui/dock tests under memory pressure from three workers; draft-ui alone 10/10 and the full re-run clean); `npm run qa` 19/19 (TC016-019 new); looked at TC016 Inbox, TC018 Highlights, TC019 Draft options from the meeting transcript. Open: Projects right-hand notes pane, librarian hook after End & draft, Inbox/Projects not reachable from an empty workspace, Close without MoM is a device-local flag, Files/Links found by pattern; 390 px horizontal overflow on Minutes (pre-existing).
 - Workers (Sonnet): threads ctx_1f104e6cae6a (T01 Inbox, T02 Librarian, T04 Highlights in Minutes, T03 on
   live lines; spec specs/w-threads.md), polish ctx_176710a964af (add-ins i18n, the 4 Windows-only test
   failures, store PNG wordmark, side panel dark + swatch contrast; specs/w-polish.md), island3
