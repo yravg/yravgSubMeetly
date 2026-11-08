@@ -30,6 +30,7 @@ import { slidingNumber, autoHeight, highlight } from './lib/motion.js';
 import { mountExtras } from './minutes-extras.js';
 import { mountDraftOptions } from './minutes-draft.js';
 import { mountDock } from './minutes-dock.js';
+import { mountThreads, renderThreads } from './minutes-threads.js';
 import { migrateLegacyLocalKeys } from './lib/legacy-keys.js';
 
 /** Lapisan tata letak: panel kiri/kanan/bawah, rel, dan dok tampilan. */
@@ -48,6 +49,7 @@ const LS_GLOSSARY = 'ysmGlossary';
 /* ==========================================================================
    State
    ========================================================================== */
+const THREAD_VIEWS = new Set(['inbox', 'projects', 'highlights']);
 const state = {
   meetings: /** @type {any[]} */ ([]),
   activeId: /** @type {string|null} */ (null),
@@ -1210,6 +1212,7 @@ function paint() {
     : state.view === 'topic' ? viewTopic(rows)
     : state.view === 'doc' ? viewDoc()
     : state.view === 'series' ? viewSeries()
+    : THREAD_VIEWS.has(state.view) ? renderThreads(state.view)
     : viewCarry();
 
   $('#q').value = state.q;
@@ -1549,6 +1552,20 @@ function wireEvents() {
     setActive: (id) => { state.activeId = id; state.sel = null; },
     paint,
     toast,
+  });
+
+  mountThreads({
+    pane: () => $('#pane'),
+    lang: () => state.lang,
+    meetings: () => state.meetings,
+    activeMeeting,
+    query: () => state.q,
+    me: () => state.me,
+    fmtDate,
+    reload: () => reloadAll(true),
+    paint,
+    toast,
+    openRef: (mid, ref) => { state.activeId = mid; state.view = 'table'; syncTabs(); selectRef(ref); },
   });
 
   mountDraftOptions({

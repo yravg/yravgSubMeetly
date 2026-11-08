@@ -46,7 +46,7 @@ const en = {
 
   /* views */
   vRegister: 'Register', vTopic: 'By topic', vDoc: 'Minutes',
-  vCarry: 'Carry-forward', vSeries: 'Series',
+  vCarry: 'Carry-forward', vSeries: 'Series', vInbox: 'Inbox', vProjects: 'Projects', vHighlights: 'Highlights',
 
   /* columns */
   cRef: 'Ref', cType: 'Type', cTopic: 'Topic', cItem: 'Item', cOwner: 'Owner',
@@ -377,7 +377,7 @@ const id = {
   noSource: 'Tanpa sumber — impor dari v1',
 
   vRegister: 'Register', vTopic: 'Per topik', vDoc: 'Notulen',
-  vCarry: 'Bawaan', vSeries: 'Seri',
+  vCarry: 'Bawaan', vSeries: 'Seri', vInbox: 'Inbox', vProjects: 'Proyek', vHighlights: 'Sorotan',
 
   cRef: 'Ref', cType: 'Jenis', cTopic: 'Topik', cItem: 'Butir', cOwner: 'Penanggung jawab',
   cDue: 'Tenggat', cStatus: 'Status', cSource: 'Sumber', cAge: 'Umur', cRaised: 'Diangkat',
