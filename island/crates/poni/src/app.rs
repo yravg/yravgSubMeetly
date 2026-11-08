@@ -16,8 +16,8 @@ use crate::services::{self, Services};
 use crate::settings_host::{self, SettingsWindow};
 use crate::settings_window::Section;
 use crate::state::{
-    AppState, FpsAccess, HudKind, InlineAction, Locate, LyricsState, LyricsStatus, Notice, NoticeAction, NotifyAccess, PairedPhone, PhoneAsk,
-    PhoneDrop, PhoneTransfer, PhoneView, PrayerState,
+    AppState, FpsAccess, HudKind, InlineAction, LyricsState, LyricsStatus, Notice, NoticeAction, NotifyAccess, PairedPhone, PhoneAsk,
+    PhoneDrop, PhoneTransfer, PhoneView,
 };
 use crate::tray::{self, Tray};
 use crate::ui::{wid, CursorKind, Hit, Input, KeyInput, MouseButton, Ui};
@@ -29,8 +29,7 @@ use poni_core::frametime::{ambient_divisor, MotionStats};
 use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::pairdrop::{MeetEvent, PeerEvent};
 use poni_core::phonedrop::{Event as PhoneEvent, QrMatrix};
-use poni_core::prayer::{Due, PlaceList, Prayer, PrayerMoment};
-use poni_core::settings::{IdleStyle, PrayerSound, Settings, Theme};
+use poni_core::settings::{IdleStyle, Settings, Theme};
 use poni_core::settings::MonitorChoice;
 use poni_core::store::{load_json, parse_json, save_json_atomic, LoadOutcome, Store};
 use std::cell::{Cell, RefCell};
@@ -346,8 +345,6 @@ pub struct App {
     services: Option<Services>,
     /// The Glass theme's screen copy, light/dark choice and glass.
     glass: crate::glass::Glass,
-    /// Prayer times' adzan, while it plays.
-    adzan: services::adzan::AdzanPlayer,
     /// The glass was still changing on the last frame (turning light or dark).
     glass_moving: bool,
     /// Animation time of the last frame (the vblank it was shown on).
@@ -574,8 +571,6 @@ impl App {
         island.set_floating(pill::on(st.settings.theme).then_some(pill::TOP_GAP));
         let clock = FrameClock::start(SendHwnd::new(hwnd), monitor.handle);
         let taskbar_created_msg = unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) };
-        // The Downloader: not in the Microsoft Store build.
-        st.downloader_offered = !crate::autostart::packaged();
         let saved_settings = st.settings.clone();
         Ok(Self {
             hwnd,
@@ -598,7 +593,6 @@ impl App {
             rx,
             services: None,
             glass: crate::glass::Glass::new(services::apps_use_light_theme()),
-            adzan: Default::default(),
             glass_moving: false,
             last_frame_t: 0.0,
             surface: Surface::default(),
@@ -981,10 +975,6 @@ impl App {
                 None => {}
             }
         }
-        // The download pill opens on its page.
-        if self.mode == Mode::Activity(activities::Activity::Download) {
-            self.st.page = PageKind::Downloads;
-        }
         self.st.hud = None;
         if !opened {
             self.expand();
@@ -1095,10 +1085,6 @@ impl App {
                         // release can't click the pill a second time.
                         self.input.pressed_id = None;
                         self.run_inline_action(a);
-                    } else if self.input.pressed_id == Some(wid(activities::PRAYER_OK_ID)) {
-                        // The prayer countdown's OK, the same way.
-                        self.input.pressed_id = None;
-                        self.prayer_countdown_ok();
                     } else {
                         // Opens when the button comes up (`open_from_press`),
                         // unless the pointer moves sideways first: then it
@@ -1434,9 +1420,7 @@ impl App {
             self.st.now = self.st.now.max(clock::mono());
             let now = self.st.now;
             let Some(w) = self.settings_win.as_mut() else { return };
-            let before = w.view.section;
             let out = w.paint(&mut self.st, now, None, false);
-            let after = w.view.section;
             if out.close {
                 self.close_settings_window();
                 return;
@@ -1615,9 +1599,6 @@ impl App {
                     // pointer so the pill can be clicked (a click on the rest
                     // of the notice still opens its page). The dwell stays
                     // armed: the next movement restarts it.
-                } else if self.input.mouse.and_then(|p| self.hit_at(p)).is_some_and(|h| h.id == wid(activities::PRAYER_OK_ID)) {
-                    // So does the prayer countdown under a pointer resting on
-                    // its OK (resting on the rest of it still opens).
                 } else {
                     self.expand();
                 }
@@ -1788,22 +1769,6 @@ impl App {
             }
         }
         self.st.pomodoro.cfg = self.st.settings.pomodoro.clone();
-        // Prayer times: off stops it at once; a new place, or following the location again.
-        let prayer_id = poni_core::addons::PRAYER_TIMES.id;
-        if before.addon_on(prayer_id) && !self.st.settings.addon_on(prayer_id) {
-            self.prayer_off();
-        }
-        if before.prayer.place != self.st.settings.prayer.place {
-            self.resolve_prayer_place();
-        }
-        if !before.prayer.follow_location && self.st.settings.prayer.follow_location && self.st.prayer_on() {
-            self.locate();
-        }
-        // The Downloader: off stops its downloads before its tools are deleted.
-        let downloader_id = poni_core::addons::DOWNLOADER.id;
-        if before.addon_on(downloader_id) && !self.st.settings.addon_on(downloader_id) {
-            self.downloads_off();
-        }
         // An add-on switched on downloads its files; off deletes them.
         for a in poni_core::addons::ALL {
             let on = self.st.settings.addon_on(a.id);
@@ -1955,15 +1920,11 @@ impl App {
         // What the Settings window shows that a service reports.
         let shown = matches!(
             ev,
-            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_)
+            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Notify(_)
         );
         if let Some(w) = self.settings_win.as_mut().filter(|_| shown) {
             w.view.dirty = true;
         }
-        // A download's bytes coming in while nobody can see the island (locked,
-        // display off) wait for the next frame something else asks for: the
-        // pill catches up then, as nothing else of it moves on its own.
-        let unseen = matches!(ev, AppEvent::Download { line: poni_core::ytdlp::Line::Progress { .. }, .. }) && (self.locked || self.display_off);
         match ev {
             AppEvent::Backdrop => {
                 if self.glass.on_backdrop(self.hwnd, &mut self.gfx) {
@@ -2019,23 +1980,11 @@ impl App {
             AppEvent::Lyrics { track_key, result } => {
                 if self.st.lyrics.track_key == track_key {
                     match result {
-                        crate::events::LyricsResult::Found { lyrics, source, ruby, wants_ja_readings } => {
+                        crate::events::LyricsResult::Found { lyrics, source, ruby } => {
                             self.st.lyrics.status = LyricsStatus::Found;
                             self.st.lyrics.lyrics = Some(lyrics);
                             self.st.lyrics.source = source;
                             self.st.lyrics.ruby = ruby;
-                            self.st.lyrics.wants_ja_readings = wants_ja_readings;
-                            // The first Japanese song whose kanji went unread
-                            // switches Japanese readings on, as its switch in
-                            // Add-ons would: it downloads once (3.8 MB) and
-                            // the song is read again with romaji. Only people
-                            // who play Japanese songs get it; switched off by
-                            // hand, it stays off (the Music page still offers it).
-                            if poni_core::addons::ja_switches_on(&self.st.settings, wants_ja_readings) {
-                                pinfo!("lyrics: a Japanese song's kanji went unread; switching Japanese readings on");
-                                self.st.settings.set_addon(poni_core::addons::JAPANESE_READINGS.id, true);
-                                self.st.cmd(Command::SaveSettings);
-                            }
                         }
                         crate::events::LyricsResult::Instrumental => self.st.lyrics.status = LyricsStatus::Instrumental,
                         crate::events::LyricsResult::NotFound => self.st.lyrics.status = LyricsStatus::NotFound,
@@ -2164,23 +2113,6 @@ impl App {
                 if self.st.settings.addon_on(id) || status == AddonStatus::Off {
                     self.st.addons.insert(id, status);
                 }
-                if id == poni_core::addons::PRAYER_TIMES.id {
-                    if status == AddonStatus::Ready && self.st.settings.addon_on(id) && self.st.prayer.places.is_none() {
-                        self.prayer_ready();
-                    } else if status == AddonStatus::Off {
-                        self.prayer_off();
-                    }
-                }
-                // Japanese readings arrived for the song that asked for them:
-                // read it again (its lyrics come from the cache).
-                if id == poni_core::addons::JAPANESE_READINGS.id && status == AddonStatus::Ready && self.st.lyrics.wants_ja_readings {
-                    if let (Some(svc), Some(m)) = (self.services.as_ref(), self.st.media.as_ref()) {
-                        if m.track_key == self.st.lyrics.track_key {
-                            pinfo!("lyrics: Japanese readings are on this PC; reading the song again");
-                            svc.request_lyrics(m);
-                        }
-                    }
-                }
             }
             AppEvent::Update(services::update::UpdateEvent::Checked(r)) => {
                 let open = self.updater.as_mut().is_some_and(|u| u.checked(&mut self.st, r, crate::updates::unix_now()));
@@ -2199,20 +2131,13 @@ impl App {
                 }
                 self.request_frame();
             }
-            AppEvent::Located(found) => self.on_located(found),
-            AppEvent::Cities { file, got } => pages::prayer::cities_came(&mut self.st, file, got),
             AppEvent::Notify(ev) => self.on_notify(ev),
-            AppEvent::AdzanEnded => self.adzan_ended(),
-            AppEvent::Download { id, line } => self.download_line(id, line),
-            AppEvent::DownloadEnded { id, ok } => self.download_ended(id, ok),
             AppEvent::Log(s) => pinfo!("{s}"),
         }
         if let Some(before) = media_before {
             self.after_media_change(before, now);
         }
-        if !unseen {
-            self.request_frame();
-        }
+        self.request_frame();
     }
 
     /// (player, track, playing) of the current media session.
@@ -2928,13 +2853,10 @@ impl App {
         if let Some(ended) = self.st.pomodoro.tick(now) {
             pages::focus::on_phase_ended(&mut self.st, ended);
         }
-        self.prayer_tick();
         self.script_tick();
-        // Prayer times, System, Script or Downloader switched off: its tab is gone.
+        // System or Notifications switched off: its tab is gone.
         let gone = match self.st.page {
-            PageKind::Prayer => !self.st.prayer_on(),
             PageKind::System => !self.st.system_on(),
-            PageKind::Downloads => !self.st.downloader_on(),
             PageKind::Notifications => !self.st.notifications_on(),
             _ => false,
         };
@@ -3013,9 +2935,6 @@ impl App {
             }
             self.mode = target;
             retarget = true;
-            if target == Mode::Expanded(PageKind::Downloads) {
-                self.downloads_page_shown();
-            }
         } else {
             // Size can change within a mode (a page's height, the hover lift); follow it.
             let g = self.geom_for(&self.mode);
@@ -3412,8 +3331,7 @@ impl App {
             consider(t);
         }
         if let Mode::Expanded(p) = self.mode {
-            // A page's own changes rest while nobody is at the PC (the Prayer
-            // page's countdown ticks every second); the lock and display
+            // A page's own changes rest while nobody is at the PC ; the lock and display
             // events ask for a frame, which picks them up again.
             let away = self.locked || self.display_off;
             if let Some(t) = pages::next_wake(p, &self.st).filter(|_| visible && !away) {
@@ -3533,10 +3451,6 @@ impl App {
             }
             return;
         }
-        if a == InlineAction::StopAdzan {
-            self.adzan.stop();
-            self.st.prayer.adzan = false;
-        }
         if a == InlineAction::Hide {
             // Gone at once, the way a notice leaves when its time is up.
             if let Some(n) = self.st.notice.as_mut() {
@@ -3570,7 +3484,7 @@ impl App {
         }
         match a {
             InlineAction::StartFocus => st.pomodoro.start(st.now),
-            InlineAction::ShowAmount | InlineAction::StopAdzan | InlineAction::Hide | InlineAction::WhatsNew | InlineAction::Open => {}
+            InlineAction::ShowAmount | InlineAction::Hide | InlineAction::WhatsNew | InlineAction::Open => {}
         }
         let until = st.now + INLINE_DONE_S;
         if let Some(n) = st.notice.as_mut() {
@@ -3578,190 +3492,6 @@ impl App {
             n.until = until;
         }
         pinfo!("notice: inline action {a:?} done");
-    }
-
-    // ------------------------------------------------------------ prayer times
-
-    /// Prayer times' files are in place: read its places, settle the place,
-    /// and ask where the PC is when following the location.
-    fn prayer_ready(&mut self) {
-        let a = &poni_core::addons::PRAYER_TIMES;
-        let path = paths::addons_dir().join(a.id).join(a.tag).join("places.json");
-        match std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|t| PlaceList::parse(&t)) {
-            Ok(list) => {
-                pinfo!("prayer: {} places", list.places.len());
-                self.st.prayer.places = Some(std::sync::Arc::new(list));
-            }
-            Err(e) => {
-                pwarn!("prayer: can't read the places ({e})");
-                return;
-            }
-        }
-        self.resolve_prayer_place();
-        if self.st.settings.prayer.follow_location {
-            self.locate();
-        }
-    }
-
-    /// Prayer times switched off: nothing plays, nothing is kept.
-    fn prayer_off(&mut self) {
-        self.adzan.stop();
-        self.st.prayer = PrayerState::default();
-    }
-
-    /// The place the times are for: the chosen one, or until there is one,
-    /// the one the PC's time zone suggests. A place from the world list is
-    /// kept as it is once settled; at start it comes from the lines settings
-    /// keep of it (nothing online).
-    fn resolve_prayer_place(&mut self) {
-        let Some(list) = self.st.prayer.places.clone() else { return };
-        let chosen = match self.st.settings.prayer.place.as_deref() {
-            Some(id) if self.st.prayer.place.as_ref().is_some_and(|p| p.id == id) => self.st.prayer.place.clone(),
-            Some(id) => poni_core::prayer::find(&list, self.st.settings.prayer.world_place.as_deref(), id),
-            None => None,
-        };
-        let suggested = chosen.is_none();
-        let place = chosen.or_else(|| poni_core::prayer::suggested_place_id(self.utc_offset_min()).and_then(|id| list.find(id)).cloned());
-        let changed = place.as_ref().map(|p| &p.id) != self.st.prayer.place.as_ref().map(|p| &p.id);
-        self.st.prayer.place = place;
-        self.st.prayer.suggested = suggested;
-        if changed {
-            pinfo!("prayer: times for {}", self.st.prayer.place.as_ref().map_or("no place", |p| p.id.as_str()));
-            // A new place: prayer times that passed there don't ring now.
-            self.st.prayer.handled_until = Some(self.st.prayer_now());
-        }
-    }
-
-    /// The PC's UTC offset in minutes, from its clock.
-    fn utc_offset_min(&self) -> i32 {
-        let l = &self.st.local;
-        let local = poni_core::datetime::days_from_civil(l.year, l.month, l.day) * 86_400 + l.hour as i64 * 3600 + l.minute as i64 * 60 + l.second as i64;
-        (((local - self.st.unix) as f64 / 900.0).round() * 15.0) as i32
-    }
-
-    /// Ask Windows where the PC is (the answer: `AppEvent::Located`).
-    fn locate(&mut self) {
-        if self.st.prayer.locate == Locate::Asking || false {
-            return;
-        }
-        self.st.prayer.locate = Locate::Asking;
-        self.st.prayer.located_at = Some(self.st.unix);
-        services::location::locate(self.sink.clone());
-    }
-
-    /// The nearest listed place becomes the place, while following the
-    /// location (`pages::prayer::located`). The point is never saved.
-    fn on_located(&mut self, found: services::location::Located) {
-        use services::location::Located;
-        match found {
-            Located::Denied => self.st.prayer.locate = Locate::Denied,
-            Located::Unknown => self.st.prayer.locate = Locate::Unknown,
-            // Kemenag's places, or the world's cities around it (looked up online).
-            Located::At(lat, lng) => pages::prayer::located(&mut self.st, lat, lng),
-        }
-    }
-
-    /// Each frame (and each minute): the prayer times that just came, and
-    /// asking where the PC is again every 3 hours while following it.
-    fn prayer_tick(&mut self) {
-        if !self.st.prayer_on() {
-            return;
-        }
-        if self.st.settings.prayer.follow_location && self.st.prayer.located_at.is_none_or(|t| self.st.unix - t >= 3 * 3600) {
-            self.locate();
-        }
-        let Some(site) = self.st.prayer.site() else { return };
-        let now = self.st.prayer_now();
-        let Some(from) = self.st.prayer.handled_until else {
-            self.st.prayer.handled_until = Some(now);
-            return;
-        };
-        if now <= from {
-            return;
-        }
-        self.st.prayer.handled_until = Some(now);
-        for m in poni_core::prayer::prayers_between(&site, from, now) {
-            match poni_core::prayer::due(m.at, now) {
-                Due::Ring => self.prayer_moment(m, true),
-                Due::Quiet => self.prayer_moment(m, false),
-                Due::Skip => {}
-            }
-        }
-    }
-
-    /// A prayer's time came: the island says so and plays the chosen sound.
-    /// Quiet when it's late (after a sleep) or a full-screen app hides the island.
-    fn prayer_moment(&mut self, m: PrayerMoment, ring: bool) {
-        let Some(site) = self.st.prayer.site() else { return };
-        let place = self.st.prayer.place.as_ref().map_or(String::new(), |p| p.label.clone());
-        let quiet = !ring || self.fullscreen_hidden;
-        let sound = if quiet { PrayerSound::Silent } else { self.st.settings.prayer.sound };
-        let mut adzan = false;
-        match sound {
-            // The recording isn't Subuh's adzan (no "ash-shalatu khairum minan naum"): Subuh gets the tone.
-            PrayerSound::Adzan if m.prayer != Prayer::Subuh => {
-                adzan = self.play_adzan();
-                if !adzan {
-                    self.st.cmd(Command::Play(crate::commands::Sound::Chime));
-                }
-            }
-            PrayerSound::Adzan | PrayerSound::Tone => self.st.cmd(Command::Play(crate::commands::Sound::Chime)),
-            PrayerSound::Silent => {}
-        }
-        let title = pages::prayer::moment_title(m.prayer);
-        let subtitle = format!("{} \u{b7} {place}", site.hhmm(m.at));
-        let secs = if adzan { 200.0 } else { 60.0 };
-        self.st.notify(Icon::Moon, self.st.accent, title, subtitle, secs, Some(NoticeAction::OpenPage(PageKind::Prayer)));
-        if adzan {
-            self.st.set_notice_inline(InlineAction::StopAdzan);
-        }
-        pinfo!("prayer: {} at {}{}", m.prayer.name(), site.hhmm(m.at), if quiet { ", quietly" } else { "" });
-    }
-
-    /// Start the adzan; music that plays pauses (and stays paused).
-    fn play_adzan(&mut self) -> bool {
-        let a = &poni_core::addons::PRAYER_TIMES;
-        let path = paths::addons_dir().join(a.id).join(a.tag).join("adzan.m4a");
-        match self.adzan.play(&path, &self.sink) {
-            Ok(()) => {
-                self.st.prayer.adzan = true;
-                if self.st.settings.prayer.pause_music && self.st.media.as_ref().is_some_and(|m| m.is_playing()) {
-                    self.st.media_cmd(MediaCmd::PlayPause);
-                }
-                true
-            }
-            Err(e) => {
-                pwarn!("prayer: the adzan didn't play ({e}); the tone instead");
-                false
-            }
-        }
-    }
-
-    /// OK on the countdown before a prayer: the closed island goes back to
-    /// what it would show (the song and its sung line) until the prayer's
-    /// time. Its moment still comes then: `prayer_tick` doesn't look at the
-    /// countdown.
-    fn prayer_countdown_ok(&mut self) {
-        self.refresh_time();
-        if let (Some(m), Some(site)) = (self.st.prayer_countdown_ok(), self.st.prayer.site()) {
-            pinfo!("prayer: countdown put away until {} at {}", m.prayer.name(), site.hhmm(m.at));
-        }
-    }
-
-    // ------------------------------------------------------------ IELTS
-
-    /// The IELTS page's coach, each frame: told when the page comes and goes
-    /// (a tab switch, the island closing, the PC locked or the display off,
-    /// a full-screen app), ticked for its clock, fed the microphone's level.
-    /// The worker goes once the page is closed and nothing is in flight.
-    fn adzan_ended(&mut self) {
-        self.adzan.stop();
-        self.st.prayer.adzan = false;
-        // The notice leaves soon after the adzan.
-        let soon = self.st.now + 4.0;
-        if let Some(n) = self.st.notice.as_mut().filter(|n| n.inline == Some(InlineAction::StopAdzan)) {
-            n.until = n.until.min(soon);
-        }
     }
 
     fn set_page(&mut self, p: PageKind) {
@@ -3882,13 +3612,6 @@ impl App {
                 }
                 Command::Phone(c) => self.phone_cmd(c),
                 Command::Pair(c) => self.pair_cmd(c),
-                // The self-test's pictures use the files it seeds (none from the website).
-                Command::GetCities(file) => {
-                    if true {
-                        services::cities::fetch(file, self.sink.clone());
-                    }
-                }
-                Command::Download(c) => self.download_cmd(c),
                 Command::Notify(c) => self.notify_cmd(c),
             }
         }
@@ -4397,9 +4120,6 @@ fn files_label(n: usize) -> String {
     format!("{n} {}", if n == 1 { "file" } else { "files" })
 }
 
-// The Downloads page's commands and yt-dlp's reports.
-#[path = "app_downloads.rs"]
-mod downloads;
 
 #[cfg(test)]
 mod tests {

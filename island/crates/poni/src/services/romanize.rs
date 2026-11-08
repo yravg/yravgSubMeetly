@@ -6,20 +6,14 @@
 //! it splits a line into words with their readings in kana, which
 //! `poni_core::romanize` spells in romaji. Where Windows has no Japanese
 //! reading data (Windows 11 keeps it in the Japanese typing feature, which
-//! most PCs outside Japan don't have) or the analyzer fails, the song is read
-//! with yravgSubMeetly's own dictionary instead (`poni_core::romanize::JaDict`),
-//! which the Japanese readings add-on brings (`poni_core::addons::
-//! JAPANESE_READINGS`, loaded only for that song). Without the add-on, kana
-//! lines still read, and the song says so (`wants_ja_readings`): the app
-//! switches the add-on on the first time, or the Music page offers it once
-//! it was switched off by hand. Korean and Chinese need no analyzer
-//! (`poni_core::romanize`). Called on the lyrics worker thread.
+//! most PCs outside Japan don't have) or the analyzer fails, only kana lines
+//! read (the own-dictionary add-on left with ISL-005). Korean and Chinese
+//! need no analyzer (`poni_core::romanize`). Called on the lyrics worker thread.
 //!
 //! The analyzer is a single-threaded (STA) class. From the lyrics worker's
 //! multithreaded apartment every call fails with RO_E_UNSUPPORTED_FROM_MTA
 //! (0x8000001D), so a Japanese song is read on a short-lived STA thread.
 
-use poni_core::addons::{JAPANESE_READINGS, JA_READINGS_FILE};
 use poni_core::lrc::Lyrics;
 use poni_core::romanize::{self, JaWord, Ruby, Script};
 use windows::core::HSTRING;
@@ -37,15 +31,11 @@ pub struct Pronounced {
     /// The pieces of every line with their readings; an empty list for lines
     /// that need none (or that couldn't be read).
     pub ruby: Vec<Vec<Ruby>>,
-    /// Kanji went unread because Windows has no Japanese reading data and the
-    /// Japanese readings add-on isn't on this PC: the app switches it on the
-    /// first time, and the Music page offers it after a switch-off by hand.
-    pub wants_ja_readings: bool,
 }
 
 impl Pronounced {
     fn read(ruby: Vec<Vec<Ruby>>) -> Self {
-        Pronounced { ruby, wants_ja_readings: false }
+        Pronounced { ruby }
     }
 }
 
@@ -56,8 +46,8 @@ pub fn pronounce(lyrics: &Lyrics) -> Pronounced {
         Some(Script::Korean) => Pronounced::read(each_line(&texts, romanize::korean_ruby)),
         Some(Script::Chinese) => Pronounced::read(each_line(&texts, |t| split_long(romanize::chinese_ruby(t)))),
         Some(Script::Japanese) => on_sta(|| japanese_song(&texts)).unwrap_or_else(|| {
-            crate::pwarn!("lyrics: couldn't start the Japanese reading thread; reading with yravgSubMeetly's own dictionary");
-            own_song(&texts)
+            crate::pwarn!("lyrics: couldn't start the Japanese reading thread; only kana lines get romaji");
+            Pronounced::read(each_line(&texts, kana_line))
         }),
     }
 }
@@ -69,11 +59,10 @@ fn each_line(texts: &[&str], mut read: impl FnMut(&str) -> Vec<Ruby>) -> Vec<Vec
 
 /// Every line of a Japanese song through the analyzer. If it fails outright
 /// (no Japanese reading data, or an error) it isn't asked again for this
-/// song, and the rest is read with yravgSubMeetly's own dictionary. A word that
+/// song, and the rest of its lines read as far as kana go. A word that
 /// can't be read costs just that word's reading.
 fn japanese_song(texts: &[&str]) -> Pronounced {
     let mut analyzer = true;
-    let mut own = OwnDictionary::default();
     let mut unread = 0;
     let out = each_line(texts, |t| {
         if analyzer {
@@ -84,81 +73,23 @@ fn japanese_song(texts: &[&str]) -> Pronounced {
                 }
                 Err(e) => {
                     analyzer = false;
-                    crate::pinfo!("lyrics: {e}; reading with yravgSubMeetly's own dictionary");
+                    crate::pinfo!("lyrics: {e}; only kana lines get romaji");
                 }
             }
         }
-        let pieces = own.read(t);
+        let pieces = kana_line(t);
         unread += pieces.iter().filter(|p| p.roman.is_empty() && has_kanji(&p.text)).count();
         pieces
     });
     if unread > 0 {
         crate::pinfo!("lyrics: {unread} kanji words came back without a reading");
     }
-    Pronounced { ruby: out, wants_ja_readings: own.wanted(texts) }
+    Pronounced { ruby: out }
 }
 
-/// Every line of a Japanese song through yravgSubMeetly's own dictionary (when the
-/// analyzer's thread can't start, and for the self-test).
-pub fn own_song(texts: &[&str]) -> Pronounced {
-    let mut own = OwnDictionary::default();
-    let ruby = each_line(texts, |t| own.read(t));
-    Pronounced { ruby, wants_ja_readings: own.wanted(texts) }
-}
-
-/// yravgSubMeetly's own reading dictionary from the Japanese readings add-on,
-/// loaded on first use (about 0.1 s and 30 MB) and dropped with the song.
-/// Without it, kana lines still read.
-#[derive(Default)]
-struct OwnDictionary {
-    dict: Option<Option<romanize::JaDict>>,
-    /// The add-on's file isn't on this PC (off, or still coming in).
-    missing: bool,
-}
-
-impl OwnDictionary {
-    fn read(&mut self, line: &str) -> Vec<Ruby> {
-        if self.dict.is_none() {
-            self.dict = Some(self.load());
-        }
-        match self.dict.as_ref().and_then(Option::as_ref) {
-            Some(d) => d.ruby(line),
-            None => romanize::japanese_kana_ruby(line).unwrap_or_default(),
-        }
-    }
-
-    fn load(&mut self) -> Option<romanize::JaDict> {
-        let path = super::addons::file_path(&JAPANESE_READINGS, JA_READINGS_FILE);
-        match read_dictionary(&path) {
-            Ok(bytes) => romanize::JaDict::load(&bytes).map_err(|e| crate::pwarn!("lyrics: {e}; only kana lines get romaji")).ok(),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                crate::pinfo!("lyrics: the Japanese readings add-on isn't on this PC; only kana lines get romaji");
-                self.missing = true;
-                None
-            }
-            Err(e) => {
-                crate::pwarn!("lyrics: couldn't read {} ({e}); only kana lines get romaji", path.display());
-                None
-            }
-        }
-    }
-
-    /// Whether the song's kanji needed the add-on that isn't here.
-    fn wanted(&self, texts: &[&str]) -> bool {
-        self.missing && texts.iter().any(|t| has_kanji(t))
-    }
-}
-
-/// The add-on's dictionary file. Unit tests read the repo's copy, built into
-/// the test binary only.
-#[cfg(not(test))]
-fn read_dictionary(path: &std::path::Path) -> std::io::Result<Vec<u8>> {
-    std::fs::read(path)
-}
-
-#[cfg(test)]
-fn read_dictionary(_path: &std::path::Path) -> std::io::Result<Vec<u8>> {
-    Ok(include_bytes!("../../../poni-core/data/ja-readings.dic.zst").to_vec())
+/// A line read as far as its kana go (kanji get no reading).
+fn kana_line(line: &str) -> Vec<Ruby> {
+    romanize::japanese_kana_ruby(line).unwrap_or_default()
 }
 
 /// Whether Windows' analyzer reads Japanese on this PC (the self-test's
@@ -333,36 +264,9 @@ mod tests {
     }
 
     #[test]
-    fn own_dictionary_reads_kanji_lines() {
-        let song = own_song(&["君の名前を呼んだ夜", "Oh yeah", "ありがとう"]);
-        let read = &song.ruby;
-        assert_eq!(roman(&read[0]), "kimi no namae wo yonda yoru");
-        assert!(read[1].is_empty());
-        assert_eq!(roman(&read[2]), "arigatou");
-        assert!(!song.wants_ja_readings);
-    }
-
-    #[test]
-    fn without_the_add_on_kana_still_reads_and_kanji_ask_for_it() {
-        let mut own = OwnDictionary { dict: Some(None), missing: true };
-        assert_eq!(roman(&own.read("ありがとう")), "arigatou");
-        assert!(own.wanted(&["ありがとう", "君の名前"]));
-        assert!(!own.wanted(&["ありがとう", "la la la"]), "kana alone never needs it");
-        assert!(!OwnDictionary { dict: Some(None), missing: false }.wanted(&["君の名前"]), "a file that failed to load isn't fixed by the offer");
-    }
-
-    #[test]
-    fn every_japanese_line_reads_with_or_without_windows_data() {
-        // Windows' analyzer where it has its data (Windows CI), yravgSubMeetly's own
-        // dictionary where it doesn't (Wine, most Windows 11 PCs outside Japan).
-        let lyrics = poni_core::lrc::parse_lrc("[00:01.00]朝の光を浴びて\n[00:02.00]遠くへ行こう\n[00:03.00]la la la\n");
-        let song = pronounce(&lyrics);
-        assert!(!song.wants_ja_readings);
-        let read = &song.ruby;
-        assert_eq!(read.len(), 3);
-        assert!(read[0].iter().any(|p| p.text.contains('光') && !p.roman.is_empty()), "{:?}", read[0]);
-        assert!(roman(&read[1]).starts_with("tooku e"), "{:?}", read[1]);
-        assert!(read[2].is_empty());
+    fn kana_lines_read_without_a_dictionary() {
+        assert_eq!(roman(&kana_line("ありがとう")), "arigatou");
+        assert!(kana_line("Oh yeah").is_empty());
     }
 
     #[test]

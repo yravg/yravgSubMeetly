@@ -13,7 +13,6 @@ use poni_core::geom::{palette, Color};
 use poni_core::lrc::Lyrics;
 use poni_core::phonedrop::QrMatrix;
 use poni_core::pomodoro::Pomodoro;
-use poni_core::prayer::{Place, PlaceList, PrayerMoment, Site, World};
 use poni_core::romanize::Ruby;
 use poni_core::settings::Settings;
 use poni_core::store::Store;
@@ -73,16 +72,11 @@ pub struct LyricsState {
     /// Each line's pieces with their readings in Latin letters (Japanese,
     /// Korean, Chinese); empty for lines that need none.
     pub ruby: Vec<Vec<Ruby>>,
-    /// The song's kanji went unread because Windows has no Japanese reading
-    /// data and the Japanese readings add-on isn't on this PC: the app
-    /// switches the add-on on the first time, and the Music page shows how
-    /// it comes in (or offers it, after a switch-off by hand).
-    pub wants_ja_readings: bool,
 }
 
 impl Default for LyricsState {
     fn default() -> Self {
-        Self { track_key: String::new(), status: LyricsStatus::Idle, lyrics: None, source: String::new(), ruby: Vec::new(), wants_ja_readings: false }
+        Self { track_key: String::new(), status: LyricsStatus::Idle, lyrics: None, source: String::new(), ruby: Vec::new() }
     }
 }
 
@@ -150,8 +144,6 @@ pub enum InlineAction {
     /// Put the notice's hidden words in place: an Oyenza sum (and sender),
     /// or a message and who it's from (Notifications).
     ShowAmount,
-    /// Stop the adzan (Prayer times).
-    StopAdzan,
     /// Put the notice away now (a new version's: the menu and Settings
     /// keep offering it).
     Hide,
@@ -355,8 +347,6 @@ pub struct PageUiState {
     /// the side of the camera they peek out from (`mac/notch.rs`).
     #[cfg(target_os = "macos")]
     pub peek: poni_core::peek::Peek,
-    /// The Downloads page: its link field, mode and scroll.
-    pub downloads: crate::pages::downloads::DownloadsUi,
     /// The Pro add-on whose "what it does" page shows on the Add-ons page.
     pub addon_about: Option<&'static str>,
 }
@@ -397,81 +387,6 @@ pub struct GameState {
     /// Frames per second over the last minute in front.
     pub history: poni_core::sysmon::Series,
     pub access: FpsAccess,
-}
-
-/// Where finding the PC's place stands.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub enum Locate {
-    /// Not asked (following the location is off, or not yet).
-    #[default]
-    Idle,
-    Asking,
-    /// Picked the nearest place, this far from the PC (km).
-    Found { km: f64 },
-    /// The nearest place in either list is too far away to use (km).
-    Far { km: f64 },
-    /// Away from Kemenag's places, and the cities around couldn't be looked
-    /// up (offline): the place stays as it was.
-    Offline,
-    /// Windows' location is off, or not allowed for yravgSubMeetly.
-    Denied,
-    /// Windows couldn't tell where the PC is.
-    Unknown,
-}
-
-/// One of Prayer times' online city files, while it's wanted.
-#[derive(Clone, Debug)]
-pub enum CityFile {
-    Asking,
-    Here(std::sync::Arc<World>),
-    /// Offline, or the website didn't answer.
-    Failed,
-}
-
-/// The Prayer times add-on's live state.
-#[derive(Clone, Debug, Default)]
-pub struct PrayerState {
-    /// The add-on's place list, read once its files are in place.
-    pub places: Option<std::sync::Arc<PlaceList>>,
-    /// The online city files asked for (`poni_core::prayer::world`): the
-    /// picker's, dropped when it closes, and a location's squares, dropped
-    /// once its place is found.
-    pub cities: HashMap<String, CityFile>,
-    /// A location waiting for its squares: the point (never saved) and the
-    /// files it needs.
-    pub fix: Option<(f64, f64, Vec<String>)>,
-    /// The last location that went online and the place it found: the next
-    /// one within a kilometre takes it again without asking.
-    pub last_fix: Option<(f64, f64, Option<(Place, f64)>)>,
-    /// The picker's last search: what was typed, and what it found.
-    pub found: Option<(String, Vec<Place>)>,
-    /// The place the times are for: the chosen one, or the time zone's
-    /// suggestion while none is chosen.
-    pub place: Option<Place>,
-    /// `place` is the time zone's suggestion.
-    pub suggested: bool,
-    pub locate: Locate,
-    /// When the PC's location was last asked (UTC seconds).
-    pub located_at: Option<i64>,
-    /// The place picker shows (Change), and what's typed in it.
-    pub picking: bool,
-    pub query: String,
-    /// Prayer times up to this moment (UTC seconds) have had their moment.
-    pub handled_until: Option<i64>,
-    /// The adzan is playing.
-    pub adzan: bool,
-    /// OK on the countdown put it away until this prayer's time (UTC
-    /// seconds): the closed island shows what it would otherwise (the song
-    /// and its sung line) until then. Kept in memory only.
-    pub countdown_ok: Option<i64>,
-    /// Self-test only: moves the prayer clock by this many seconds.
-    pub clock_shift: i64,
-}
-
-impl PrayerState {
-    pub fn site(&self) -> Option<Site> {
-        self.place.as_ref().and_then(|p| p.site())
-    }
 }
 
 pub struct AppState {
@@ -524,8 +439,6 @@ pub struct AppState {
     /// New versions (`crate::updates`): what Settings, the menu and the
     /// island's notice show.
     pub update: UpdateView,
-    /// The Prayer times add-on, while it is on (its choices: `settings.prayer`).
-    pub prayer: PrayerState,
     /// The Script page's reading (its script and pace are in `store.script`).
     pub script: poni_core::script::Reader,
     /// A message under the script until a time (mono seconds).
@@ -533,11 +446,6 @@ pub struct AppState {
     /// Whether Windows leaves the island out of screen capture while the
     /// Script page shows (None = not asked yet, or not on Windows).
     pub script_hidden: Option<bool>,
-    /// The Downloads page's jobs (`poni_core::downloads`), in memory only.
-    pub downloads: poni_core::downloads::Jobs,
-    /// This app offers the Downloader: Windows outside the Microsoft Store
-    /// build, and the Mac (set at start).
-    pub downloader_offered: bool,
     /// Whether Windows lets the island read notifications.
     pub notify_access: NotifyAccess,
     /// This copy can read other apps' notifications: Windows lets only an app
@@ -605,12 +513,9 @@ impl AppState {
             pair_server: None,
             addons: BTreeMap::new(),
             update: UpdateView::default(),
-            prayer: PrayerState::default(),
             script: poni_core::script::Reader::default(),
             script_note: None,
             script_hidden: None,
-            downloads: poni_core::downloads::Jobs::default(),
-            downloader_offered: false,
             notify_access: NotifyAccess::Unknown,
             notify_can: false,
             cmds: Vec::new(),
@@ -621,12 +526,11 @@ impl AppState {
             let on = st.settings.addon_on(a.id);
             st.addons.insert(a.id, if !on { AddonStatus::Off } else if a.downloads() { AddonStatus::Checking } else { AddonStatus::Ready });
         }
-        // Last open on the Script, System or Downloads page, since switched
+        // Last open on the Script or System page, since switched
         // off, or on a tab since hidden: open on the first tab.
         let off = match st.page {
             PageKind::Script => !st.script_on(),
             PageKind::System => !st.system_on(),
-            PageKind::Downloads => !st.downloader_on(),
             PageKind::Notifications => !st.notifications_on(),
             p => st.tab_hidden(p),
         };
@@ -651,27 +555,6 @@ impl AppState {
         self.addon(poni_core::addons::SYSTEM.id) == AddonStatus::Ready
     }
 
-    /// Prayer times is on and its places are read: the tab and reminders run.
-    pub fn prayer_on(&self) -> bool {
-        self.addon(poni_core::addons::PRAYER_TIMES.id) == AddonStatus::Ready && self.prayer.places.is_some()
-    }
-
-    /// The prayer clock, UTC seconds (the self-test moves it).
-    pub fn prayer_now(&self) -> i64 {
-        self.unix + self.prayer.clock_shift
-    }
-
-    /// OK on the countdown before a prayer: it goes away until that prayer's
-    /// time (`activities::prayer_countdown`). The adzan still comes then,
-    /// since what rings follows the prayer clock, not the countdown. Returns
-    /// the prayer put away (none when no countdown runs).
-    pub fn prayer_countdown_ok(&mut self) -> Option<PrayerMoment> {
-        let site = self.prayer.site()?;
-        let (m, _) = poni_core::prayer::countdown(&site, self.prayer_now(), self.settings.prayer.remind_before_min)?;
-        self.prayer.countdown_ok = Some(m.at);
-        Some(m)
-    }
-
     /// Show `n` now or, while a full-screen app hides the island (`hidden`), keep
     /// it for when the island is back, the way money notices wait
     /// (`OyenzaState::held`, shown then if no older than `HELD_MAX_S`). One
@@ -682,11 +565,6 @@ impl AppState {
         } else if self.held.as_ref().is_none_or(|(_, at)| self.now - at > HELD_MAX_S) {
             self.held = Some((n, self.now));
         }
-    }
-
-    /// The Downloader add-on is on, with its tools in place: the Downloads tab shows.
-    pub fn downloader_on(&self) -> bool {
-        self.downloader_offered && self.addon(poni_core::addons::DOWNLOADER.id) == AddonStatus::Ready
     }
 
     /// Notifications is on: its tab shows, and new notifications from the
