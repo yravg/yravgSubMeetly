@@ -139,6 +139,7 @@ impl Services {
     pub fn pair_begin(&self) -> Result<String, String> {
         match &self.pairdrop {
             Some(p) => p.begin_pairing(),
+            None if poni_core::pairdrop::configured_server().is_none() => Err(poni_core::pairdrop::NO_SERVER.into()),
             None => Err("Pairing couldn't start on this PC.".into()),
         }
     }

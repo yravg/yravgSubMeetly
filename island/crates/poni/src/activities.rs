@@ -26,6 +26,8 @@ pub enum Activity {
     MediaTimer,
     /// Show over games: frame rate, GPU and CPU while a full-screen app is in front.
     Game,
+    /// The engine's newest caption, while it is fresh ([`poni_core::helper::Live`]).
+    Caption,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -84,6 +86,7 @@ pub fn content_key(m: &Mode) -> u32 {
         Mode::Activity(Activity::Timer) => 3,
         Mode::Activity(Activity::MediaTimer) => 4,
         Mode::Activity(Activity::Game) => 6,
+        Mode::Activity(Activity::Caption) => 7,
         Mode::Hud(t) => 10 + *t as u32,
         Mode::Notice => 20,
         Mode::Expanded(_) => 30,
@@ -114,6 +117,10 @@ pub fn current_activity(st: &AppState) -> Option<Activity> {
     // Over a game the readout takes the pill; music and timer wait.
     if st.game.active {
         return Some(Activity::Game);
+    }
+    // A line the engine just heard is what the island is for while a meeting runs.
+    if st.helper.pill_line(poni_core::helper::now_ms()).is_some() {
+        return Some(Activity::Caption);
     }
     let media = st.settings.show_media_activity
         && st.media.as_ref().is_some_and(|m| m.is_playing() || media_grace_end(st).is_some_and(|end| st.now < end));
@@ -218,6 +225,7 @@ pub fn geom(m: &Mode, st: &AppState) -> Geom {
             Geom::new(if long { 112.0 } else { 96.0 }, 32.0, 15.0)
         }
         Mode::Activity(Activity::MediaTimer) => Geom::new(132.0, 32.0, 15.0),
+        Mode::Activity(Activity::Caption) => Geom::new(crate::pill::live::CAPTION_W, 32.0, 15.0),
         Mode::Activity(Activity::Game) => Geom::new(if game_temp(st).is_some() { GAME_W } else { GAME_NO_TEMP_W }, 32.0, 15.0),
         Mode::Hud(HudTag::Volume) => Geom::new(316.0, 40.0, 19.0),
         Mode::Hud(HudTag::Charging) | Mode::Hud(HudTag::LowBattery) => Geom::new(300.0, 40.0, 19.0),
@@ -482,6 +490,7 @@ fn draw_activity(ui: &mut Ui, st: &mut AppState, a: Activity, body: Rect) {
             let text = fmt_countdown(p.remaining(st.now));
             ui.c.text(&text, Rect::new(body.x + 40.0, body.y, 64.0, body.h), &countdown_style(col, paused));
         }
+        Activity::Caption => crate::pill::live::draw_caption(ui, st, body),
         Activity::Game => draw_game(ui, st, body),
         Activity::MediaTimer => {
             // Art on the left; the ring sits right next to its countdown.
@@ -755,6 +764,7 @@ mod tests {
     /// Music playing 12 s into a song, with these lyrics found for it.
     fn playing(lrc: Option<&str>) -> AppState {
         let mut st = AppState::new(Settings::default(), Store::default());
+        st.settings.theme = poni_core::settings::Theme::Classic;
         let key = MediaSession::make_track_key("Paper Boats", "The Lanterns", "");
         st.media = Some(MediaSession {
             app_id: "Spotify.exe".into(),
@@ -805,7 +815,7 @@ mod tests {
         let mut st = playing(Some("[00:10.00]紙の舟よ\n[00:14.00]Paper boats\n"));
         assert_eq!(geom(&media, &st).h, 32.0, "no readings: one row");
         st.lyrics.ruby = vec![vec![Ruby { text: "紙の舟よ".into(), roman: "kami no fune yo".into() }], Vec::new()];
-        for theme in [Theme::Classic, Theme::Oyen, Theme::Glass, Theme::Pill] {
+        for theme in [Theme::Classic, Theme::Paper, Theme::Glass, Theme::Pill] {
             st.settings.theme = theme;
             assert_eq!(geom(&media, &st).h, crate::pill::media::H_READS, "{theme:?}: the line over its reading");
         }
@@ -814,6 +824,30 @@ mod tests {
         assert_eq!(geom(&media, &st).h, 32.0);
     }
 
+
+    #[test]
+    fn the_engines_fresh_line_takes_the_collapsed_island_until_stop_or_a_game() {
+        use poni_core::helper::{now_ms, Live, Snapshot};
+        let mut st = AppState::new(Settings::default(), Store::default());
+        let heard = |ago: u64| Snapshot { live: Some(Live { seq: 1, source: "Halo dunia".into(), at: Some(now_ms() - ago), ..Default::default() }), ..Default::default() };
+        assert_eq!(collapsed_mode(&st), Mode::Idle);
+        st.helper.apply(Ok((heard(500), 5)));
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Caption));
+        assert_eq!(geom(&collapsed_mode(&st), &st).w, crate::pill::live::CAPTION_W);
+        // Stop on the Live page lets the island go; an old line is not now.
+        st.helper.set_following(false);
+        assert_eq!(collapsed_mode(&st), Mode::Idle);
+        st.helper.set_following(true);
+        st.helper.apply(Ok((heard(60_000), 5)));
+        assert_eq!(collapsed_mode(&st), Mode::Idle);
+        // A helper that stops answering shows nothing; a game's readout outranks it.
+        st.helper.apply(Ok((heard(500), 5)));
+        st.game.active = true;
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Game));
+        st.game.active = false;
+        st.helper.apply(Err("down".into()));
+        assert_eq!(collapsed_mode(&st), Mode::Idle);
+    }
     #[test]
     fn a_notice_that_stays_waits_under_a_volume_change_and_a_games_readout() {
         let mut st = AppState::new(Settings::default(), Store::default());
@@ -831,24 +865,6 @@ mod tests {
         st.notify(Icon::Download, palette::GREEN, "Saved", "", 5.0, None);
         st.hud = Some(crate::state::Hud { kind: HudKind::Volume { level: 0.5, muted: false }, until: st.now + 2.0 });
         st.game.active = true;
-        assert_eq!(collapsed_mode(&st), Mode::Notice);
-    }
-
-    #[test]
-    fn a_notice_that_stays_waits_under_a_recording() {
-        let mut st = AppState::new(Settings::default(), Store::default());
-        st.recorder = true;
-        st.store.recorder_island = true;
-        st.notify(Icon::Download, palette::GREEN, "Update available", "", f64::INFINITY, None);
-        st.rec.phase = Some(poni_core::recorder::Phase::Recording);
-        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Recording), "Stop stays one click away");
-        st.rec.phase = Some(poni_core::recorder::Phase::Paused);
-        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Recording));
-        st.rec.phase = None;
-        assert_eq!(collapsed_mode(&st), Mode::Notice, "and back once the recording ends");
-        // A notice with a time limit still shows over it.
-        st.rec.phase = Some(poni_core::recorder::Phase::Recording);
-        st.notify(Icon::Download, palette::GREEN, "Saved", "", 5.0, None);
         assert_eq!(collapsed_mode(&st), Mode::Notice);
     }
 

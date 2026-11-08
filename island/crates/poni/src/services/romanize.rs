@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn kana_lines_read_without_a_dictionary() {
         assert_eq!(roman(&kana_line("ありがとう")), "arigatou");
-        assert!(kana_line("Oh yeah").is_empty());
+        assert_eq!(roman(&kana_line("Oh yeah")), "", "Latin words get no reading");
     }
 
     #[test]

@@ -40,6 +40,8 @@ const INK: Color = Color::white(1.0);
 /// end, the countdown right-aligned 14 from the right one. Classic's
 /// widths, so the morphs between them match; wider once the countdown
 /// needs a third minute digit.
+/// The caption pill: a dot, then the engine's line cut at the edge.
+pub const CAPTION_W: f32 = 300.0;
 const TIMER_W: f32 = 96.0;
 const TIMER_LONG_W: f32 = 112.0;
 const RING_D: f32 = 14.0;
@@ -75,6 +77,7 @@ pub fn geom(a: Activity, st: &AppState) -> Option<Geom> {
         Activity::Timer => TIMER_W,
         Activity::MediaTimer => MEDIA_TIMER_W,
         Activity::Game => game_w(st),
+        Activity::Caption => CAPTION_W,
     };
     Some(capsule(w))
 }
@@ -85,6 +88,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, a: Activity, body: Rect) -> bool {
         Activity::Timer => draw_timer(ui, st, body),
         Activity::MediaTimer => draw_media_timer(ui, st, body),
         Activity::Game => draw_game(ui, st, body),
+        Activity::Caption => draw_caption(ui, st, body),
     }
     true
 }
@@ -116,6 +120,16 @@ thread_local! {
 fn snap(ui: &Ui, v: f32) -> f32 {
     let s = ui.c.scale().max(0.1);
     (v * s).round() / s
+}
+
+// ------------------------------------------------------------------ caption
+
+pub(crate) fn draw_caption(ui: &mut Ui, st: &AppState, body: Rect) {
+    let line = st.helper.pill_line(poni_core::helper::now_ms()).map(|l| l.source.as_str()).unwrap_or_default();
+    let cy = body.center().y;
+    ui.c.fill_circle(Point::new(body.x + GLYPH_INSET + 3.0, cy), 3.0, palette::GREEN);
+    let x = body.x + TEXT_INSET + 8.0;
+    ui.c.text(line, Rect::new(x, body.y, body.right() - TEXT_INSET - x, body.h), &TextStyle::body().color(INK));
 }
 
 // -------------------------------------------------------------------- timer

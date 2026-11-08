@@ -28,7 +28,9 @@ pub struct PairDropService {
 impl PairDropService {
     pub fn start(sink: EventSink) -> windows::core::Result<Self> {
         pairdrop::set_logger(|line| crate::pinfo!("{line}"));
-        let server = server();
+        let Some(server) = pairdrop::configured_server() else {
+            return Err(windows::core::Error::new(windows::Win32::Foundation::E_FAIL, pairdrop::NO_SERVER));
+        };
         let client = random16().map(|b| b64u(&b)).ok_or_else(|| windows::core::Error::new(windows::Win32::Foundation::E_FAIL, "no random bytes"))?;
         let inbox = crate::paths::phone_inbox_dir();
         let cfg = MeetCfg {
@@ -50,7 +52,7 @@ impl PairDropService {
             }
         });
         let save = Arc::new(|b: &Book| save_book(b));
-        let meet = Meet::start(cfg, Arc::new(WinPost), book, emit, save)
+        let meet = Meet::start(cfg, Arc::new(WinPost(server.clone())), book, emit, save)
             .map_err(|e| windows::core::Error::new(windows::Win32::Foundation::E_FAIL, format!("could not start the pair-drop thread: {e}")))?;
         Ok(Self { meet })
     }
@@ -78,15 +80,6 @@ impl PairDropService {
     }
 }
 
-/// The meeting server: `PONI_DROP_SERVER` (for self-hosting and tests), else Oyenza's.
-fn server() -> String {
-    std::env::var("PONI_DROP_SERVER")
-        .ok()
-        .map(|s| s.trim().trim_end_matches('/').to_string())
-        .filter(|s| s.starts_with("https://") || s.starts_with("http://127.0.0.1") || s.starts_with("http://localhost"))
-        .unwrap_or_else(|| pairdrop::DEFAULT_SERVER.to_string())
-}
-
 fn random16() -> Option<[u8; 16]> {
     let mut b = [0u8; 16];
     let status = unsafe { BCryptGenRandom(BCRYPT_ALG_HANDLE::default(), &mut b, BCRYPT_USE_SYSTEM_PREFERRED_RNG) };
@@ -110,7 +103,7 @@ fn save_book(b: &Book) {
 
 /// HTTPS POSTs through `Windows.Web.Http`, one client per calling thread
 /// (the worker, each phone's session, the occasional kick).
-struct WinPost;
+struct WinPost(String);
 
 thread_local! {
     // The client is released before COM is uninitialised (tuple fields drop in order).
@@ -119,7 +112,7 @@ thread_local! {
 
 impl Post for WinPost {
     fn post(&self, path: &str, body: &Value, timeout: Duration) -> Result<(u16, Value), String> {
-        let url = format!("{}{path}", server());
+        let url = format!("{}{path}", self.0);
         CLIENT.with(|c| {
             let mut c = c.borrow_mut();
             if c.is_none() {

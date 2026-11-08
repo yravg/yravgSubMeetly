@@ -414,6 +414,10 @@ raw('GET', '/health', { host: '[::1]:17865', mask: HEALTH_MASK });
 
 get('/health', { mask: HEALTH_MASK });
 
+// Island caption read: nothing transcribed yet, so the idle shape (the ML
+// routes that fill it are not goldens; engine tests cover record_live).
+get('/live');
+
 // ------------------------------------------------------------------ helpers
 function slug(name) {
   return name

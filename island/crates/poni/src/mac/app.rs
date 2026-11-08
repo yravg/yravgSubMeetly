@@ -3190,7 +3190,7 @@ impl App {
             }
             OyenzaEvent::Connected { account } => {
                 self.end_sign_in();
-                self.st.notify(Icon::Check, palette::GREEN, "Connected to Oyenza", format!("as {account}"), 6.0, Some(NoticeAction::OpenPage(PageKind::Oyenza)));
+                self.st.notify(Icon::Check, palette::GREEN, "Connected to yravgSubMeetly", format!("as {account}"), 6.0, Some(NoticeAction::OpenPage(PageKind::Oyenza)));
                 self.st.oyenza.link = OyenzaLink::Connected { account };
                 self.ask_pro();
                 // Signed in from the Today page: back to it, where the day comes in.
@@ -3285,7 +3285,7 @@ impl App {
                 // Signed out: an IELTS session ends, and the ladder was the account's.
                 self.ielts_off();
                 let (title, subtitle) =
-                    if by_server { ("Oyenza disconnected", "Sign in again in Settings") } else { ("Disconnected from Oyenza", "Sign in again any time in Settings") };
+                    if by_server { ("yravgSubMeetly disconnected", "Sign in again in Settings") } else { ("Disconnected from yravgSubMeetly", "Sign in again any time in Settings") };
                 self.st.notify(Icon::Unlink, palette::TEXT_DIM, title, subtitle, 6.0, None);
             }
         }

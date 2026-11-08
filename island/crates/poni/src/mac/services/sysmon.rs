@@ -566,7 +566,7 @@ impl Sampler {
         }
         let power = (full && self.battery.is_none()).then(|| self.power_reading()).flatten();
         let (top_cpu, top_memory, top_io) = top;
-        Reading { cpu, gpu, memory, drives: self.drive_list.clone(), disk, network, battery: self.battery.clone(), power, top_cpu, top_memory, top_io }
+        Reading { cpu, gpu, memory, drives: self.drive_list.clone(), disk, network, battery: self.battery.clone(), power, top_cpu, top_memory, top_io, watched_cpu: None }
     }
 
     /// What the SMC says the whole Mac draws, opened with the page's first

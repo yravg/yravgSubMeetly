@@ -8,7 +8,7 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Map, Value};
@@ -35,6 +35,10 @@ const TARGET_LANGS: [&str; 11] = [
 const NO_TRANSLATE: &str = "no translation model (set TRANSLATE=on)";
 const CUDA_WARNING: &str = "CUDA tidak terdeteksi — helper akan jatuh ke CPU saat start";
 
+fn live_idle() -> Value {
+    json!({ "seq": 0, "source": "", "translation": "", "ms": null, "audio_s": null, "rtf": null, "at": null })
+}
+
 pub struct App {
     state_dir: PathBuf,
     notes_path: PathBuf,
@@ -46,6 +50,7 @@ pub struct App {
     ml: Arc<Ml>,
     jobs: Jobs,
     shutdown: AtomicBool,
+    live: Mutex<Value>,
 }
 
 impl App {
@@ -75,6 +80,7 @@ impl App {
             ml: Arc::new(Ml::from_env(&device_pref)),
             jobs: Jobs::default(),
             shutdown: AtomicBool::new(false),
+            live: Mutex::new(live_idle()),
         }
     }
 
@@ -193,6 +199,10 @@ impl App {
         match path {
             "/engine/device" => self.json_response(request, 200, self.device_state()),
             "/health" => self.json_response(request, 200, self.health()),
+            "/live" => {
+                let live = self.live.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                self.json_response(request, 200, live)
+            }
             "/notes" => self.json_response(request, 200, json!({ "notes": self.load_notes() })),
             "/models" => self.json_response(
                 request,
@@ -317,6 +327,7 @@ impl App {
                     return Ok(self.json_response(request, 200, json!({ "text": "" })));
                 }
                 let text = self.ml.text(&pcm, lang(&language).as_deref(), task)?;
+                self.record_live(&text, "", ms(), pcm.len());
                 self.json_response(request, 200, json!({ "text": text, "ms": ms() }))
             }
             "/transcribe_file" => {
@@ -412,6 +423,7 @@ impl App {
             ));
         }
         if !self.ml.translate_available() {
+            self.record_live(&source, &source, ms(), pcm.len());
             return Ok(self.json_response(
                 request,
                 200,
@@ -423,6 +435,7 @@ impl App {
             .ml
             .with_translator(|mt| mt.translate(&source, src, tgt, !accurate))?;
         let translate_ms = mt_start.elapsed().as_millis() as u64;
+        self.record_live(&source, &translation, ms(), pcm.len());
         Ok(self.json_response(
             request,
             200,
@@ -434,6 +447,27 @@ impl App {
                 "translate_ms": translate_ms,
             }),
         ))
+    }
+
+    /// Remember the latest caption for `GET /live` (same fields as server.py).
+    /// `samples` is the 16 kHz audio length, so `rtf` = compute / audio seconds.
+    pub fn record_live(&self, source: &str, translation: &str, ms: u64, samples: usize) {
+        if source.trim().is_empty() {
+            return;
+        }
+        let audio_s = samples as f64 / 16000.0;
+        let round3 = |x: f64| (x * 1000.0).round() / 1000.0;
+        let mut live = self.live.lock().unwrap_or_else(|e| e.into_inner());
+        let seq = live["seq"].as_u64().unwrap_or(0) + 1;
+        *live = json!({
+            "seq": seq,
+            "source": source.trim(),
+            "translation": translation.trim(),
+            "ms": ms,
+            "audio_s": round3(audio_s),
+            "rtf": if audio_s > 0.0 { json!(round3(ms as f64 / 1000.0 / audio_s)) } else { Value::Null },
+            "at": SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0),
+        });
     }
 
     /// Upload body as a temp file owned by the caller. The server already

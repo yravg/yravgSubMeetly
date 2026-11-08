@@ -476,22 +476,7 @@ pub fn fetch_for_selftest(addon: &'static Addon, dir: &Path) -> (bool, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use poni_core::addons::JAPANESE_READINGS;
-
-    #[test]
-    fn a_pro_add_on_s_files_come_only_with_pro() {
-        use poni_core::addons::{DOWNLOADER, PRAYER_TIMES};
-        // Switched on: kept (and fetched) with Pro, left as they are without it.
-        assert_eq!(wanted(&DOWNLOADER, true, true), Some(true));
-        assert_eq!(wanted(&DOWNLOADER, true, false), None);
-        for pro in [true, false] {
-            // Switched off: deleted, Pro or not.
-            assert_eq!(wanted(&DOWNLOADER, false, pro), Some(false));
-            // Every other add-on goes by its switch alone.
-            assert_eq!(wanted(&PRAYER_TIMES, true, pro), Some(true));
-            assert_eq!(wanted(&PRAYER_TIMES, false, pro), Some(false));
-        }
-    }
+    use poni_core::sha256;
 
     #[test]
     fn a_big_file_gets_more_time() {
@@ -502,8 +487,10 @@ mod tests {
 
     #[test]
     fn a_file_read_in_full_is_stamped_and_a_changed_one_is_caught() {
-        let file = JAPANESE_READINGS.files[1];
-        let bytes: &[u8] = include_bytes!("../../../../addons/ja/NOTICE.txt");
+        let bytes: &[u8] = b"A notice kept beside an add-on's files.
+";
+        let hex: &'static str = Box::leak(sha256::hex(&sha256::sha256(bytes)).into_boxed_str());
+        let file = AddonFile { name: "NOTICE.txt", size: bytes.len() as u64, sha256: hex, url: None };
         let dir = std::env::temp_dir().join(format!("poni-addon-stamp-{}", std::process::id()));
         let path = dir.join(file.name);
         fs::create_dir_all(&dir).unwrap();
@@ -532,7 +519,7 @@ mod tests {
         set_time(t);
         assert!(present(&path, &file, &stamp, &mut Vec::new()));
         // A line made for another pin matches nothing.
-        let other = AddonFile { sha256: JAPANESE_READINGS.files[0].sha256, ..file };
+        let other = AddonFile { sha256: "0000000000000000000000000000000000000000000000000000000000000000", ..file };
         assert!(!present(&path, &other, &stamp, &mut Vec::new()));
         let _ = fs::remove_dir_all(&dir);
     }

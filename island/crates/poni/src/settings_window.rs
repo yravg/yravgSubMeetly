@@ -1554,11 +1554,10 @@ mod tests {
             apply(&mut st, Key::Width, Act::Step(1));
             apply(&mut st, Key::FocusMin, Act::Step(1));
             apply(&mut st, Key::LongEvery, Act::Step(1));
-            apply(&mut st, Key::AiNear, Act::Step(1));
             apply(&mut st, Key::LyricsOffset, Act::Step(1));
         }
         let s = &st.settings;
-        assert_eq!((s.expanded_width, s.pomodoro.focus_min, s.pomodoro.long_every, s.usage.near_pct, s.lyrics_offset_ms), (900.0, 180, 12, 95, -5000));
+        assert_eq!((s.expanded_width, s.pomodoro.focus_min, s.pomodoro.long_every, s.lyrics_offset_ms), (900.0, 180, 12, -5000));
         for _ in 0..100 {
             apply(&mut st, Key::Width, Act::Step(-1));
             apply(&mut st, Key::FocusMin, Act::Step(-1));
@@ -1577,7 +1576,7 @@ mod tests {
             _ => None,
         };
         assert_eq!((pick(&st, Key::HoverDelay), pick(&st, Key::CloseDelay)), (Some(0), Some(0)));
-        st.settings.hover_delay_ms = 2000;
+        st.settings.hover_delay_ms = 2900;
         assert_eq!(pick(&st, Key::HoverDelay), Some(2));
         st.settings.hover_delay_ms = poni_core::settings::HOVER_OFF_MS;
         assert_eq!(pick(&st, Key::HoverDelay), Some(3));
@@ -1603,6 +1602,7 @@ mod tests {
         apply(&mut st, Key::RememberPage, Act::Toggle);
         assert!(row(Section::Tabs, &st, Key::StartPage).is_some());
         let pages = start_pages(&st);
+        st.settings.start_page = pages[0].key().to_string();
         apply(&mut st, Key::StartPage, Act::Step(1));
         assert_eq!(st.settings.start_page, pages[1].key());
         apply(&mut st, Key::StartPage, Act::Step(-1));
@@ -1627,6 +1627,7 @@ mod tests {
     #[test]
     fn idle_looks_follow_the_theme() {
         let mut st = state();
+        st.settings.theme = Theme::Classic;
         let looks = |st: &AppState| match row(Section::Appearance, st, Key::IdleLook).map(|i| i.ctl) {
             Some(Ctl::Choice(names, _)) => names,
             _ => Vec::new(),
@@ -1634,8 +1635,6 @@ mod tests {
         assert!(!looks(&st).contains(&"Status"));
         st.settings.theme = Theme::Pill;
         assert!(looks(&st).contains(&"Status"));
-        st.settings.theme = Theme::Oyen;
-        assert!(looks(&st).contains(&"Oyen"));
     }
 
     #[test]

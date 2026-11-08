@@ -887,7 +887,7 @@ fn draw_phone(ui: &mut Ui, st: &AppState, l: &mut Local, pd: &PhoneDrop, r: Rect
 
 /// Where pairing links point (the meeting server's host name).
 fn pairing_host() -> String {
-    let server = std::env::var("PONI_DROP_SERVER").ok().filter(|s| s.starts_with("http")).unwrap_or_else(|| poni_core::pairdrop::DEFAULT_SERVER.to_string());
+    let server = poni_core::pairdrop::configured_server().unwrap_or_default();
     server.split("://").nth(1).unwrap_or(&server).trim_end_matches('/').to_string()
 }
 
@@ -901,7 +901,8 @@ fn draw_paired_list(ui: &mut Ui, st: &AppState, x: f32, w: f32, r: Rect, pills_y
     let dim = TextStyle::footnote().color(palette::TEXT_DIM);
     if st.paired.is_empty() {
         ui.c.text("No phone is paired", Rect::new(x, r.y + 18.0, w, 20.0), &TextStyle::headline());
-        ui.c.text(&format!("Pair a phone, and it can send to {THIS_COMPUTER} from any network."), Rect::new(x, r.y + 44.0, w, 18.0), &dim);
+        let line = if poni_core::pairdrop::configured_server().is_some() { format!("Pair a phone, and it can send to {THIS_COMPUTER} from any network.") } else { "Pairing is off: no meeting server is set (PONI_DROP_SERVER).".to_string() };
+        ui.c.text(&line, Rect::new(x, r.y + 44.0, w, 18.0), &dim);
         return;
     }
     let unix = st.unix;

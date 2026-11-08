@@ -1,0 +1,23 @@
+{
+  "name": "GET /live",
+  "capturedFrom": "native/server.py (faster_whisper/ctranslate2 stubbed; no model is exercised)",
+  "request": {
+    "method": "GET",
+    "path": "/live",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "seq": 0,
+      "source": "",
+      "translation": "",
+      "ms": null,
+      "audio_s": null,
+      "rtf": null,
+      "at": null
+    }
+  },
+  "mask": []
+}

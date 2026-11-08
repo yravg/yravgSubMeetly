@@ -35,8 +35,20 @@ pub use peer::PeerEvent;
 
 use std::sync::OnceLock;
 
-/// The meeting server yravgSubMeetly uses unless `PONI_DROP_SERVER` says otherwise.
-pub const DEFAULT_SERVER: &str = "https://drop.oyenza.com";
+/// What the UI says while no meeting server is set.
+pub const NO_SERVER: &str = "Phone pairing is off: no meeting server is set. Run your own and set PONI_DROP_SERVER to its address.";
+
+/// The meeting server from a `PONI_DROP_SERVER` value. There is no built-in one: another
+/// vendor's server is never used. Only https, or http on this PC, is accepted.
+pub fn server_from(var: Option<&str>) -> Option<String> {
+    let s = var?.trim().trim_end_matches('/');
+    (s.starts_with("https://") || s.starts_with("http://127.0.0.1") || s.starts_with("http://localhost")).then(|| s.to_string())
+}
+
+/// The owner's meeting server (`PONI_DROP_SERVER`), if one is set.
+pub fn configured_server() -> Option<String> {
+    server_from(std::env::var("PONI_DROP_SERVER").ok().as_deref())
+}
 
 /// Public STUN servers for the PC's own internet address.
 pub const STUN_SERVERS: &[&str] = &["stun.cloudflare.com:3478", "stun.l.google.com:19302"];
