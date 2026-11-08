@@ -145,3 +145,25 @@ then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
   failures, store PNG wordmark, side panel dark + swatch contrast; specs/w-polish.md), island3
   ctx_ad370109b179 (Live caption stream, Pause/Stop honesty, Engine CPU/RTF, mac Oyenza strings, pairdrop
   default server, cargo test -p poni, Update sheet shot; specs/w-island3.md). Lead re-runs the Qwen test.
+
+## Moved to the VPS (2026-11-09, lead)
+
+Claude cannot run as root with `--dangerously-skip-permissions`, so the VPS work runs as Linux user `dev`
+(ssh alias `hostinger-vps-dev`, key auth only, no sudo). `/home/user/dev` is owned by `dev`.
+
+- VPS main checkout `/home/user/dev/yravgSubMeetly/yravgSubMeetly` fast-forwarded to local main 5b2092b
+  (pushed over SSH, nothing pushed to GitHub).
+- Worktrees `/home/user/dev/yravgSubMeetly/wt/sm-s5` (e08e787), `sm-addins2` (d472e38), `sm-desktop` (c66adbd),
+  each with `.checkpoints/<name>.md` (copied from the laptop) and `.ref/` (specs, old dispatch, `VPS-BRIEF.md`).
+  `.checkpoints/` and `.ref/` are in `.git/info/exclude`.
+- Installed: Rust 1.99.1 (dev, rustup), npm ci in all three worktrees, ffmpeg, cmake, clang, xvfb,
+  Chrome for Testing 152 at `/home/dev/cft/chrome-linux64/chrome`.
+- `tmux` session `sm-launcher` runs `~/start-submeetly-workers.sh`: it waits for Claude login, then starts
+  three Sonnet workers in tmux sessions `sm-s5`, `sm-addins2`, `sm-desktop`. Each finishes with `.ref/REPORT.md`.
+- Blocked, owner must act: (1) Claude on the VPS is logged out for root and dev
+  ("OAuth session expired and could not be refreshed"); log in as dev. (2) Chrome cannot start: Ubuntu 24.04
+  blocks unprivileged user namespaces, so Puppeteer tests fail with "No usable sandbox". Options: an AppArmor
+  profile for that Chrome path, or `--no-sandbox` for the test browser. The lead's attempts at both were refused
+  by the permission classifier. (3) First start of each worker may wait on the trust or bypass-permissions prompt.
+- Next: after login, attach each tmux session, accept prompts; when all three REPORT.md files exist, the lead
+  verifies each branch and merges.
