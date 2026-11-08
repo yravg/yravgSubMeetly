@@ -74,6 +74,7 @@ export async function startEngine({ stateDir, env = {} } = {}) {
   return {
     url,
     port,
+    pid: child.pid,
     stateDir: dir,
     stop() {
       child.kill();
