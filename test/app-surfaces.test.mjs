@@ -503,9 +503,11 @@ test('hasil dan ekspor TXT/SRT/VTT: baris hasil tampil, ekspor lewat normalizer 
   // TXT: stempel waktu + teks; sumber ikut bila ada.
   assert.match(txt, /\[00:00:00\.000\]/);
   assert.match(txt, /Hello everyone/);
-  // Bawaan non-Windows: LF tanpa BOM.
-  assert.equal(vtt.charCodeAt(0) === 0xfeff, false, 'tidak boleh ada BOM di bawaan macOS/Linux');
-  assert.doesNotMatch(srt, /\r\n/, 'tidak boleh CRLF di bawaan macOS/Linux');
+  // Bawaan per OS (defaultExportOptions): Windows CRLF + BOM, macOS/Linux LF tanpa BOM.
+  const win = process.platform === 'win32';
+  // BOM hanya dicek di non-Windows: Blob.text() membuang BOM, jadi di Windows BOM-nya dibuktikan export-browser.test.mjs (bytes).
+  if (!win) assert.equal(vtt.charCodeAt(0) === 0xfeff, false, 'tidak boleh ada BOM di bawaan macOS/Linux');
+  assert.equal(/\r\n/.test(srt), win, `CRLF harus ${win ? 'ada' : 'tidak ada'} di bawaan ${process.platform}`);
 });
 
 test('Captions punya child tab Live/Performance; Performance memuat bench dan menggambar 3 chart', async () => {
