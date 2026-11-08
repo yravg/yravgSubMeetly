@@ -2,9 +2,10 @@
 //! dim, the current line large, its translation under it in the person's
 //! colour (Settings), and Pause / Stop beside the title.
 //!
-//! The helper has no caption stream, so this follows the tail of the newest
-//! note's `transcript[]` (`poni_core::helper`). Pause holds the page on the
-//! line it shows; Stop leaves the note alone and stops following until Start.
+//! The line comes from the engine's `GET /live` (the last line it heard, while
+//! it is fresh), else from the tail of the newest note's `transcript[]`
+//! (`poni_core::helper`). Pause holds the page on the line it shows; Stop
+//! leaves the note alone and stops following until Start.
 //! The five states are `PageState`: normal, empty (nothing to follow, or
 //! stopped), error (helper offline), locked (an issued meeting) and needs
 //! input (items wait on a person; a pill opens the Meeting page).
@@ -53,11 +54,12 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
 
 fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     let locked = state == PageState::Locked;
+    // No note yet (a meeting is saved when it ends): the engine's line stands alone.
     let (title, waiting, total) = match st.helper.note() {
         Some(n) => (n.title.clone(), n.waiting(), n.transcript.len()),
-        None => return,
+        None => ("Live from the engine".to_string(), 0, 0),
     };
-    let paused = st.helper.frozen.is_some();
+    let paused = st.helper.paused();
     let head = Rect::new(area.x, area.y, area.w, HEAD_H);
     let cy = head.center().y;
 
@@ -113,8 +115,10 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     if !cap.translation.is_empty() {
         ui.c.text(&cap.translation, Rect::new(area.x, y, area.w, 40.0), &TextStyle::body().color(color).wrap().top());
     }
-    let n = st.helper.frozen.map_or(total, |i| i + 1);
-    let count = format!("{n} / {total}");
-    let w = ui.c.measure(&count, &TextStyle::caption(), 200.0).0.ceil();
-    ui.c.text(&count, Rect::new(area.right() - w, area.bottom() - 14.0, w, 14.0), &TextStyle::caption().color(palette::TEXT_FAINT).right());
+    if total > 0 {
+        let n = st.helper.frozen.map_or(total, |i| i + 1);
+        let count = format!("{n} / {total}");
+        let w = ui.c.measure(&count, &TextStyle::caption(), 200.0).0.ceil();
+        ui.c.text(&count, Rect::new(area.right() - w, area.bottom() - 14.0, w, 14.0), &TextStyle::caption().color(palette::TEXT_FAINT).right());
+    }
 }

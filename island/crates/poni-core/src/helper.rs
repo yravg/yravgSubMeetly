@@ -176,6 +176,50 @@ pub fn parse_health(body: &str) -> Option<Health> {
     })
 }
 
+/// The engine's last caption (`GET /live`): the line, and how long the
+/// engine took for it against the audio it heard. `seq` 0 = nothing yet.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Live {
+    pub seq: u64,
+    pub source: String,
+    pub translation: String,
+    pub ms: Option<u64>,
+    pub audio_s: Option<f64>,
+    /// Compute seconds per audio second; under 1 keeps up with real time.
+    pub rtf: Option<f64>,
+    /// When the engine heard it (epoch ms, the engine's clock).
+    pub at: Option<u64>,
+}
+
+/// How long a line counts as "now" for the collapsed pill.
+pub const LIVE_FRESH_MS: u64 = 8_000;
+
+impl Live {
+    /// A real line heard at most [`LIVE_FRESH_MS`] before `now_ms`.
+    pub fn fresh(&self, now_ms: u64) -> bool {
+        self.seq > 0 && !self.source.is_empty() && self.at.is_some_and(|a| now_ms.saturating_sub(a) <= LIVE_FRESH_MS)
+    }
+}
+
+pub fn parse_live(body: &str) -> Option<Live> {
+    let v: Value = serde_json::from_str(body).ok()?;
+    let seq = v.get("seq").and_then(Value::as_u64)?;
+    Some(Live {
+        seq,
+        source: text(&v, "source").unwrap_or_default(),
+        translation: text(&v, "translation").unwrap_or_default(),
+        ms: v.get("ms").and_then(Value::as_u64),
+        audio_s: v.get("audio_s").and_then(Value::as_f64),
+        rtf: v.get("rtf").and_then(Value::as_f64),
+        at: v.get("at").and_then(Value::as_u64),
+    })
+}
+
+/// Epoch milliseconds now, to age a [`Live`] line against.
+pub fn now_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64)
+}
+
 fn parse_item(v: &Value, n: usize) -> Option<Item> {
     let body = text(v, "text")?;
     Some(Item {
@@ -241,6 +285,8 @@ pub fn parse_notes(body: &str) -> Option<Vec<Note>> {
 pub struct Snapshot {
     pub health: Health,
     pub notes: Vec<Note>,
+    /// None from a helper without `GET /live` (older than this island).
+    pub live: Option<Live>,
 }
 
 /// Whether the helper answered the last time we asked.
@@ -464,7 +510,9 @@ pub fn fetch(port: u16) -> Result<Snapshot, String> {
     let health = if code == 200 { parse_health(&body) } else { None }.ok_or_else(|| format!("Port {port} answered, but not as the helper."))?;
     let (code, body) = request(port, "GET", "/notes", None)?;
     let notes = if code == 200 { parse_notes(&body) } else { None }.ok_or("The helper's notes could not be read.")?;
-    Ok(Snapshot { health, notes })
+    // An older helper has no /live (404): the island falls back to the note's transcript.
+    let live = request(port, "GET", "/live", None).ok().filter(|(code, _)| *code == 200).and_then(|(_, body)| parse_live(&body));
+    Ok(Snapshot { health, notes, live })
 }
 
 /// `POST /notes` with a body from [`decide`].
@@ -572,11 +620,15 @@ pub struct View {
     /// Milliseconds of the last answers, oldest first.
     pub rtt: Vec<u32>,
     pub timer: Stopwatch,
+    /// The engine line before its newest one.
+    pub prev_line: String,
+    /// Live is paused on the engine's line: what the page shows meanwhile.
+    pub held: Option<Captions>,
 }
 
 impl Default for View {
     fn default() -> Self {
-        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default() }
+        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), held: None }
     }
 }
 
@@ -586,6 +638,11 @@ impl View {
     pub fn apply(&mut self, r: Result<(Snapshot, u32), String>) {
         match r {
             Ok((snap, ms)) => {
+                match (&self.snap.live, &snap.live) {
+                    (Some(old), Some(new)) if new.seq > old.seq && old.seq > 0 => self.prev_line = old.source.clone(),
+                    (_, Some(new)) if new.seq == 0 => self.prev_line.clear(),
+                    _ => {}
+                }
                 self.link = Link::Online;
                 self.snap = snap;
                 self.rtt.push(ms);
@@ -603,6 +660,17 @@ impl View {
 
     /// Pause on the current line, or let go.
     pub fn toggle_pause(&mut self) {
+        self.toggle_pause_at(now_ms());
+    }
+
+    pub fn toggle_pause_at(&mut self, now_ms: u64) {
+        if self.held.take().is_some() {
+            return;
+        }
+        if self.followed_line(now_ms).is_some() {
+            self.held = Some(self.captions_at(now_ms));
+            return;
+        }
         self.frozen = match (self.frozen, self.note()) {
             (None, Some(n)) if !n.transcript.is_empty() => Some(n.transcript.len() - 1),
             _ => None,
@@ -613,14 +681,66 @@ impl View {
     pub fn set_following(&mut self, on: bool) {
         self.following = on;
         self.frozen = None;
+        self.held = None;
     }
 
     pub fn live_state(&self) -> PageState {
-        live_state(&self.link, &self.snap.notes, self.following)
+        self.live_state_at(now_ms())
     }
 
     pub fn captions(&self) -> Captions {
-        self.note().map(|n| captions(n, self.frozen)).unwrap_or_default()
+        self.captions_at(now_ms())
+    }
+
+    /// The engine's fresh line, only while the page follows (not paused, not stopped).
+    fn followed_line(&self, now_ms: u64) -> Option<&Live> {
+        if self.following && self.frozen.is_none() && self.held.is_none() {
+            self.live_line(now_ms)
+        } else {
+            None
+        }
+    }
+
+    /// [`live_state`], plus: with no note to follow, a fresh engine line is enough.
+    pub fn live_state_at(&self, now_ms: u64) -> PageState {
+        match live_state(&self.link, &self.snap.notes, self.following) {
+            PageState::Empty if self.held.is_some() || self.followed_line(now_ms).is_some() => PageState::Normal,
+            s => s,
+        }
+    }
+
+    /// The engine's fresh line (over the one before it) while the page follows;
+    /// else the held pair, else the note's lines (a note is saved when a meeting ends).
+    pub fn captions_at(&self, now_ms: u64) -> Captions {
+        if let Some(h) = &self.held {
+            return h.clone();
+        }
+        match self.followed_line(now_ms) {
+            Some(l) => Captions { previous: self.prev_line.clone(), current: l.source.clone(), translation: l.translation.clone() },
+            None => self.note().map(|n| captions(n, self.frozen)).unwrap_or_default(),
+        }
+    }
+
+    /// Live is paused, on a note line or on the engine's line.
+    pub fn paused(&self) -> bool {
+        self.frozen.is_some() || self.held.is_some()
+    }
+
+    /// What the collapsed pill shows: the engine's fresh line, unless Stop was pressed on the Live page.
+    pub fn pill_line(&self, now_ms: u64) -> Option<&Live> {
+        if self.following {
+            self.live_line(now_ms)
+        } else {
+            None
+        }
+    }
+
+    /// The engine's newest line while it is still fresh (the collapsed pill).
+    pub fn live_line(&self, now_ms: u64) -> Option<&Live> {
+        if !matches!(self.link, Link::Online) {
+            return None;
+        }
+        self.snap.live.as_ref().filter(|l| l.fresh(now_ms))
     }
 }
 
@@ -649,6 +769,44 @@ mod tests {
 
     fn notes() -> Vec<Note> {
         parse_notes(NOTES).unwrap()
+    }
+
+    #[test]
+    fn live_line_parses_idle_and_ages_out() {
+        let idle = parse_live(r#"{"seq":0,"source":"","translation":"","ms":null,"audio_s":null,"rtf":null,"at":null}"#).unwrap();
+        assert_eq!(idle, Live::default());
+        assert!(!idle.fresh(1_000));
+        let l = parse_live(r#"{"seq":3,"source":" Halo dunia ","translation":"Hello world","ms":420,"audio_s":2.0,"rtf":0.21,"at":100000}"#).unwrap();
+        assert_eq!((l.seq, l.source.as_str(), l.rtf, l.ms), (3, "Halo dunia", Some(0.21), Some(420)));
+        assert!(l.fresh(100_000 + LIVE_FRESH_MS) && !l.fresh(100_000 + LIVE_FRESH_MS + 1));
+        assert!(parse_live("{}").is_none() && parse_live("nope").is_none());
+        let mut v = View::default();
+        v.apply(Ok((Snapshot { live: Some(l), ..Default::default() }, 5)));
+        assert!(v.live_line(100_500).is_some() && v.live_line(200_000).is_none());
+        v.apply(Err("down".into()));
+        assert!(v.live_line(100_500).is_none(), "an offline helper shows no line");
+
+        // On the Live page: no note, a fresh line = something to follow; stopped = nothing.
+        let mut v = View::default();
+        v.apply(Ok((Snapshot { live: Some(Live { seq: 1, source: "Halo".into(), translation: "Hi".into(), at: Some(1000), ..Default::default() }), ..Default::default() }, 5)));
+        assert_eq!(v.live_state_at(2000), PageState::Normal);
+        assert_eq!((v.captions_at(2000).current.as_str(), v.captions_at(2000).translation.as_str()), ("Halo", "Hi"));
+        assert_eq!(v.live_state_at(20_000), PageState::Empty, "an old line is not now");
+        v.set_following(false);
+        assert_eq!(v.live_state_at(2000), PageState::Empty);
+        // Lines arrive one by one: the one before becomes the previous line, and Pause holds the pair.
+        let mut v = View::default();
+        let at = |seq: u64, s: &str| Snapshot { live: Some(Live { seq, source: s.into(), at: Some(1000), ..Default::default() }), ..Default::default() };
+        v.apply(Ok((at(1, "Satu."), 5)));
+        v.apply(Ok((at(2, "Dua."), 5)));
+        assert_eq!((v.captions_at(2000).previous.as_str(), v.captions_at(2000).current.as_str()), ("Satu.", "Dua."));
+        v.toggle_pause_at(2000);
+        assert!(v.paused());
+        v.apply(Ok((at(3, "Tiga."), 5)));
+        assert_eq!(v.captions_at(2000).current, "Dua.", "paused holds the engine line");
+        assert_eq!(v.live_state_at(60_000), PageState::Normal, "a held page stays a page");
+        v.toggle_pause_at(2000);
+        assert_eq!((v.captions_at(2000).previous.as_str(), v.captions_at(2000).current.as_str()), ("Dua.", "Tiga."));
     }
 
     #[test]

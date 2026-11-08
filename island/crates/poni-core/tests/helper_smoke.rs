@@ -60,6 +60,7 @@ fn island_reads_and_writes_the_real_helper() {
             }
         }
     };
+    assert_eq!(snap.live, Some(helper::Live::default()), "GET /live answers idle on the real helper");
     assert_eq!(snap.notes.len(), 1);
     let n = &snap.notes[0];
     assert_eq!((n.title.as_str(), n.items.len(), n.transcript.len()), ("Weekly sync", 2, 1));
