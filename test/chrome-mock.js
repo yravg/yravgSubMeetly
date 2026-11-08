@@ -106,6 +106,7 @@
   function emitContent(type, data) {
     const msg = { target: 'content', type, data };
     labMock.content.log.push(msg);
+    window.dispatchEvent(new CustomEvent('labmock:log'));
     window.__mockEmit(msg);
   }
 
@@ -147,6 +148,7 @@
       labMock.helper.failNext = 0;
       labMock.helper.log.length = 0;
       labMock.content.log.length = 0;
+      window.dispatchEvent(new CustomEvent('labmock:log'));
     },
   };
   window.__labMock = labMock;
@@ -154,20 +156,43 @@
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input?.url || String(input);
-    if (!HELPER_ORIGIN_RE.test(url) || labMock.helper.mode === 'passthrough') return realFetch(input, init);
+    if (!HELPER_ORIGIN_RE.test(url)) return realFetch(input, init);
     const method = (init.method || 'GET').toUpperCase();
     const path = new URL(url).pathname;
-    labMock.helper.log.push({ method, path });
+    // Tiap entri log: waktu, metode, path, hasil ("200" atau pesan galat), tunda (ms).
+    // `result`/`delayMs` diisi setelah permintaan selesai; kendali Mock helper di app.html membacanya.
+    const entry = { time: new Date().toISOString(), method, path, result: '…', delayMs: 0 };
+    const t0 = performance.now();
+    labMock.helper.log.push(entry);
+    const done = (result) => {
+      entry.result = String(result);
+      entry.delayMs = Math.round(performance.now() - t0);
+      window.dispatchEvent(new CustomEvent('labmock:log'));
+    };
+    if (labMock.helper.mode === 'passthrough') {
+      try {
+        const res = await realFetch(input, init);
+        done(res.status);
+        return res;
+      } catch (err) {
+        done(err?.message || 'Failed to fetch');
+        throw err;
+      }
+    }
     if (labMock.helper.latencyMs) await new Promise((r) => setTimeout(r, labMock.helper.latencyMs));
     if (labMock.helper.failNext > 0) {
       labMock.helper.failNext -= 1;
+      done('Failed to fetch');
       throw new TypeError('Failed to fetch');
     }
-    if (labMock.helper.mode === 'offline') throw new TypeError('Failed to fetch');
+    if (labMock.helper.mode === 'offline') {
+      done('Failed to fetch');
+      throw new TypeError('Failed to fetch');
+    }
     const json = (status, body) =>
       new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
-    if (path === '/health') return json(200, labMock.helper.health);
-    if (path === '/engine/device' && method === 'GET') return json(200, labMock.helper.device);
+    if (path === '/health') { done(200); return json(200, labMock.helper.health); }
+    if (path === '/engine/device' && method === 'GET') { done(200); return json(200, labMock.helper.device); }
     if (path === '/engine/device' && method === 'POST') {
       let want = 'auto';
       try {
@@ -176,6 +201,7 @@
         /* biarkan 'auto' */
       }
       labMock.helper.device = { ...labMock.helper.device, device: want, applied: want === 'auto' || want === labMock.helper.device.active };
+      done(200);
       return json(200, {
         ok: true,
         supported: labMock.helper.device.supported,
@@ -183,6 +209,7 @@
         restart_required: want !== labMock.helper.device.active,
       });
     }
+    done(404);
     return json(404, { error: 'not found' });
   };
 

@@ -56,6 +56,9 @@ test('production export card uses selected realtime data and persists cross-OS o
 
   await page.goto(`${ORIGIN}/app.html`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#helper-export [data-export-kind="srt"]');
+  // Board D02: kartu ekspor tinggal di tab History, jadi buka tab itu dulu.
+  await page.evaluate(() => document.querySelector('.bottom-nav-item[data-view="history"]').click());
+  await page.waitForFunction(() => !document.getElementById('view-history').classList.contains('hidden'));
 
   assert.equal(await page.$eval('#helper-export [data-export-kind="srt"]', (el) => el.disabled), true);
   assert.equal(await page.$$eval('#settings-modal #helper-export, #export-format-list', (els) => els.length), 0);
