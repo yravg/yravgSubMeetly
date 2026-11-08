@@ -150,7 +150,7 @@ impl PageKind {
         match self {
             PageKind::Live => Icon::Lyrics,
             PageKind::Meeting => Icon::Clipboard,
-            PageKind::Inbox => Icon::Tray,
+            PageKind::Inbox => Icon::CheckCircle,
             PageKind::Timer => Icon::Clock,
             PageKind::Talk => Icon::Volume,
             PageKind::Engine => Icon::Cpu,
