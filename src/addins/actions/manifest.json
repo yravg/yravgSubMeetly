@@ -1,0 +1,17 @@
+{
+  "manifest": 0,
+  "id": "actions",
+  "name": "Actions panel",
+  "version": "1",
+  "description": "Lists the open actions of the series, oldest first.",
+  "appliesTo": "always",
+  "panels": [
+    {
+      "id": "actions",
+      "title": "Actions",
+      "source": "seriesSummary",
+      "when": "openActions > 0",
+      "badge": "openActions"
+    }
+  ]
+}

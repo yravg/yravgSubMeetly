@@ -1,0 +1,16 @@
+{
+  "manifest": 0,
+  "id": "flag-decision",
+  "name": "Flag decision",
+  "version": "1",
+  "description": "One tap writes a decision into the open meeting, to review later.",
+  "appliesTo": { "projectType": ["hse", "weekly-progress"] },
+  "actions": [
+    {
+      "id": "flag",
+      "label": "Flag decision",
+      "badge": "decisions",
+      "do": { "call": "addItem", "type": "decision", "text": "Decision flagged for review" }
+    }
+  ]
+}
