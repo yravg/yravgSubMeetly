@@ -477,6 +477,158 @@ pub fn post_note(port: u16, body: &str) -> Result<(), String> {
     }
 }
 
+/// Items nobody owns yet (the Talk page asks who).
+pub fn unowned(note: &Note) -> usize {
+    note.items.iter().filter(|i| i.owner.is_none() && i.kind != Kind::Info).count()
+}
+
+pub fn timer_state(link: &Link, notes: &[Note]) -> PageState {
+    if matches!(link, Link::Offline(_)) {
+        return PageState::Error;
+    }
+    match current(notes) {
+        None => PageState::Empty,
+        Some(n) if n.issued => PageState::Locked,
+        Some(n) if n.agenda_total == 0 => PageState::Needs,
+        Some(_) => PageState::Normal,
+    }
+}
+
+pub fn talk_state(link: &Link, notes: &[Note]) -> PageState {
+    if matches!(link, Link::Offline(_)) {
+        return PageState::Error;
+    }
+    match current(notes) {
+        Some(n) if !talk_share(n).is_empty() => {
+            if n.issued {
+                PageState::Locked
+            } else if unowned(n) > 0 {
+                PageState::Needs
+            } else {
+                PageState::Normal
+            }
+        }
+        _ => PageState::Empty,
+    }
+}
+
+/// No Locked here: the engine has nothing to read-protect.
+pub fn engine_state(link: &Link, health: &Health) -> PageState {
+    match link {
+        Link::Offline(_) => PageState::Error,
+        Link::Connecting => PageState::Empty,
+        Link::Online if !health.translate => PageState::Needs,
+        Link::Online => PageState::Normal,
+    }
+}
+
+/// "m:ss" or "h:mm:ss".
+pub fn clock(secs: f64) -> String {
+    let t = secs.max(0.0) as u64;
+    if t >= 3600 {
+        format!("{}:{:02}:{:02}", t / 3600, t / 60 % 60, t % 60)
+    } else {
+        format!("{}:{:02}", t / 60, t % 60)
+    }
+}
+
+/// A stopwatch on the island's own clock (mono seconds), for the Agenda timer.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct Stopwatch {
+    since: Option<f64>,
+    before: f64,
+}
+
+impl Stopwatch {
+    pub fn running(&self) -> bool {
+        self.since.is_some()
+    }
+    pub fn elapsed(&self, now: f64) -> f64 {
+        self.before + self.since.map_or(0.0, |s| (now - s).max(0.0))
+    }
+    pub fn toggle(&mut self, now: f64) {
+        match self.since.take() {
+            Some(s) => self.before += (now - s).max(0.0),
+            None => self.since = Some(now),
+        }
+    }
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
+/// Round trips kept for the Engine monitor's bars.
+pub const RTT_KEPT: usize = 24;
+
+/// Everything the island pages read of the helper, owned by the UI thread.
+#[derive(Clone, Debug, PartialEq)]
+pub struct View {
+    pub link: Link,
+    pub snap: Snapshot,
+    /// Live follows the newest line until Stop; Start follows again.
+    pub following: bool,
+    /// Live is paused on this line of the newest note.
+    pub frozen: Option<usize>,
+    /// Milliseconds of the last answers, oldest first.
+    pub rtt: Vec<u32>,
+    pub timer: Stopwatch,
+}
+
+impl Default for View {
+    fn default() -> Self {
+        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default() }
+    }
+}
+
+impl View {
+    /// Take the service's answer: a snapshot and how long it took, or why not.
+    /// An offline helper keeps the last notes on screen (stale, not blank).
+    pub fn apply(&mut self, r: Result<(Snapshot, u32), String>) {
+        match r {
+            Ok((snap, ms)) => {
+                self.link = Link::Online;
+                self.snap = snap;
+                self.rtt.push(ms);
+                if self.rtt.len() > RTT_KEPT {
+                    self.rtt.remove(0);
+                }
+            }
+            Err(e) => self.link = Link::Offline(e),
+        }
+    }
+
+    pub fn note(&self) -> Option<&Note> {
+        current(&self.snap.notes)
+    }
+
+    /// Pause on the current line, or let go.
+    pub fn toggle_pause(&mut self) {
+        self.frozen = match (self.frozen, self.note()) {
+            (None, Some(n)) if !n.transcript.is_empty() => Some(n.transcript.len() - 1),
+            _ => None,
+        };
+    }
+
+    /// Stop following; Start follows again from the newest line.
+    pub fn set_following(&mut self, on: bool) {
+        self.following = on;
+        self.frozen = None;
+    }
+
+    pub fn live_state(&self) -> PageState {
+        live_state(&self.link, &self.snap.notes, self.following)
+    }
+
+    pub fn captions(&self) -> Captions {
+        self.note().map(|n| captions(n, self.frozen)).unwrap_or_default()
+    }
+}
+
+/// `YSM_HELPER_PORT`, else the helper's default.
+pub fn configured_port() -> u16 {
+    port_from_env(std::env::var("YSM_HELPER_PORT").ok().as_deref())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -642,5 +794,80 @@ mod tests {
     fn a_closed_port_is_an_error_not_a_hang() {
         // Port 1 is never open on a dev machine; the connect is refused at once.
         assert!(fetch(1).is_err());
+    }
+
+    #[test]
+    fn stopwatch_and_view() {
+        let mut w = Stopwatch::default();
+        assert_eq!(w.elapsed(10.0), 0.0);
+        w.toggle(10.0);
+        assert!(w.running());
+        assert_eq!(w.elapsed(15.0), 5.0);
+        w.toggle(15.0);
+        assert_eq!(w.elapsed(99.0), 5.0, "paused keeps its time");
+        w.toggle(20.0);
+        assert_eq!(w.elapsed(22.0), 7.0);
+        w.reset();
+        assert!(!w.running() && w.elapsed(30.0) == 0.0);
+
+        let mut v = View::default();
+        assert_eq!(v.live_state(), PageState::Empty);
+        v.apply(Ok((Snapshot { notes: notes(), ..Default::default() }, 12)));
+        assert_eq!(v.link, Link::Online);
+        assert_eq!(v.live_state(), PageState::Needs);
+        assert_eq!(v.captions().current, "Dua.");
+        v.toggle_pause();
+        assert_eq!(v.frozen, Some(1));
+        v.frozen = Some(0);
+        assert_eq!(v.captions().current, "Satu.");
+        v.toggle_pause();
+        assert_eq!(v.frozen, None);
+        v.set_following(false);
+        assert_eq!(v.live_state(), PageState::Empty);
+        v.apply(Err("down".into()));
+        assert_eq!(v.live_state(), PageState::Error);
+        assert!(!v.snap.notes.is_empty(), "the last notes stay");
+        for i in 0..40 {
+            v.apply(Ok((Snapshot::default(), i)));
+        }
+        assert_eq!(v.rtt.len(), RTT_KEPT);
+        assert_eq!(*v.rtt.last().unwrap(), 39);
+    }
+
+    #[test]
+    fn timer_talk_engine_states() {
+        let n = notes();
+        let off = Link::Offline("x".into());
+        assert_eq!(timer_state(&Link::Online, &n), PageState::Normal);
+        assert_eq!(timer_state(&Link::Online, &n[1..]), PageState::Locked);
+        assert_eq!(timer_state(&Link::Online, &[]), PageState::Empty);
+        assert_eq!(timer_state(&off, &n), PageState::Error);
+        let mut none = n[0].clone();
+        none.agenda_total = 0;
+        assert_eq!(timer_state(&Link::Online, &[none]), PageState::Needs, "no agenda to count");
+
+        assert_eq!(unowned(&n[0]), 3, "decision, question, risk have no owner; the info row is not counted");
+        assert_eq!(talk_state(&Link::Online, &n), PageState::Needs);
+        assert_eq!(talk_state(&Link::Online, &n[1..]), PageState::Empty, "nobody owns anything");
+        assert_eq!(talk_state(&off, &n), PageState::Error);
+        let mut owned = n[0].clone();
+        for i in &mut owned.items {
+            i.owner = Some("Mei Lin".into());
+        }
+        assert_eq!(talk_state(&Link::Online, &[owned.clone()]), PageState::Normal);
+        owned.issued = true;
+        assert_eq!(talk_state(&Link::Online, &[owned]), PageState::Locked);
+
+        let mut h = Health { translate: true, ..Default::default() };
+        assert_eq!(engine_state(&Link::Online, &h), PageState::Normal);
+        h.translate = false;
+        assert_eq!(engine_state(&Link::Online, &h), PageState::Needs);
+        assert_eq!(engine_state(&Link::Connecting, &h), PageState::Empty);
+        assert_eq!(engine_state(&off, &h), PageState::Error);
+    }
+
+    #[test]
+    fn clock_formats() {
+        assert_eq!((clock(0.0).as_str(), clock(65.4).as_str(), clock(3725.0).as_str(), clock(-3.0).as_str()), ("0:00", "1:05", "1:02:05", "0:00"));
     }
 }
