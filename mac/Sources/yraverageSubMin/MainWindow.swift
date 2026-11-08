@@ -44,7 +44,7 @@ final class MainWindowController: NSObject {
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false)
-        w.title = "yraverageSubMin"
+        w.title = "yravgSubMeetly"
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
         w.isMovableByWindowBackground = false

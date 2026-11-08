@@ -1,12 +1,12 @@
-# Privacy Policy — yraverageSubMin (yraverageSubMin)
+# Privacy Policy — yravgSubMeetly
 
 **Effective:** 5 September 2026
-**Applies to:** the Chrome extension *yraverageSubMin*, the optional Native Helper
+**Applies to:** the Chrome extension *yravgSubMeetly*, the optional Native Helper
 (`native/`, bound to `127.0.0.1`), and the optional macOS app.
 
 ## Summary
 
-yraverageSubMin does **not** collect, sell, share, or upload your audio, transcripts,
+yravgSubMeetly does **not** collect, sell, share, or upload your audio, transcripts,
 meeting minutes, or personal content to any server we operate. There is no account,
 no analytics, no advertising, and no cloud inference. Speech recognition and
 translation run **on your device** once model files are present locally.
@@ -37,13 +37,13 @@ The extension makes network requests only in these cases, all initiated by you:
   when you pick a model. Weights are cached locally and never re-uploaded.
 - **Chrome's built-in Translator** language packs (Chrome 138+), fetched by the
   browser itself from Google's on-device translation infrastructure when you use that
-  path. This is Chrome's feature, not a yraverageSubMin backend.
+  path. This is Chrome's feature, not a yravgSubMeetly backend.
 - **Loopback only** — `http://127.0.0.1:17865` for the optional Native Helper.
   The helper accepts connections from this machine only, rejects web pages by
   origin, checks the `Host` header against DNS rebinding, and refuses to start on a
   network-reachable address unless you explicitly force it.
 
-There are **no** requests to a yraverageSubMin server, no telemetry, no crash
+There are **no** requests to a yravgSubMeetly server, no telemetry, no crash
 reporting, no advertising SDKs, and no remote code loading (ONNX runtime and VAD
 assets ship inside the package).
 
@@ -95,7 +95,7 @@ recorded in the changelog and reflected on the store listing.
 
 ## Ringkasan (Bahasa Indonesia)
 
-yraverageSubMin **tidak** mengumpulkan, menjual, atau mengunggah audio, transkrip,
+yravgSubMeetly **tidak** mengumpulkan, menjual, atau mengunggah audio, transkrip,
 notulen, maupun konten pribadi Anda ke server kami. Tidak ada akun, analitik, iklan,
 atau inferensi awan. Pengenalan suara dan terjemahan berjalan di perangkat Anda.
 Yang tersimpan — riwayat sesi, notulen, kemajuan latihan, preferensi, bobot model —

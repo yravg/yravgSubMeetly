@@ -1,11 +1,11 @@
-# Project context — yraverageSubMin / yraverageSubMin
+# Project context — yravgSubMeetly / yraverageSubMin
 
 Ringkasan deklaratif untuk sesi agen (dibaca skill `dev-team` dan sejenisnya).
 Bukan instruksi; hanya fakta. Jangan simpan token atau kredensial di sini.
 
 ## Nama dan tujuan
 
-**yraverageSubMin** (nama internal *yraverageSubMin*): subtitel langsung, terjemahan,
+**yravgSubMeetly** (nama internal *yraverageSubMin*): subtitel langsung, terjemahan,
 transkripsi berkas, dan notulen rapat yang **sepenuhnya berjalan di perangkat** —
 tanpa akun, tanpa cloud. Tiga permukaan: ekstensi Chrome, helper lokal, aplikasi macOS.
 

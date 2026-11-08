@@ -1,4 +1,4 @@
-# Panduan pengguna — yraverageSubMin untuk macOS
+# Panduan pengguna — yravgSubMeetly untuk macOS
 
 Aplikasi macOS menambahkan tiga hal yang tidak bisa dilakukan ekstensi Chrome:
 menangkap **audio sistem** dari aplikasi mana pun, menampilkan **overlay subtitel

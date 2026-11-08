@@ -107,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let args = CommandLine.arguments
             let text = args.firstIndex(of: "--text").flatMap { i in
                 i + 1 < args.count ? args[i + 1] : nil
-            } ?? "yraverageSubMin dictation probe"
+            } ?? "yravgSubMeetly dictation probe"
             let restore = args.contains("--restore-clipboard")
             let delay = args.firstIndex(of: "--delay").flatMap { i in
                 i + 1 < args.count ? Double(args[i + 1]) : nil

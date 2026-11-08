@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "yraverageSubMin",
+  "name": "yravgSubMeetly",
   "version": "1.1.1",
   "description": "On-device realtime subtitles: local AI transcription + translation for any tab. Audio is not uploaded to our servers.",
   "minimum_chrome_version": "120",
@@ -28,7 +28,7 @@
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_title": "yraverageSubMin",
+    "default_title": "yravgSubMeetly",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

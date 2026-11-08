@@ -1,4 +1,4 @@
-# Chrome Web Store submission guide — yraverageSubMin 1.1.1
+# Chrome Web Store submission guide — yravgSubMeetly 1.1.1
 
 ## Build & pack (canonical)
 

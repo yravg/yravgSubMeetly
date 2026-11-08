@@ -177,7 +177,7 @@ function cueBody(l) {
 export function formatSrt(lines, { url, title } = {}) {
   const cues = [];
   if (url || title) {
-    const meta = [`yraverageSubMin`, title && `Title: ${title}`, url && `Source: ${url}`]
+    const meta = [`yravgSubMeetly`, title && `Title: ${title}`, url && `Source: ${url}`]
       .filter(Boolean)
       .join('\n');
     cues.push({ t0: 0, t1: 0.001, src: '', tgt: meta, _meta: true });

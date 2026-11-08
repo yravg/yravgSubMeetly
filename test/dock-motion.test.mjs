@@ -346,14 +346,14 @@ test('halaman tidak meluber mendatar di jendela sempit; appbar dan dok tetap ter
   await page.waitForSelector('#btn-settings');
 });
 
-test('appbar memakai wordmark yraverageSubMin dan "Minutes" membawa kembali ke halaman utama', async () => {
+test('appbar memakai wordmark yravgSubMeetly dan "Minutes" membawa kembali ke halaman utama', async () => {
   const brand = await page.evaluate(() => {
     const el = document.querySelector('.brand');
     return { teks: el.textContent.replace(/\s+/g, ''), adaPil: !!el.querySelector('.brand-pill'),
       adaIkonLama: !!el.querySelector('svg') };
   });
-  assert.equal(brand.teks, 'yraverageSubMin');
-  assert.equal(brand.adaPil, true, 'pil SubMin tidak terbentuk');
+  assert.equal(brand.teks, 'yravgSubMeetly');
+  assert.equal(brand.adaPil, true, 'pil SubMeetly tidak terbentuk');
   assert.equal(brand.adaIkonLama, false, 'ikon generik lama masih ada di sebelah wordmark');
 
   // Jejak remah ditulis ulang tiap render; tautan pulang tidak boleh ikut hilang.

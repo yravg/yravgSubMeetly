@@ -1,4 +1,4 @@
-# yraverageSubMin for macOS
+# yravgSubMeetly for macOS
 
 A menu-bar app that puts **live floating subtitles** over any app's audio, transcribes
 media files to SRT/VTT, and does **hold-to-talk dictation** into whatever app has focus.
@@ -109,7 +109,7 @@ SRT/VTT/TXT when you stop.
 **Transcribe a file** — the *Transcribe a file* tab: choose any audio/video file, get
 time-stamped lines, export SRT/VTT/TXT.
 
-**Dock icon** — yraverageSubMin is a normal Dock app; launching it opens its window.
+**Dock icon** — yravgSubMeetly is a normal Dock app; launching it opens its window.
 Settings → Subtitles → *Hide Dock icon (menu bar only)* moves it to the menu bar instead,
 applied immediately without a relaunch.
 

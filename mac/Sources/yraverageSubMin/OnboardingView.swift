@@ -75,7 +75,7 @@ struct OnboardingView: View {
         case 2: "Setup overview"
         case 3: "Translation models"
         case 4: "Grant permissions"
-        default: "Welcome to yraverageSubMin"
+        default: "Welcome to yravgSubMeetly"
         }
     }
 
@@ -83,7 +83,7 @@ struct OnboardingView: View {
         switch ui.onboardingStep {
         case 2: "Two short steps, then you're recording. Everything stays on this Mac."
         case 3: "Speech recognition is built into macOS — nothing to download. Translation uses Apple's on-device models; install the pair you use."
-        case 4: "macOS needs your approval before yraverageSubMin can hear anything or paste dictation."
+        case 4: "macOS needs your approval before yravgSubMeetly can hear anything or paste dictation."
         default: "Subtitle. Translate. Dictate. Take minutes. All on your device."
         }
     }

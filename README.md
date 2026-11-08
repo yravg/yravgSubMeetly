@@ -1,7 +1,7 @@
-# yraverageSubMin
+# yravgSubMeetly
 
 Live subtitles, transcription and translation that run **on your device**.
-No accounts, no telemetry — we do not upload your audio, video, or transcripts to a yraverageSubMin cloud. Model weights may download once when you choose them, then stay cached locally.
+No accounts, no telemetry — we do not upload your audio, video, or transcripts to a yravgSubMeetly cloud. Model weights may download once when you choose them, then stay cached locally.
 
 This repo holds two clients built on that same idea:
 
@@ -73,7 +73,7 @@ inference runs **locally** after models are downloaded and cached.
 2. **Chrome**: open `chrome://extensions`, enable **Developer mode** (top right).
    **Edge**: open `edge://extensions`, enable **Developer mode** (left sidebar).
 3. Click **Load unpacked** and select the `dist/` folder.
-4. Pin "yraverageSubMin" and click its icon — the side panel opens (in Edge it opens
+4. Pin "yravgSubMeetly" and click its icon — the side panel opens (in Edge it opens
    in the sidebar).
 
 Requires Chrome 120+ or Edge 120+ (any recent Chromium browser with the sidePanel,
@@ -129,7 +129,7 @@ target → **Start Task**. Subtitles appear over the page; drag them anywhere. *
 Task** stops capture and saves the transcript to History.
 
 If Chrome refuses automatic tab capture ("extension has not been invoked"), either
-**right-click the page → "Start yraverageSubMin on this page"**, or use **Pick tab /
+**right-click the page → "Start yravgSubMeetly on this page"**, or use **Pick tab /
 window manually** — a screen-share-style picker; choose the Chrome tab and tick
 *"Also share tab audio"* (window/screen system audio isn't available on macOS).
 

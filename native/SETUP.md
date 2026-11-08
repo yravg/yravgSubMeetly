@@ -24,7 +24,7 @@ Installer host butuh ID ekstensi, karena manifest Native Messaging hanya
 mengizinkan ekstensi yang disebut namanya.
 
 1. Buka `chrome://extensions`, nyalakan **Developer mode**.
-2. Salin ID 32 huruf di kartu **yraverageSubMin** (mis. `abcdefghijklmnopabcdefghijklmnop`).
+2. Salin ID 32 huruf di kartu **yravgSubMeetly** (mis. `abcdefghijklmnopabcdefghijklmnop`).
 
 ID berubah setiap kali ekstensi unpacked dimuat dari folder berbeda — jalankan
 ulang installer host bila itu terjadi.
