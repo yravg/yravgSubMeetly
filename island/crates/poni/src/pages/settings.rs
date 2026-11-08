@@ -22,10 +22,9 @@ use crate::activities::{text_with_dim, text_with_dim_width};
 use crate::commands::Command;
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
-use crate::pages::PageKind;
 use crate::pill::status;
 use crate::state::{AppState, Said};
-use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_GAP, PILL_REGULAR, PILL_SMALL};
+use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_SMALL};
 use crate::version::VERSION;
 use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::phonedrop::fmt_bytes;
@@ -83,7 +82,7 @@ const CHIP_ICON_GAP: f32 = 5.0;
 const CHIP_GAP: f32 = 6.0;
 
 // Glass: on Windows from a copy of the screen, on a Mac macOS's own glass.
-const THEMES: [(Theme, &str); 3] = [(Theme::Classic, "Classic"), (Theme::Glass, "Glass"), (Theme::Pill, "Pill")];
+const THEMES: [(Theme, &str); 4] = [(Theme::Classic, "Classic"), (Theme::Glass, "Glass"), (Theme::Paper, "Paper"), (Theme::Pill, "Pill")];
 
 /// An idle look's name in the picker.
 fn idle_name(s: IdleStyle, eyes: &'static str) -> &'static str {

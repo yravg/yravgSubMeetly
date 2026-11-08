@@ -31,8 +31,11 @@ pub enum Theme {
     /// Pill: the island floats a little below the top edge as a black
     /// capsule, with its own layouts: the time and battery at rest, the song
     /// while music plays, a rounded card when it opens.
-    #[default]
     Pill,
+    /// Paper: the Pill in the SubMeetly paper look (white, navy ink). The
+    /// default.
+    #[default]
+    Paper,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,8 +46,51 @@ pub enum MonitorChoice {
     Cursor,
 }
 
+/// `hover_delay_ms` value for "Off": the island opens on click only.
+pub const HOVER_OFF_MS: u32 = 600_000;
+/// Longest dwell the settings offer besides Off.
+pub const HOVER_MAX_MS: u32 = 3000;
+
+/// The colour of the translated line on the Live page (board I08). Five
+/// swatches that read on the paper ground; Indigo is the default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranslationColor {
+    #[default]
+    Indigo,
+    Navy,
+    Teal,
+    Neutral,
+    Bronze,
+}
+
+impl TranslationColor {
+    pub const ALL: [TranslationColor; 5] = [Self::Indigo, Self::Navy, Self::Teal, Self::Neutral, Self::Bronze];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Indigo => "Indigo",
+            Self::Navy => "Navy",
+            Self::Teal => "Teal",
+            Self::Neutral => "Neutral",
+            Self::Bronze => "Bronze",
+        }
+    }
+
+    /// 0xRRGGBB.
+    pub fn rgb(self) -> u32 {
+        match self {
+            Self::Indigo => 0x4A3C94,
+            Self::Navy => 0x2F3D80,
+            Self::Teal => 0x0B6E83,
+            Self::Neutral => 0x4F5675,
+            Self::Bronze => 0x7A5200,
+        }
+    }
+}
+
 /// Bumped when defaults change in a way existing files should pick up.
-pub const SETTINGS_VERSION: u32 = 5;
+pub const SETTINGS_VERSION: u32 = 6;
 
 fn version_zero() -> u32 {
     0
@@ -59,8 +105,10 @@ pub struct Settings {
     pub theme: Theme,
     pub idle_style: IdleStyle,
     pub use_24h: bool,
-    /// Delay before hover expands the island.
+    /// Delay before hover expands the island; `HOVER_OFF_MS` = never.
     pub hover_delay_ms: u32,
+    /// Colour of the translated line on the Live page.
+    pub translation_color: TranslationColor,
     /// Grace period after the cursor leaves before collapsing (0 = the
     /// island starts closing on the next frame).
     pub collapse_delay_ms: u32,
@@ -106,8 +154,6 @@ pub struct Settings {
     /// Add-ons switched on, by id (`poni_core::addons`). Ids this version
     /// doesn't know are kept, so a newer Poni's choices survive a save.
     pub addons: BTreeMap<String, bool>,
-    /// The Prayer times add-on's choices.
-    pub prayer: PrayerSettings,
     /// Show over games: while a full-screen app is in front, the island
     /// shows its frame rate, the GPU's load and temperature and the CPU's
     /// load. Turning it on also keeps the island on top of full-screen apps.
@@ -124,51 +170,15 @@ pub struct Settings {
     pub notifications: crate::notifications::NotificationSettings,
 }
 
-/// What plays when a prayer's time comes.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PrayerSound {
-    /// The adzan recording (Subuh plays the tone: the recording isn't Subuh's adzan).
-    Adzan,
-    /// A short system tone.
-    #[default]
-    Tone,
-    Silent,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct PrayerSettings {
-    /// The place the times are for: its id in the add-on's place list, or
-    /// "w:lat,lng" for a city abroad. None until one is found or picked.
-    pub place: Option<String>,
-    /// That city abroad as its own few lines (`prayer::World::excerpt`): its
-    /// name, country, point and clock, so its times need nothing online.
-    pub world_place: Option<String>,
-    /// Let Windows' location pick the nearest place, and pick again when the
-    /// PC moves. Picking a place by hand turns this off.
-    pub follow_location: bool,
-    pub sound: PrayerSound,
-    /// Minutes before each prayer the island counts down (0 = no countdown).
-    pub remind_before_min: u32,
-    /// Pause music that is playing when the adzan starts (it stays paused).
-    pub pause_music: bool,
-}
-
-impl Default for PrayerSettings {
-    fn default() -> Self {
-        Self { place: None, world_place: None, follow_location: true, sound: PrayerSound::Tone, remind_before_min: 10, pause_music: true }
-    }
-}
-
 impl Default for Settings {
     fn default() -> Self {
         Self {
             settings_version: SETTINGS_VERSION,
-            theme: Theme::Pill,
+            theme: Theme::Paper,
             idle_style: IdleStyle::Clock,
             use_24h: true,
             hover_delay_ms: 220,
+            translation_color: TranslationColor::Indigo,
             collapse_delay_ms: 0,
             expanded_width: 620.0,
             hide_in_fullscreen: true,
@@ -189,7 +199,6 @@ impl Default for Settings {
             pomodoro: PomodoroConfig::default(),
             system_history: true,
             addons: BTreeMap::new(),
-            prayer: PrayerSettings::default(),
             game_stats: false,
             game_peek: false,
             notifications: crate::notifications::NotificationSettings::default(),
@@ -215,7 +224,7 @@ impl Settings {
 
     /// Is the add-on `id` switched on?
     pub fn addon_on(&self, id: &str) -> bool {
-        self.addons.get(id).copied().unwrap_or(false)
+        self.addons.get(id).copied().unwrap_or_else(|| crate::addons::on_by_default(id))
     }
 
     pub fn set_addon(&mut self, id: &str, on: bool) {
@@ -267,6 +276,10 @@ impl Settings {
         if self.settings_version < 5 && self.addons.get("notifications") == Some(&false) && !self.hidden_tabs.iter().any(|k| k == "notifications") {
             self.hidden_tabs.push("notifications".into());
         }
+        // v6: Paper became the default theme; the old default, Pill, moves.
+        if self.settings_version < 6 && self.theme == Theme::Pill {
+            self.theme = Theme::Paper;
+        }
         self.settings_version = self.settings_version.max(SETTINGS_VERSION);
         // Step aside is no longer offered: the island stays over maximized windows.
         self.step_aside = false;
@@ -274,7 +287,9 @@ impl Settings {
         if self.game_stats {
             self.hide_in_fullscreen = false;
         }
-        self.hover_delay_ms = self.hover_delay_ms.min(2000);
+        if self.hover_delay_ms != HOVER_OFF_MS {
+            self.hover_delay_ms = self.hover_delay_ms.min(HOVER_MAX_MS);
+        }
         self.lyrics_offset_ms = self.lyrics_offset_ms.clamp(-5000, 5000);
         self.collapse_delay_ms = self.collapse_delay_ms.min(5000);
         if !self.expanded_width.is_finite() {
@@ -287,7 +302,6 @@ impl Settings {
         p.short_break_min = p.short_break_min.clamp(1, 60);
         p.long_break_min = p.long_break_min.clamp(1, 120);
         p.long_every = p.long_every.min(12);
-        self.prayer.remind_before_min = self.prayer.remind_before_min.min(60);
         self
     }
 }
@@ -307,12 +321,12 @@ mod tests {
     #[test]
     fn addons_are_off_until_switched_on_and_unknown_ones_survive() {
         let mut s = Settings::default();
-        assert!(!s.addon_on("sholat"));
-        s.set_addon("sholat", true);
-        assert!(s.addon_on("sholat"));
+        assert!(!s.addon_on("system"));
+        s.set_addon("system", true);
+        assert!(s.addon_on("system"));
         // A newer Poni's add-on stays in the file when this one saves it.
-        let s: Settings = serde_json::from_str(r#"{"addons":{"sholat":true,"future":true}}"#).unwrap();
-        assert!(s.addon_on("sholat"));
+        let s: Settings = serde_json::from_str(r#"{"addons":{"system":true,"future":true}}"#).unwrap();
+        assert!(s.addon_on("system"));
         let back: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert!(back.addon_on("future"));
         // Files from before add-ons have none on.
@@ -323,45 +337,61 @@ mod tests {
     #[test]
     fn an_addon_switched_off_by_hand_is_no_longer_unset() {
         let mut s = Settings::default();
-        assert!(s.addon_unset("ja"));
-        s.set_addon("ja", true);
-        assert!(!s.addon_unset("ja"));
-        s.set_addon("ja", false);
-        assert!(!s.addon_unset("ja"), "off by hand: the person's word, kept");
-        assert!(!s.addon_on("ja"));
+        assert!(s.addon_unset("script"));
+        s.set_addon("script", true);
+        assert!(!s.addon_unset("script"));
+        s.set_addon("script", false);
+        assert!(!s.addon_unset("script"), "off by hand: the person's word, kept");
+        assert!(!s.addon_on("script"));
         // It survives a save and a load.
         let back: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
-        assert!(!back.addon_unset("ja"));
+        assert!(!back.addon_unset("script"));
     }
 
     #[test]
-    fn prayer_defaults_follow_location_with_a_tone_ten_minutes_before() {
-        let p = Settings::default().prayer;
-        assert_eq!((p.place, p.follow_location, p.sound, p.remind_before_min, p.pause_music), (None, true, PrayerSound::Tone, 10, true));
-        let s: Settings = serde_json::from_str(r#"{"prayer":{"place":"jakarta","sound":"adzan","remind_before_min":600}}"#).unwrap();
-        let s = s.sanitized();
-        assert_eq!((s.prayer.place.as_deref(), s.prayer.sound, s.prayer.remind_before_min), (Some("jakarta"), PrayerSound::Adzan, 60));
-        assert!(s.prayer.follow_location);
-    }
-
-    #[test]
-    fn theme_defaults_to_pill() {
-        // Files written before themes existed get the floating pill.
+    fn theme_defaults_to_paper() {
+        // Files written before themes existed get the paper pill.
         let s: Settings = serde_json::from_str(r#"{"idle_style":"eyes"}"#).unwrap();
-        assert_eq!(s.theme, Theme::Pill);
+        assert_eq!(s.theme, Theme::Paper);
         let s: Settings = serde_json::from_str(r#"{"theme":"classic"}"#).unwrap();
         assert_eq!(s.theme, Theme::Classic);
         let s: Settings = serde_json::from_str(r#"{"theme":"glass"}"#).unwrap();
         assert_eq!(s.theme, Theme::Glass);
         let s: Settings = serde_json::from_str(r#"{"theme":"pill"}"#).unwrap();
         assert_eq!(s.theme, Theme::Pill);
+        let s: Settings = serde_json::from_str(r#"{"theme":"paper"}"#).unwrap();
+        assert_eq!(s.theme, Theme::Paper);
+    }
+
+    #[test]
+    fn old_pill_default_moves_to_paper_once() {
+        let old = serde_json::from_str::<Settings>(r#"{"settings_version":5,"theme":"pill"}"#).unwrap().sanitized();
+        assert_eq!(old.theme, Theme::Paper);
+        // A Pill chosen after v6 stays.
+        let kept = serde_json::from_str::<Settings>(r#"{"settings_version":6,"theme":"pill"}"#).unwrap().sanitized();
+        assert_eq!(kept.theme, Theme::Pill);
     }
 
     #[test]
     fn sanitize_clamps() {
         let s = Settings { expanded_width: 5000.0, hover_delay_ms: 99999, ..Default::default() }.sanitized();
         assert_eq!(s.expanded_width, 900.0);
-        assert_eq!(s.hover_delay_ms, 2000);
+        assert_eq!(s.hover_delay_ms, HOVER_MAX_MS);
+        // Off survives; so does a pick inside the range.
+        let off = Settings { hover_delay_ms: HOVER_OFF_MS, ..Default::default() }.sanitized();
+        assert_eq!(off.hover_delay_ms, HOVER_OFF_MS);
+    }
+
+    #[test]
+    fn translation_colour_swatches() {
+        let hex: Vec<u32> = TranslationColor::ALL.iter().map(|c| c.rgb()).collect();
+        assert_eq!(hex, [0x4A3C94, 0x2F3D80, 0x0B6E83, 0x4F5675, 0x7A5200]);
+        assert_eq!(Settings::default().translation_color, TranslationColor::Indigo);
+        let s: Settings = serde_json::from_str(r#"{"translation_color":"teal"}"#).unwrap();
+        assert_eq!(s.translation_color, TranslationColor::Teal);
+        // Older files have no key.
+        let s: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(s.translation_color, TranslationColor::Indigo);
     }
 
     #[test]
@@ -485,9 +515,9 @@ mod tests {
     fn notifications_switched_off_as_an_add_on_stays_off() {
         // Until 0.2.24 Notifications was an add-on, off by default. One switched
         // off by hand stays off, as a hidden tab.
-        let s = serde_json::from_str::<Settings>(r#"{"settings_version":4,"addons":{"notifications":false,"sholat":true}}"#).unwrap().sanitized();
+        let s = serde_json::from_str::<Settings>(r#"{"settings_version":4,"addons":{"notifications":false,"system":true}}"#).unwrap().sanitized();
         assert_eq!(s.hidden_tabs, ["notifications"]);
-        assert!(s.addon_on("sholat"));
+        assert!(s.addon_on("system"));
         // Switched on, or never touched: on, like everyone's now.
         for file in [r#"{"settings_version":4,"addons":{"notifications":true}}"#, r#"{"settings_version":4}"#] {
             let s = serde_json::from_str::<Settings>(file).unwrap().sanitized();

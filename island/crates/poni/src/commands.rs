@@ -112,28 +112,10 @@ pub enum Command {
     AllowFps,
     Phone(PhoneCmd),
     Pair(PairCmd),
-    /// Get one of Prayer times' online city files ("ed", "near/55_-5"; the
-    /// answer: `AppEvent::Cities`).
-    GetCities(String),
     /// Notifications.
     Notify(NotifyCmd),
-    /// The Downloads page (`pages::downloads`).
-    Download(DownloadCmd),
-}
-
-/// What the Downloads page asks for.
-#[derive(Clone, Debug, PartialEq)]
-pub enum DownloadCmd {
-    /// Download `url`'s video or sound.
-    Start { url: String, mode: poni_core::ytdlp::Mode },
-    /// Stop a download; one still waiting its turn leaves the list (Cancel).
-    Stop(u64),
-    /// Take a finished, failed or stopped job off the list.
-    Remove(u64),
-    ClearDone,
-    /// Open the finished file, or show it in its folder.
-    Open(u64),
-    Reveal(u64),
-    /// Put the clipboard's link in the page's link field.
-    PasteLink,
+    /// `POST /notes` to the helper with this body (a decision on a page).
+    HelperPost(String),
+    /// Ask the helper again now.
+    HelperPoll,
 }

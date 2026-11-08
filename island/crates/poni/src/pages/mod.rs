@@ -11,17 +11,19 @@
 
 pub mod addons;
 pub mod card;
-pub mod downloads;
-pub mod downloads_offer;
 pub mod focus;
+pub mod hkit;
+pub mod inbox;
+pub mod live;
 pub mod media;
+pub mod meeting;
 pub mod notifications;
-pub mod prayer;
 pub mod script;
 pub mod settings;
 pub mod shelf;
 pub mod system;
 pub mod tasks;
+pub mod tools;
 
 use crate::commands::Command;
 use crate::gfx::{TextStyle, Weight};
@@ -48,6 +50,18 @@ pub fn header_rect(body: Rect) -> Rect {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PageKind {
+    /// The helper's newest line (board I02).
+    Live,
+    /// The newest meeting's decisions (I03).
+    Meeting,
+    /// Open items across meetings (I04).
+    Inbox,
+    /// Agenda timer add-in (I06).
+    Timer,
+    /// Talk time add-in (I06).
+    Talk,
+    /// Engine monitor add-in (I07).
+    Engine,
     Media,
     Shelf,
     Tasks,
@@ -56,10 +70,6 @@ pub enum PageKind {
     System,
     /// The teleprompter: a script read under the webcam.
     Script,
-    /// Prayer times, while that add-on is on ([`tabs`]).
-    Prayer,
-    /// Links to save as video or sound, while the Downloader add-on is on ([`tabs`]).
-    Downloads,
     /// Which apps' notifications show on the island, while Notifications is
     /// on ([`tabs`]; Windows' Store copy only).
     Notifications,
@@ -73,15 +83,19 @@ pub enum PageKind {
 impl PageKind {
     /// The tab row's order: the island's own pages, Oyenza, then the
     /// add-ons' pages and the "+".
-    pub const ALL: [PageKind; 11] = [
+    pub const ALL: [PageKind; 15] = [
+        PageKind::Live,
+        PageKind::Meeting,
+        PageKind::Inbox,
+        PageKind::Timer,
+        PageKind::Talk,
+        PageKind::Engine,
         PageKind::Media,
         PageKind::Shelf,
         PageKind::Tasks,
         PageKind::Focus,
         PageKind::System,
         PageKind::Script,
-        PageKind::Prayer,
-        PageKind::Downloads,
         PageKind::Notifications,
         PageKind::Addons,
         PageKind::Settings,
@@ -89,14 +103,18 @@ impl PageKind {
 
     pub fn key(self) -> &'static str {
         match self {
+            PageKind::Live => "live",
+            PageKind::Meeting => "meeting",
+            PageKind::Inbox => "inbox",
+            PageKind::Timer => "timer",
+            PageKind::Talk => "talk",
+            PageKind::Engine => "engine",
             PageKind::Media => "media",
             PageKind::Focus => "focus",
             PageKind::Shelf => "shelf",
             PageKind::Tasks => "tasks",
             PageKind::System => "system",
             PageKind::Script => "script",
-            PageKind::Prayer => "prayer",
-            PageKind::Downloads => "downloads",
             PageKind::Notifications => "notifications",
             PageKind::Addons => "addons",
             PageKind::Settings => "settings",
@@ -105,19 +123,23 @@ impl PageKind {
 
     pub fn from_key(s: &str) -> PageKind {
         let s = s.trim();
-        Self::ALL.into_iter().find(|p| p.key().eq_ignore_ascii_case(s)).unwrap_or(PageKind::Media)
+        Self::ALL.into_iter().find(|p| p.key().eq_ignore_ascii_case(s)).unwrap_or(PageKind::Live)
     }
 
     pub fn title(self) -> &'static str {
         match self {
+            PageKind::Live => "Live",
+            PageKind::Meeting => "Meeting",
+            PageKind::Inbox => "Inbox",
+            PageKind::Timer => "Agenda timer",
+            PageKind::Talk => "Talk time",
+            PageKind::Engine => "Engine",
             PageKind::Media => "Music",
             PageKind::Focus => "Focus",
             PageKind::Shelf => "Shelf",
             PageKind::Tasks => "Tasks",
             PageKind::System => "System",
             PageKind::Script => "Script",
-            PageKind::Prayer => "Prayer",
-            PageKind::Downloads => "Downloads",
             PageKind::Notifications => "Notifications",
             PageKind::Addons => "Add-ons",
             PageKind::Settings => "Settings",
@@ -126,14 +148,18 @@ impl PageKind {
 
     pub fn icon(self) -> Icon {
         match self {
+            PageKind::Live => Icon::Lyrics,
+            PageKind::Meeting => Icon::Clipboard,
+            PageKind::Inbox => Icon::CheckCircle,
+            PageKind::Timer => Icon::Clock,
+            PageKind::Talk => Icon::Volume,
+            PageKind::Engine => Icon::Cpu,
             PageKind::Media => Icon::Music,
             PageKind::Focus => Icon::Timer,
             PageKind::Shelf => Icon::Tray,
             PageKind::Tasks => Icon::ListChecks,
             PageKind::System => Icon::Gauge,
             PageKind::Script => Icon::Script,
-            PageKind::Prayer => Icon::Moon,
-            PageKind::Downloads => Icon::Download,
             PageKind::Notifications => Icon::Bell,
             PageKind::Addons => Icon::Addons,
             PageKind::Settings => Icon::Gear,
@@ -168,7 +194,7 @@ impl PageKind {
 
 /// The tabs in the header: every page but Settings, AI only with Studio Pro,
 /// and Health, IELTS, Notes,
-/// System, Script, Record, Prayer and Stocks only while their add-ons are on.
+/// System and Script only while their add-ons are on.
 /// Music, Today, Shelf, Tasks and Focus unless Settings took them off the
 /// row; one of those still shows while its page is open (a file dropped on
 /// the island opens the Shelf). Notifications wherever the copy can read
@@ -202,10 +228,11 @@ fn row(st: &AppState, open: Option<PageKind>) -> Vec<PageKind> {
     PageKind::ALL
         .into_iter()
         .filter(|&p| match p {
+            PageKind::Timer => st.addon(poni_core::addons::AGENDA_TIMER.id) == poni_core::addons::Status::Ready,
+            PageKind::Talk => st.addon(poni_core::addons::TALK_TIME.id) == poni_core::addons::Status::Ready,
+            PageKind::Engine => st.addon(poni_core::addons::ENGINE_MONITOR.id) == poni_core::addons::Status::Ready,
             PageKind::System => st.system_on(),
-            PageKind::Prayer => st.prayer_on(),
             PageKind::Script => st.script_on(),
-            PageKind::Downloads => st.downloader_on(),
             PageKind::Notifications => st.notifications_on(),
             p if p.hideable() => !st.tab_hidden(p) || open == Some(p),
             p => p.tabbed(),
@@ -223,14 +250,16 @@ pub fn step_tab(p: PageKind, st: &AppState, forward: bool) -> PageKind {
 
 pub fn content_height(p: PageKind, st: &AppState) -> f32 {
     match p {
+        PageKind::Live => live::height(st),
+        PageKind::Meeting => meeting::height(st),
+        PageKind::Inbox => inbox::height(st),
+        PageKind::Timer | PageKind::Talk | PageKind::Engine => tools::height(st),
         PageKind::Media => media::height(st),
         PageKind::Focus => focus::height(st),
         PageKind::Shelf => shelf::height(st),
         PageKind::Tasks => tasks::height(st),
         PageKind::System => system::height(st),
         PageKind::Script => script::height(st),
-        PageKind::Prayer => prayer::height(st),
-        PageKind::Downloads => downloads::height(st),
         PageKind::Notifications => notifications::height(st),
         PageKind::Addons => addons::height(st),
         PageKind::Settings => settings::height(st),
@@ -247,8 +276,7 @@ pub fn next_wake(page: PageKind, st: &AppState) -> Option<f64> {
         PageKind::Shelf => shelf::next_wake(st),
         PageKind::Settings => settings::next_wake(st),
         PageKind::Script => script::next_wake(st),
-        PageKind::Prayer => prayer::next_wake(st),
-        PageKind::Downloads => downloads::next_wake(st),
+        PageKind::Timer => tools::timer_wake(st),
         _ => None,
     }
 }
@@ -346,14 +374,18 @@ pub(crate) fn draw_pages(ui: &mut Ui, st: &mut AppState, body: Rect, header: Rec
 
 pub(crate) fn draw_page(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKind) {
     match page {
+        PageKind::Live => live::draw(ui, st, area),
+        PageKind::Meeting => meeting::draw(ui, st, area),
+        PageKind::Inbox => inbox::draw(ui, st, area),
+        PageKind::Timer => tools::draw_timer(ui, st, area),
+        PageKind::Talk => tools::draw_talk(ui, st, area),
+        PageKind::Engine => tools::draw_engine(ui, st, area),
         PageKind::Media => media::draw(ui, st, area),
         PageKind::Focus => focus::draw(ui, st, area),
         PageKind::Shelf => shelf::draw(ui, st, area),
         PageKind::Tasks => tasks::draw(ui, st, area),
         PageKind::System => system::draw(ui, st, area),
         PageKind::Script => script::draw(ui, st, area),
-        PageKind::Prayer => prayer::draw(ui, st, area),
-        PageKind::Downloads => downloads::draw(ui, st, area),
         PageKind::Notifications => notifications::draw(ui, st, area),
         PageKind::Addons => addons::draw(ui, st, area),
         PageKind::Settings => settings::draw(ui, st, area),
@@ -772,31 +804,6 @@ mod tests {
     }
 
     #[test]
-    fn downloads_has_a_tab_only_with_studio_pro() {
-        for (page, addon) in [(PageKind::Downloads, poni_core::addons::DOWNLOADER)] {
-            let mut st = state();
-            st.downloader_offered = true;
-            st.settings.set_addon(addon.id, true);
-            st.addons.insert(addon.id, poni_core::addons::Status::Ready);
-            assert!(!tabs(&st).contains(&page), "{}: signed out", addon.id);
-            st.oyenza.link = OyenzaLink::Connected { account: "a•••@example.com".into() };
-            assert!(!tabs(&st).contains(&page), "{}: before the server's answer", addon.id);
-            st.oyenza.pro = Some(false);
-            assert!(!tabs(&st).contains(&page), "{}: an account without Pro", addon.id);
-            st.oyenza.pro = Some(true);
-            assert!(tabs(&st).contains(&page), "{}", addon.id);
-            // Signed out again: gone, whatever the server said before.
-            st.oyenza.link = OyenzaLink::Off;
-            assert!(!tabs(&st).contains(&page), "{}", addon.id);
-            // Pro isn't known yet at start: an island last open on its page opens on the first tab.
-            let store = Store { last_page: page.key().into(), ..Store::default() };
-            let mut settings = Settings { remember_page: true, ..Settings::default() };
-            settings.set_addon(addon.id, true);
-            assert_eq!(AppState::new(settings, store).page, PageKind::ALL[0], "{}", addon.id);
-        }
-    }
-
-    #[test]
     fn today_keeps_its_tiles_only_for_a_server_without_the_day() {
         use crate::state::AgendaState;
         let mut st = state();
@@ -812,21 +819,6 @@ mod tests {
         st.oyenza.agenda_state = AgendaState::Ready;
         assert!(!today::shows_tiles(&st));
         assert!(today::next_wake(&st).is_some_and(|t| t > st.now && t <= st.now + 60.0));
-    }
-
-    #[test]
-    fn prayer_has_a_tab_only_while_its_add_on_is_on_and_ready() {
-        let mut st = state();
-        assert!(!tabs(&st).contains(&PageKind::Prayer));
-        st.addons.insert("sholat", poni_core::addons::Status::Ready);
-        assert!(!tabs(&st).contains(&PageKind::Prayer), "no places read yet");
-        let list = poni_core::prayer::PlaceList::parse(r#"{"places":[]}"#).unwrap();
-        st.prayer.places = Some(std::sync::Arc::new(list));
-        let row = tabs(&st);
-        assert_eq!(&row[row.len() - 2..], &[PageKind::Prayer, PageKind::Addons]);
-        assert!(content_height(PageKind::Prayer, &st) <= content_height(PageKind::Tasks, &st));
-        st.addons.insert("sholat", poni_core::addons::Status::Downloading { done: 1, total: 2 });
-        assert!(!tabs(&st).contains(&PageKind::Prayer));
     }
 
     #[test]

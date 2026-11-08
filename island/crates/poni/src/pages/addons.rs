@@ -1,32 +1,21 @@
 //! Add-ons page, the "+" at the end of the tab row: features only the people
-//! who switch them on get (`poni_core::addons`). Most download then; Script
-//! reader, System, Health, Stocks, IELTS and Meeting notes are already in
-//! the app and only show their pages (System's readings, Health's steps and
-//! Stocks' prices also run only while they are on; IELTS only while a
-//! session runs, Meeting notes only while it records).
+//! who switch them on get (`poni_core::addons`). Script reader and System are
+//! already in the app and only show their pages (System's readings also run
+//! only while it is on).
 //!
 //! One row per add-on: its icon, its name, what it does (or where its
 //! download stands, with a bar while it comes in), its size while it is off,
 //! ("Built in" for one with nothing to download), and a switch. The whole
-//! row toggles, as in Settings: on downloads the add-on and starts it, off
-//! stops it and deletes its files
-//! (`Command::SaveSettings`; the app passes the change to `services::addons`).
-//! One whose files this build can't get yet stays off and says so
-//! (`Status::Unpinned`).
-//! Both apps list every add-on ([`OFFERED`]) but Screen recorder, which shows
-//! once yravgSubMeetly Recorder is installed ([`rows`]). From seven rows each
-//! is one line: the name, then the line after it.
-//!
-//! A Studio Pro add-on's row says Pro where its size was, for everyone, so
-//! people know what Pro brings before they buy it. Without Pro its switch
-//! gives way to a +, and a click opens what it does ([`locked`], [`draw_about`]).
-//! The Downloader's tools come only with Pro ([`needs_pro`]).
+//! row toggles, as in Settings (`Command::SaveSettings`; the app passes the
+//! change to `services::addons`). One whose files this build can't get yet
+//! stays off and says so (`Status::Unpinned`).
+//! Both apps list every add-on ([`OFFERED`]).
 
 use crate::commands::Command;
-use crate::gfx::{TextStyle, Weight};
+use crate::gfx::TextStyle;
 use crate::icons::Icon;
 use crate::state::AppState;
-use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_GAP, PILL_SMALL};
+use crate::ui::{wid_n, Ui};
 use poni_core::addons::{self, Addon, Status};
 use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::phonedrop::fmt_bytes;
@@ -52,8 +41,7 @@ const TWO_LINES: f32 = 33.0;
 const BADGE_ONE_LINE: f32 = 24.0;
 /// Between the name and the line after it, on a one-line row.
 const LINE_GAP: f32 = 10.0;
-/// The add-ons this app has, in the page's order: all of them, on Windows
-/// and on the Mac (whose Prayer times use macOS's location and sounds).
+/// The add-ons this app has, in the page's order.
 pub const OFFERED: &[&Addon] = &addons::ALL;
 /// The lines name the Mac ("on this Mac") and leave out Windows' reasons.
 const MAC: bool = cfg!(target_os = "macos");
@@ -63,10 +51,9 @@ pub fn height(st: &AppState) -> f32 {
     ROWS_Y + n as f32 * row_h(n)
 }
 
-/// The page's rows: every add-on offered, Downloader only where it's offered
-/// (`AppState::downloader_offered`).
-fn rows(st: &AppState) -> Vec<&'static Addon> {
-    OFFERED.iter().copied().filter(|a| a.id != addons::DOWNLOADER.id || st.downloader_offered).collect()
+/// The page's rows: every add-on offered.
+fn rows(_st: &AppState) -> Vec<&'static Addon> {
+    OFFERED.to_vec()
 }
 
 fn row_h(n: usize) -> f32 {
@@ -81,12 +68,11 @@ fn status(st: &AppState, a: &Addon) -> Status {
 /// Each add-on's icon on its badge.
 fn icon(a: &Addon) -> Icon {
     match a.id {
-        "sholat" => Icon::Moon,
-        "ja" => Icon::Lyrics,
         "script" => Icon::Script,
         "system" => Icon::Gauge,
-        "notifications" => Icon::Bell,
-        "downloader" => Icon::Download,
+        "timer" => Icon::Clock,
+        "talk" => Icon::Volume,
+        "engine" => Icon::Cpu,
         _ => Icon::Addons,
     }
 }
@@ -184,83 +170,11 @@ mod tests {
     use super::*;
     use poni_core::settings::Settings;
     use poni_core::store::Store;
-    use crate::state::OyenzaLink;
 
     #[test]
     fn every_row_offered_fits_the_page() {
-        let mut st = AppState::new(Settings::default(), Store::default());
-        let without = rows(&st).len();
-        // yravgSubMeetly Recorder installed, and signed in with Pro where the
-        // Downloader is offered: the recorder and the Downloader join.
-        st.recorder = true;
-        st.store.recorder_island = true;
-        st.downloader_offered = true;
-        st.oyenza.link = OyenzaLink::Connected { account: "a•••@example.com".into() };
-        st.oyenza.pro = Some(true);
-        assert_eq!(rows(&st).len(), without + 2);
+        let st = AppState::new(Settings::default(), Store::default());
+        assert_eq!(rows(&st).len(), addons::ALL.len());
         assert!(height(&st) <= MAX_H, "the window never grows for this page");
-        let h = row_h(rows(&st).len());
-        assert!(h < TWO_LINES, "that many rows are a line each");
-        assert!(BADGE_ONE_LINE.min(h - 2.0) + 2.0 <= h, "{h} DIPs: the badges keep apart");
-    }
-
-    #[test]
-    fn pro_add_ons_show_for_everyone_and_say_what_they_do_without_pro() {
-        use poni_core::addons::{AI_USAGE, DOWNLOADER, IELTS, MEETING_NOTES, STOCKS};
-        let connected = || OyenzaLink::Connected { account: "a\u{2022}\u{2022}\u{2022}@example.com".into() };
-        let listed = |st: &AppState, id: &str| rows(st).iter().any(|a| a.id == id);
-        let mut st = AppState::new(Settings::default(), Store::default());
-        st.downloader_offered = true;
-        // The Downloader switched on before, its tools in place.
-        st.settings.set_addon(DOWNLOADER.id, true);
-        st.addons.insert(DOWNLOADER.id, Status::Ready);
-        for (link, pro) in [(OyenzaLink::Off, None), (connected(), None), (connected(), Some(false))] {
-            st.oyenza.link = link;
-            st.oyenza.pro = pro;
-            for a in [&AI_USAGE, &MEETING_NOTES, &IELTS, &DOWNLOADER] {
-                assert!(listed(&st, a.id), "{} listed without Pro ({pro:?})", a.id);
-                assert_eq!(status(&st, a), Status::Off, "{} stays off", a.id);
-                assert!(locked(&st, a), "{}: its row opens what it does ({pro:?})", a.id);
-                assert_ne!(about(a), a.blurb, "{} says more than its row", a.id);
-            }
-            assert!(!st.ai_usage_on());
-        }
-        // With Pro they switch: AI usage is on already, until switched off.
-        st.oyenza.link = connected();
-        st.oyenza.pro = Some(true);
-        assert_eq!(status(&st, &DOWNLOADER), Status::Ready);
-        assert_eq!(status(&st, &AI_USAGE), Status::Ready);
-        assert!(st.ai_usage_on() && !locked(&st, &AI_USAGE) && !locked(&st, &IELTS));
-        st.settings.set_addon(AI_USAGE.id, false);
-        assert_eq!(status(&st, &AI_USAGE), Status::Off);
-        assert!(!st.ai_usage_on() && !locked(&st, &AI_USAGE));
-        // One left on when Pro ended still switches off.
-        st.settings.set_addon(IELTS.id, true);
-        st.addons.insert(IELTS.id, Status::Ready);
-        st.oyenza.pro = Some(false);
-        assert!(!locked(&st, &IELTS));
-        // Not where it isn't offered (the Store build), Pro or not.
-        st.downloader_offered = false;
-        assert!(!listed(&st, DOWNLOADER.id));
-        // A free add-on: listed and on without Pro.
-        st.oyenza = Default::default();
-        st.settings.set_addon(STOCKS.id, true);
-        st.addons.insert(STOCKS.id, Status::Ready);
-        assert_eq!(status(&st, &STOCKS), Status::Ready);
-        assert!(listed(&st, STOCKS.id) && !locked(&st, &STOCKS));
-    }
-
-    #[test]
-    fn the_island_asks_about_pro_at_sign_in_for_what_needs_it() {
-        use poni_core::addons::{AI_USAGE, DOWNLOADER};
-        let mut st = AppState::new(Settings::default(), Store::default());
-        assert!(pro_wanted(&st), "AI usage's tab waits on it");
-        st.settings.set_addon(AI_USAGE.id, false);
-        assert!(!pro_wanted(&st), "nothing to ask about at sign-in");
-        st.downloader_offered = true;
-        st.settings.set_addon(DOWNLOADER.id, true);
-        assert!(pro_wanted(&st));
-        st.downloader_offered = false;
-        assert!(!pro_wanted(&st), "not offered here");
     }
 }

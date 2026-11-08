@@ -127,9 +127,8 @@ pub const GLASS_LIGHT: Look = Look {
 /// src/minutes.css) on the island. A charcoal ground (#181818), near-white ink
 /// (#f5f5f5), the emerald accent (#14b789) and the warn, danger and AI tones
 /// from the same stylesheets. The light (Coretax paper) counterpart is
-/// #FFFFFF ground, #131B44 ink, #212C5F navy accent and #FFC91B gold; the
-/// island itself stays dark, so only the dark mapping is used here. It floats
-/// as the Pill, the default theme.
+/// #FFFFFF ground, #131B44 ink, #212C5F navy accent and #FFC91B gold, see
+/// [`SUBMEETLY_PAPER`] (the default). This dark one stays as the Pill theme.
 pub const SUBMEETLY: Look = Look {
     ground: Color::hex(0x181818),
     ink: Color::hex(0xF5F5F5),
@@ -151,6 +150,33 @@ pub const SUBMEETLY: Look = Look {
     ],
 };
 
+/// The light counterpart of [`SUBMEETLY`]: the Coretax paper tokens of the
+/// design canvas (`.desk` in docs/design/submeetly-canvas): `--bg` #FFFFFF
+/// ground, `--text` #131B44 ink, `--accent` navy #212C5F, `--gold` #FFC91B,
+/// `--border` navy at 14 % over white (#E0E2E9). Accents swap for the canvas's
+/// own: `--ok`, `--warn-edge`/`--warn-text`, `--danger`, `--t-decision`,
+/// `--t-metric`, `--ai`. The Pill's default look.
+pub const SUBMEETLY_PAPER: Look = Look {
+    ground: Color::hex(0xFFFFFF),
+    ink: Color::hex(0x131B44),
+    accent: Some(Color::hex(0x212C5F)),
+    border: Color::hex(0xE0E2E9),
+    light: true,
+    font: None,
+    material: Material::Solid,
+    shape: Shape::Pill,
+    swaps: &[
+        Swap { from: palette::GREEN, fill: Color::hex(0x17744A), text: Color::hex(0x17744A) },
+        Swap { from: palette::ORANGE, fill: Color::hex(0xD99A00), text: Color::hex(0x7A5200) },
+        Swap { from: palette::RED, fill: Color::hex(0xB02A1E), text: Color::hex(0xB02A1E) },
+        Swap { from: palette::BLUE, fill: Color::hex(0x1F5F9E), text: Color::hex(0x1F5F9E) },
+        Swap { from: palette::CYAN, fill: Color::hex(0x0B6E83), text: Color::hex(0x0B6E83) },
+        Swap { from: palette::PURPLE, fill: Color::hex(0x4A3C94), text: Color::hex(0x4A3C94) },
+        Swap { from: palette::YELLOW, fill: Color::hex(0xFFC91B), text: Color::hex(0x7A5200) },
+        Swap { from: palette::PINK, fill: Color::hex(0xD95926), text: Color::hex(0xA63F12) },
+    ],
+};
+
 /// The theme's look. Glass starts dark; the app picks [`glass`] light or
 /// dark from what's behind the island and the Windows mode.
 pub fn of(theme: Theme) -> &'static Look {
@@ -158,6 +184,7 @@ pub fn of(theme: Theme) -> &'static Look {
         Theme::Classic => &CLASSIC,
         Theme::Glass => &GLASS_DARK,
         Theme::Pill => &SUBMEETLY,
+        Theme::Paper => &SUBMEETLY_PAPER,
     }
 }
 
@@ -170,6 +197,7 @@ pub fn around_notch(theme: Theme) -> &'static Look {
         Theme::Classic => &CLASSIC,
         Theme::Glass => &GLASS_DARK,
         Theme::Pill => &SUBMEETLY,
+        Theme::Paper => &SUBMEETLY_PAPER,
     }
 }
 
@@ -233,6 +261,7 @@ mod tests {
         assert_eq!(*around_notch(Theme::Classic), CLASSIC);
         assert_eq!(*around_notch(Theme::Glass), GLASS_DARK);
         assert_eq!(*around_notch(Theme::Pill), SUBMEETLY);
+        assert_eq!(*around_notch(Theme::Paper), SUBMEETLY_PAPER);
     }
 
     #[test]
@@ -248,6 +277,30 @@ mod tests {
         assert_eq!(SUBMEETLY.paint(palette::GREEN), Color::hex(0x14B789));
         assert_eq!(SUBMEETLY.paint_text(palette::GREEN), Color::hex(0x6CE0B8));
         assert_eq!(SUBMEETLY.material, Material::Solid);
+    }
+
+    #[test]
+    fn paper_is_the_canvas_light_look() {
+        assert_eq!(*of(Theme::Paper), SUBMEETLY_PAPER);
+        assert_eq!(SUBMEETLY_PAPER.shape, Shape::Pill);
+        assert!(SUBMEETLY_PAPER.light);
+        assert_eq!(SUBMEETLY_PAPER.ground, Color::hex(0xFFFFFF));
+        assert_eq!(SUBMEETLY_PAPER.ink, Color::hex(0x131B44));
+        assert_eq!(SUBMEETLY_PAPER.accent, Some(Color::hex(0x212C5F)));
+        // Classic's white text is the ink, its black island is the paper.
+        assert_eq!(SUBMEETLY_PAPER.paint(Color::white(1.0)), Color::hex(0x131B44));
+        assert_eq!(SUBMEETLY_PAPER.paint(Color::black(1.0)), Color::hex(0xFFFFFF));
+        assert_eq!(SUBMEETLY_PAPER.paint(palette::YELLOW), Color::hex(0xFFC91B));
+        assert_eq!(SUBMEETLY_PAPER.paint_text(palette::YELLOW), Color::hex(0x7A5200));
+        // Coloured text reads on the paper: WCAG contrast of at least 4.5.
+        fn lin(v: f32) -> f32 {
+            if v <= 0.03928 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+        }
+        let rl = |c: Color| 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+        for s in SUBMEETLY_PAPER.swaps {
+            let ratio = 1.05 / (rl(s.text) + 0.05);
+            assert!(ratio >= 4.5, "{:?} {ratio}", s.from);
+        }
     }
 
     #[test]

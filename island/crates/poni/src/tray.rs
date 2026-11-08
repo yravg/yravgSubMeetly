@@ -122,7 +122,7 @@ pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine) -> Vec<MenuIte
         item("Advanced settings…", MenuCmd::ShowSettings, false),
         MenuItem::Separator,
         item("Keep island open", MenuCmd::TogglePinned, pinned),
-        MenuItem::Sub { label: "Theme".into(), items: vec![theme("Classic", Theme::Classic), theme("Glass", Theme::Glass), theme("Pill", Theme::Pill)] },
+        MenuItem::Sub { label: "Theme".into(), items: vec![theme("Classic", Theme::Classic), theme("Glass", Theme::Glass), theme("Paper", Theme::Paper), theme("Pill", Theme::Pill)] },
         // The status bar is listed only in Pill, as on the Settings page: the
         // other themes would draw the clock for it.
         MenuItem::Sub { label: "Idle look".into(), items: crate::pill::status::looks(s.theme).iter().map(|l| style(*l)).collect() },
