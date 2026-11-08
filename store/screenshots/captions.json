@@ -1,7 +1,7 @@
 {
   "source": "app.html",
   "size": "1280x800",
-  "capturedAt": "2026-11-08T12:27:07.376Z",
+  "capturedAt": "2026-11-08T14:11:11.293Z",
   "shots": [
     {
       "file": "01-sidepanel-realtime.png",
@@ -15,7 +15,7 @@
     },
     {
       "file": "03-settings-helper.png",
-      "surface": "settings",
+      "surface": "helper",
       "caption": "Pengaturan mesin + status Native Helper & ekspor"
     }
   ]

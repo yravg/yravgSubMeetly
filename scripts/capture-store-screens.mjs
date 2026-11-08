@@ -130,8 +130,8 @@ const SHOTS = [
   },
   {
     file: '03-settings-helper.png',
-    surface: 'settings',
-    // Modal lebarnya tetap; shell lebar hanya menyisakan ruang kosong.
+    // Since board D02 the Native Helper status has its own Helper tab (Settings > Engine only links to it).
+    surface: 'helper',
     width: 'compact',
     caption: 'Pengaturan mesin + status Native Helper & ekspor',
   },
@@ -171,6 +171,10 @@ async function main() {
   for (const shot of SHOTS) {
     await openSurface(page, shot.surface);
     if (shot.prepare) await shot.prepare(page);
+    // The notes sample opens the Minutes register in a new tab; the panel tab then runs in the
+    // background (about 1 frame/s) and the next screenshot times out. Close extras, refocus.
+    for (const other of await browser.pages()) if (other !== page) await other.close();
+    await page.bringToFront();
     await stageShot(page, { width: shot.width });
     const out = path.join(OUT, shot.file);
     await page.screenshot({ path: out, fullPage: false });
