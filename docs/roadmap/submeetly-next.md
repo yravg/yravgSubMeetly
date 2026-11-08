@@ -56,7 +56,7 @@ Status words: `missing`, `partial`, `done`. The handoff holds the evidence for e
 
 | ID | P | Row | Acceptance (observable) | Status |
 |---|---|---|---|---|
-| BRAND-001 | P0 | Display name yravgSubMeetly everywhere users look | No user-visible "yraverageSubMin" in extension, helper, macOS app, guides, store listing | done (merged 35f47ce; store PNGs open) |
+| BRAND-001 | P0 | Display name yravgSubMeetly everywhere users look | No user-visible "yraverageSubMin" in extension, helper, macOS app, guides, store listing | done (merged 35f47ce; store PNGs 01-02 recaptured 2026-11-08; 03-settings still old wordmark: capture times out on the Settings shot) |
 | ENG-001 | P0 | Rust engine serves every non-ML route like Python | 79 goldens, 0 mismatches, `npm run test:engine-rs` | done (merged 6da5720) |
 | ENG-002 | P0 | Rust engine speech-to-text (candle Whisper) | WER <= 0.10 vs Python faster-whisper per clip on 5 CC0 clips; segment starts within 0.5 s; RTF reported | done (merge a595096: WER <= 0.021, starts within 0.06 s on 5 clips; RTF rust 0.19-0.28, python 0.05-0.16 on CPU) |
 | ENG-003 | P1 | Rust engine translation (candle Qwen2.5) | Same prompts as Python; non-empty, target script, no prompt leakage on fixed set | partial (route and prompts ported in a595096; property test never ran, model download too slow) |

@@ -59,6 +59,8 @@ async function stageShot(page, { width = 'full' } = {}) {
     // punya spesifisitas yang sama dengan `[hidden]`, jadi spanduk tetap tampil.
     const banner = document.querySelector('.app-banner');
     if (banner) banner.style.display = 'none';
+    // Lab chrome (board D03: lab bar, lab tabs, state notes, sample rails) is not the product: the listing shows the panel only.
+    for (const el of document.querySelectorAll('.labbar, #ltabs, .lstate, #lab-rails')) el.style.display = 'none';
     document.body.setAttribute('data-width', w);
   }, width);
   await new Promise((r) => setTimeout(r, 600));
