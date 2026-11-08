@@ -124,6 +124,10 @@ fn handle_connection(stream: TcpStream, app: &App) -> io::Result<()> {
             peer_loopback,
             body_file,
         };
+        if let Some(page) = crate::web::serve(&request) {
+            write_page(&mut writer, &page)?;
+            continue;
+        }
         let response = app.handle(&request);
         if let Some(path) = &request.body_file {
             let _ = std::fs::remove_file(path);
@@ -187,6 +191,25 @@ fn write_response(writer: &mut TcpStream, response: &Response) -> io::Result<()>
     writer.flush()
 }
 
+fn write_page(writer: &mut TcpStream, page: &crate::web::WebResponse) -> io::Result<()> {
+    let head = format!(
+        "HTTP/1.1 {} {}
+Content-Type: {}
+Content-Length: {}
+Cache-Control: no-cache
+X-Content-Type-Options: nosniff
+
+",
+        page.status,
+        reason_phrase(page.status),
+        page.content_type,
+        page.body.len()
+    );
+    writer.write_all(head.as_bytes())?;
+    writer.write_all(&page.body)?;
+    writer.flush()
+}
+
 fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",
@@ -195,6 +218,7 @@ fn reason_phrase(status: u16) -> &'static str {
         400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
+        405 => "Method Not Allowed",
         500 => "Internal Server Error",
         501 => "Not Implemented",
         _ => "OK",

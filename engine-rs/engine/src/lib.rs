@@ -12,6 +12,7 @@ pub mod protocol;
 pub mod server;
 pub mod state;
 pub mod translate;
+pub mod web;
 pub mod whisper;
 mod whisper_model;
 
