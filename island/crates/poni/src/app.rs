@@ -2110,6 +2110,7 @@ impl App {
             AppEvent::Paired(e) => self.on_paired(e),
             AppEvent::Autostart(on) => self.st.ui.autostart = Some(on),
             AppEvent::Helper(r) => self.st.helper.apply(r),
+            AppEvent::Engine(info) => self.st.engine = info,
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::Addon { id, status } => {
                 // A late report from before a switch-off doesn't bring it back.

@@ -15,6 +15,39 @@ pub struct WebResponse {
 /// The how-to page lives in the engine, so it never enters the store zip.
 const SETUP_PAGE: &str = include_str!("../web/setup-extension.html");
 
+/// The extension ID of the unpacked build (src/manifest.json "key").
+pub const EXTENSION_ID: &str = "llhpkcjflnepbpgldhbceifjbjgcbapi";
+
+const SEEN_FILE: &str = "extension-seen";
+
+/// The extension (or its native host) reached the engine at least once: the
+/// how-to page and the island read it to know the extension is installed.
+pub fn mark_extension_seen() {
+    mark_seen_in(&crate::state::default_state_dir());
+}
+
+fn mark_seen_in(dir: &Path) {
+    let file = dir.join(SEEN_FILE);
+    if !file.exists() {
+        let _ = std::fs::create_dir_all(dir);
+        let _ = std::fs::write(file, b"1");
+    }
+}
+
+fn seen_in(dir: &Path) -> bool {
+    dir.join(SEEN_FILE).exists()
+}
+
+/// Call with every request: an Origin of the extension marks it seen.
+pub fn note_extension(request: &Request) {
+    if request
+        .header("Origin")
+        .is_some_and(|o| o.starts_with("chrome-extension://"))
+    {
+        mark_extension_seen();
+    }
+}
+
 /// Folder with the built pages: `SUBMEETLY_APP_DIR`, else `app` or `extension`
 /// next to the engine exe.
 pub fn app_dir() -> Option<PathBuf> {
@@ -43,6 +76,22 @@ pub fn serve(request: &Request) -> Option<WebResponse> {
         || !is_loopback_host(host_header_hostname(request.header("Host").unwrap_or("")))
     {
         return Some(text(403, "helper hanya melayani loopback"));
+    }
+    if rest == "_status.json" {
+        let body = format!(
+            "{{\"extensionSeen\":{},\"extensionId\":\"{EXTENSION_ID}\",\"appDir\":{}}}",
+            seen_in(&crate::state::default_state_dir()),
+            serde_json::Value::String(
+                app_dir()
+                    .map(|d| d.display().to_string())
+                    .unwrap_or_default()
+            )
+        );
+        return Some(WebResponse {
+            status: 200,
+            content_type: "application/json; charset=utf-8",
+            body: body.into_bytes(),
+        });
     }
     let name = if rest.is_empty() {
         "minutes.html"
@@ -186,6 +235,24 @@ mod tests {
         ] {
             assert!(safe_join(&r, bad).is_none(), "{bad}");
         }
+    }
+
+    #[test]
+    fn the_extension_seen_flag_is_written_once_and_read_back() {
+        let d = std::env::temp_dir().join(format!("ysm-seen-{}", std::process::id()));
+        assert!(!seen_in(&d));
+        mark_seen_in(&d);
+        mark_seen_in(&d);
+        assert!(seen_in(&d));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn the_status_page_names_the_fixed_extension_id() {
+        let reply = serve(&req("GET", "/app/_status.json", "127.0.0.1", true)).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&reply.body).unwrap();
+        assert_eq!(v["extensionId"], EXTENSION_ID);
+        assert!(v["extensionSeen"].is_boolean());
     }
 
     #[test]

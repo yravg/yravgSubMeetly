@@ -124,6 +124,7 @@ fn handle_connection(stream: TcpStream, app: &App) -> io::Result<()> {
             peer_loopback,
             body_file,
         };
+        crate::web::note_extension(&request);
         if let Some(page) = crate::web::serve(&request) {
             write_page(&mut writer, &page)?;
             continue;

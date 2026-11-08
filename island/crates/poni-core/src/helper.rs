@@ -155,6 +155,8 @@ pub struct Health {
     pub compute: String,
     pub translate: bool,
     pub platform: String,
+    /// The Rust engine (it decodes media itself); false for the Python helper.
+    pub rust: bool,
 }
 
 fn text(v: &Value, k: &str) -> Option<String> {
@@ -173,6 +175,7 @@ pub fn parse_health(body: &str) -> Option<Health> {
         compute: text(&v, "compute").unwrap_or_default(),
         translate: v.get("translate").and_then(Value::as_bool).unwrap_or(false),
         platform: text(&v, "platform").unwrap_or_default(),
+        rust: text(&v, "media_decoder").as_deref() == Some("symphonia"),
     })
 }
 
