@@ -137,6 +137,7 @@ export const LOW_CONFIDENCE = 0.7;
  * @property {string} name
  * @property {string|null} org
  * @property {string|null} speakerLabel
+ * @property {string|null} email      alamat surel bila diketahui (dipakai add-in Recap email)
  */
 
 /**
@@ -349,6 +350,7 @@ export function createMeeting(partial = {}) {
       name: str(a?.name),
       org: strOrNull(a?.org),
       speakerLabel: strOrNull(a?.speakerLabel),
+      email: strOrNull(a?.email),
     })).filter((a) => a.name),
     agenda: (Array.isArray(partial.agenda) ? partial.agenda : []).map((a) => ({
       ref: str(a?.ref),
