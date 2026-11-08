@@ -1,11 +1,14 @@
 //! Live page (board I02): what the helper is hearing now. The previous line
 //! dim, the current line large, its translation under it in the person's
-//! colour (Settings), and Pause / Stop beside the title.
+//! colour (Settings), and Hold / Unfollow beside the title.
 //!
 //! The line comes from the engine's `GET /live` (the last line it heard, while
 //! it is fresh), else from the tail of the newest note's `transcript[]`
-//! (`poni_core::helper`). Pause holds the page on the line it shows; Stop
-//! leaves the note alone and stops following until Start.
+//! (`poni_core::helper`). Hold (was Pause) keeps the page on the line it shows; Unfollow (was Stop)
+//! leaves the note alone and stops following until Start. Neither controls
+//! capture: it lives in the Chrome extension and the Mac app, and the helper
+//! has no capture route (ISL-002 gap), so the labels and a line on the page
+//! say "this view".
 //! The five states are `PageState`: normal, empty (nothing to follow, or
 //! stopped), error (helper offline), locked (an issued meeting) and needs
 //! input (items wait on a person; a pill opens the Meeting page).
@@ -41,9 +44,9 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
             let (title, line) = if st.helper.following {
                 ("Nothing to follow", "Start a recording in the extension or the Mac app. The newest line shows up here.")
             } else {
-                ("Stopped", "The island left the meeting alone. Start follows the newest line again.")
+                ("Unfollowed", "The island left the meeting alone. Follow shows the newest line again.")
             };
-            let button = if st.helper.following { None } else { Some(("Start", wid("live.start"))) };
+            let button = if st.helper.following { None } else { Some(("Follow", wid("live.start"))) };
             if hkit::message(ui, area, accent, Icon::Lyrics, title, line, false, button) {
                 st.helper.set_following(true);
             }
@@ -63,16 +66,16 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     let head = Rect::new(area.x, area.y, area.w, HEAD_H);
     let cy = head.center().y;
 
-    // Right to left: Stop, Pause, then the "waiting" pill.
+    // Right to left: Unfollow, Hold, then the "waiting" pill.
     let mut right = head.right();
     if !locked {
-        let w = ui.pill_width("Stop", false, true);
+        let w = ui.pill_width("Unfollow", false, true);
         let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
-        if ui.pill(wid("live.stop"), b, "Stop", None, PillStyle::Utility).clicked {
+        if ui.pill(wid("live.stop"), b, "Unfollow", None, PillStyle::Utility).clicked {
             st.helper.set_following(false);
         }
         right = b.x - PILL_GAP;
-        let label = if paused { "Resume" } else { "Pause" };
+        let label = if paused { "Release" } else { "Hold" };
         let w = ui.pill_width(label, false, true);
         let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
         if ui.pill(wid("live.pause"), b, label, None, PillStyle::Neutral).clicked {
@@ -92,7 +95,7 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     let tag = if locked {
         "Issued \u{b7} read-only"
     } else if paused {
-        "Paused"
+        "Held"
     } else {
         "Following"
     };
@@ -114,6 +117,12 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     y += 50.0;
     if !cap.translation.is_empty() {
         ui.c.text(&cap.translation, Rect::new(area.x, y, area.w, 40.0), &TextStyle::body().color(color).wrap().top());
+    }
+    // Capture runs in the Chrome extension or the Mac app, which the helper has no
+    // route to control: these two buttons act on this view only, and it says so.
+    if !locked {
+        let note = "Hold and Unfollow change this view. Recording runs in the extension.";
+        ui.c.text(note, Rect::new(area.x, area.bottom() - 14.0, (area.w - 70.0).max(0.0), 14.0), &TextStyle::caption().color(palette::TEXT_FAINT));
     }
     if total > 0 {
         let n = st.helper.frozen.map_or(total, |i| i + 1);
