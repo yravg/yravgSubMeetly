@@ -122,6 +122,7 @@ pub enum Section {
     Island,
     Music,
     Speech,
+    Models,
     Popups,
     Tabs,
     Addons,
@@ -131,12 +132,13 @@ pub enum Section {
 }
 
 impl Section {
-    pub const ALL: [Section; 11] = [
+    pub const ALL: [Section; 12] = [
         Section::General,
         Section::Appearance,
         Section::Island,
         Section::Music,
         Section::Speech,
+        Section::Models,
         Section::Popups,
         Section::Tabs,
         Section::Addons,
@@ -152,6 +154,7 @@ impl Section {
             Section::Island => "Island",
             Section::Music => "Music and lyrics",
             Section::Speech => "Captions and languages",
+            Section::Models => "Models",
             Section::Popups => "Pop-ups",
             Section::Tabs => "Tabs",
             Section::Addons => "Add-ons",
@@ -169,6 +172,7 @@ impl Section {
             Section::Island => "island",
             Section::Music => "music",
             Section::Speech => "speech",
+            Section::Models => "models",
             Section::Popups => "popups",
             Section::Tabs => "tabs",
             Section::Addons => "addons",
@@ -185,6 +189,7 @@ impl Section {
             Section::Island => Icon::AppWindow,
             Section::Music => Icon::Music,
             Section::Speech => Icon::Lyrics,
+            Section::Models => Icon::Download,
             Section::Popups => Icon::Volume,
             Section::Tabs => Icon::App,
             Section::Addons => Icon::Addons,
@@ -202,6 +207,7 @@ impl Section {
             Section::Island => palette::BLUE,
             Section::Music => palette::PINK,
             Section::Speech => palette::PURPLE,
+            Section::Models => palette::YELLOW,
             Section::Popups => palette::CYAN,
             Section::Tabs => palette::GREEN,
             Section::Addons => Color::hex(0x0A84FF),
@@ -514,8 +520,11 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 ],
             ),
             Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
-            Block::Group(Some("Models"), [Kind::Asr, Kind::Translate].into_iter().flat_map(|k| model_items(&st.models, k)).collect()),
         ],
+        Section::Models => [Kind::Asr, Kind::Translate]
+            .into_iter()
+            .map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k)))
+            .collect(),
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
             vec![
@@ -1146,7 +1155,7 @@ fn draw(ui: &mut Ui, st: &mut AppState, section: Section, frame: Frame, light: b
     ui.c.clip(view);
     let mut y = view.y - sc.at;
     let x = content.x;
-    if section == Section::Speech && st.models.due(st.now) {
+    if matches!(section, Section::Speech | Section::Models) && st.models.due(st.now) {
         st.cmd(Command::ModelsRefresh);
     }
     for (bi, b) in blocks(section, st).into_iter().enumerate() {
@@ -1756,8 +1765,8 @@ mod tests {
     fn the_model_rows_offer_the_catalog_and_download_what_is_missing() {
         use poni_core::models::{parse, Kind, OFF};
         let mut st = state();
-        let pick = |st: &AppState, k| row(Section::Speech, st, Key::ModelPick(k)).map(|i| (i.sub.unwrap_or_default(), i.ctl));
-        let button = |st: &AppState, k| row(Section::Speech, st, Key::ModelPull(k)).map(|i| i.ctl);
+        let pick = |st: &AppState, k| row(Section::Models, st, Key::ModelPick(k)).map(|i| (i.sub.unwrap_or_default(), i.ctl));
+        let button = |st: &AppState, k| row(Section::Models, st, Key::ModelPull(k)).map(|i| i.ctl);
         // Before the engine answered: a line, nothing to step or press.
         assert_eq!(pick(&st, Kind::Asr), Some(("Checking…".into(), Ctl::None)));
         assert_eq!(button(&st, Kind::Asr), None);

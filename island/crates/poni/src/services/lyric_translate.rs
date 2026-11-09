@@ -107,7 +107,7 @@ fn run(shared: &Shared, sink: &EventSink, job: Job) {
     }
     // The engine downloads a translation model it lacks at the first request, silently and for minutes.
     if crate::services::capture::translation_on_disk(job.port) == Some(false) {
-        return send(&job, Vec::new(), TrState::Unavailable("The translation model is not downloaded. Download it in Settings, under Captions and languages.".into()));
+        return send(&job, Vec::new(), TrState::Unavailable("The translation model is not downloaded. Download it in Settings, under Models.".into()));
     }
     let mut out = vec![String::new(); job.lines.len()];
     send(&job, out.clone(), TrState::Working);
