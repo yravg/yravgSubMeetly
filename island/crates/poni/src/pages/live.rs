@@ -35,10 +35,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let state = st.helper.live_state();
     match state {
         PageState::Error => {
-            let line = hkit::offline_line(&st.helper.link);
-            if hkit::message(ui, area, accent, Icon::Unlink, "Helper offline", &line, true, Some(("Try again", wid("live.retry")))) {
-                st.cmd(Command::HelperPoll);
-            }
+            hkit::offline(ui, st, area, wid("live.retry"));
         }
         PageState::Empty => {
             let (title, line) = if st.helper.following {

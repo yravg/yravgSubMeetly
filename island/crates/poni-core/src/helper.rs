@@ -155,6 +155,8 @@ pub struct Health {
     pub compute: String,
     pub translate: bool,
     pub platform: String,
+    /// The Rust engine (it decodes media itself); false for the Python helper.
+    pub rust: bool,
 }
 
 fn text(v: &Value, k: &str) -> Option<String> {
@@ -173,6 +175,7 @@ pub fn parse_health(body: &str) -> Option<Health> {
         compute: text(&v, "compute").unwrap_or_default(),
         translate: v.get("translate").and_then(Value::as_bool).unwrap_or(false),
         platform: text(&v, "platform").unwrap_or_default(),
+        rust: text(&v, "media_decoder").as_deref() == Some("symphonia"),
     })
 }
 
@@ -345,7 +348,7 @@ pub fn current(notes: &[Note]) -> Option<&Note> {
 }
 
 pub fn meeting_state(link: &Link, notes: &[Note]) -> PageState {
-    if matches!(link, Link::Offline(_)) {
+    if !matches!(link, Link::Online) {
         return PageState::Error;
     }
     match current(notes) {
@@ -376,7 +379,7 @@ pub fn inbox_locked(notes: &[Note]) -> usize {
 }
 
 pub fn inbox_state(link: &Link, notes: &[Note]) -> PageState {
-    if matches!(link, Link::Offline(_)) {
+    if !matches!(link, Link::Online) {
         PageState::Error
     } else if !inbox(notes).is_empty() {
         PageState::Normal
@@ -412,7 +415,7 @@ pub fn captions(note: &Note, at: Option<usize>) -> Captions {
 
 /// `following`: the person has not pressed Stop on the Live page.
 pub fn live_state(link: &Link, notes: &[Note], following: bool) -> PageState {
-    if matches!(link, Link::Offline(_)) {
+    if !matches!(link, Link::Online) {
         return PageState::Error;
     }
     match current(notes) {
@@ -562,7 +565,7 @@ pub fn unowned(note: &Note) -> usize {
 }
 
 pub fn timer_state(link: &Link, notes: &[Note]) -> PageState {
-    if matches!(link, Link::Offline(_)) {
+    if !matches!(link, Link::Online) {
         return PageState::Error;
     }
     match current(notes) {
@@ -574,7 +577,7 @@ pub fn timer_state(link: &Link, notes: &[Note]) -> PageState {
 }
 
 pub fn talk_state(link: &Link, notes: &[Note]) -> PageState {
-    if matches!(link, Link::Offline(_)) {
+    if !matches!(link, Link::Online) {
         return PageState::Error;
     }
     match current(notes) {
@@ -896,6 +899,18 @@ mod tests {
     }
 
     #[test]
+    fn before_the_first_answer_no_page_claims_to_be_empty() {
+        // The island starts the engine itself: until /notes answers, say so (the offline page) instead of "No decisions yet".
+        let n = notes();
+        let c = Link::Connecting;
+        assert_eq!(meeting_state(&c, &n), PageState::Error);
+        assert_eq!(inbox_state(&c, &n), PageState::Error);
+        assert_eq!(live_state(&c, &n, true), PageState::Error);
+        assert_eq!(timer_state(&c, &n), PageState::Error);
+        assert_eq!(talk_state(&c, &n), PageState::Error);
+    }
+
+    #[test]
     fn meeting_states() {
         let n = notes();
         assert_eq!(meeting_state(&Link::Online, &n), PageState::Needs);
@@ -1029,7 +1044,7 @@ mod tests {
         assert!(!w.running() && w.elapsed(30.0) == 0.0);
 
         let mut v = View::default();
-        assert_eq!(v.live_state(), PageState::Empty);
+        assert_eq!(v.live_state(), PageState::Error, "no answer yet is not an empty meeting");
         v.apply(Ok((Snapshot { notes: notes(), ..Default::default() }, 12)));
         assert_eq!(v.link, Link::Online);
         assert_eq!(v.live_state(), PageState::Needs);

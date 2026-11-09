@@ -9,8 +9,9 @@ $version = (Select-String -Path (Join-Path $island 'Cargo.toml') -Pattern '^vers
 $env:CARGO_TARGET_DIR = $Target
 Push-Location $island; cargo build -p poni --release; if ($LASTEXITCODE) { throw 'poni build failed' }; Pop-Location
 Push-Location (Join-Path $root 'engine-rs'); cargo build -p submeetly-engine --release; if ($LASTEXITCODE) { throw 'engine build failed' }; Pop-Location
+Push-Location $root; npm run build; if ($LASTEXITCODE) { throw 'extension build failed' }; Pop-Location
 $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-& $iscc "/DAppVersion=$version" "/DExeSource=$Target\release\poni.exe" "/DEngineSource=$Target\release\submeetly-engine.exe" (Join-Path $island 'installer\yravgsubmeetly.iss')
+& $iscc "/DAppVersion=$version" "/DExeSource=$Target\release\poni.exe" "/DEngineSource=$Target\release\submeetly-engine.exe" "/DExtensionSource=$root\dist" (Join-Path $island 'installer\yravgsubmeetly.iss')
 if ($LASTEXITCODE) { throw 'ISCC failed' }
 $setup = Join-Path $island "dist\yravgSubMeetly-Setup-$version.exe"
 '{0}  {1:N1} MB  sha256 {2}' -f $setup, ((Get-Item $setup).Length / 1MB), (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()

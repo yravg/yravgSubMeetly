@@ -6,7 +6,10 @@ use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
 use crate::ui::{PillStyle, Ui, PILL_SMALL};
 use poni_core::geom::{palette, Color, Point, Rect};
-use poni_core::helper::{Kind, Link};
+use crate::commands::Command;
+use crate::state::AppState;
+use poni_core::engine_link;
+use poni_core::helper::{self, Kind, Link};
 
 /// Height of the block [`message`] draws.
 pub const MESSAGE_H: f32 = 56.0;
@@ -35,11 +38,17 @@ pub fn message(ui: &mut Ui, area: Rect, accent: Color, icon: Icon, title: &str, 
     clicked
 }
 
-/// The sentence for a helper that did not answer.
-pub fn offline_line(link: &Link) -> String {
-    match link {
-        Link::Offline(why) => format!("{why} Start the helper (native/run.sh or run.bat), then try again."),
-        _ => "Waiting for the helper\u{2026}".into(),
+/// The page shown while the engine does not answer: what the supervisor is
+/// doing (`poni_core::engine_link::offline_message`) and a Try again button,
+/// which also asks it to start the engine. Draws in `area`.
+pub fn offline(ui: &mut Ui, st: &mut AppState, area: Rect, retry_id: u64) {
+    let why = match &st.helper.link {
+        Link::Offline(why) => why.as_str(),
+        _ => "no answer yet",
+    };
+    let (title, line, bad) = engine_link::offline_message(&st.engine, why, helper::configured_port());
+    if message(ui, area, st.accent, Icon::Unlink, title, &line, bad, Some(("Try again", retry_id))) {
+        st.cmd(Command::HelperPoll);
     }
 }
 

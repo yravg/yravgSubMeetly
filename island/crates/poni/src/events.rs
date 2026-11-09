@@ -134,6 +134,8 @@ pub enum AppEvent {
     Helper(Result<(poni_core::helper::Snapshot, u32), String>),
     /// A decision the helper refused or could not be reached for.
     HelperNotice(String),
+    /// The engine link: what answers /health, and whether the island started it.
+    Engine(poni_core::engine_link::EngineInfo),
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

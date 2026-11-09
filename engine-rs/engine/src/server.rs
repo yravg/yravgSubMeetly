@@ -124,6 +124,11 @@ fn handle_connection(stream: TcpStream, app: &App) -> io::Result<()> {
             peer_loopback,
             body_file,
         };
+        crate::web::note_extension(&request);
+        if let Some(page) = crate::web::serve(&request) {
+            write_page(&mut writer, &page)?;
+            continue;
+        }
         let response = app.handle(&request);
         if let Some(path) = &request.body_file {
             let _ = std::fs::remove_file(path);
@@ -187,6 +192,19 @@ fn write_response(writer: &mut TcpStream, response: &Response) -> io::Result<()>
     writer.flush()
 }
 
+fn write_page(writer: &mut TcpStream, page: &crate::web::WebResponse) -> io::Result<()> {
+    let head = format!(
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-cache\r\nX-Content-Type-Options: nosniff\r\n\r\n",
+        page.status,
+        reason_phrase(page.status),
+        page.content_type,
+        page.body.len()
+    );
+    writer.write_all(head.as_bytes())?;
+    writer.write_all(&page.body)?;
+    writer.flush()
+}
+
 fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",
@@ -195,6 +213,7 @@ fn reason_phrase(status: u16) -> &'static str {
         400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
+        405 => "Method Not Allowed",
         500 => "Internal Server Error",
         501 => "Not Implemented",
         _ => "OK",
@@ -227,5 +246,26 @@ mod tests {
         stream.read_to_string(&mut response).expect("read");
         assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
         assert!(response.contains("\"ok\":true"), "{response}");
+    }
+
+    #[test]
+    fn a_page_reply_has_crlf_line_ends_whatever_the_checkout() {
+        let page = crate::web::WebResponse {
+            status: 200,
+            content_type: "text/html",
+            body: b"x".to_vec(),
+        };
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let address = listener.local_addr().expect("addr");
+        let t = thread::spawn(move || write_page(&mut listener.accept().expect("accept").0, &page));
+        let mut stream = TcpStream::connect(address).expect("connect");
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).expect("read");
+        t.join().expect("thread").expect("write");
+        assert!(
+            raw.starts_with("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"),
+            "{raw:?}"
+        );
+        assert!(raw.ends_with("\r\n\r\nx"), "{raw:?}");
     }
 }

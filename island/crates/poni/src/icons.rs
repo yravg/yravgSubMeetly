@@ -22,6 +22,8 @@ pub enum Icon {
     Coffee,
     Steps,
     Tray,
+    /// Three lines: the header's Menu button.
+    Menu,
     ListChecks,
     Check,
     CheckCircle,
@@ -194,6 +196,7 @@ pub fn parts(icon: Icon) -> &'static [Part] {
             s("M14.2 17C13.8 15.6 13 14.2 13 12.1C13 9.3 14.5 7 16.5 7C18.5 7 20 9.3 20 12.1C20 14.2 19.2 15.6 18.8 17Z"),
             s("M14.5 19.5H18.5V20.1A2 2 0 0 1 14.5 20.1Z"),
         ],
+        Menu => p![s("M4 7h16"), s("M4 12h16"), s("M4 17h16")],
         Tray => p![
             s("M4 13l2.4-7.2a1.6 1.6 0 0 1 1.5-1.1h8.2a1.6 1.6 0 0 1 1.5 1.1L20 13"),
             s("M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"),
@@ -442,7 +445,7 @@ mod tests {
 
     const ALL: &[Icon] = &[
         Icon::Play, Icon::Pause, Icon::Next, Icon::Prev, Icon::Music, Icon::Lyrics, Icon::Timer, Icon::Coffee, Icon::Steps,
-        Icon::Tray, Icon::ListChecks, Icon::Check, Icon::CheckCircle, Icon::Circle, Icon::Plus, Icon::Minus,
+        Icon::Tray, Icon::Menu, Icon::ListChecks, Icon::Check, Icon::CheckCircle, Icon::Circle, Icon::Plus, Icon::Minus,
         Icon::Close, Icon::Clipboard, Icon::Copy, Icon::Calendar, Icon::Clock, Icon::Cpu, Icon::Memory, Icon::Disk,
         Icon::Battery, Icon::Bolt, Icon::Bluetooth, Icon::Headphones, Icon::Volume, Icon::VolumeLow, Icon::VolumeMute,
         Icon::Pin, Icon::PinFill, Icon::Folder, Icon::File, Icon::Trash, Icon::Undo, Icon::Reset,

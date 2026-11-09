@@ -7,6 +7,7 @@ pub mod applemusic_ui;
 pub mod audio;
 pub mod backdrop;
 pub mod bluetooth;
+pub mod engine;
 pub mod clipboard;
 pub mod frames;
 pub mod fullscreen;
@@ -44,6 +45,7 @@ pub struct Services {
     pairdrop: Option<pairdrop::PairDropService>,
     addons: Option<addons::AddonService>,
     helper: Option<helper::HelperService>,
+    engine: Option<engine::EngineService>,
 }
 
 fn started<T, E: std::fmt::Display>(name: &str, r: Result<T, E>) -> Option<T> {
@@ -72,12 +74,31 @@ impl Services {
         let on = poni_core::addons::ALL.iter().filter(|a| settings.addon_on(a.id)).map(|a| a.id).collect();
         let addons = started("add-ons", addons::AddonService::start(sink.clone(), on));
         let helper = started("helper link", helper::HelperService::start(sink.clone()));
-        Self { media, lyrics, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons, helper }
+        let engine = started("engine link", engine::EngineService::start(sink.clone()));
+        Self { media, lyrics, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons, helper, engine }
     }
 
     pub fn stop(self, _helper: HWND) {
         if let Some(f) = self.fullscreen {
             f.stop();
+        }
+        // Stops the engine this island started, and only that one.
+        if let Some(e) = self.engine {
+            e.stop();
+        }
+    }
+
+    /// Start the engine now (the menu's Start engine).
+    pub fn engine_start(&self) {
+        if let Some(e) = &self.engine {
+            e.start_now();
+        }
+    }
+
+    /// Restart the engine this island started.
+    pub fn engine_restart(&self) {
+        if let Some(e) = &self.engine {
+            e.restart();
         }
     }
 

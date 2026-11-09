@@ -83,6 +83,8 @@ pub enum Command {
     /// Open the Settings window, or bring it forward (the gear, Windows).
     OpenSettings,
     SetPage(PageKind),
+    /// A menu entry chosen in the island's Menu list (same as the tray menu).
+    Menu(crate::tray::MenuCmd),
     /// Keep the island open even when the cursor leaves.
     SetPinned(bool),
     Collapse,

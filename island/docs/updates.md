@@ -16,11 +16,11 @@ yravgSubMeetly installs with one Setup and learns about new versions from one si
 ## The installer
 
 Per user, no admin, no UAC. It installs into `%LOCALAPPDATA%\Programs\yravgSubMeetly`:
-`poni.exe` (the island), `submeetly-engine.exe` (the local helper), `submeetly-host.bat` (what Chrome starts for Native Messaging), the licence files.
+`poni.exe` (the island), `submeetly-engine.exe` (the local helper), `submeetly-host.bat` (what Chrome starts for Native Messaging), `extension\` (the built Chrome extension, loaded unpacked), the licence files.
 
-- **Start menu:** the app and the engine.
+- **Start menu:** the app, the Minutes register (`--open minutes`), "Set up the Chrome extension" (`--open setup-extension`) and the engine. The island starts the engine itself when nothing answers; the engine serves the extension pages at `http://127.0.0.1:17865/app/<file>`.
 - **Start with Windows:** an optional task, off by default (`HKCU\...\Run\yravgSubMeetly`).
-- **Native Messaging host `com.yraveragesubmin.helper`:** written under `HKCU\Software\{Google\Chrome,Microsoft\Edge,Chromium}\NativeMessagingHosts`, the same manifest `native/install-host.bat` writes. Chrome needs the extension's ID in `allowed_origins`, so the wizard asks for it (32 letters a-p) and prefills it from the manifest already there, which is why silent updates keep it. Left empty, no host is registered.
+- **Native Messaging host `com.yraveragesubmin.helper`:** written under `HKCU\Software\{Google\Chrome,Microsoft\Edge,Chromium}\NativeMessagingHosts`, the same manifest `native/install-host.bat` writes. The extension ID is fixed (`llhpkcjflnepbpgldhbceifjbjgcbapi`, the manifest `key`), so the host is always registered with it in `allowed_origins`. `/EXTID=<id>` (or an ID kept from an earlier install) is allowed next to it, for a Web Store copy. There is no ID page in the wizard.
 - **Uninstall** removes the program, the Run value, the host keys and the cache in `%LOCALAPPDATA%\Poni`. It keeps `%APPDATA%\Poni` and `~/.yraveragesubmin` (settings, minutes, notes).
 - **Silent update** (what the app's Install runs): `Setup /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /reopen`. A running copy is closed first, Start with Windows stays as the person set it, `/reopen` starts the new version. Inno does not read NSIS's `/S`.
 - Never change the `AppId` in the `.iss`: upgrades and the uninstaller find the install by it.

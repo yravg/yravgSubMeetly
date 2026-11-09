@@ -10,6 +10,7 @@
 pub mod addons;
 pub mod applemusic;
 pub mod datetime;
+pub mod engine_link;
 pub mod frames;
 pub mod frametime;
 pub mod geom;

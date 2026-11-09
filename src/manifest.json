@@ -1,5 +1,6 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA18fuUKT0tVAOdS4ZhBCOJArEoGMirpwit3nop7CG+oJW/X761xgBPb2Q+YlbAL55ZWJmaqWKR+PyNacsbFzDAwL/vR1rPAB/0fU+oPSLpnDsNpPiluTgfkgOEZ7aZX3qIQJCW5hL/QnLFKYhWTd8BmK0/UArfdM6iTENwyO61BXj/mFIouNcbNykxTjMVSBojW/56yZ7SxU48fhf3bJjDFvPOC8t5BKPBZHx6BbQ9z+KeBfkhakej6NAQreMmf/HS72EKiHqCzqoq0tDZdPuqh4JvFDOdftSRs8js/zcvgYdLzu6lZpY4kpTRenvx5ZoKA2xno43aM2COXvoFplOzQIDAQAB",
   "name": "yravgSubMeetly",
   "version": "1.1.1",
   "description": "On-device realtime subtitles: local AI transcription + translation for any tab. Audio is not uploaded to our servers.",

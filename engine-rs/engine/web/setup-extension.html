@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up the Chrome extension</title>
+<style>
+:root {
+  --bg: #f6f7f8; --card: #fff; --border: #d9dde0; --text: #15191c; --muted: #4f5b63;
+  --accent: #0b7a5c; --on-accent: #fff; --code: #eef1f3; --ok: #0b7a5c; --warn: #8a5a00; --danger: #b3261e;
+  --focus: #0b7a5c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131313; --card: #1f1f1f; --border: #3a3a3a; --text: #f5f5f5; --muted: #b4b4b4;
+    --accent: #14b789; --on-accent: #06140f; --code: #292929; --ok: #6ce0b8; --warn: #e0b05c; --danger: #e06c75;
+    --focus: #6ce0b8;
+  }
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 "Segoe UI", system-ui, sans-serif; padding: 32px 16px 64px; }
+main { max-width: 640px; margin: 0 auto; }
+h1 { font-size: 22px; line-height: 1.25; margin-bottom: 4px; }
+.lead { color: var(--muted); margin-bottom: 20px; }
+.status { display: flex; gap: 10px; align-items: center; border: 1px solid var(--border); background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 20px; font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }
+.status[data-s="ok"] .dot { background: var(--ok); }
+.status[data-s="down"] .dot { background: var(--danger); }
+ol { list-style: none; padding: 0; counter-reset: s; display: grid; gap: 12px; }
+li { counter-increment: s; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 14px 52px; position: relative; }
+li::before { content: counter(s); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 700; display: grid; place-items: center; font-size: 13px; }
+li b { display: block; margin-bottom: 2px; }
+li span { color: var(--muted); }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+code { background: var(--code); border-radius: 6px; padding: 4px 8px; font: 13px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+button { font: inherit; font-weight: 600; background: var(--accent); color: var(--on-accent); border: 0; border-radius: 8px; padding: 6px 14px; cursor: pointer; min-height: 32px; }
+button:hover { filter: brightness(1.08); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.note { color: var(--muted); font-size: 13px; margin-top: 20px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Set up the Chrome extension</h1>
+  <p class="lead">Four steps, about a minute. The extension is on this computer already; Chrome only needs to be told where.</p>
+
+  <div class="status" id="status" data-s="wait" role="status" aria-live="polite">
+    <i class="dot"></i><span id="status-text">Checking the engine…</span>
+  </div>
+
+  <ol>
+    <li>
+      <b>Open Chrome's extensions page</b>
+      <span>Chrome does not let a web page open it, so copy the address and paste it into a new tab.</span>
+      <div class="row"><code>chrome://extensions</code><button type="button" data-copy="chrome://extensions">Copy</button></div>
+    </li>
+    <li>
+      <b>Turn on Developer mode</b>
+      <span>The switch is at the top right of that page.</span>
+    </li>
+    <li>
+      <b>Choose Load unpacked, then this folder</b>
+      <span id="folder-help">Paste the folder below into the file dialog's address bar, then press Select Folder.</span>
+      <div class="row" id="folder-row"><code id="folder">…</code><button type="button" id="copy-folder">Copy</button></div>
+      <span id="folder-missing" hidden>The extension files were not found next to the engine. Run the yravgSubMeetly Setup again to restore them.</span>
+    </li>
+    <li>
+      <b>Pin it and open the captions panel</b>
+      <span>Click the puzzle-piece icon in Chrome's toolbar, pin yravgSubMeetly, then click it. This page turns green once the extension has talked to the engine.</span>
+    </li>
+  </ol>
+
+  <p class="note">Extension ID <code id="ext-id">…</code> — fixed, so Chrome keeps the connection when you load it again.</p>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var folderPath = '';
+  function copy(text, btn) {
+    var done = function () { var t = btn.textContent; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = t; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () {});
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.copy) copy(b.dataset.copy, b);
+    if (b.id === 'copy-folder' && folderPath) copy(folderPath, b);
+  });
+  function show(state, text) { $('status').dataset.s = state; $('status-text').textContent = text; }
+  function poll() {
+    fetch('/app/_status.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) {
+      folderPath = s.appDir || '';
+      $('folder').textContent = folderPath || 'not found';
+      $('folder-row').hidden = !folderPath;
+      $('folder-missing').hidden = !!folderPath;
+      $('ext-id').textContent = s.extensionId;
+      if (s.extensionSeen) show('ok', 'Connected: the extension has reached the engine.');
+      else show('wait', 'Engine is running. Waiting for the extension…');
+    }).catch(function () { show('down', 'The engine is not answering. Start it from the island menu (Start engine), then reload this page.'); });
+  }
+  poll(); setInterval(poll, 2000);
+})();
+</script>
+</body>
+</html>
