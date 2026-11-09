@@ -125,6 +125,10 @@ pub fn main_entry() -> i32 {
     let _mutex = unsafe { CreateMutexW(None, true, mutex_name) };
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         pinfo!("another instance is running; exiting");
+        // A Start-menu "Minutes register" launch while the island runs: the running one has the engine.
+        if let Some(path) = services::engine::open_arg(&args) {
+            services::engine::open_now(path);
+        }
         return 0;
     }
     if let Err(e) = unsafe { OleInitialize(None) } {
@@ -139,6 +143,9 @@ pub fn main_entry() -> i32 {
     if !crate::autostart::packaged() && crate::updates::pending_install() {
         unsafe { OleUninitialize() };
         return 0;
+    }
+    if let Some(path) = services::engine::open_arg(&args) {
+        services::engine::open_when_ready(path);
     }
     let code = match run() {
         Ok(code) => code,

@@ -52,17 +52,29 @@ fn spawn(exe: &std::path::Path, port: u16) -> std::io::Result<Child> {
 /// Open `path` of the engine's own pages in the default browser once the engine
 /// answers /health (up to 15 s; after that the browser shows the honest error).
 pub fn open_when_ready(path: &str) {
+    let path = path.to_string();
+    let _ = std::thread::Builder::new().name("engine-open".into()).spawn(move || open_now(&path));
+}
+
+/// `open_when_ready` on this thread: for the second launch, which exits after.
+pub fn open_now(path: &str) {
     let port = helper::configured_port();
-    let url = format!("http://127.0.0.1:{port}{path}");
-    let _ = std::thread::Builder::new().name("engine-open".into()).spawn(move || {
-        for _ in 0..50 {
-            if helper::request(port, "GET", "/health", None).is_ok_and(|(code, _)| code == 200) {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(300));
+    for _ in 0..50 {
+        if helper::request(port, "GET", "/health", None).is_ok_and(|(code, _)| code == 200) {
+            break;
         }
-        crate::shell::open(&url);
-    });
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    crate::shell::open(&format!("http://127.0.0.1:{port}{path}"));
+}
+
+/// `--open <name>` on the command line: the engine page it names.
+pub fn open_arg(args: &[String]) -> Option<&'static str> {
+    match args.iter().position(|a| a == "--open").and_then(|i| args.get(i + 1)).map(String::as_str) {
+        Some("minutes") => Some("/app/minutes.html"),
+        Some("setup-extension") => Some("/app/setup-extension.html"),
+        _ => None,
+    }
 }
 
 impl EngineService {
@@ -150,5 +162,23 @@ impl EngineService {
         if let Some(t) = self.thread.take() {
             let _ = t.join();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::open_arg;
+
+    fn a(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn open_names_an_engine_page_and_nothing_else() {
+        assert_eq!(open_arg(&a(&["poni.exe", "--open", "minutes"])), Some("/app/minutes.html"));
+        assert_eq!(open_arg(&a(&["poni.exe", "--open", "setup-extension"])), Some("/app/setup-extension.html"));
+        assert_eq!(open_arg(&a(&["poni.exe", "--open", "../x"])), None);
+        assert_eq!(open_arg(&a(&["poni.exe", "--open"])), None);
+        assert_eq!(open_arg(&a(&["poni.exe"])), None);
     }
 }
