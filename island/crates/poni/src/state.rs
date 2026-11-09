@@ -570,6 +570,8 @@ pub struct AppState {
     pub notify_can: bool,
     /// What the helper said last (`services::helper`), for the meeting pages.
     pub helper: poni_core::helper::View,
+    /// Which of the spoken/target languages the engine said last (`lang_prefs`).
+    pub lang_sync: poni_core::lang_prefs::Sync,
     /// What the engine link knows (`services::engine`): the menu's status line.
     pub engine: poni_core::engine_link::EngineInfo,
     /// A line the Meeting page shows for a moment: what a button did, or why
@@ -655,6 +657,7 @@ impl AppState {
             winlang: Vec::new(),
             notify_can: false,
             helper: Default::default(),
+            lang_sync: Default::default(),
             engine: Default::default(),
             helper_notice: None,
             calendar_manage: false,

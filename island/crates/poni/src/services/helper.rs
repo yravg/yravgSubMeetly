@@ -16,6 +16,8 @@ const EVERY: Duration = Duration::from_millis(2500);
 enum Msg {
     /// `POST /notes` with this body, then ask again.
     Post(String),
+    /// `POST /ui-prefs` (the languages), then ask again.
+    Prefs(String),
     /// Ask now.
     Poll,
     /// A calendar request, then ask for the calendar and the notes again.
@@ -50,6 +52,15 @@ impl HelperService {
                         }
                         ask(&sink);
                     }
+                    Ok(Msg::Prefs(body)) => {
+                        // shortcut: best effort and logged; an older engine refuses the keys and the island keeps its own settings.
+                        match helper::request(port, "POST", "/ui-prefs", Some(&body)) {
+                            Ok((200, _)) => {}
+                            Ok((code, _)) => sink.send(AppEvent::Log(format!("engine: languages not saved (answered {code})"))),
+                            Err(e) => sink.send(AppEvent::Log(format!("engine: languages not saved ({e})"))),
+                        }
+                        ask(&sink);
+                    }
                     Ok(Msg::Calendar(req)) => {
                         let done = calendar::run(port, &req);
                         // The error text never holds a link: the engine masks it.
@@ -77,6 +88,10 @@ impl HelperService {
 
     pub fn post(&self, body: String) {
         let _ = self.tx.send(Msg::Post(body));
+    }
+
+    pub fn post_prefs(&self, body: String) {
+        let _ = self.tx.send(Msg::Prefs(body));
     }
 
     pub fn poll(&self) {

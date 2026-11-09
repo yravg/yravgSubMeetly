@@ -292,6 +292,8 @@ pub struct Snapshot {
     pub live: Option<Live>,
     /// Where the side panel wants live captions (`GET /ui-prefs`, `captionSurface`).
     pub surface: Surface,
+    /// The spoken and target language the engine keeps (`GET /ui-prefs`).
+    pub langs: crate::lang_prefs::LangPrefs,
 }
 
 /// Where live captions show: the page overlay, the island, or both.
@@ -548,8 +550,8 @@ pub fn fetch(port: u16) -> Result<Snapshot, String> {
     // An older helper has no /live (404): the island falls back to the note's transcript.
     let live = request(port, "GET", "/live", None).ok().filter(|(code, _)| *code == 200).and_then(|(_, body)| parse_live(&body));
     // Missing on an older helper (404) = the overlay only.
-    let surface = request(port, "GET", "/ui-prefs", None).ok().filter(|(code, _)| *code == 200).map(|(_, b)| parse_surface(&b)).unwrap_or_default();
-    Ok(Snapshot { health, notes, live, surface })
+    let prefs = request(port, "GET", "/ui-prefs", None).ok().filter(|(code, _)| *code == 200).map(|(_, b)| b).unwrap_or_default();
+    Ok(Snapshot { health, notes, live, surface: parse_surface(&prefs), langs: crate::lang_prefs::parse(&prefs) })
 }
 
 /// `POST /notes` with a body from [`decide`].

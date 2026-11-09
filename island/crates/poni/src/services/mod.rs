@@ -204,6 +204,13 @@ impl Services {
         self.session.lock().unwrap_or_else(|e| e.into_inner()).restore(lines);
     }
 
+    /// `POST /ui-prefs` to the engine: the spoken and target language.
+    pub fn helper_post_prefs(&self, body: String) {
+        if let Some(h) = &self.helper {
+            h.post_prefs(body);
+        }
+    }
+
     pub fn helper_poll(&self) {
         if let Some(h) = &self.helper {
             h.poll();

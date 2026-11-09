@@ -733,7 +733,7 @@ mod tests {
         use PageKind::*;
         let st = AppState::new(poni_core::settings::Settings::default().fresh_install(), Store::default());
         assert_eq!(st.page, Live);
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Addons]);
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Addons]);
         // The tucked-away tabs are one chip away in Settings.
         assert_eq!(hideable_tabs(&st).len(), 4);
     }

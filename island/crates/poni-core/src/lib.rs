@@ -22,6 +22,7 @@ pub mod hdr;
 pub mod helper;
 pub mod look;
 pub mod lrc;
+pub mod lang_prefs;
 pub mod lrclib;
 pub mod lyric_tr;
 pub mod meeting_doc;

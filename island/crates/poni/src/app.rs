@@ -1975,6 +1975,30 @@ impl App {
         }
     }
 
+    /// The engine keeps the spoken and target language (`/ui-prefs`), so the extension and the app
+    /// share them: its word wins when it changes or at the start; if it has none yet, ours go up.
+    fn on_engine_langs(&mut self, engine: &poni_core::lang_prefs::LangPrefs) {
+        use poni_core::lang_prefs::{patch_body, Step};
+        let (src, tgt) = (self.st.settings.source_lang.clone(), self.st.settings.target_lang.clone());
+        match self.st.lang_sync.on_engine(engine, &src, &tgt) {
+            Step::Nothing => {}
+            Step::Push => {
+                if let Some(s) = self.services.as_ref() {
+                    s.helper_post_prefs(patch_body(&src, &tgt));
+                }
+            }
+            Step::Adopt { src, tgt } => {
+                if let Some(s) = src {
+                    self.st.settings.source_lang = s;
+                }
+                if let Some(t) = tgt {
+                    self.st.settings.target_lang = t;
+                }
+                self.st.cmd(Command::SaveSettings);
+            }
+        }
+    }
+
     /// Apply side effects of a settings change (from the menu, a reload or a page).
     fn settings_changed(&mut self, before: &Settings) {
         // Show over games and Hide in full-screen apps follow each other.
@@ -2007,6 +2031,12 @@ impl App {
         let new_language = before.source_lang != now.source_lang || before.target_lang != now.target_lang;
         if retranslate {
             self.start_lyric_translation();
+        }
+        // The engine keeps the languages for the extension and the app too (a no-op post when it just told us).
+        if new_language {
+            if let Some(s) = self.services.as_ref() {
+                s.helper_post_prefs(poni_core::lang_prefs::patch_body(&self.st.settings.source_lang, &self.st.settings.target_lang));
+            }
         }
         // Running captions pick up a new language by starting again.
         if new_language && self.st.capture.running() {
@@ -2429,7 +2459,13 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Paired(e) => self.on_paired(e),
             AppEvent::Autostart(on) => self.st.ui.autostart = Some(on),
-            AppEvent::Helper(r) => self.st.helper.apply(r),
+            AppEvent::Helper(r) => {
+                let langs = r.as_ref().ok().map(|(s, _)| s.langs.clone());
+                self.st.helper.apply(r);
+                if let Some(l) = langs {
+                    self.on_engine_langs(&l);
+                }
+            }
             AppEvent::Engine(info) => {
                 // The engine came back after a translation it could not make: ask again.
                 let back = info.running && !self.st.engine.running && matches!(self.st.lyrics.tr, poni_core::lyric_tr::TrState::Unavailable(_));
