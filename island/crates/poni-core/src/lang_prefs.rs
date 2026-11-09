@@ -25,9 +25,17 @@ pub fn parse(body: &str) -> LangPrefs {
     LangPrefs { src: get("srcLang", true), tgt: get("tgtLang", false) }
 }
 
-/// The `POST /ui-prefs` body that says both languages.
+/// The `POST /ui-prefs` body that says both languages. The engine ignores a `tgtLang` of "auto" (and
+/// anything it cannot name), so a key the island cannot vouch for is left out, not sent.
 pub fn patch_body(src: &str, tgt: &str) -> String {
-    json!({ "srcLang": src, "tgtLang": tgt }).to_string()
+    let mut body = serde_json::Map::new();
+    if let Some(s) = known(src, true) {
+        body.insert("srcLang".into(), s.into());
+    }
+    if let Some(t) = known(tgt, false) {
+        body.insert("tgtLang".into(), t.into());
+    }
+    Value::Object(body).to_string()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -89,6 +97,14 @@ mod tests {
     fn the_patch_names_both_keys() {
         let v: Value = serde_json::from_str(&patch_body("de", "id")).unwrap();
         assert_eq!((v["srcLang"].as_str(), v["tgtLang"].as_str()), (Some("de"), Some("id")));
+    }
+
+    #[test]
+    fn a_target_of_auto_or_an_unknown_code_is_never_sent() {
+        let v = |s, t| serde_json::from_str::<Value>(&patch_body(s, t)).unwrap();
+        assert_eq!(v("auto", "auto"), json!({ "srcLang": "auto" }), "auto is a spoken language only");
+        assert_eq!(v("de", " ID "), json!({ "srcLang": "de", "tgtLang": "id" }), "codes go out trimmed and lower case");
+        assert_eq!(v("xx", ""), json!({}));
     }
 
     #[test]
