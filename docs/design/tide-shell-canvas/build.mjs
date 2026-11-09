@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { BOARD_CSS, TIDE_CSS, NEW, esc, st, bt, paneCss, ixScript, ixDc } from './kit.mjs';
 import * as B from './boards.mjs';
 import { BOARDS, PRD } from './data.mjs';
+import { MIN_CSS } from './minutes-boards.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const S = 1140 / 1440;
@@ -39,18 +40,26 @@ const toggle = (b) => {
 };
 
 const win_html = (b) => Object.values(b.wins).map((w) => w.html).join('');
+const noteH = (n) => Math.ceil(n[2].replace(/<[^>]+>/g, '').length / 40) * 16 + 16;
 const boardHtml = (b) => {
   const keys = b.states ? b.states.map((s) => s[0]) : ['a'];
-  const inner = keys.map((k) => b.states ? `<div data-p="st:${k}">${win(b.wins[k].html, b.wins[k].h, b.afterOnly)}</div>` : win(b.wins[k].html, b.wins[k].h, b.afterOnly)).join('');
-  const after = b.afterOnly ? inner : `<div data-p="ba:after">${inner}</div>`;
-  const wh = Math.max(...Object.values(b.wins).map((w) => w.h)) * S;
-  const before = b.afterOnly ? '' : `<div data-p="ba:before"><p class="ixcap"><span class="vt">BEFORE</span>${esc(b.before.cap)}</p><img class="ixi" src="${b.before.img}" alt="Before: ${esc(b.title)}"></div>`;
-  const tags = (win_html(b).match(/class="parttag"/g) || []).length;
+  const tagsIn = (h) => (h.match(/class="parttag"/g) || []).length;
   const pn = b.notes.filter((n) => n[3]).length;
   const gap = (b.stories.find((x) => x.stat === 'partial') || {}).gap || '';
-  const extra = [];
-  for (let i = pn; i < tags; i++) extra.push([1160, Math.max(...b.notes.map((n) => n[1])) + 130 + (i - pn) * 115, `<b>${b.states ? b.states[Math.min(i, b.states.length - 1)][1] + ' view.' : 'Same page.'}</b> ${gap.replace('Exists:', '<b>Exists:</b>').replace('Missing:', '<b>Missing:</b>')}`, true]);
-  const notes = [...b.notes, ...extra].map(noteHtml).join('');
+  const gapHtml = gap.replace('Exists:', '<b>Exists:</b>').replace('Missing:', '<b>Missing:</b>');
+  const baseBottom = Math.max(...b.notes.map((n) => n[1] + noteH(n)));
+  // A note must never cover a card: per-state notes live inside their state pane (only the visible state shows its note);
+  // stateless boards keep one always-visible note per PARTIAL tag. The first tagged state is served by the board's own gap note.
+  const extraNote = (label, y) => [1160, y, `<b>${label}</b> ${gapHtml}`, true];
+  const stateNotes = {}; const flat = []; let used = pn;
+  if (b.states) keys.forEach((k) => { if (tagsIn(b.wins[k].html) > 0) { if (used > 0) used--; else stateNotes[k] = extraNote(b.states.find((s) => s[0] === k)[1] + ' view.', baseBottom + 12); } });
+  else { const t = tagsIn(win_html(b)); for (let i = pn; i < t; i++) flat.push(extraNote('Same page.', baseBottom + 12 + (i - pn) * 120)); }
+  const inner = keys.map((k) => b.states ? `<div data-p="st:${k}">${win(b.wins[k].html, b.wins[k].h, b.afterOnly)}${stateNotes[k] ? noteHtml(stateNotes[k]) : ''}</div>` : win(b.wins[k].html, b.wins[k].h, b.afterOnly)).join('');
+  const after = b.afterOnly ? inner : `<div data-p="ba:after">${inner}</div>`;
+  const colBottom = Math.max(...[...b.notes, ...flat, ...Object.values(stateNotes)].map((n) => n[1] + noteH(n))) + 8;
+  const wh = Math.max(Math.max(...Object.values(b.wins).map((w) => w.h)) * S, colBottom);
+  const before = b.afterOnly ? '' : `<div data-p="ba:before"><p class="ixcap"><span class="vt">BEFORE</span>${esc(b.before.cap)}</p><img class="ixi" src="${b.before.img}" alt="Before: ${esc(b.title)}"></div>`;
+  const notes = [...b.notes, ...flat].map(noteHtml).join('');
   const stories = b.stories.map((s) => `<div class="st"><div class="sti"><span class="sid">${s.id}</span><span class="src">${s.src}</span><span class="stat ${s.stat}">${s.stat === 'new' ? 'NEW' : 'PARTIAL'}</span></div><div>${esc(s.text)}</div>${s.gap ? `<div class="gap">${esc(s.gap).replace('Exists:', '<b>Exists:</b>').replace('Missing:', '<b>Missing:</b>')}</div>` : ''}</div>`).join('');
   const refs = `<div class="refs"><div class="lbl">Reference: the original UI</div><p>${esc(b.refs.note)}</p>${b.refs.shots.length ? `<div class="rg">${b.refs.shots.map(([p, c]) => `<figure><img src="${p}" alt="Reference crop"><figcaption>${esc(c)}</figcaption></figure>`).join('')}</div>` : ''}</div>`;
   return `<section class="board" id="${b.id}">
@@ -94,7 +103,7 @@ const boards = BOARDS.map((b) => {
 }).join('\n');
 
 const body = `<div class="page"><nav class="toc"><div class="tt">CANVAS</div><a href="#cover">Cover</a><a href="#status">Status</a><a href="#index">Story index</a><div class="tt">BOARDS</div>${idx}</nav><main class="cv">${cover}${status}${index}${boards}</main></div>`;
-const css = BOARD_CSS + '\n' + TIDE_CSS + '\n' + paneCss(body);
+const css = BOARD_CSS + '\n' + TIDE_CSS + '\n' + MIN_CSS + '\n' + paneCss(body);
 const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1640"><title>Tide app shell canvas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Geist:wght@400;500;600&family=Geist+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <style>${css}</style></head><body>${body}${ixScript}</body></html>`;
@@ -155,6 +164,7 @@ ${fontLink}
 body{margin:0}
 ${BOARD_CSS}
 ${TIDE_CSS}
+${MIN_CSS}
 ${paneCss(s)}
 </style>
 </helmet>

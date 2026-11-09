@@ -6,7 +6,9 @@ shots/app-before.png
 shots/b-captions.png
 shots/b-history.png
 shots/b-lab-mock.png
+shots/b-minutes-owner.png
 shots/b-minutes-sample.png
+shots/b-minutes-summary-owner.png
 shots/b-settings.png
 tide/icons/01-tide-mark-green.svg
 tide/tide-celebrate.webp
