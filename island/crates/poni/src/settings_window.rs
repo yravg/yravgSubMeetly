@@ -211,10 +211,16 @@ impl Section {
     }
 }
 
-/// A model's row: what the engine says about it, with Download or Retry when that helps.
-fn model_item(m: &poni_core::models::Models, k: Kind) -> Item {
+/// A model's rows: the choice (steps through what the engine offers, with what is true of it
+/// underneath) and, when downloading helps, a Download or Retry button.
+fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     let d = m.describe(k);
-    item(Key::ModelPull(k), k.label(), Some(&d.text), d.button.map_or(Ctl::None, Ctl::Button))
+    let value = m.step(k, 1).and_then(|_| m.chosen(k)).map(|id| m.label_of(&id));
+    let mut rows = vec![item(Key::ModelPick(k), k.label(), Some(&d.text), value.map_or(Ctl::None, Ctl::Stepper))];
+    if let Some(b) = d.button {
+        rows.push(item(Key::ModelPull(k), &format!("{} download", k.label()), None, Ctl::Button(b)));
+    }
+    rows
 }
 
 /// The sections the sidebar lists now.
@@ -248,7 +254,9 @@ pub enum Key {
     SpokenLang,
     TargetLang,
     LyricsTranslate,
-    /// The Download (or Retry) button of a model's row.
+    /// The choice of a model (steps through the engine's catalog).
+    ModelPick(poni_core::models::Kind),
+    /// The Download (or Retry) button of a model.
     ModelPull(poni_core::models::Kind),
     HudVolume,
     HudPower,
@@ -459,7 +467,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 ],
             ),
             Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
-            Block::Group(Some("Models"), [Kind::Asr, Kind::Translate].map(|k| model_item(&st.models, k)).to_vec()),
+            Block::Group(Some("Models"), [Kind::Asr, Kind::Translate].into_iter().flat_map(|k| model_items(&st.models, k)).collect()),
         ],
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
@@ -614,6 +622,16 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
         Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
         Key::LyricsTranslate => s.lyrics_translate = !s.lyrics_translate,
+        Key::ModelPick(k) => {
+            // A model not on disk waits for its Download button; one that is switches at once.
+            let Some(id) = st.models.step(k, step).filter(|_| step != 0) else { return };
+            let now = st.models.selected(k).as_deref() == Some(id.as_str());
+            if st.models.switchable(k, &id) {
+                st.cmd(Command::ModelSelect(k, id.clone()));
+            }
+            st.models.set_pick(k, (!now).then_some(id));
+            return;
+        }
         Key::ModelPull(k) => {
             st.cmd(Command::ModelPull(k));
             return;
@@ -1649,23 +1667,39 @@ mod tests {
     }
 
     #[test]
-    fn the_model_rows_say_what_is_missing_and_download_it() {
-        use poni_core::models::{parse, Kind};
+    fn the_model_rows_offer_the_catalog_and_download_what_is_missing() {
+        use poni_core::models::{parse, Kind, OFF};
         let mut st = state();
-        let label = |st: &AppState, k| row(Section::Speech, st, Key::ModelPull(k)).map(|i| (i.sub.unwrap_or_default(), i.ctl));
-        // Before the engine answered: a line, nothing to press.
-        assert_eq!(label(&st, Kind::Asr), Some(("Checking…".into(), Ctl::None)));
-        let body = r#"{"models":[{"key":"asr","id":"org/speech-small","loaded":false},{"key":"translate","id":"org/mt-small","loaded":true}],
-            "cached":[{"id":"org/mt-small","bytes":5,"complete":true}]}"#;
+        let pick = |st: &AppState, k| row(Section::Speech, st, Key::ModelPick(k)).map(|i| (i.sub.unwrap_or_default(), i.ctl));
+        let button = |st: &AppState, k| row(Section::Speech, st, Key::ModelPull(k)).map(|i| i.ctl);
+        // Before the engine answered: a line, nothing to step or press.
+        assert_eq!(pick(&st, Kind::Asr), Some(("Checking…".into(), Ctl::None)));
+        assert_eq!(button(&st, Kind::Asr), None);
+        let body = r#"{"models":[{"key":"asr","id":"org/speech-base","downloaded":false},{"key":"translate","id":"org/mt-small","loaded":true,"downloaded":true}],
+            "catalog":[{"kind":"asr","id":"org/speech-base","label":"Base","downloaded":false},{"kind":"asr","id":"org/speech-small","label":"Small","downloaded":true},
+                       {"kind":"translate","id":"org/mt-small","label":"Qwen small","downloaded":true},{"kind":"translate","id":"org/mt-big","label":"Qwen big","downloaded":false}]}"#;
         st.models.apply(Ok(parse(body).unwrap()), 1.0);
-        assert_eq!(label(&st, Kind::Asr), Some(("org/speech-small · not downloaded".into(), Ctl::Button("Download"))));
-        assert_eq!(label(&st, Kind::Translate).map(|r| r.1), Some(Ctl::None), "a model on disk has nothing to download");
+        assert_eq!(pick(&st, Kind::Asr), Some(("org/speech-base · not downloaded".into(), Ctl::Stepper("Base".into()))));
+        assert_eq!(button(&st, Kind::Asr), Some(Ctl::Button("Download")));
+        assert_eq!(button(&st, Kind::Translate), None, "a model on disk has nothing to download");
         st.cmds.clear();
         apply(&mut st, Key::ModelPull(Kind::Asr), Act::Press);
         assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelPull(Kind::Asr))));
+        // Stepping to a model on disk switches at once; to one that is not, it waits for Download.
+        st.cmds.clear();
+        apply(&mut st, Key::ModelPick(Kind::Asr), Act::Step(1));
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(Kind::Asr, id) if id == "org/speech-small")));
+        st.cmds.clear();
+        apply(&mut st, Key::ModelPick(Kind::Translate), Act::Step(1));
+        assert!(st.cmds.is_empty());
+        assert_eq!(button(&st, Kind::Translate), Some(Ctl::Button("Download")));
+        assert_eq!(pick(&st, Kind::Translate).map(|r| r.1), Some(Ctl::Stepper("Qwen big".into())));
+        // Off needs no files.
+        apply(&mut st, Key::ModelPick(Kind::Translate), Act::Step(1));
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(Kind::Translate, id) if id == OFF)));
         // While it downloads the button is gone.
         st.models.pulling = Some(Kind::Asr);
-        assert_eq!(label(&st, Kind::Asr).map(|r| r.1), Some(Ctl::None));
+        assert_eq!(button(&st, Kind::Asr), None);
     }
 
     #[test]

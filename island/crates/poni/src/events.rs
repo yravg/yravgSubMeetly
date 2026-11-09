@@ -141,9 +141,11 @@ pub enum AppEvent {
     /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.
     LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
     /// What the engine says its models are (or why it could not say), during a download too.
-    Models(Result<Vec<poni_core::models::Row>, String>),
+    Models(Result<poni_core::models::Inventory, String>),
     /// A model download ended.
-    ModelPulled { kind: poni_core::models::Kind, result: Result<(), String> },
+    ModelPulled { kind: poni_core::models::Kind, id: String, result: Result<(), String> },
+    /// The engine switched (or refused to switch) its model.
+    ModelSelected { kind: poni_core::models::Kind, result: Result<(), String> },
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

@@ -126,4 +126,6 @@ pub enum Command {
     ModelsRefresh,
     /// Download this model.
     ModelPull(poni_core::models::Kind),
+    /// Switch the engine to this model (`models::OFF` for no translation).
+    ModelSelect(poni_core::models::Kind, String),
 }

@@ -1753,10 +1753,14 @@ impl App {
         services::models::fetch(self.sink.clone(), poni_core::helper::configured_port());
     }
 
-    /// Download a model the engine has configured but not on disk; the engine is started first.
+    /// Download the model Settings shows for `kind` (the engine's own unless one was stepped to);
+    /// the engine is started first. One job per model: nothing starts while it already downloads.
     fn pull_model(&mut self, kind: poni_core::models::Kind) {
         let m = &mut self.st.models;
-        let Some(id) = m.row(kind).and_then(|r| r.id.clone()).filter(|_| m.pulling.is_none()) else { return };
+        let Some(id) = m.chosen(kind).filter(|id| id != poni_core::models::OFF) else { return };
+        if m.pulling.is_some() || m.status(&id).is_some_and(|s| s.pulling) {
+            return;
+        }
         m.pulling = Some(kind);
         m.failed = None;
         if let Some(svc) = self.services.as_mut() {
@@ -1765,14 +1769,30 @@ impl App {
         services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
     }
 
-    fn on_model_pulled(&mut self, kind: poni_core::models::Kind, result: std::result::Result<(), String>) {
+    fn select_model(&mut self, kind: poni_core::models::Kind, id: String) {
+        services::models::select(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
+    }
+
+    fn on_model_pulled(&mut self, kind: poni_core::models::Kind, id: String, result: std::result::Result<(), String>) {
         self.st.models.pulling = None;
         self.st.models.failed = result.err().map(|e| (kind, e));
+        // A model stepped to and now on disk is what the person asked for: switch to it.
+        if self.st.models.failed.is_none() && self.st.models.chosen(kind).as_deref() == Some(id.as_str()) && self.st.models.selected(kind).as_deref() != Some(id.as_str()) {
+            self.select_model(kind, id);
+        }
         self.refresh_models();
         let title = if self.st.models.failed.is_none() { format!("{} downloaded", kind.label()) } else { format!("{} download failed", kind.label()) };
         let (icon, color) = if self.st.models.failed.is_none() { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
         let sub = self.st.models.failed.as_ref().map_or_else(|| "Captions start by themselves".to_string(), |(_, e)| e.clone());
         self.st.notify(icon, color, title, sub, 6.0, None);
+    }
+
+    fn on_model_selected(&mut self, kind: poni_core::models::Kind, result: std::result::Result<(), String>) {
+        if let Err(e) = result {
+            self.st.models.set_pick(kind, None);
+            self.st.notify(Icon::Download, palette::ORANGE, format!("{} not switched", kind.label()), e, 6.0, None);
+        }
+        self.refresh_models();
     }
 
     /// Translate the song now followed (once; the engine answers from its cache file next time),
@@ -2278,7 +2298,8 @@ impl App {
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::Capture(e) => self.on_capture(e),
             AppEvent::Models(r) => self.st.models.apply(r, now),
-            AppEvent::ModelPulled { kind, result } => self.on_model_pulled(kind, result),
+            AppEvent::ModelPulled { kind, id, result } => self.on_model_pulled(kind, id, result),
+            AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
             AppEvent::LyricsTr { track_key, tgt, lines, state } => {
                 // A late answer for another song or another target language is dropped.
                 if self.st.lyrics.track_key == track_key && self.st.settings.target_lang == tgt && self.st.settings.lyrics_translate {
@@ -3818,6 +3839,7 @@ impl App {
                 Command::Captions(on) => self.set_captions(on),
                 Command::ModelsRefresh => self.refresh_models(),
                 Command::ModelPull(k) => self.pull_model(k),
+                Command::ModelSelect(k, id) => self.select_model(k, id),
             }
         }
         self.sync_phone_offer();
