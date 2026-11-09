@@ -1,0 +1,16 @@
+{
+  "manifest": 0,
+  "id": "due-to-calendar",
+  "name": "Due dates to calendar",
+  "version": "1",
+  "description": "Saves the open actions that have a due date as one .ics file for your calendar.",
+  "appliesTo": "always",
+  "actions": [
+    {
+      "id": "ics",
+      "label": "Due dates to calendar",
+      "badge": "openActions",
+      "do": { "call": "exportIcs" }
+    }
+  ]
+}

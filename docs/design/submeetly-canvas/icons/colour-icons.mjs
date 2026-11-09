@@ -43,6 +43,9 @@ export const ICONS = {
   trash: ['r', P('M5.5 7.5h13l-1 12.5a1 1 0 0 1-1 .9H7.5a1 1 0 0 1-1-.9z', c.rl, c.rd) + L('M4 7.5h16M9.5 7.5V5h5v2.5', c.rd, 1.5)],
   bolt: ['o', P('M13.5 2.8 5.5 14h5.5l-1.2 7.2L18.5 10H13z', c.y, c.od)],
   check: ['g', C(12, 12, 9, c.g, c.gd) + L('M7.8 12.4l3 3 5.6-6.4', c.w, 2)],
+  mail: ['b', R(2.8, 5.5, 18.4, 13, c.bl, c.bd, 2.5) + L('M3.5 7.5 12 13.5l8.5-6', c.bd, 1.7)],
+  calendar: ['o', R(3, 5, 18, 16, c.w, c.od, 3) + R(3, 5, 18, 5, c.o, c.od, 3) + L('M8 3v4M16 3v4', c.od, 1.8) + R(7, 13, 3, 3, c.ol, c.od, 0.8) + R(14, 13, 3, 3, c.ol, c.od, 0.8)],
+  book: ['t', P('M5 4h10.5a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z', c.tl, c.td) + L('M5 17a3 3 0 0 1 3-3h10.5M9 8h5M9 11h3', c.td, 1.4)],
 };
 
 /** Plain colour icon (no tile). */

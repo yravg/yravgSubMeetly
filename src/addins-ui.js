@@ -6,13 +6,15 @@
 import { tile } from './lib/colour-icons.js';
 import { listMeetings } from './lib/notes-store.js';
 import {
-  TRUST_KEY, REMOVED_KEY, listAddins, mayCall, visibleActions, visiblePanels, panelRows,
+  TRUST_KEY, REMOVED_KEY, listAddins, mayCall, visibleActions, visiblePanels, panelRows, hookActive,
 } from './lib/addins.js';
+import { applyToLine, applyToMeeting, GLOSSARY_MAX } from './lib/glossary.js';
 import { BUNDLED } from './addins/index.js';
 import { I18N } from './lib/i18n.js';
 
 const RUNS_KEY = 'ysmAddinRuns';
 const STORE_KEYS = [TRUST_KEY, REMOVED_KEY, RUNS_KEY];
+export const GLOSSARY_KEY = 'ysmGlossary';
 const MAX_RUNS = 5;
 const TOAST_MS = 8000;
 
@@ -32,6 +34,40 @@ export async function recordRun(addinId, text) {
   await chrome.storage.local.set({ [RUNS_KEY]: { ...runs, [addinId]: list } });
 }
 
+/* ---------- glossary store + runtime ---------- */
+/** chrome.storage.local `ysmGlossary` = { [seriesId]: [{term, heard[], translation}] }. */
+export async function loadGlossary() {
+  const v = (await chrome.storage.local.get(GLOSSARY_KEY))[GLOSSARY_KEY];
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+}
+export async function saveGlossary(all, seriesId, entries) {
+  const next = { ...all, [seriesId]: entries.slice(0, GLOSSARY_MAX) };
+  await chrome.storage.local.set({ [GLOSSARY_KEY]: next });
+  return next;
+}
+// Read synchronously by the caption path (sidepanel.js pushLive); notes-panel.js keeps it current.
+let gl = { all: {}, caption: false, draft: false, seriesId: null };
+export function syncGlossary(all, enabled, active) {
+  gl = { all, caption: hookActive(enabled, 'caption.final', active), draft: hookActive(enabled, 'meeting.draft', active), seriesId: active?.seriesId ?? null };
+}
+export const glossaryEntries = (seriesId = gl.seriesId) => gl.all[seriesId] || [];
+/** {src,tgt,changes,marks} when the glossary changed this caption line, else null. */
+export function glossaryCaption(line) {
+  const entries = gl.caption ? glossaryEntries() : [];
+  if (!entries.length) return null;
+  const r = applyToLine(line, entries);
+  return r.changes ? r : null;
+}
+/** {meeting, changes}; the meeting comes back untouched when the draft hook is off or nothing matched. */
+export function glossaryDraft(meeting) {
+  const entries = gl.draft ? glossaryEntries(meeting?.seriesId) : [];
+  return entries.length ? applyToMeeting(meeting, entries) : { meeting, changes: 0 };
+}
+
+/** Section words of the recap text, in the UI language (lib/recap-email.js label keys). */
+export const recapLabels = (lang) => Object.fromEntries(['Subject', 'Date', 'Attendees', 'Decisions', 'Actions', 'Questions', 'Due', 'NoDue']
+  .map((k) => [k[0].toLowerCase() + k.slice(1), tr(lang, `aiRl${k}`)]));
+
 /** Enabled manifests only: needs-trust, changed, broken and removed add-ins never reach the Notes panel. */
 export async function loadRuntime(bundled = BUNDLED) {
   const { trusted, removed } = await loadStore();
@@ -39,15 +75,59 @@ export async function loadRuntime(bundled = BUNDLED) {
 }
 
 /* ---------- Notes panel strip ---------- */
-export function stripHtml(enabled, active, meetings, { lang = 'en', now } = {}) {
+const CHIP_ICON = { recapEmail: 'mail', exportIcs: 'calendar' };
+
+/** Result card under the chips. result = { kind: 'recap'|'ics'|'error', ...payload, copied? }; five states: normal, empty, needs input, error (locked/untrusted add-ins never reach the strip). */
+function resultHtml(res, lang) {
+  const T = (k, ...a) => tr(lang, k, ...a);
+  const dismiss = `<button type="button" class="mini-btn" data-ai-act="dismiss">${T('aiDismiss')}</button>`;
+  const card = (cls, icon, title, inner, btns = '') => `<div class="ai-result ${cls}" data-ai-result="${esc(res.kind)}" role="status"><div class="ai-rh">${tile(icon, 20)}<b>${esc(title)}</b></div>${inner}<div class="ai-btns">${btns}${dismiss}</div></div>`;
+  if (res.kind === 'error') return card('ai-res-error', 'warn', res.title, `<p role="alert">${esc(T('aiErr', res.message))}</p>`);
+  if (res.kind === 'ics') {
+    const { count, skipped, filename } = res.ics;
+    const inner = `<p>${esc(count ? T('aiIcsSaved', count, filename) : T('aiIcsEmpty'))}</p>${count && skipped ? `<p class="ai-dim">${esc(T('aiIcsSkipped', skipped))}</p>` : ''}`;
+    return card(count ? '' : 'ai-res-empty', 'calendar', T('aiIcsTitle'), inner);
+  }
+  const r = res.recap;
+  if (r.empty) return card('ai-res-empty', 'mail', T('aiRecapTitle'), `<p>${esc(T('aiRecapEmpty'))}</p>`);
+  const to = r.to.length ? T('aiRecapTo', r.to.length) : T('aiRecapNoTo');
+  const inner = `<p class="ai-dim">${esc(T('aiRecapNote'))}</p><p class="${r.to.length ? '' : 'ai-need'}">${esc(to)}</p>${r.to.length && r.noEmail.length ? `<p class="ai-dim">${esc(T('aiRecapMissing', r.noEmail.join(', ')))}</p>` : ''}${r.tooLong ? `<p class="ai-need" role="alert">${esc(T('aiRecapTooLong'))}</p>` : ''}${res.copyFailed ? `<p class="ai-need" role="alert">${esc(T('aiRecapCopyFail'))}</p>` : ''}<details class="ai-prev"><summary>${esc(T('aiRecapPreview'))}</summary><pre class="ai-pre">${esc(`${r.subject}\n\n${r.body}`)}</pre></details>`;
+  const open = `<button type="button" class="mini-btn ai-primary" data-ai-act="recap-open"${r.url ? '' : ' disabled'}>${T('aiRecapOpen')}</button>`;
+  const copy = `<button type="button" class="mini-btn" data-ai-act="recap-copy">${T(res.copied ? 'aiRecapCopied' : 'aiRecapCopy')}</button>`;
+  return card('', 'mail', T('aiRecapTitle'), inner, open + copy);
+}
+
+/** Glossary editor panel. gl = { entries, note: {kind: 'error'|'ok', text} | null }. */
+function glossaryPanelHtml(p, g, lang) {
+  const T = (k, ...a) => tr(lang, k, ...a);
+  const entries = g.entries;
+  const list = entries.length
+    ? `<ul class="gl-list">${entries.map((e, i) => `<li><b>${esc(e.term)}</b>${e.heard.length ? `<span class="ai-dim">${esc(e.heard.join(' | '))}</span>` : ''}${e.translation ? `<span class="gl-tr">${esc(e.translation)}</span>` : ''}<button type="button" class="ai-lnk" data-ai-act="gl-del" data-i="${i}" aria-label="${esc(`${T('aiGlRemove')} ${e.term}`)}">${T('aiGlRemove')}</button></li>`).join('')}</ul>`
+    : `<div class="ai-zero"><span>${T('aiGlEmpty')}</span></div>`;
+  const note = g.note ? `<p class="ai-note ai-note-${g.note.kind}" role="${g.note.kind === 'error' ? 'alert' : 'status'}">${esc(g.note.text)}</p>` : '';
+  return `<details class="ai-panel ai-gl" open data-ai-panel="glossary"><summary>${tile('book', 20)}<b>${esc(p.title)}</b><i class="ai-count">${entries.length}</i></summary>
+    <p class="ai-dim ai-gl-hint">${T('aiGlHint')}</p>${list}
+    <div class="gl-add">
+      <label>${T('aiGlTerm')}<input class="gl-in" id="gl-term" maxlength="80" autocomplete="off"></label>
+      <label>${T('aiGlHeard')}<input class="gl-in" id="gl-heard" autocomplete="off"></label>
+      <label>${T('aiGlTrans')}<input class="gl-in" id="gl-trans" maxlength="120" autocomplete="off"></label>
+      <button type="button" class="mini-btn ai-primary" data-ai-act="gl-add">${T('aiGlAdd')}</button>
+    </div>${note}
+    <div class="ai-btns"><button type="button" class="mini-btn" data-ai-act="gl-import">${T('aiGlImport')}</button><button type="button" class="mini-btn" data-ai-act="gl-export"${entries.length ? '' : ' disabled'}>${T('aiGlExport')}</button><input type="file" id="gl-file" accept=".csv,text/csv" hidden></div></details>`;
+}
+
+export function stripHtml(enabled, active, meetings, { lang = 'en', now, result = null, glossary = { entries: [], note: null } } = {}) {
   if (!active || !enabled.length) return '';
   const chips = visibleActions(enabled, active);
   const panels = visiblePanels(enabled, active);
   if (!chips.length && !panels.length) return '';
   const series = meetings.filter((m) => m.seriesId === active.seriesId);
+  const chip = (c) => `<button type="button" class="ai-chb" data-addin="${esc(c.addinId)}:${esc(c.actionId)}"${c.mutates && active.issuedAt ? ' disabled' : ''}>${tile(CHIP_ICON[c.call] || 'bolt', 20)}<span>${esc(c.label)}</span>${c.badge != null ? `<i>${c.badge}</i>` : ''}</button>`;
   return `<div class="ai-strip" data-addins-strip>
-    ${chips.length ? `<div class="ai-chips">${chips.map((c) => `<button type="button" class="ai-chb" data-addin="${esc(c.addinId)}:${esc(c.actionId)}"${active.issuedAt ? ' disabled' : ''}>${tile('bolt', 20)}<span>${esc(c.label)}</span>${c.badge != null ? `<i>${c.badge}</i>` : ''}</button>`).join('')}</div>` : ''}
+    ${chips.length ? `<div class="ai-chips">${chips.map(chip).join('')}</div>` : ''}
+    ${result ? resultHtml(result, lang) : ''}
     ${panels.map((p) => {
+      if (p.source === 'glossary') return glossaryPanelHtml(p, glossary, lang);
       const rows = panelRows(enabled.find((m) => m.id === p.addinId), p.panelId, series, { lang, now });
       return `<details class="ai-panel" open><summary>${tile('pages', 20)}<b>${esc(p.title)}</b>${p.badge != null ? `<i class="ai-count">${p.badge}</i>` : ''}</summary>
         <ul>${rows.map((r) => `<li><span class="ai-ref">${esc(r.ref)}</span><span>${esc(r.text)}</span>${r.owner ? `<span class="ai-dim">${esc(r.owner)}</span>` : ''}</li>`).join('')}</ul></details>`;
@@ -73,7 +153,8 @@ function scopeText(a, T) {
   if (a === 'always') return T('aiAlways');
   return [a.projectType && `projectType ${a.projectType.join(', ')}`, a.seriesId && `seriesId ${a.seriesId.join(', ')}`].filter(Boolean).join(' · ');
 }
-const doText = (d, T) => (d.call === 'addItem' ? T('aiDoAddItem', d.type) : T('aiDoOpen', d.url));
+const DO_KEY = { recapEmail: 'aiDoRecap', exportIcs: 'aiDoIcs', applyGlossary: 'aiDoGlossary' };
+const doText = (d, T) => (DO_KEY[d.call] ? T(DO_KEY[d.call]) : d.call === 'addItem' ? T('aiDoAddItem', d.type) : T('aiDoOpen', d.url));
 
 function kindText(e, T) {
   if (e.state === 'broken') return T('aiKindBroken');
@@ -81,7 +162,8 @@ function kindText(e, T) {
   const m = e.manifest;
   return `${[m.actions?.length && T('aiKAction'), m.panels?.length && T('aiKPanel'), m.hooks?.length && T('aiKHook')].filter(Boolean).join(' + ') || T('aiKEmpty')} · appliesTo ${scopeText(m.appliesTo, T)}`;
 }
-const iconOf = (e) => (e.state === 'broken' ? 'warn' : e.state === 'changed' ? 'diff' : e.manifest?.panels?.length && !e.manifest?.actions?.length ? 'pages' : 'bolt');
+const ID_ICON = { 'recap-email': 'mail', 'due-to-calendar': 'calendar', glossary: 'book' };
+const iconOf = (e) => (e.state === 'broken' ? 'warn' : e.state === 'changed' ? 'diff' : ID_ICON[e.id] || (e.manifest?.panels?.length && !e.manifest?.actions?.length ? 'pages' : 'bolt'));
 
 function rowHtml(e, ui, T) {
   const name = e.manifest?.name || String(e.raw?.name || e.id);
@@ -101,10 +183,10 @@ function quoteHtml(e, T) {
     lines.push(line('appliesTo', esc(scopeText(m.appliesTo, T))));
     for (const a of m.actions || []) lines.push(line('actions', esc(`${a.label} → ${doText(a.do, T)}`)), ...(a.badge ? [line('badge', esc(T('aiCountOf', a.badge)))] : []));
     for (const p of m.panels || []) lines.push(line('panels', esc(T('aiPanelLine', p.title, p.source))), ...(p.when ? [line('when', esc(p.when))] : []));
-    for (const h of m.hooks || []) lines.push(line('hooks', esc(`${T('aiHookOn', h.on)} → ${doText(h.do, T)} ${T('aiHookNote')}`)));
+    for (const h of m.hooks || []) lines.push(line('hooks', esc(`${T('aiHookOn', h.on)} → ${doText(h.do, T)}${h.do.call === 'applyGlossary' ? '' : ` ${T('aiHookNote')}`}`)));
   }
-  const chips = (m?.actions || []).map((a) => `<span class="ai-chb ai-chb-demo">${tile('bolt', 20)}<span>${esc(a.label)}</span></span>`)
-    .concat((m?.panels || []).map((p) => `<span class="ai-chb ai-chb-demo">${tile('pages', 20)}<span>${esc(p.title)}</span></span>`));
+  const chips = (m?.actions || []).map((a) => `<span class="ai-chb ai-chb-demo">${tile(ID_ICON[e.id] || 'bolt', 20)}<span>${esc(a.label)}</span></span>`)
+    .concat((m?.panels || []).map((p) => `<span class="ai-chb ai-chb-demo">${tile(ID_ICON[e.id] || 'pages', 20)}<span>${esc(p.title)}</span></span>`));
   return `<div class="ai-quote"><div class="ai-qh">${tile('bolt', 20)}<b>${esc(m?.name || e.raw?.name || e.id)}</b><span class="ai-grow"></span><span class="ai-mono">manifest v0</span></div>${lines.join('')}</div>${chips.length ? `<div class="ai-chips">${chips.join('')}</div>` : ''}`;
 }
 
@@ -127,7 +209,8 @@ function sideHtml(e, runs, T) {
   const rows = e.manifest ? mayCall(e.manifest) : [{ ok: false, label: T('aiEverything') }];
   const log = runs[e.id] || [];
   const never = T({ broken: 'aiNeverBroken', 'needs-trust': 'aiNeverNeeds', changed: 'aiNeverChanged', removed: 'aiNeverRemoved' }[e.state] || 'aiNoRuns');
-  return `<div class="ai-blk"><div class="ai-sl">${T('aiMayCall')}</div>${rows.map((r) => `<div class="ai-li"><i class="ai-yn ${r.ok ? 'y' : 'n'}" aria-hidden="true">${r.ok ? '✓' : '✕'}</i><span><span class="ai-sr">${r.ok ? T('aiAllowed') : T('aiRefused')}</span>${esc(r.label)}</span></div>`).join('')}</div>
+  const how = I18N.en[`aiHow_${e.id}`] ? `<div class="ai-blk ai-how"><div class="ai-sl">${T('aiHowTitle')}</div><p>${esc(T(`aiHow_${e.id}`))}</p></div>` : '';
+  return `${how}<div class="ai-blk"><div class="ai-sl">${T('aiMayCall')}</div>${rows.map((r) => `<div class="ai-li"><i class="ai-yn ${r.ok ? 'y' : 'n'}" aria-hidden="true">${r.ok ? '✓' : '✕'}</i><span><span class="ai-sr">${r.ok ? T('aiAllowed') : T('aiRefused')}</span>${esc(r.label)}</span></div>`).join('')}</div>
     <div class="ai-blk"><div class="ai-sl">${T('aiLastRuns')}</div>${log.length ? log.map((r) => `<div class="ai-li"><span class="ai-dim">${esc(r.at.slice(11, 16))}</span><span>${esc(r.text)}</span></div>`).join('') : `<div class="ai-li ai-dim">${never}</div>`}</div>`;
 }
 

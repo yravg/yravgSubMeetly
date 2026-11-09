@@ -77,12 +77,12 @@ after(async () => {
   server?.kill('SIGTERM');
 });
 
-test('Add-ins tab: both bundled add-ins wait for trust, nothing runs', async () => {
+test('Add-ins tab: all five bundled add-ins wait for trust, nothing runs', async () => {
   await boot(`(${SEED})()`);
   await openAddins();
   assert.equal(await state(), 'needs');
   const rows = await page.$$eval('.ai-row', (r) => r.map((e) => e.textContent));
-  assert.equal(rows.length, 2);
+  assert.equal(rows.length, 5);
   await click('.ai-row');
   assert.ok((await text('.ai-gate')).length > 10);
   // untrusted: no chip in the notes strip
