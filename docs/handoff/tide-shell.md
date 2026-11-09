@@ -16,7 +16,17 @@ Updated 2026-11-09 by the lead (Claude Opus 5.5); build rows by worker tide-buil
 | Build fix · lab-lib pkill | done | f603dbe. `npm run build` killed every `scripts/lab-server.py` on the machine, including the systemd preview; now only this checkout's own server |
 | Build 2 · TIDE-023 Minutes window (A04c) | done | c0a5bd9. Side panel Notes tab "Open Minutes window ↗"; `src/lib/minutes-window.js`; unit 6/6; `npm test` 454 / 0 / 13. Real extension (Chrome for Testing + xvfb): popup 1280×800, 2nd click focuses, reopen at remembered 30,40 1100×760, label flips both ways. Lab: named `window.open`. Button text 5.31–10.20:1. Shell Minutes page gets the same button in build 4 |
 | Build 3 · TIDE-001 Tide tokens (K01) | done | 7de87fa. `npm test` 457 pass, 2 load timeouts (load avg 138–174 on 4 cores; both files 16/16 alone). `src/theme-tide.css` scoped to `[data-reskin='tide']`; fonts Fredoka + Plus Jakarta Sans TTF with OFL; design-tokens 11/11 incl. 14-pair contrast table × light/dark (lowest 4.88 green-ink on mint, matches K01); slop 100 (A). Viewed swatch/type sheet light + dark, both fonts `loaded` |
-| Build 4..7 (T5..T8) | open | in progress by worker tide-build |
+| Build 4–6 · T5 shell + Today, T6 pages, T7 Ask Tide | done | 66c8a60 (one commit: changes interleaved in app.js/css/html). Tests: today 5 (mutation-checked), app-shell 11, app-controls 17 (all 789 controls from controls.json reachable), ask-tide 8, ask-tide-ui 8. `npm test` at T5+T6: 492 pass / 0 fail / 13 skip. `npm test` at T7 was killed by Claude Code for low machine memory (not a test failure); targeted T7 tests 27/27. Slop 99–100 (A), 0 errors; text pairs ≥ 4.71:1. Viewed 1440/1024/390, dark, sheet, welcome/empty/loading states, Minutes Classic+Modern (light/dark/empty), All features, Developer, Ask dialog (register, local stream, picker, consent, 390, dark), Plans |
+| Build 7 · T8 side panel Tide reskin (TIDE-012) | open | code in the working tree, not committed, not built/tested: `RESKINS` + Tide card in Settings › Reskin, theme-tide.css linked after sidepanel.css, scope raised to `:root[data-reskin='tide']` (beats the panel's system-light rule), Tide only on the empty History state, `test/sidepanel-tide.test.mjs` written. Next: `npm run build`, run that test, full suite, view at 480/390 light/dark, commit |
+
+Deviations for the lead to judge:
+- Live captions, History, Files, Settings, Helper, Add-ins, Glossary, Island and Performance pages mount the existing side panel views (`sidepanel.html?view=…`) instead of new A02/A05/A07 layouts; every control is kept (control test) but those boards are not drawn as designed.
+- Developer area (A08) mounts the existing lab page; in the extension it frames http://127.0.0.1:8799/app.html behind Settings › Developer.
+- Modern register: the theme picker keeps its two choices (dark = Tide dark, "Coretax · paper" = Tide light); its labels still say Coretax. A04a improvements done: Tide colours, type tag as ink word + dot, empty state with Tide. Not done: sticky header, density control, row hover actions, sentence-case Source chips.
+- Ask Tide: export card ("Done · N rows · Open →") not built (a page cannot open a downloaded file); helper `/ask` route does not exist yet in engine-rs, so Local shows "no Ask route" until it is added; OpenRouter model ids are guesses mapped in the helper.
+- Side panel default reskin stays Yraverage; Tide is an option. Making Tide the default is a global change: owner/lead decision.
+- Helper does not mirror the Tide reskin (`UI_RESKINS` in engine-rs/engine/src/app.rs ignores unknown values); one-line Rust change left for a session that runs the Rust gate.
+- A01 headline kept as "Items this week" (board), PRD says "Actions this week".
 
 ## Facts
 
