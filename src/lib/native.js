@@ -154,6 +154,12 @@ export async function nativePullModel(url, id, timeoutMs = 5000) {
   return postJson(`${base(url)}/models/pull`, { id }, timeoutMs);
 }
 
+// Put one model's files in another folder (dir) or back in the default (null). 200 remapped, 202 a move started
+// (progress is on the model row); refusals come back as { error, code, needBytes?, freeBytes? }.
+export async function nativeSetModelLocation(url, id, dir, timeoutMs = 8000) {
+  return postJson(`${base(url)}/engine/models/location`, { id, dir }, timeoutMs);
+}
+
 // Choose the speech and/or translation model: { asr?: id, translate?: id | 'off' }.
 export async function nativeSetModels(url, patch, timeoutMs = 5000) {
   return postJson(`${base(url)}/engine/models`, patch, timeoutMs);

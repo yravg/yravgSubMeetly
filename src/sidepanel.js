@@ -20,6 +20,7 @@ import {
   nativeGetModels,
   nativePullModel,
   nativeSetModels,
+  nativeSetModelLocation,
   nativeGetDevice,
   nativeSetDevice,
   HELPER_DEVICE_OPTIONS,
@@ -1905,6 +1906,16 @@ function fmtBytes(n) {
 // Models of the engine (GET /models): the fixed catalog, what is on disk, a picker and
 // Download with progress. Refreshes on checkNative and, while a pull runs, every 1.5 s.
 let modelsPollTimer = null;
+let locOpen = null; // id of the model whose folder editor is open
+let modelsSeq = 0; // only the newest render may touch the list: a slower earlier one would wipe a field being typed in
+let locFocus = false; // focus the field once, right after the editor opens
+let locDraft = ''; // what was typed there; survives the 1.5 s re-render while a transfer runs
+// The engine's refusal codes for a folder change or a download, in words (POST /engine/models/location, /models/pull).
+function locMessage(r) {
+  const why = { 'bad-dir': 'modelsLocBadDir', 'dir-not-writable': 'modelsLocNotWritable', busy: 'modelsLocBusy', 'target-has-copy': 'modelsLocHasCopy', 'model-dir-unavailable': 'modelsDriveAway' }[r.code];
+  if (r.code === 'not-enough-space') return t('modelsLocNoSpace', { need: fmtBytes(r.needBytes), free: fmtBytes(r.freeBytes) });
+  return why ? t(why, { dir: r.dir || '' }) : r.error || 'failed';
+}
 async function renderNativeModels() {
   const host = $('native-models');
   if (!host) return;
@@ -1914,7 +1925,9 @@ async function renderNativeModels() {
     return;
   }
   const url = state.settings.nativeUrl || DEFAULT_NATIVE_URL;
+  const seq = ++modelsSeq;
   const res = await nativeGetModels(url);
+  if (seq !== modelsSeq) return;
   const catalog = res && Array.isArray(res.catalog) ? res.catalog : [];
   host.replaceChildren();
   if (!catalog.length) return; // an engine without the catalog: nothing to pick, nothing invented
@@ -1925,7 +1938,7 @@ async function renderNativeModels() {
     if (r.error) fail(r.error);
     rerender();
   };
-  const row = ({ title, sub, selected, action, bar, error }) => {
+  const row = ({ title, sub, selected, action, more = [], extra = [], bar, error }) => {
     const div = document.createElement('div');
     div.className = 'm-item';
     div.dataset.selected = selected ? 'true' : 'false';
@@ -1953,6 +1966,7 @@ async function renderNativeModels() {
       e.textContent = /^download failed/i.test(error) ? error : t('modelsFailed', { why: error }); // the engine's reason already says it
       meta.appendChild(e);
     }
+    meta.append(...extra);
     div.appendChild(meta);
     const side = document.createElement('div');
     side.className = 'm-actions';
@@ -1962,19 +1976,68 @@ async function renderNativeModels() {
       tag.textContent = t('modelsInUse');
       side.appendChild(tag);
     }
-    if (action) {
+    for (const a of [action, ...more]) {
+      if (!a) continue;
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'mini-btn';
-      btn.textContent = action.label;
-      btn.disabled = !!action.disabled;
-      btn.addEventListener('click', action.run);
+      btn.textContent = a.label;
+      btn.disabled = !!a.disabled;
+      btn.addEventListener('click', a.run);
       side.appendChild(btn);
     }
     div.appendChild(side);
     return div;
   };
   let pulling = false;
+  let moving = false;
+  const note = (text, cls = '') => { const d = document.createElement('div'); d.className = `m-sub ${cls}`.trim(); d.textContent = text; return d; };
+  const setLocation = async (id, dir) => {
+    const r = await nativeSetModelLocation(url, id, dir);
+    if (r.error) showToast(locMessage(r), 'error');
+    else { locOpen = null; locDraft = ''; }
+    rerender();
+  };
+  // The folder line, the drive-away and move states, and the typed-path editor, for a row whose engine reports a folder.
+  const folderBits = (m, title) => {
+    const extra = [];
+    const more = [];
+    if (typeof m.dir !== 'string') return { extra, more };
+    extra.push(note(Number.isFinite(m.freeBytes) ? t('modelsFolderFree', { dir: m.dir, free: fmtBytes(m.freeBytes) }) : t('modelsFolder', { dir: m.dir }), 'm-dir'));
+    if (m.dirAvailable === false) extra.push(note(t('modelsDriveAway', { dir: m.dir }), 'm-error'));
+    if (m.moveError) extra.push(note(t('modelsMoveFailed', { why: m.moveError }), 'm-error'));
+    if (m.moveWarning) extra.push(note(m.moveWarning));
+    if (m.moving || m.pulling) return { extra, more };
+    more.push({ label: t('modelsLocChange'), run() { locOpen = locOpen === m.id ? null : m.id; locFocus = locOpen != null; locDraft = locDraft || m.dir; rerender(); } });
+    if (locOpen === m.id) {
+      const ed = document.createElement('div');
+      ed.className = 'm-loc';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'm-loc-input';
+      inp.value = locDraft;
+      inp.spellcheck = false;
+      inp.setAttribute('aria-label', t('modelsLocLabel', { title }));
+      inp.addEventListener('input', () => { locDraft = inp.value; });
+      if (locFocus) { locFocus = false; setTimeout(() => { inp.focus(); inp.select(); }); }
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.className = 'mini-btn';
+      go.textContent = t('modelsLocApply');
+      go.addEventListener('click', () => (locDraft.trim() ? setLocation(m.id, locDraft.trim()) : showToast(t('modelsLocEmpty'), 'error')));
+      ed.append(inp, go);
+      if (!m.dirIsDefault) {
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'mini-btn';
+        reset.textContent = t('modelsLocReset');
+        reset.addEventListener('click', () => setLocation(m.id, null));
+        ed.appendChild(reset);
+      }
+      extra.push(ed);
+    }
+    return { extra, more };
+  };
   for (const [kind, heading] of [['asr', t('modelsAsr')], ['translate', t('modelsTranslate')]]) {
     const rows = catalog.filter((m) => m.kind === kind);
     if (!rows.length) continue;
@@ -2005,19 +2068,29 @@ async function renderNativeModels() {
       } else if (!m.downloaded) {
         action = {
           label: m.pullError ? t('modelsRetry') : t('modelsDownload'),
+          disabled: m.dirAvailable === false || !!m.moving,
           async run() {
             const r = await nativePullModel(url, m.id);
-            if (r.error) fail(r.error);
+            if (r.error) showToast(locMessage(r), 'error');
             rerender();
           },
         };
       } else if (!m.selected) {
         action = { label: t('modelsUse'), run: () => choose({ [kind]: m.id }) };
       }
-      host.appendChild(row({ title: m.label || m.id, sub, selected: !!m.selected, action, bar, error: m.pulling ? '' : m.pullError }));
+      const { extra, more } = folderBits(m, m.label || m.id);
+      if (m.moving) {
+        moving = true;
+        bar = Number.isFinite(m.movePct) ? m.movePct : 0;
+        extra.push(note(t('modelsMoving', { phase: m.movePhase || '', pct: Number.isFinite(m.movePct) ? `${Math.round(m.movePct)}%` : '' })));
+        action = { label: t('modelsMovingBtn'), disabled: true, run() {} };
+      }
+      host.appendChild(row({ title: m.label || m.id, sub, selected: !!m.selected, action, more, extra, bar, error: m.pulling ? '' : m.pullError }));
     }
   }
-  if (pulling) modelsPollTimer = setTimeout(rerender, 1500);
+  // A re-render would drop the focus (and the caret) of a path being typed, so progress waits while the field is focused.
+  const again = () => (host.querySelector('.m-loc-input:focus') ? (modelsPollTimer = setTimeout(again, 1500)) : rerender());
+  if (pulling || moving) modelsPollTimer = setTimeout(again, 1500);
 }
 
 function updateNativeHostHint() {

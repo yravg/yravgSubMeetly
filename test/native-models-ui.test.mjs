@@ -21,7 +21,7 @@ const catalog = () => [
   row('translate', 'Qwen/Qwen2.5-0.5B-Instruct', 'Qwen 2.5 0.5B', 1_000_000_000, { partialBytes: 300_000_000, selected: true }),
   row('translate', 'Qwen/Qwen2.5-1.5B-Instruct', 'Qwen 2.5 1.5B', 3_100_000_000, { downloaded: true, bytes: 3_100_000_000 }),
 ];
-let cat; let calls; let server; let origin; let browser; let pullFails = false;
+let cat; let calls; let server; let origin; let browser; let pullFails = false; let refuse = null;
 
 before(async () => {
   assert.ok(existsSync(join(DIST, 'app.html')), 'dist/ not built: run `npm run build`');
@@ -31,12 +31,13 @@ before(async () => {
     const json = (status, body) => { res.statusCode = status; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(body)); };
     if (url.pathname === '/health') return json(200, { ok: true, device: 'cpu', models: [] });
     if (url.pathname === '/models') return json(200, { models: [], catalog: cat });
-    if (url.pathname === '/models/pull' || url.pathname === '/engine/models') {
+    if (url.pathname === '/models/pull' || url.pathname === '/engine/models' || url.pathname === '/engine/models/location') {
       let body = '';
       req.on('data', (c) => { body += c; });
       req.on('end', () => {
         const b = JSON.parse(body || '{}');
         calls.push({ path: url.pathname, body: b });
+        if (url.pathname === '/engine/models/location') return refuse ? json(refuse.status, refuse.body) : json(202, { ok: true, started: true });
         if (url.pathname === '/models/pull') {
           const m = cat.find((r) => r.id === b.id);
           if (!m) return json(400, { error: 'unknown model' });
@@ -77,7 +78,7 @@ const click = (page, title, text) => page.evaluate((ti, tx) => {
 }, title, text);
 // shortcut: the first navigation of a fresh Chrome sometimes ends net::ERR_ABORTED (cause not found); one retry, drop it when found.
 const openModels = async (page) => {
-  const go = () => page.goto(`${origin}/app/sidepanel.html?view=settings&stab=engine`, { waitUntil: 'domcontentloaded' });
+  const go = () => page.goto(`${origin}/app/sidepanel.html?view=settings&stab=models`, { waitUntil: 'domcontentloaded' });
   await go().catch((e) => { if (!/ERR_ABORTED/.test(e.message)) throw e; return go(); });
 };
 const waitRows = (page, fn, what) => page.waitForFunction(fn, { timeout: 8000 }).catch(() => { throw new Error('timeout: ' + what); });
@@ -142,4 +143,59 @@ test('Models: an engine without a catalog shows nothing instead of invented rows
   assert.equal((await rows(page)).length, 0);
   await page.close();
   cat = saved;
+});
+
+// Storage location (engine-models cd63f5d): rows carry dir/freeBytes/dirAvailable/move state; POST /engine/models/location moves or remaps.
+test('Models: folder, free space, change location with the engine refusals in words, move progress, drive away', { timeout: 60_000 }, async () => {
+  const saved = cat; calls = [];
+  const loc = (extra = {}) => ({ dir: 'C:/hub', dirIsDefault: true, dirAvailable: true, freeBytes: 120_000_000_000, moving: false, moveBytesDone: 0, moveBytesTotal: 0, movePct: null, movePhase: null, moveError: null, moveWarning: null, ...extra });
+  cat = [
+    row('asr', 'openai/whisper-base', 'Whisper base', 290_000_000, { downloaded: true, bytes: 290_000_000, selected: true, ...loc() }),
+    row('asr', 'openai/whisper-small', 'Whisper small', 967_000_000, loc({ dir: 'F:/models', dirIsDefault: false, dirAvailable: false, freeBytes: null, dirError: 'drive not found' })),
+    row('translate', 'Qwen/Qwen2.5-0.5B-Instruct', 'Qwen 2.5 0.5B', 1_000_000_000, { downloaded: true, bytes: 1_000_000_000, selected: true, ...loc({ moving: true, movePct: 40, movePhase: 'copying' }) }),
+  ];
+  refuse = { status: 400, body: { error: 'x', code: 'not-enough-space', needBytes: 290_000_000, freeBytes: 100_000_000 } };
+  const page = await browser.newPage();
+  await page.setViewport({ width: 520, height: 900 });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.evaluateOnNewDocument((engine) => localStorage.setItem('settings', JSON.stringify({ nativeUrl: engine })), origin);
+  await openModels(page);
+  await waitRows(page, () => document.querySelectorAll('#native-models .m-item').length >= 4, 'rows');
+  const info = () => page.$$eval('#native-models .m-item', (els) => els.map((e) => ({ title: e.querySelector('.m-name').textContent, dir: e.querySelector('.m-dir')?.textContent || null, errors: [...e.querySelectorAll('.m-error')].map((x) => x.textContent), buttons: [...e.querySelectorAll('button')].map((b) => b.textContent + (b.disabled ? ' (off)' : '')), bar: e.querySelector('.fill')?.style.width || null })));
+  let r = await info();
+  assert.equal(r[0].dir, 'Folder: C:/hub · 112 GB free');
+  assert.deepEqual(r[0].buttons, ['Change location…'], 'in use, on disk: only the folder action');
+  assert.match(r[1].errors[0], /That drive is not connected: F:.models/, 'drive away is said, not a generic error');
+  assert.deepEqual(r[1].buttons, ['Download (off)', 'Change location…'], 'download is blocked while the drive is away');
+  assert.equal(r[3].bar, '40%');
+  assert.deepEqual(r[3].buttons, ['Moving… (off)'], 'one move at a time: no second action while it runs');
+  assert.ok(r[3].dir.startsWith('Folder: C:/hub'));
+  assert.match(await page.$eval('#native-models', (e) => e.textContent), /Moving files: copying 40%/);
+
+  // Refused: the engine's code becomes a sentence and the editor stays open with what was typed.
+  await click(page, 'Whisper base', 'Change location');
+  await page.waitForSelector('.m-loc-input');
+  await page.waitForFunction(() => document.activeElement?.classList.contains('m-loc-input'), { timeout: 3000 }); // the field takes focus when the editor opens, so a later poll cannot drop the typing
+  await page.keyboard.type('D:/big');
+  await page.evaluate(() => [...document.querySelectorAll('.m-loc button')].find((b) => b.textContent === 'Move here').click());
+  await waitRows(page, () => /Not enough space there: needs 277 MB, 95.4 MB free\./.test(document.body.textContent), 'refusal toast');
+  assert.deepEqual(calls.at(-1), { path: '/engine/models/location', body: { id: 'openai/whisper-base', dir: 'D:/big' } });
+  assert.equal(await page.$eval('.m-loc-input', (i) => i.value), 'D:/big', 'typed path kept after the refusal');
+
+  // Accepted (202 move started): editor closes.
+  refuse = null;
+  await page.evaluate(() => [...document.querySelectorAll('.m-loc button')].find((b) => b.textContent === 'Move here').click());
+  await waitRows(page, () => !document.querySelector('.m-loc-input'), 'editor closed');
+  assert.deepEqual(calls.at(-1), { path: '/engine/models/location', body: { id: 'openai/whisper-base', dir: 'D:/big' } });
+
+  // A non-default folder offers the way back; null means default.
+  await click(page, 'Whisper small', 'Change location');
+  await page.waitForSelector('.m-loc-input');
+  await page.evaluate(() => [...document.querySelectorAll('.m-loc button')].find((b) => b.textContent === 'Back to default').click());
+  await waitRows(page, () => !document.querySelector('.m-loc-input'), 'reset closed');
+  assert.deepEqual(calls.at(-1), { path: '/engine/models/location', body: { id: 'openai/whisper-small', dir: null } });
+  assert.deepEqual(errors, []);
+  await page.close();
+  cat = saved; refuse = null;
 });

@@ -912,7 +912,11 @@ input[type="range"] { accent-color: var(--accent); width: 130px; }
 .m-sub { font-size: var(--text-xs); color: var(--muted); }
 .m-state { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }
 .m-state.done { color: var(--accent-soft); }
-.m-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+.m-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-2); flex-shrink: 0; max-width: 45%; }
+.m-dir { word-break: break-all; }
+.m-loc { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.m-loc-input { flex: 1 1 12em; min-width: 0; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-1) var(--space-2); font: inherit; font-size: var(--text-sm); }
+.m-loc-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .m-item[data-selected="true"] { border-color: var(--accent); }
 .m-error { color: var(--danger); }
 .m-item .bar { margin-top: var(--space-1); }
