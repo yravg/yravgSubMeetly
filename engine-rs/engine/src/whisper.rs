@@ -187,9 +187,16 @@ impl WhisperAsr {
     pub fn load(model: &str, device: Device) -> Result<Self> {
         let repo_id = repo_for(model);
         let fetch = |name: &str| {
-            crate::ml::hub_file(&repo_id, None, name)
-                // whisper-base and friends only have safetensors on this PR ref.
-                .or_else(|_| crate::ml::hub_file(&repo_id, Some("refs/pr/22"), name))
+            crate::ml::hub_file(&repo_id, None, name).or_else(|first| {
+                // whisper-base and friends only have safetensors on this PR ref. Only a
+                // 404 means "try the PR"; any other failure is the real error, not
+                // something the PR ref's own 404 should overwrite.
+                if crate::ml::is_not_found(&first) {
+                    crate::ml::hub_file(&repo_id, Some("refs/pr/22"), name).map_err(|_| first)
+                } else {
+                    Err(first)
+                }
+            })
         };
         let config: Config = serde_json::from_slice(&std::fs::read(fetch("config.json")?)?)
             .context("whisper config")?;

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use candle_core::Device;
-use hf_hub::{split_id, HFClientSync};
+use hf_hub::{split_id, HFClientSync, HFError};
 
 /// Device the build can use: CUDA/Metal when compiled in and present, else CPU.
 pub fn pick_device(want_gpu: bool) -> Device {
@@ -50,6 +50,15 @@ pub fn hub_file(repo_id: &str, revision: Option<&str>, filename: &str) -> Result
     path.with_context(|| format!("download {repo_id}/{filename}"))
 }
 
+/// True when the Hub answered 404 for the file or revision, as opposed to a
+/// network, disk or Xet failure. Callers may try another ref only then.
+pub fn is_not_found(err: &anyhow::Error) -> bool {
+    matches!(
+        err.downcast_ref::<HFError>(),
+        Some(HFError::EntryNotFound { .. } | HFError::RevisionNotFound { .. })
+    )
+}
+
 /// Whole snapshot of `repo_id` into the hub cache (for `/models/pull`).
 pub fn hub_snapshot(repo_id: &str) -> Result<PathBuf> {
     let (owner, name) = split_id(repo_id);
@@ -58,4 +67,21 @@ pub fn hub_snapshot(repo_id: &str) -> Result<PathBuf> {
         .snapshot_download()
         .send()
         .with_context(|| format!("download {repo_id}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_hub_404_counts_as_not_found() {
+        let missing = anyhow::Error::new(HFError::EntryNotFound {
+            path: "model.safetensors".into(),
+            repo_id: "openai/whisper-base".into(),
+            context: None,
+        })
+        .context("download openai/whisper-base/model.safetensors");
+        assert!(is_not_found(&missing));
+        assert!(!is_not_found(&anyhow::anyhow!("connection reset")));
+    }
 }
