@@ -1,6 +1,7 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Rencana tampilan Tide (Oyenza-style):** PRD `docs/roadmap/tide-shell.md` (TIDE-001..015) dan handoff `docs/handoff/tide-shell.md` untuk mengganti app.html dengan kerangka ala Oyenza (sidebar, beranda Today, Ask Tide, area Developer), maskot Tide dan token merek yravg; keputusan pemilik 2026-11-09 tercatat. Belum ada perubahan kode
 - **Island:** pil teks langsung kini membawa terjemahan di baris kedua (warna terjemahan pilihan, pil setinggi 52 DIP); tanpa terjemahan tetap satu baris
 - **Subtitel tampil di (Settings, tab Output):** pilihan Page overlay / Island / Both (`captionSurface`, bawaan overlay). Nilainya disalin ke helper (`/ui-prefs`, Python dan Rust) dan pil island hanya menampilkan baris langsung saat Island atau Both; island membaca baris dari helper, jadi dengan mesin Browser panel menampilkan petunjuk dengan tombol "Use Native Helper"
 - **Overlay subtitel di halaman (`src/content.js`, `src/overlay.css`):** tampilan ulang ala macOS dengan token desain (`tokens.css` ikut masuk ke shadow root): kaca buram, tema gelap/terang otomatis, sakelar On/Off, tombol Force Translate dengan menu (membuka ke atas bila tak ada ruang), ikon SVG bergaris, status bar bertitik, wordmark yravgSubMeetly, keadaan kosong dan titik pemuatan, aksesibilitas (aria, Escape, gerak berkurang, kontras tinggi). Warna terjemahan mengikuti `settings.translationColour`. Kontrak pesan tidak berubah. Tinggi minimum panel 140 menjadi 190 px karena toolbar kini dua baris
