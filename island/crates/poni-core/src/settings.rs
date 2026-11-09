@@ -294,6 +294,17 @@ impl Settings {
         self.system_on() && self.system_history
     }
 
+    /// The settings of an install with no settings file yet: the meeting tabs
+    /// (Live, Meeting, Inbox and the add-ons' tools) show, the others (Music,
+    /// Shelf, Tasks, Focus) are tucked away behind Settings > Tabs, one chip
+    /// each, and the island opens on Live. Existing files are never touched
+    /// (`Default` keeps every tab shown), so no one loses a tab they use.
+    pub fn fresh_install(mut self) -> Self {
+        self.hidden_tabs = ["media", "shelf", "tasks", "focus"].map(String::from).to_vec();
+        self.start_page = "live".into();
+        self
+    }
+
     /// Has the person never switched the add-on `id` on or off? An add-on
     /// that switches itself on when first needed (Japanese readings) does so
     /// only then: one switched off by hand stays off.
@@ -591,6 +602,19 @@ mod tests {
         assert!(s.hidden_tabs.is_empty());
     }
 
+
+    #[test]
+    fn a_fresh_install_keeps_the_meeting_tabs_and_tucks_the_rest_away() {
+        // Only a settings file that does not exist yet gets this; every file
+        // before keeps its tabs as it saved them (Default stays all-shown).
+        let s = Settings::default().fresh_install();
+        assert_eq!(s.hidden_tabs, ["media", "shelf", "tasks", "focus"]);
+        assert_eq!(s.start_page, "live");
+        assert!(Settings::default().hidden_tabs.is_empty() && Settings::default().start_page == "media");
+        // Nothing is removed: the Settings > Tabs chips bring each one back.
+        let s = s.sanitized();
+        assert_eq!(s.hidden_tabs.len(), 4);
+    }
     #[test]
     fn every_tab_shows_until_hidden() {
         assert!(Settings::default().hidden_tabs.is_empty());

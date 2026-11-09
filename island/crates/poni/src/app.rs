@@ -173,6 +173,7 @@ fn run() -> Result<i32> {
     if let Some(m) = s_out.message() {
         pwarn!("settings: {m}");
     }
+    let raw_settings = if s_out == LoadOutcome::Missing { raw_settings.fresh_install() } else { raw_settings };
     let settings = raw_settings.clone().sanitized();
     // Write new files, and write migrated / clamped values back so a
     // migration (e.g. the v2 hover delay) happens once and sticks.

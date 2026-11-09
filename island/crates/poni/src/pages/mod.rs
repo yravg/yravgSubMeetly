@@ -719,6 +719,16 @@ mod tests {
     }
 
     #[test]
+    fn a_fresh_install_row_is_the_meeting_tabs_then_the_plus() {
+        use PageKind::*;
+        let st = AppState::new(poni_core::settings::Settings::default().fresh_install(), Store::default());
+        assert_eq!(st.page, Live);
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Addons]);
+        // The tucked-away tabs are one chip away in Settings.
+        assert_eq!(hideable_tabs(&st).len(), 4);
+    }
+
+    #[test]
     fn hidden_tabs_leave_the_row_but_not_while_their_page_is_open() {
         use PageKind::*;
         let mut st = state();
