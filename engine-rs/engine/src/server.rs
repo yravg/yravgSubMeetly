@@ -250,7 +250,11 @@ mod tests {
 
     #[test]
     fn a_page_reply_has_crlf_line_ends_whatever_the_checkout() {
-        let page = crate::web::WebResponse { status: 200, content_type: "text/html", body: b"x".to_vec() };
+        let page = crate::web::WebResponse {
+            status: 200,
+            content_type: "text/html",
+            body: b"x".to_vec(),
+        };
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let address = listener.local_addr().expect("addr");
         let t = thread::spawn(move || write_page(&mut listener.accept().expect("accept").0, &page));
@@ -258,7 +262,10 @@ mod tests {
         let mut raw = String::new();
         stream.read_to_string(&mut raw).expect("read");
         t.join().expect("thread").expect("write");
-        assert!(raw.starts_with("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"), "{raw:?}");
+        assert!(
+            raw.starts_with("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"),
+            "{raw:?}"
+        );
         assert!(raw.ends_with("\r\n\r\nx"), "{raw:?}");
     }
 }
