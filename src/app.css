@@ -30,7 +30,7 @@ kbd { font: 600 12px var(--font-mono, ui-monospace, Menlo, monospace); opacity: 
 .icon-b:active { transform: scale(0.96); }
 .badge { position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-full); background: var(--danger); color: var(--tide-white); font: 700 11px/18px var(--font-ui); }
 .series { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--radius-lg); background: var(--card2); margin-top: 6px; }
-.series select { flex: 1; min-width: 0; border: 0; background: transparent; font-weight: var(--font-semibold); font-size: var(--text-md); cursor: pointer; }
+.series select { flex: 1; min-width: 0; min-height: 32px; border: 0; background: transparent; font-weight: var(--font-semibold); font-size: var(--text-md); cursor: pointer; }
 .av { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--tide-ink); display: grid; place-items: center; font-weight: var(--font-bold); font-size: var(--text-sm); flex: none; }
 .sec { font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--muted); padding: 14px 12px 4px; }
 .nav { display: flex; flex-direction: column; gap: 2px; }
@@ -187,7 +187,7 @@ a.over:hover { filter: brightness(0.97); }
 .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 .chips .chip { height: 42px; cursor: pointer; border: 0; }
 .chips .chip:hover { background: var(--card2); }
-.plk { margin-left: auto; font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--accent-soft); }
+.plk { margin-left: auto; display: inline-flex; align-items: center; min-height: 28px; padding: 0 8px; margin-right: -8px; /* hit area >= 24px, same visual position */ font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--accent-soft); }
 
 /* ---- Ask Tide dialog (A03, A03b) ---------------------------------------- */
 .ask-ov { position: fixed; inset: 0; z-index: var(--z-overlay, 60); background: var(--tide-scrim); display: grid; place-items: center; padding: 16px; }
