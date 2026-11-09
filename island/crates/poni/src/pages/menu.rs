@@ -40,7 +40,7 @@ pub struct MenuUi {
 }
 
 /// The product rows under the pages: what the engine and extension let you do now.
-/// The first line of 	ray::product_actions is the engine's status, shown but not chosen.
+/// The first line of `tray::product_actions` is the engine's status, shown but not chosen.
 pub fn actions(st: &AppState) -> Vec<(String, crate::tray::MenuCmd)> {
     crate::tray::product_actions(&st.engine, false).into_iter().filter_map(|(l, c)| c.map(|c| (l, c))).collect()
 }
