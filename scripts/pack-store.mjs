@@ -8,10 +8,11 @@
  *
  * Versi diambil dari src/manifest.json dan harus cocok dengan package.json.
  */
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { stripKey } from './store-manifest.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
@@ -68,14 +69,21 @@ const rootZip = join(storeDir, `yraverage-submin-${version}.zip`);
 rmSync(releaseZip, { force: true });
 rmSync(rootZip, { force: true });
 
+// Zip a staged copy: the store assigns its own ID, so the manifest loses "key".
+const stage = join(storeDir, '.stage');
+rmSync(stage, { recursive: true, force: true });
+cpSync(dist, stage, { recursive: true });
+writeFileSync(join(stage, 'manifest.json'), JSON.stringify(stripKey(distManifest), null, 2) + '\n');
 const r = spawnSync('zip', ['-r', '-q', releaseZip, '.', '-x', '*.map'], {
-  cwd: dist,
+  cwd: stage,
   encoding: 'utf8',
 });
 if (r.status !== 0) {
+  rmSync(stage, { recursive: true, force: true });
   console.error(r.stderr || 'zip failed');
   process.exit(r.status || 1);
 }
+rmSync(stage, { recursive: true, force: true });
 copyFileSync(releaseZip, rootZip);
 
 const bytes = statSync(releaseZip).size;

@@ -36,7 +36,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
-use windows::core::{w, Result};
+use windows::core::{w, Result, HSTRING};
 use windows::Foundation::Numerics::Matrix3x2;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Ole::{OleInitialize, OleUninitialize};
@@ -120,11 +120,15 @@ pub fn main_entry() -> i32 {
     unsafe {
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
-    // Single instance (the self-test may run next to a normal instance).
-    let mutex_name = w!("Local\\yravgSubMeetly.Island");
-    let _mutex = unsafe { CreateMutexW(None, true, mutex_name) };
+    // Single instance. A run with its own PONI_HOME (dev, self-test) is its own instance, next to the installed one.
+    let mutex_name = HSTRING::from(if std::env::var_os("PONI_HOME").is_some() { "Local\\yravgSubMeetly.Island.dev" } else { "Local\\yravgSubMeetly.Island" });
+    let _mutex = unsafe { CreateMutexW(None, true, &mutex_name) };
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         pinfo!("another instance is running; exiting");
+        // A Start-menu "Minutes register" launch while the island runs: the running one has the engine.
+        if let Some(path) = services::engine::open_arg(&args) {
+            services::engine::open_now(path);
+        }
         return 0;
     }
     if let Err(e) = unsafe { OleInitialize(None) } {
@@ -139,6 +143,9 @@ pub fn main_entry() -> i32 {
     if !crate::autostart::packaged() && crate::updates::pending_install() {
         unsafe { OleUninitialize() };
         return 0;
+    }
+    if let Some(path) = services::engine::open_arg(&args) {
+        services::engine::open_when_ready(path);
     }
     let code = match run() {
         Ok(code) => code,
@@ -307,7 +314,7 @@ fn run_deferred(d: Deferred) {
             let Some((helper, items)) = with_app(|app| {
                 // Right-clicked on the open island (the tray's menu leaves it as it is).
                 app.menu_open = app.expanded && app.hovering;
-                (app.helper, tray::menu_items(&app.st.settings, app.st.pinned, crate::updates::menu_line(&app.st, app.updater.is_some())))
+                (app.helper, tray::menu_items(&app.st.settings, app.st.pinned, crate::updates::menu_line(&app.st, app.updater.is_some()), &app.st.engine))
             }) else {
                 return;
             };
@@ -1221,6 +1228,7 @@ impl App {
                         VK_BACK => Some(KeyInput::Backspace),
                         VK_DELETE => Some(KeyInput::Delete),
                         VK_RETURN => Some(KeyInput::Enter),
+                        VK_TAB => Some(KeyInput::Tab),
                         VK_ESCAPE => Some(KeyInput::Escape),
                         VK_LEFT => Some(KeyInput::Left),
                         VK_RIGHT => Some(KeyInput::Right),
@@ -1901,6 +1909,32 @@ impl App {
                 self.expand();
             }
             CheckForUpdates => self.check_for_updates(),
+            OpenLive => self.open_page(PageKind::Live),
+            OpenMeeting => self.open_page(PageKind::Meeting),
+            OpenInbox => self.open_page(PageKind::Inbox),
+            OpenMinutes => {
+                if let Some(svc) = &self.services {
+                    svc.engine_start();
+                }
+                crate::services::engine::open_when_ready("/app/minutes.html");
+            }
+            StartEngine => {
+                if let Some(svc) = &self.services {
+                    svc.engine_start();
+                }
+            }
+            RestartEngine => {
+                if let Some(svc) = &self.services {
+                    svc.engine_restart();
+                }
+            }
+            SetupExtension => {
+                if let Some(svc) = &self.services {
+                    svc.engine_start();
+                }
+                crate::services::engine::open_when_ready("/app/setup-extension.html");
+            }
+            OpenCaptionsPanel => shell::open_in_chrome(&format!("chrome-extension://{}/sidepanel.html", crate::services::engine::EXTENSION_ID)),
             Quit => {
                 self.quit(0);
                 return;
@@ -2109,6 +2143,7 @@ impl App {
             AppEvent::Paired(e) => self.on_paired(e),
             AppEvent::Autostart(on) => self.st.ui.autostart = Some(on),
             AppEvent::Helper(r) => self.st.helper.apply(r),
+            AppEvent::Engine(info) => self.st.engine = info,
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::Addon { id, status } => {
                 // A late report from before a switch-off doesn't bring it back.
@@ -3502,6 +3537,12 @@ impl App {
         pinfo!("notice: inline action {a:?} done");
     }
 
+    /// Open the island on page `p` (the menu's entries for our own pages).
+    fn open_page(&mut self, p: PageKind) {
+        self.set_page(p);
+        self.expand();
+    }
+
     fn set_page(&mut self, p: PageKind) {
         if p != self.st.page {
             self.st.page = p;
@@ -3578,6 +3619,7 @@ impl App {
                     SetTimer(self.hwnd, TIMER_SAVE, 800, None);
                 },
                 Command::SetPage(p) => self.set_page(p),
+                Command::Menu(c) => self.on_menu(c),
                 Command::OpenSystem(m) => {
                     self.st.ui.system_module = m;
                     self.set_page(PageKind::System);
@@ -3628,6 +3670,7 @@ impl App {
                 }
                 Command::HelperPoll => {
                     if let Some(s) = self.services.as_ref() {
+                        s.engine_start(); // Try again also starts the engine
                         s.helper_poll();
                     }
                 }

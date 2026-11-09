@@ -332,6 +332,8 @@ pub struct PageUiState {
     pub peek_until: f64,
     /// Header tab under the pointer and since when (for hover labels).
     pub tab_hover: Option<(usize, f64)>,
+    /// The header's Menu: whether its list is open, the row and the keyboard ring ([`crate::pages::menu`]).
+    pub menu: crate::pages::menu::MenuUi,
     /// The module the System page shows under its strip.
     pub system_module: poni_core::sysmon::Module,
     /// The last System reading had a GPU (keeps its chip while the next one is on its way).
@@ -455,6 +457,8 @@ pub struct AppState {
     pub notify_can: bool,
     /// What the helper said last (`services::helper`), for the meeting pages.
     pub helper: poni_core::helper::View,
+    /// What the engine link knows (`services::engine`): the menu's status line.
+    pub engine: poni_core::engine_link::EngineInfo,
     /// A line the Meeting page shows for a moment: what a button did, or why
     /// the helper refused (until mono seconds; true: it went wrong).
     pub helper_notice: Option<(String, f64, bool)>,
@@ -524,6 +528,7 @@ impl AppState {
             notify_access: NotifyAccess::Unknown,
             notify_can: false,
             helper: Default::default(),
+            engine: Default::default(),
             helper_notice: None,
             cmds: Vec::new(),
         };

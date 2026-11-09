@@ -17,6 +17,7 @@ pub mod inbox;
 pub mod live;
 pub mod media;
 pub mod meeting;
+pub mod menu;
 pub mod notifications;
 pub mod script;
 pub mod settings;
@@ -314,6 +315,7 @@ pub fn draw_expanded(ui: &mut Ui, st: &mut AppState, body: Rect, page: PageKind,
     let header = header_rect(body);
     let tip = draw_header(ui, st, header, page, tr);
     draw_pages(ui, st, body, header, page, tr);
+    menu::draw_list(ui, st, body, header, page);
     // Hover labels sit on top of the page, outside the content clip.
     if let Some(tip) = tip {
         draw_tip(ui, header, &tip);
@@ -425,8 +427,9 @@ const PIN: f32 = 28.0;
 const GEAR: f32 = 28.0;
 const GEAR_GAP: f32 = 2.0;
 /// Hover labels: dwell, fade-in, capsule metrics.
-const TIP_DELAY: f64 = 0.4;
-const TIP_FADE: f64 = 0.12;
+/// A name shows the moment the pointer or the keyboard is on a tab.
+const TIP_DELAY: f64 = 0.0;
+const TIP_FADE: f64 = 0.08;
 pub(crate) const TIP_H: f32 = 22.0;
 pub(crate) const TIP_PAD: f32 = 8.0;
 const TIP_RADIUS: f32 = 8.0;
@@ -435,6 +438,7 @@ pub(crate) const TIP_FILL: Color = Color::rgba(0.16, 0.16, 0.16, 1.0);
 /// `tab_hover` slots of the pin and Settings buttons (tabs use their place in the row).
 const PIN_SLOT: usize = PageKind::ALL.len();
 const GEAR_SLOT: usize = PIN_SLOT + 1;
+const MENU_SLOT: usize = GEAR_SLOT + 1;
 /// The Settings button's widget id (the self-test clicks it).
 pub const GEAR_ID: &str = "header.gear";
 
@@ -468,8 +472,8 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
     let from = tr.map_or(page, |t| t.from);
     let e = tr.map_or(1.0, |t| ease_out_cubic(t.t / TABS_END));
     let row = self::tabs(st);
-    let lay_from = tab_layout(ui, r.x, &row, from, &label_st, scale);
-    let lay_to = if from == page { lay_from.clone() } else { tab_layout(ui, r.x, &row, page, &label_st, scale) };
+    let lay_from = tab_layout(ui, r.x + menu::SLOT, &row, from, &label_st, scale);
+    let lay_to = if from == page { lay_from.clone() } else { tab_layout(ui, r.x + menu::SLOT, &row, page, &label_st, scale) };
     let tabs: Vec<Rect> =
         (0..row.len()).map(|i| Rect::new(lerp(lay_from[i].0, lay_to[i].0, e), cy - TAB_H / 2.0, lerp(lay_from[i].1, lay_to[i].1, e), TAB_H)).collect();
     let place = |p: PageKind| row.iter().position(|t| *t == p).unwrap_or(0);
@@ -488,6 +492,19 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
     }
 
     let mut hover: Option<(usize, Rect)> = None;
+    // The Menu button, left of the tabs: a list of every page by name.
+    let menu_r = Rect::new(r.x, cy - TAB_H / 2.0, TAB_W, TAB_H);
+    let menu_resp = ui.button(wid("header.menu"), menu_r);
+    menu::keyboard(ui, st, menu_resp.clicked, &row);
+    let menu_open = st.ui.menu.open;
+    if menu_open || menu_resp.hovered {
+        ui.c.fill_rrect(menu_r, TAB_H / 2.0, if menu_open { Color::white(0.14) } else { palette::SURFACE });
+    }
+    if menu_resp.hovered {
+        hover = Some((MENU_SLOT, menu_r));
+    }
+    let mic = if menu_open || menu_resp.hovered { palette::TEXT } else { palette::TEXT_FAINT };
+    ui.c.icon(Icon::Menu, Rect::new(snap(menu_r.x + (TAB_W - TAB_ICON) / 2.0, scale), snap(cy - TAB_ICON / 2.0, scale), TAB_ICON, TAB_ICON), mic);
     for (i, &p) in row.iter().enumerate() {
         let tr = tabs[i];
         let resp = ui.button(wid_n("tab", i as u64), tr);
@@ -502,6 +519,16 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
         ui.c.icon(p.icon(), Rect::new(ix, snap(cy - TAB_ICON / 2.0, scale), TAB_ICON, TAB_ICON), ic);
         if resp.clicked && !active {
             st.cmd(Command::SetPage(p));
+        }
+    }
+    // The keyboard's focus ring, with the name of what it is on.
+    if let Some(k) = st.ui.menu.ring.filter(|_| ui.input.focused == Some(wid(menu::KEY_ID))) {
+        let at = if k == 0 { Some((MENU_SLOT, menu_r)) } else { tabs.get(k - 1).map(|t| (k - 1, *t)) };
+        if let Some((slot, rr)) = at {
+            ui.c.stroke_rrect(rr, TAB_H / 2.0, st.accent, 1.5);
+            if hover.is_none() {
+                hover = Some((slot, rr));
+            }
         }
     }
     if from.tabbed() && (fi != pi || !page.tabbed()) {
@@ -577,6 +604,10 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
         (None, _) => None,
     };
     let (slot, anchor) = hover?;
+    // The list has its own rows; a label under it would sit on top of them.
+    if st.ui.menu.open {
+        return None;
+    }
     let since = now - st.ui.tab_hover.map_or(now, |h| h.1);
     if since < TIP_DELAY + TIP_FADE {
         ui.request_anim();
@@ -587,6 +618,7 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
     }
     let text = match row.get(slot) {
         Some(p) => p.title(),
+        None if slot == MENU_SLOT => "Menu",
         None if slot == GEAR_SLOT && page == PageKind::Settings => "Close settings",
         None if slot == GEAR_SLOT => "Settings",
         None if st.pinned => "Unpin",

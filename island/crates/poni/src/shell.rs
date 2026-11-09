@@ -59,6 +59,22 @@ pub fn open(target: &str) {
     });
 }
 
+/// Open `url` (an http(s) or chrome-extension address) in Chrome, not the default browser.
+pub fn open_in_chrome(url: &str) {
+    if !(url.starts_with("chrome-extension://") && url.len() < 200 && url.bytes().all(|b| b.is_ascii_graphic())) {
+        crate::pwarn!("open_in_chrome refused: {}", for_log(url));
+        return;
+    }
+    let url = url.to_string();
+    run("open-chrome", move || {
+        let u = HSTRING::from(url.as_str());
+        let r = unsafe { ShellExecuteW(None, w!("open"), w!("chrome"), &u, None, SW_SHOWNORMAL) };
+        if (r.0 as isize) <= 32 {
+            crate::pwarn!("open_in_chrome failed ({})", r.0 as isize);
+        }
+    });
+}
+
 /// Open Settings > Apps > Startup (asynchronously). The Store build sends
 /// people there when they turned Poni's startup task off in Windows, the only
 /// place it can be turned back on.

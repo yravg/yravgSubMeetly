@@ -38,6 +38,7 @@ pub enum KeyInput {
     Backspace,
     Delete,
     Enter,
+    Tab,
     Escape,
     Left,
     Right,
