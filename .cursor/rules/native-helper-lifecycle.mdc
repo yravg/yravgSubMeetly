@@ -10,8 +10,8 @@ The native helper listens on `127.0.0.1:17865`. Restart failures almost always m
 
 ## Single control path
 
-- **Start / Stop / Restart** must go through `native/messaging_host.py` when the Chrome native launcher is installed.
-- Do **not** call `nativeShutdown()` from the extension *and* `messaging_host` restart — that races and leaves the port busy.
+- **Start / Stop / Restart** must go through the Rust engine's `native-host` mode (`engine-rs/engine/src/native_host.rs`) when the Chrome native launcher is installed.
+- Do **not** call `nativeShutdown()` from the extension *and* the host `restart` action — that races and leaves the port busy.
 - `sidepanel.js` → `nativeHostAction(action)` only; fallback to HTTP shutdown only when native messaging is unavailable.
 
 ## Stop before start
@@ -37,13 +37,13 @@ Never assume a fixed sleep (500 ms) is enough.
 - Restart after native code change: `./scripts/restart-native.sh`
 - Manual start: `./scripts/start-native.sh`
 - Manual stop / unstick port: `./scripts/stop-native.sh`
-- `native/run.sh`: install deps once (`.venv/.deps-installed`), not on every restart.
+- `native/run.sh` starts the prebuilt `submeetly-engine` (found via `native/engine-path.sh`); no dependency install step.
 
 ## Agent workflow
 
 After editing `native/**`, `scripts/*native*`, or native-related extension code (`src/lib/native*.js`, native UI in `sidepanel.js`):
 
-1. Run `./scripts/ensure-dev-services.sh` (or `./scripts/restart-native.sh` if only native Python/shell changed).
+1. Run `./scripts/ensure-dev-services.sh` (or `./scripts/restart-native.sh` if only native shell scripts changed (rebuild the engine with `cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml` after Rust changes)).
 2. Rebuild extension if JS changed: `node esbuild.config.mjs`.
 3. Verify: `curl -sf http://127.0.0.1:17865/health` and lab at `http://127.0.0.1:8799/lab.html`.
 
@@ -56,7 +56,7 @@ After editing lifecycle code, test: Start → health OK → Restart → health O
 When the native helper is running, **Translation Lab must also be running** at `http://127.0.0.1:8799/lab.html`.
 
 - Use `scripts/ensure-lab.sh` (idempotent) — never raw `python3 -m http.server` on 8799.
-- Call `ensure-lab.sh` from `start-native.sh`, `ensure-native.sh`, and `messaging_host.py` after native start/restart.
+- Call `ensure-lab.sh` from `start-native.sh`, `ensure-native.sh`, and the engine's native host after native start/restart (`ensure_lab` only reports whether the lab answers).
 - Extension: `nativeHostAction('ensure_lab')` once when native health is OK.
 - Lab uses `scripts/lab-server.py` (YouTube proxy + static files), not a bare static server.
 - Stopping native does **not** need to stop lab; starting native **must** ensure lab is up.

@@ -9,7 +9,7 @@
  * Usage:
  *   node scripts/e2e.mjs                 # tabCapture allowlisted
  *   node scripts/e2e.mjs --pick          # pemilih tab manual
- *   node scripts/e2e.mjs --native        # ASR lewat helper :17865
+ *   node scripts/e2e.mjs --native        # ASR lewat engine Rust :17865 (ganti dengan E2E_HELPER_URL)
  *   node scripts/e2e.mjs --harness-only  # cek prasyarat tanpa Chrome headed
  *
  * Menulis test/last-e2e.json (suite e2e-realtime / e2e-pick / e2e-native).
@@ -21,6 +21,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+
+const HELPER_URL = process.env.E2E_HELPER_URL || 'http://127.0.0.1:17865';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DIST = path.join(root, 'dist');
 const PROFILE = path.join(root, '.e2e-profile');
@@ -75,7 +77,7 @@ function writeReport({ status, durationMs, error = null }) {
     covers: PICK_MODE
       ? 'Jalur getDisplayMedia / btn-pick terhadap AudioTestPage'
       : NATIVE_MODE
-        ? 'ASR engine=native via helper 127.0.0.1:17865'
+        ? `ASR engine=native via helper ${HELPER_URL}`
         : 'Puppeteer + tabCapture allowlisted → subtitel + overlay',
     checks: [...checks],
     log: [...logLines],
@@ -137,7 +139,7 @@ async function harnessPreflight() {
     let nativeOk = false;
     let nativeDetail = 'offline';
     try {
-      const r = await fetch('http://127.0.0.1:17865/health', { signal: AbortSignal.timeout(1500) });
+      const r = await fetch(`${HELPER_URL}/health`, { signal: AbortSignal.timeout(1500) });
       nativeOk = r.ok;
       nativeDetail = r.ok ? JSON.stringify(await r.json()).slice(0, 120) : `status ${r.status}`;
     } catch (err) {
@@ -225,7 +227,7 @@ async function runLiveE2E() {
       overlayFontSize: 24,
       asrModel: process.env.E2E_MODEL || 'whisper-tiny',
       engine: NATIVE_MODE ? 'native' : 'browser',
-      nativeUrl: 'http://127.0.0.1:17865',
+      nativeUrl: HELPER_URL,
     };
     log('settings:', JSON.stringify(e2eSettings));
     await panel.evaluate((s) => chrome.storage.local.set({ settings: s }), e2eSettings);

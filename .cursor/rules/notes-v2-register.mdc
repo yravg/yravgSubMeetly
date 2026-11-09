@@ -76,4 +76,4 @@ directly.
 Native extraction (mlx_lm), SQLite storage, provenance audio playback (the
 "▶ Play from here" action currently just toasts), diarization, and
 XLSX/ICS/DOCX export are Phase 2.1+ and not implemented yet — don't assume
-they exist when reading `native/server.py`.
+they exist when reading the Rust engine (`engine-rs/engine/src/app.rs`).

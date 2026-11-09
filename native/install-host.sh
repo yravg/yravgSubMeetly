@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the Chrome Native Messaging host so the extension can start/stop the
 # helper from Settings. Run once after loading the extension:
-#   cd native && ./install-host.sh YOUR_EXTENSION_ID
+#   cd native && ./install-host.sh YOUR_EXTENSION_ID [path/to/submeetly-engine]
 #
 # Find YOUR_EXTENSION_ID on chrome://extensions (Developer mode → ID column).
 set -euo pipefail
@@ -9,20 +9,22 @@ cd "$(dirname "$0")"
 
 EXT_ID="${1:-}"
 if [ -z "$EXT_ID" ]; then
-  echo "Usage: ./install-host.sh <chrome-extension-id>"
+  echo "Usage: ./install-host.sh <chrome-extension-id> [path/to/submeetly-engine]"
   echo ""
   echo "Find the ID on chrome://extensions (enable Developer mode)."
   exit 1
 fi
 
-HOST_PY="$(cd "$(dirname "$0")" && pwd)/messaging_host.py"
-chmod +x "$HOST_PY"
+# The Native Messaging host is the Rust engine itself: Chrome starts it with the
+# calling origin as first argument and the engine switches to host mode.
+ENGINE="${2:-$(bash "$(dirname "$0")/engine-path.sh")}"
+[ -x "$ENGINE" ] || { echo "Engine not found or not executable: $ENGINE" >&2; exit 1; }
 
 MANIFEST=$(cat <<EOF
 {
   "name": "com.yraveragesubmin.helper",
-  "description": "yraverageSubMin native helper launcher",
-  "path": "$HOST_PY",
+  "description": "yravgSubMeetly native helper launcher",
+  "path": "$ENGINE",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://${EXT_ID}/"
@@ -53,11 +55,6 @@ case "$(uname -s)" in
     install_one "$HOME/Library/Application Support/Chromium/NativeMessagingHosts" "Chromium"
     ;;
   Linux)
-    # Di Linux host .py bisa dieksekusi langsung asalkan punya shebang dan bit
-    # executable (dipasang di atas) — tidak perlu pembungkus seperti Windows.
-    command -v python3 >/dev/null 2>&1 || {
-      echo "⚠ python3 tidak ditemukan di PATH — host tidak akan bisa dijalankan browser."
-    }
     install_one "$HOME/.config/google-chrome/NativeMessagingHosts" "Google Chrome"
     install_one "$HOME/.config/chromium/NativeMessagingHosts" "Chromium"
     install_one "$HOME/.config/microsoft-edge/NativeMessagingHosts" "Microsoft Edge"

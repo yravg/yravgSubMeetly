@@ -1,7 +1,7 @@
-//! Starts the real Python helper (native/server.py) on a free loopback port
+//! Starts the real Rust engine (`submeetly-engine`) on a free loopback port
 //! with a fixture state dir and checks that the island's client reads it and
-//! that a decision round-trips. Skipped (with a message) when no Python with
-//! the helper's dependencies is found: set `YSM_PYTHON` to pick one.
+//! that a decision round-trips. Skipped (with a message) when no engine binary
+//! is found: build it, or set `SUBMEETLY_ENGINE_BIN` to pick one.
 
 use poni_core::helper::{self, Decision};
 use std::net::TcpListener;
@@ -24,28 +24,41 @@ impl Drop for Guard {
     }
 }
 
+/// `SUBMEETLY_ENGINE_BIN`, else the engine-rs build output (release first).
+fn engine_binary() -> Option<std::path::PathBuf> {
+    if let Ok(p) = std::env::var("SUBMEETLY_ENGINE_BIN") {
+        let p = std::path::PathBuf::from(p);
+        return p.is_file().then_some(p);
+    }
+    let exe = if cfg!(windows) { "submeetly-engine.exe" } else { "submeetly-engine" };
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../engine-rs/target");
+    let targets = [std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from), Some(repo)];
+    targets
+        .into_iter()
+        .flatten()
+        .flat_map(|t| [t.join("release").join(exe), t.join("debug").join(exe)])
+        .find(|p| p.is_file())
+}
+
 #[test]
 fn island_reads_and_writes_the_real_helper() {
-    let server = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../native/server.py");
-    if !server.is_file() {
-        eprintln!("skip: {} not found", server.display());
+    let Some(engine) = engine_binary() else {
+        eprintln!("skip: submeetly-engine not built (cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml)");
         return;
-    }
+    };
     let port = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
     let dir = std::env::temp_dir().join(format!("island-smoke-{port}"));
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("notes.json"), NOTES).unwrap();
-    let py = std::env::var("YSM_PYTHON").unwrap_or_else(|_| "python".into());
-    let child = Command::new(&py)
-        .arg(&server)
+    let child = Command::new(&engine)
+        .env("HOST", "127.0.0.1")
         .env("PORT", port.to_string())
         .env("YSM_STATE_DIR", &dir)
-        .env("PYTHONUTF8", "1")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn();
     let Ok(child) = child else {
-        eprintln!("skip: cannot start {py}");
+        eprintln!("skip: cannot start {}", engine.display());
         return;
     };
     let _guard = Guard(child);
@@ -55,7 +68,7 @@ fn island_reads_and_writes_the_real_helper() {
             Ok(s) => break s,
             Err(_) if start.elapsed() < Duration::from_secs(20) => std::thread::sleep(Duration::from_millis(250)),
             Err(e) => {
-                eprintln!("skip: helper did not come up ({e}); set YSM_PYTHON to a Python with its dependencies");
+                eprintln!("skip: engine did not come up ({e})");
                 return;
             }
         }

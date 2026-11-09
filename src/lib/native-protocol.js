@@ -20,7 +20,7 @@ export const NATIVE_HOST_ACTIONS = Object.freeze([
 /**
  * Keadaan sambungan Native Messaging. Dibedakan karena perbaikannya berbeda:
  * host belum dipasang butuh installer, `forbidden` butuh id ekstensi ditambah
- * ke allowed_origins, `crashed` menunjuk ke Python yang tidak bisa dijalankan.
+ * ke allowed_origins, `crashed` menunjuk ke biner engine yang tidak bisa dijalankan.
  */
 export const NATIVE_CONNECTION_STATES = Object.freeze([
   'connected',

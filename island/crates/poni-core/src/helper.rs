@@ -1,8 +1,8 @@
-//! The island's view of the yravgSubMeetly helper (native/server.py or
+//! The island's view of the yravgSubMeetly helper (the Rust engine in
 //! engine-rs) over loopback: `GET /health`, `GET /notes`, `POST /notes`.
 //!
 //! The contract is the one `src/lib/notes-sync.js` writes and
-//! `_normalize_note_doc` reads: a note document with `items[]` (ref, type,
+//! the engine's note normalizer reads: a note document with `items[]` (ref, type,
 //! text, owner, due, status, review, confidence), a `meeting{}` block
 //! (attendees, chair, agenda counts, issuedAt) and, from the macOS app, a
 //! `transcript[]` of `{t0, t1, source, translation}`.
@@ -17,7 +17,7 @@ use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::time::Duration;
 
-/// native/server.py's default port (`PORT`).
+/// The engine's default port (`PORT`).
 pub const DEFAULT_PORT: u16 = 17865;
 /// The port to talk to: `YSM_HELPER_PORT`, else the helper's default.
 pub fn port_from_env(var: Option<&str>) -> u16 {

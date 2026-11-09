@@ -323,9 +323,9 @@ const CHECKS = {
 
   'mt-native-llm': async () => {
     const src = assertContains(
-      'native/server.py',
-      /translate_text|TRANSLATE_MODEL|mlx_lm/,
-      'Helper punya jalur LLM terjemahan',
+      'engine-rs/engine/src/engine.rs',
+      /TRANSLATE_MODEL/,
+      'Engine punya jalur LLM terjemahan',
     );
     if (src.status === 'fail') return src;
     const h = await helper();
@@ -337,7 +337,7 @@ const CHECKS = {
       };
     }
     if (LIVE) return { status: 'fail', detail: `--live: helper offline (${h.detail})` };
-    return { status: 'warn', detail: `LLM di server.py ada; helper offline (${h.detail})` };
+    return { status: 'warn', detail: `LLM di engine ada; helper offline (${h.detail})` };
   },
 
   'export-srt': () => {
@@ -380,12 +380,12 @@ const CHECKS = {
 
   'helper-http': async () => {
     const src = assertContains(
-      'native/server.py',
-      /\/health|17865/,
-      'server.py mengekspos /health',
+      'engine-rs/engine/src/app.rs',
+      /"\/health"/,
+      'engine mengekspos /health',
     );
     if (src.status === 'fail') return src;
-    const host = assertExists('native/messaging_host.py', 'Native Messaging Host');
+    const host = assertExists('engine-rs/engine/src/native_host.rs', 'Native Messaging Host');
     if (host.status === 'fail') return host;
     const h = await helper();
     if (h.ok) return { status: 'pass', detail: `HTTP helper OK — ${h.detail}` };
@@ -395,9 +395,9 @@ const CHECKS = {
 
   'helper-asr': async () => {
     const src = assertContains(
-      'native/server.py',
-      /mlx-whisper|faster-whisper|asr_array/,
-      'Helper punya mesin ASR mlx/faster-whisper',
+      'engine-rs/engine/src/whisper.rs',
+      /log_mel|mel_filters/,
+      'Engine punya mesin ASR Whisper (candle)',
     );
     if (src.status === 'fail') return src;
     const h = await helper();
@@ -410,9 +410,9 @@ const CHECKS = {
 
   'helper-large-file': async () => {
     const py = assertContains(
-      'native/server.py',
-      /transcribe_file|asr_file/,
-      'Endpoint /transcribe_file di server.py',
+      'engine-rs/engine/src/app.rs',
+      /"\/transcribe_file"/,
+      'Endpoint /transcribe_file di engine',
     );
     if (py.status === 'fail') return py;
     return assertContains(
@@ -470,17 +470,18 @@ const CROSSOS_CHECKS = {
   'crossos-launcher': () => {
     const sh = read('native/run.sh');
     const bat = read('native/run.bat');
-    if (!sh || !bat) return { status: 'fail', detail: 'run.sh / run.bat tidak lengkap' };
-    if (!/\.venv\/Scripts\/python\.exe/.test(sh)) {
-      return { status: 'fail', detail: 'run.sh tidak mengenali tata letak venv Windows (Scripts/)' };
+    const path = read('native/engine-path.sh');
+    if (!sh || !bat || !path) return { status: 'fail', detail: 'run.sh / run.bat / engine-path.sh tidak lengkap' };
+    if (/python|\.venv/i.test(sh + bat + path)) {
+      return { status: 'fail', detail: 'peluncur masih menyebut Python/venv' };
     }
-    if (/^\s*set\s+"?WHISPER_MODEL=.*mlx-community/im.test(bat)) {
-      return { status: 'fail', detail: 'run.bat menyetel model MLX — faster-whisper tidak bisa memuatnya' };
+    if (!/submeetly-engine\.exe/.test(bat)) {
+      return { status: 'fail', detail: 'run.bat tidak menjalankan submeetly-engine.exe' };
     }
-    if (!/if \$IS_MAC_ARM; then[\s\S]*?mlx-community/.test(sh)) {
-      return { status: 'fail', detail: 'default model MLX di run.sh tidak dipagari Apple Silicon' };
+    if (!/submeetly-engine/.test(path)) {
+      return { status: 'fail', detail: 'engine-path.sh tidak mencari submeetly-engine' };
     }
-    return { status: 'pass', detail: 'run.sh (POSIX+Scripts) dan run.bat konsisten' };
+    return { status: 'pass', detail: 'run.sh (via engine-path.sh) dan run.bat menjalankan biner Rust' };
   },
 
   'crossos-installer-linux': () => {
@@ -495,35 +496,36 @@ const CROSSOS_CHECKS = {
   'crossos-installer-windows': () => {
     const bat = read('native/install-host.bat');
     if (!bat) return { status: 'fail', detail: 'native/install-host.bat tidak ada' };
-    // Chrome tidak bisa mengeksekusi .py — manifest harus menunjuk pembungkus.
-    if (!/messaging_host\.bat/.test(bat)) return { status: 'fail', detail: 'pembungkus messaging_host.bat tidak dibuat' };
+    // Manifest menunjuk langsung ke biner Rust (mode host dipilih dari argumen Chrome).
+    if (!/submeetly-engine\.exe/.test(bat) || /messaging_host|python/i.test(bat)) {
+      return { status: 'fail', detail: 'manifest tidak menunjuk ke submeetly-engine.exe' };
+    }
     const keys = ['Google\\Chrome', 'Microsoft\\Edge', 'Chromium'];
     const missing = keys.filter((k) => !bat.includes(`${k}\\NativeMessagingHosts`));
     if (missing.length) return { status: 'fail', detail: `kunci registry hilang: ${missing.join(', ')}` };
     if (!exists('native/uninstall-host.bat')) return { status: 'fail', detail: 'uninstall-host.bat tidak ada' };
-    return { status: 'pass', detail: 'pembungkus + 3 kunci registry + uninstall' };
+    return { status: 'pass', detail: 'biner Rust + 3 kunci registry + uninstall' };
   },
 
   'crossos-native-ping': () => {
-    const host = read('native/messaging_host.py');
+    const host = read('engine-rs/engine/src/native_host.rs');
     const proto = read('src/lib/native-protocol.js');
     if (!host || !proto) return { status: 'fail', detail: 'berkas host/protokol tidak ada' };
-    if (!/action == "ping"/.test(host)) return { status: 'fail', detail: 'host tidak menjawab aksi ping' };
+    if (!/"ping" =>/.test(host)) return { status: 'fail', detail: 'host tidak menjawab aksi ping' };
     if (!/'ping'/.test(proto)) return { status: 'fail', detail: "kontrak ekstensi tidak menyebut 'ping'" };
     return { status: 'pass', detail: 'status bridge bisa ditanya tanpa menyalakan helper' };
   },
 
   'crossos-device': () => {
-    const srv = read('native/server.py');
-    if (!srv) return { status: 'fail', detail: 'server.py tidak ada' };
+    const srv = read('engine-rs/engine/src/app.rs') + read('engine-rs/engine/src/ml.rs');
     if (!srv.includes('"/engine/device"')) return { status: 'fail', detail: '/engine/device tidak dilayani' };
-    if (!/_cuda_available/.test(srv)) return { status: 'fail', detail: 'deteksi CUDA tidak ada' };
+    if (!/gpu_available/.test(srv)) return { status: 'fail', detail: 'deteksi CUDA tidak ada' };
     return { status: 'pass', detail: 'pilihan runtime CPU/GPU tersedia' };
   },
 
   'crossos-streaming': () => {
-    const srv = read('native/server.py');
-    if (!srv || !/def asr_file_streaming/.test(srv)) {
+    const srv = read('engine-rs/engine/src/app.rs') + read('engine-rs/engine/src/engine.rs');
+    if (!/fn file_streaming/.test(srv)) {
       return { status: 'fail', detail: 'transkripsi streaming tidak ada' };
     }
     if (!/streaming_file_jobs/.test(srv)) return { status: 'fail', detail: '/health tidak mengumumkan streaming_file_jobs' };
@@ -531,12 +533,12 @@ const CROSSOS_CHECKS = {
   },
 
   'crossos-loopback': () => {
-    const srv = read('native/server.py');
-    if (!srv) return { status: 'fail', detail: 'server.py tidak ada' };
-    if (/Access-Control-Allow-Origin", "\*"/.test(srv)) {
+    const srv = read('engine-rs/engine/src/app.rs');
+    if (!srv) return { status: 'fail', detail: 'app.rs tidak ada' };
+    if (/Access-Control-Allow-Origin"\.to_string\(\),\s*"\*"/.test(srv)) {
       return { status: 'fail', detail: 'CORS masih "*" — situs web mana pun bisa membaca transkrip' };
     }
-    if (!/_host_header_hostname/.test(srv)) return { status: 'fail', detail: 'header Host tidak diperiksa (DNS rebinding)' };
+    if (!/host_header_hostname/.test(srv)) return { status: 'fail', detail: 'header Host tidak diperiksa (DNS rebinding)' };
     return { status: 'pass', detail: 'CORS ketat + penjagaan Host + pengikatan loopback' };
   },
 

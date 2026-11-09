@@ -10,11 +10,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 import { migrateLegacyLocalKeys, LEGACY_LOCAL_KEYS } from '../src/lib/legacy-keys.js';
 
@@ -78,50 +74,8 @@ test('daftar kunci lama mencakup seluruh kunci yang benar-benar bertahan di disk
   assert.ok(Object.keys(LEGACY_LOCAL_KEYS).length >= 6);
 });
 
-const RUN_MIGRATION = `src = open('native/server.py', encoding='utf-8').read()
-m = '\\n_migrate_state_dir()\\n'
-assert m in src, 'panggilan _migrate_state_dir() hilang dari server.py'
-exec(compile(src.split(m)[0] + m, 'server.py', 'exec'))
-`;
-// USERPROFILE: Path.home() di Windows membaca itu, bukan HOME (Mac/Linux mengabaikannya).
-test('direktori state helper ~/.localtranssub dipindah beserta isinya', () => {
-  const home = mkdtempSync(join(tmpdir(), 'ysm-home-'));
-  const lama = join(home, '.localtranssub');
-  mkdirSync(lama);
-  writeFileSync(join(lama, 'notes.json'), '{"notes":[{"id":"rapat-1"}]}');
-  writeFileSync(join(lama, 'device.json'), '{"device":"mlx"}');
-
-  // server.py menjalankan migrasi saat impor, sebelum dependensi berat dimuat. Yang dijalankan di sini hanya
-  // kepala berkas sampai pemanggilan itu (stdlib saja): mengimpor seluruh server.py ikut menarik numpy/
-  // faster-whisper dan, dengan HOME kosong, mencoba mengunduh dari HF Hub — menit, bukan detik.
-  const root = fileURLToPath(new URL('..', import.meta.url));
-  execFileSync('python3', ['-c',
-    RUN_MIGRATION],
-    { cwd: root, env: { ...process.env, HOME: home, USERPROFILE: home } });
-
-  const baru = join(home, '.yraveragesubmin');
-  assert.ok(existsSync(baru), 'direktori baru tidak terbentuk');
-  assert.equal(existsSync(lama), false, 'direktori lama harus dipindah, bukan disalin');
-  assert.deepEqual(readdirSync(baru).sort(), ['device.json', 'notes.json']);
-  assert.equal(readFileSync(join(baru, 'notes.json'), 'utf8'), '{"notes":[{"id":"rapat-1"}]}',
-    'isi notulen berubah saat dipindah');
-});
-
-test('direktori baru yang sudah ada tidak ditimpa direktori lama', () => {
-  const home = mkdtempSync(join(tmpdir(), 'ysm-home-'));
-  mkdirSync(join(home, '.localtranssub'));
-  writeFileSync(join(home, '.localtranssub', 'notes.json'), '{"lama":true}');
-  mkdirSync(join(home, '.yraveragesubmin'));
-  writeFileSync(join(home, '.yraveragesubmin', 'notes.json'), '{"baru":true}');
-
-  const root = fileURLToPath(new URL('..', import.meta.url));
-  execFileSync('python3', ['-c',
-    RUN_MIGRATION],
-    { cwd: root, env: { ...process.env, HOME: home, USERPROFILE: home } });
-
-  assert.equal(readFileSync(join(home, '.yraveragesubmin', 'notes.json'), 'utf8'), '{"baru":true}',
-    'notulen yang lebih baru tertimpa yang lama');
-});
+// Migrasi direktori state helper (~/.localtranssub → ~/.yraveragesubmin) kini dijaga
+// engine-rs/engine/tests/contract.rs (legacy_state_dir_is_migrated_once).
 
 /** Stub chrome.runtime.connectNative: host mana yang menjawab, sisanya galat. */
 function stubChrome(hostYangHidup, galat = 'Specified native messaging host not found.') {

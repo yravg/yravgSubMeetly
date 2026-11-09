@@ -1,7 +1,7 @@
 // Pemasang Native Messaging Host tidak bisa dijalankan di CI macOS/Linux,
 // tapi isinya bisa diperiksa: bentuk manifest, nama host, target registry,
-// dan — yang paling penting — bahwa Windows menunjuk ke pembungkus yang bisa
-// dieksekusi, bukan langsung ke berkas .py (Chrome tidak bisa menjalankan .py).
+// dan — yang terpenting — bahwa manifest menunjuk langsung ke biner Rust
+// (submeetly-engine), bukan ke skrip Python atau pembungkus .bat.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -22,40 +22,40 @@ test('Linux mendaftarkan Chrome, Chromium, Edge, dan varian Flatpak', () => {
   assert.match(sh, /\.var\/app\/com\.microsoft\.Edge/, 'Flatpak Edge');
 });
 
-test('Linux memakai .py langsung (punya shebang), bukan pembungkus', () => {
-  const host = readFileSync(new URL('../native/messaging_host.py', import.meta.url), 'utf8');
-  assert.match(host.split('\n')[0], /^#!.*python3/, 'shebang wajib agar bisa dieksekusi');
-  assert.match(sh, /chmod \+x/, 'bit executable harus dipasang');
+test('pemasang POSIX menunjuk ke biner Rust lewat engine-path.sh, tanpa Python', () => {
+  assert.match(sh, /engine-path\.sh/, 'lokasi biner harus lewat engine-path.sh');
+  assert.doesNotMatch(sh, /python|messaging_host|\.venv/i);
 });
 
 /** Rekonstruksi JSON dari blok `echo` di dalam .bat. */
-function manifestFromBat(source, { extId, wrapper }) {
+function manifestFromBat(source, { extId, engine }) {
   const start = source.indexOf('> "%MANIFEST%" (');
   // Ambil HANYA blok itu: berhenti di ')' penutup, kalau tidak baris echo
   // sesudahnya (pesan ke layar) ikut terbaca sebagai JSON.
   const end = source.indexOf('\n)', start);
   const body = source.slice(start, end);
-  const lines = [...body.matchAll(/^\s*echo (.*)$/gm)].map((m) => m[1]);
+  const lines = [...body.matchAll(/^\s*echo (.*)$/gm)].map((m) => m[1].replace(/\r$/, ''));
   const json = lines
     .join('\n')
     .replace(/\^/g, '')
-    .replace(/%WRAPPER_JSON%/g, wrapper.replace(/\\/g, '\\\\'))
+    .replace(/%ENGINE_JSON%/g, engine.replace(/\\/g, '\\\\'))
     .replace(/%EXT_ID%/g, extId);
   return JSON.parse(json);
 }
 
 test('manifest Windows valid dan cocok dengan nama host yang dipakai ekstensi', () => {
-  const m = manifestFromBat(bat, { extId: 'abcdefghijklmnop', wrapper: 'C:\\app\\messaging_host.bat' });
+  const m = manifestFromBat(bat, { extId: 'abcdefghijklmnop', engine: 'C:\\app\\submeetly-engine.exe' });
   assert.equal(m.name, NATIVE_HOST_NAME, 'nama host harus sama dengan konstanta ekstensi');
   assert.equal(m.type, 'stdio');
   assert.deepEqual(m.allowed_origins, ['chrome-extension://abcdefghijklmnop/']);
 });
 
-test('Windows menunjuk ke pembungkus .bat, bukan .py', () => {
-  const m = manifestFromBat(bat, { extId: 'x', wrapper: 'C:\\app\\messaging_host.bat' });
-  assert.ok(m.path.endsWith('.bat'), `path harus .bat, dapat ${m.path}`);
-  assert.ok(!m.path.endsWith('.py'), 'Chrome tidak bisa mengeksekusi .py sebagai host');
-  assert.match(bat, /messaging_host\.bat/, 'pembungkus harus dibuat oleh skrip');
+test('Windows menunjuk langsung ke submeetly-engine.exe, bukan .py atau pembungkus', () => {
+  const m = manifestFromBat(bat, { extId: 'x', engine: 'C:\\app\\submeetly-engine.exe' });
+  assert.ok(m.path.endsWith('submeetly-engine.exe'), `path harus biner engine, dapat ${m.path}`);
+  assert.doesNotMatch(bat, /python|messaging_host|\.venv/i);
+  // Backslash di JSON harus digandakan, kalau tidak Chrome menolak manifest.
+  assert.ok(bat.includes('set "ENGINE_JSON=%ENGINE:\\=\\\\%"'),'ENGINE_JSON harus menggandakan backslash');
 });
 
 test('registry didaftarkan untuk Chrome, Edge, dan Chromium', () => {
@@ -68,8 +68,8 @@ test('registry didaftarkan untuk Chrome, Edge, dan Chromium', () => {
   }
 });
 
-test('skrip Windows memeriksa Python dan argumen extension id', () => {
-  assert.match(bat, /where py |where python/, 'harus mencari Python');
+test('skrip Windows mencari engine dan menolak pemakaian tanpa extension id', () => {
+  assert.match(bat, /submeetly-engine\.exe/, 'harus mencari engine');
   assert.match(bat, /Usage: install-host\.bat/, 'harus menolak pemakaian tanpa extension id');
 });
 

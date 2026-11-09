@@ -38,6 +38,11 @@ pub struct Ml {
     pub stream_min_bytes: u64,
 }
 
+/// Env `DEVICE` wins over the saved preference; only `cpu` turns the GPU off.
+fn wants_gpu(env_device: Option<&str>, pref: &str) -> bool {
+    env_device.unwrap_or(pref) != "cpu"
+}
+
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }
@@ -49,8 +54,8 @@ impl Ml {
         let translate_model = (env::var("TRANSLATE").unwrap_or_default() != "off").then(|| {
             env::var("TRANSLATE_MODEL").unwrap_or_else(|_| DEFAULT_TRANSLATE_MODEL.to_string())
         });
-        let want = env::var("DEVICE").unwrap_or_else(|_| device_pref.to_string());
-        let device = crate::ml::pick_device(want != "cpu");
+        let device =
+            crate::ml::pick_device(wants_gpu(env::var("DEVICE").ok().as_deref(), device_pref));
         Self {
             asr_model: repo_for(&model),
             translate_model,
@@ -154,32 +159,47 @@ impl Ml {
             }
             let base = start_sec - lead_sec;
             let win_end = base + window.len() as f64 / SAMPLE_RATE as f64;
-            for seg in self.segments(&window, language, task)? {
-                let mut st = (base + seg.start).min(win_end).max(base);
-                let mut en = (base + seg.end).min(win_end);
-                if let Some(total) = total {
-                    st = st.min(total);
-                    en = en.min(total);
-                }
-                if en <= st || (!out.is_empty() && en <= start_sec + 0.05) {
-                    continue;
-                }
-                if !out.is_empty() {
-                    st = st.max(start_sec);
-                }
-                if en <= st {
-                    continue;
-                }
-                out.push(Segment {
-                    start: st,
-                    end: en,
-                    text: seg.text,
-                });
-            }
+            let segs = self.segments(&window, language, task)?;
+            merge_window(&mut out, segs, base, start_sec, win_end, total);
             let done = start_sec + window.len() as f64 / SAMPLE_RATE as f64 - lead_sec;
             on_progress(total.map(|t| (done / t).min(0.99)), &out);
         }
         Ok(out)
+    }
+}
+
+/// Fold one window's segments into `out`: times become absolute, are clamped to the
+/// window and the file end, and audio already covered by the previous window (the
+/// lead-in) is dropped or trimmed so cues never overlap.
+fn merge_window(
+    out: &mut Vec<Segment>,
+    segs: Vec<Segment>,
+    base: f64,
+    start_sec: f64,
+    win_end: f64,
+    total: Option<f64>,
+) {
+    for seg in segs {
+        let mut st = (base + seg.start).min(win_end).max(base);
+        let mut en = (base + seg.end).min(win_end);
+        if let Some(total) = total {
+            st = st.min(total);
+            en = en.min(total);
+        }
+        if en <= st || (!out.is_empty() && en <= start_sec + 0.05) {
+            continue;
+        }
+        if !out.is_empty() {
+            st = st.max(start_sec);
+        }
+        if en <= st {
+            continue;
+        }
+        out.push(Segment {
+            start: st,
+            end: en,
+            text: seg.text,
+        });
     }
 }
 
@@ -281,4 +301,122 @@ pub fn run_job(
         ),
     }
     let _ = std::fs::remove_file(&path);
+}
+
+#[cfg(test)]
+mod merge_tests {
+    use super::*;
+
+    #[test]
+    fn device_env_wins_over_the_saved_preference() {
+        assert!(wants_gpu(None, "auto"));
+        assert!(!wants_gpu(None, "cpu"));
+        assert!(wants_gpu(Some("cuda"), "cpu"));
+        assert!(!wants_gpu(Some("cpu"), "cuda"));
+    }
+
+    fn seg(start: f64, end: f64, text: &str) -> Segment {
+        Segment {
+            start,
+            end,
+            text: text.to_string(),
+        }
+    }
+
+    fn pairs(out: &[Segment]) -> Vec<(f64, f64)> {
+        out.iter().map(|s| (s.start, s.end)).collect()
+    }
+
+    #[test]
+    fn times_become_absolute_and_the_last_one_reaches_the_file_end() {
+        let mut out = Vec::new();
+        merge_window(
+            &mut out,
+            vec![seg(0.0, 5.0, "w1")],
+            0.0,
+            0.0,
+            5.0,
+            Some(12.0),
+        );
+        // Second window starts at 5 s with a 1 s lead-in: base 4.
+        merge_window(
+            &mut out,
+            vec![seg(1.0, 6.0, "w2")],
+            4.0,
+            5.0,
+            10.0,
+            Some(12.0),
+        );
+        merge_window(
+            &mut out,
+            vec![seg(1.0, 3.0, "w3")],
+            9.0,
+            10.0,
+            12.0,
+            Some(12.0),
+        );
+        assert_eq!(pairs(&out), [(0.0, 5.0), (5.0, 10.0), (10.0, 12.0)]);
+    }
+
+    #[test]
+    fn lead_in_echoes_are_dropped_but_not_in_the_first_window() {
+        let mut out = Vec::new();
+        merge_window(
+            &mut out,
+            vec![seg(0.0, 0.8, "echo1"), seg(1.0, 5.0, "w1")],
+            0.0,
+            0.0,
+            5.0,
+            Some(12.0),
+        );
+        // Entirely inside the 1 s lead-in (4..5): already transcribed.
+        merge_window(
+            &mut out,
+            vec![seg(0.0, 0.9, "echo2"), seg(1.0, 6.0, "w2")],
+            4.0,
+            5.0,
+            10.0,
+            Some(12.0),
+        );
+        let texts: Vec<_> = out.iter().map(|s| s.text.as_str()).collect();
+        assert_eq!(texts, ["echo1", "w1", "w2"]);
+        assert!(out.windows(2).all(|w| w[1].start >= w[0].end));
+    }
+
+    #[test]
+    fn a_timestamp_past_the_window_is_clamped_to_the_file() {
+        // Whisper once returned end 29.98 s for a 16 s file.
+        let mut out = Vec::new();
+        merge_window(
+            &mut out,
+            vec![seg(0.0, 29.98, "x")],
+            0.0,
+            0.0,
+            12.0,
+            Some(12.0),
+        );
+        assert_eq!(pairs(&out), [(0.0, 12.0)]);
+    }
+
+    #[test]
+    fn a_cue_straddling_the_window_boundary_starts_at_the_new_audio() {
+        let mut out = Vec::new();
+        merge_window(
+            &mut out,
+            vec![seg(0.2, 5.0, "a")],
+            0.0,
+            0.0,
+            5.0,
+            Some(12.0),
+        );
+        merge_window(
+            &mut out,
+            vec![seg(0.5, 6.0, "b")],
+            4.0,
+            5.0,
+            10.0,
+            Some(12.0),
+        );
+        assert_eq!(pairs(&out), [(0.2, 5.0), (5.0, 10.0)]);
+    }
 }

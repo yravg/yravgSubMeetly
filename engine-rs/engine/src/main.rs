@@ -4,7 +4,8 @@ use submeetly_engine::state::{default_state_dir, legacy_state_dir, migrate_state
 
 fn main() {
     match std::env::args().nth(1).as_deref() {
-        Some("native-host") => {
+        // Chrome starts a registered host as `exe chrome-extension://<id>/`.
+        Some(arg) if arg == "native-host" || arg.starts_with("chrome-extension://") => {
             if let Err(error) = submeetly_engine::native_host::run() {
                 eprintln!("native-host: {error}");
                 exit(1);

@@ -13,8 +13,9 @@ tanpa akun, tanpa cloud. Tiga permukaan: ekstensi Chrome, helper lokal, aplikasi
 
 - **Ekstensi Chrome MV3** (`src/`): vanilla JS, esbuild → `dist/`. Side panel + service
   worker + offscreen document (Whisper via worker) + content-script overlay.
-- **Native helper** (`native/`): Python HTTP di `127.0.0.1:17865` — mlx-whisper di Apple
-  Silicon, faster-whisper (CPU/CUDA) di OS lain; hanya loopback; job streaming untuk berkas
+- **Native helper** (`engine-rs/`, peluncur di `native/`): engine Rust `submeetly-engine`,
+  HTTP di `127.0.0.1:17865` — candle (CPU; CUDA bila dibangun dengannya; Metal di macOS
+  belum diuji), tanpa Python/ffmpeg; hanya loopback; job streaming untuk berkas
   >2 GiB; bridge Native Messaging `com.yraveragesubmin.helper`.
 - **App macOS** (`mac/`): SwiftUI menu-bar; ScreenCaptureKit, SpeechAnalyzer, Translation
   framework, dikte global. Dibangun dengan Command Line Tools (tanpa macro `@State`).

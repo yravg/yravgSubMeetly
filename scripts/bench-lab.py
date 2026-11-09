@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Headless benchmark for yraverageSubMin native helper.
 
+HTTP only and engine-agnostic: it measures whatever answers on the helper URL,
+which is the Rust engine (submeetly-engine) since S5/ENG-004. ffmpeg here only
+decodes the CC0 samples.
+
 Runs the same checks as test/lab.html without a browser:
   - /draft at 0.35s, 0.5s, 1s, 2s windows
   - /transcribe (final ASR)

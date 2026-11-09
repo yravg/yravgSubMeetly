@@ -436,7 +436,7 @@ enum HelperSharedStore {
         return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
     }
 
-    /// Direktori state helper. `YSM_STATE_DIR` dihormati karena native/server.py
+    /// Direktori state helper. `YSM_STATE_DIR` dihormati karena engine Rust
     /// juga menghormatinya — tanpa ini, pengguna yang memindahkan direktori
     /// state-nya akan melihat notulennya hilang dari aplikasi ini saja.
     static var stateDir: URL {
