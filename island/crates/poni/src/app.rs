@@ -1738,6 +1738,26 @@ impl App {
         self.request_frame();
     }
 
+    /// Translate the song now followed (once; the engine answers from its cache file next time),
+    /// or stop: translation off, no synced lyrics, or the song already in the target language.
+    fn start_lyric_translation(&mut self) {
+        let Some(svc) = self.services.as_ref() else { return };
+        let s = &self.st.settings;
+        let l = &self.st.lyrics;
+        let lines: Vec<String> = l.lyrics.as_ref().filter(|x| x.synced).map(|x| x.lines.iter().map(|y| y.text.trim().to_string()).collect()).unwrap_or_default();
+        let src = poni_core::lyric_tr::song_lang(&lines.iter().map(String::as_str).collect::<Vec<_>>());
+        if !s.lyrics_translate || lines.is_empty() || !poni_core::lyric_tr::wants(src, &s.target_lang) {
+            svc.translate_lyrics(None);
+            self.st.lyrics.translated.clear();
+            self.st.lyrics.tr = poni_core::lyric_tr::TrState::Idle;
+            return;
+        }
+        let job = services::lyric_translate::Job { track_key: l.track_key.clone(), lines, src, tgt: s.target_lang.clone(), port: poni_core::helper::configured_port() };
+        svc.translate_lyrics(Some(job));
+        self.st.lyrics.tr = poni_core::lyric_tr::TrState::Working;
+        self.st.lyrics.translated.clear();
+    }
+
     fn on_capture(&mut self, e: services::capture::CaptureEvent) {
         use services::capture::CaptureEvent;
         match e {
@@ -1816,6 +1836,9 @@ impl App {
                     }
                 }
             }
+        }
+        if before.lyrics_translate != now.lyrics_translate || before.target_lang != now.target_lang {
+            self.start_lyric_translation();
         }
         self.st.pomodoro.cfg = self.st.settings.pomodoro.clone();
         // An add-on switched on downloads its files; off deletes them.
@@ -2030,6 +2053,9 @@ impl App {
                         let changed = prev_key.as_deref() != Some(s.track_key.as_str());
                         if changed {
                             self.st.lyrics = LyricsState { track_key: s.track_key.clone(), status: LyricsStatus::Idle, ..Default::default() };
+                            if let Some(svc) = self.services.as_ref() {
+                                svc.translate_lyrics(None);
+                            }
                             if self.st.settings.lyrics && !s.title.is_empty() {
                                 if let Some(svc) = self.services.as_ref() {
                                     self.st.lyrics.status = LyricsStatus::Loading;
@@ -2068,6 +2094,7 @@ impl App {
                             self.st.lyrics.lyrics = Some(lyrics);
                             self.st.lyrics.source = source;
                             self.st.lyrics.ruby = ruby;
+                            self.start_lyric_translation();
                         }
                         crate::events::LyricsResult::Instrumental => self.st.lyrics.status = LyricsStatus::Instrumental,
                         crate::events::LyricsResult::NotFound => self.st.lyrics.status = LyricsStatus::NotFound,
@@ -2192,9 +2219,23 @@ impl App {
             AppEvent::Paired(e) => self.on_paired(e),
             AppEvent::Autostart(on) => self.st.ui.autostart = Some(on),
             AppEvent::Helper(r) => self.st.helper.apply(r),
-            AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::Engine(info) => {
+                // The engine came back after a translation it could not make: ask again.
+                let back = info.running && !self.st.engine.running && matches!(self.st.lyrics.tr, poni_core::lyric_tr::TrState::Unavailable(_));
+                self.st.engine = info;
+                if back {
+                    self.start_lyric_translation();
+                }
+            }
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::Capture(e) => self.on_capture(e),
+            AppEvent::LyricsTr { track_key, tgt, lines, state } => {
+                // A late answer for another song or another target language is dropped.
+                if self.st.lyrics.track_key == track_key && self.st.settings.target_lang == tgt && self.st.settings.lyrics_translate {
+                    self.st.lyrics.translated = lines;
+                    self.st.lyrics.tr = state;
+                }
+            }
             AppEvent::Addon { id, status } => {
                 // A late report from before a switch-off doesn't bring it back.
                 if self.st.settings.addon_on(id) || status == AddonStatus::Off {

@@ -138,6 +138,8 @@ pub enum AppEvent {
     Engine(poni_core::engine_link::EngineInfo),
     /// System-audio captions: a state change, or words heard (`services::capture`).
     Capture(crate::services::capture::CaptureEvent),
+    /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.
+    LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

@@ -21,10 +21,10 @@ pub const LANGS: [(&str, &str); 12] = [
     ("es", "Spanish"),
     ("fr", "French"),
     ("de", "German"),
-    ("pt", "Portuguese"),
+    ("th", "Thai"),
     ("ru", "Russian"),
     ("ar", "Arabic"),
-    ("hi", "Hindi"),
+    ("vi", "Vietnamese"),
 ];
 
 /// The name of a language code (`auto` = "Auto-detect"; unknown codes show as is).
@@ -276,8 +276,8 @@ mod tests {
     fn languages_cycle_and_have_names() {
         assert_eq!(next_lang("auto", true), "en");
         assert_eq!(next_lang("en", true), "id");
-        assert_eq!(next_lang("hi", true), "auto");
-        assert_eq!(next_lang("hi", false), "en");
+        assert_eq!(next_lang("vi", true), "auto");
+        assert_eq!(next_lang("vi", false), "en");
         assert_eq!(next_lang("xx", false), "en");
         assert_eq!(lang_name("ja"), "Japanese");
         assert_eq!(lang_name("auto"), "Auto-detect");

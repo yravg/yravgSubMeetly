@@ -15,6 +15,7 @@ pub mod fullscreen;
 pub mod helper;
 pub mod http;
 pub mod imaging;
+pub mod lyric_translate;
 pub mod lyrics;
 pub mod media;
 pub mod pairdrop;
@@ -40,6 +41,7 @@ use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
 pub struct Services {
     media: Option<media::MediaService>,
     lyrics: Option<lyrics::LyricsService>,
+    lyric_tr: Option<lyric_translate::LyricTranslateService>,
     _audio: Option<audio::AudioService>,
     _bluetooth: Option<bluetooth::BluetoothService>,
     fullscreen: Option<fullscreen::FullscreenWatcher>,
@@ -67,6 +69,7 @@ impl Services {
     pub fn start(sink: &EventSink, _island: HWND, helper: HWND, settings: &Settings) -> Self {
         let media = started("media", media::MediaService::start(sink.clone()));
         let lyrics = started("lyrics", lyrics::LyricsService::start(sink.clone()));
+        let lyric_tr = started("lyrics translation", lyric_translate::LyricTranslateService::start(sink.clone()));
         let audio = started("audio", audio::AudioService::start(sink.clone()));
         let bluetooth = started("bluetooth", bluetooth::BluetoothService::start(sink.clone()));
         let fullscreen = started("fullscreen", fullscreen::FullscreenWatcher::start(helper, sink.clone()));
@@ -77,7 +80,7 @@ impl Services {
         let addons = started("add-ons", addons::AddonService::start(sink.clone(), on));
         let helper = started("helper link", helper::HelperService::start(sink.clone()));
         let engine = started("engine link", engine::EngineService::start(sink.clone()));
-        Self { media, lyrics, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons, helper, capture: None, engine }
+        Self { media, lyrics, lyric_tr, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons, helper, capture: None, engine }
     }
 
     pub fn stop(mut self, _helper: HWND) {
@@ -161,6 +164,16 @@ impl Services {
     pub fn media_cmd(&self, c: MediaCmd) {
         if let Some(m) = &self.media {
             m.send(c);
+        }
+    }
+
+    /// Translate the song's lines once (or read them from the cache); `None` stops the one running.
+    pub fn translate_lyrics(&self, job: Option<lyric_translate::Job>) {
+        if let Some(t) = &self.lyric_tr {
+            match job {
+                Some(j) => t.request(j),
+                None => t.cancel(),
+            }
         }
     }
 

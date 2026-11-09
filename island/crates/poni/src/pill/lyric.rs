@@ -36,6 +36,7 @@ use crate::state::{AppState, LyricsStatus};
 use crate::ui::Ui;
 use poni_core::geom::{palette, Point, Rect};
 use poni_core::lrc::{LyricLine, Lyrics};
+use poni_core::lyric_tr;
 use poni_core::nowplaying::lyrics_lead_s;
 use poni_core::romanize;
 use poni_core::timeline::LyricClock;
@@ -133,7 +134,7 @@ pub fn sings(st: &AppState) -> bool {
 /// rows): it sings, readings are on, and some line has one. For the whole
 /// song, as [`sings`] is.
 pub fn reads(st: &AppState) -> bool {
-    sings(st) && st.settings.lyrics_pronunciation && st.lyrics.ruby.iter().any(|p| p.iter().any(|r| !r.roman.is_empty()))
+    sings(st) && (st.lyrics.tr.row() || (st.settings.lyrics_pronunciation && st.lyrics.ruby.iter().any(|p| p.iter().any(|r| !r.roman.is_empty()))))
 }
 
 /// The lyrics the pill follows for the song playing now (see [`sings`]).
@@ -320,14 +321,18 @@ fn line_text(st: &AppState, i: usize) -> Option<&str> {
 
 /// Line `i`'s reading in Latin letters, when readings are on and it has one.
 fn reading_at(st: &AppState, i: usize) -> Option<String> {
-    let pieces = st.lyrics.ruby.get(i).filter(|_| st.settings.lyrics_pronunciation)?;
-    romanize::reading(pieces)
+    let reading = st.lyrics.ruby.get(i).filter(|_| st.settings.lyrics_pronunciation).and_then(|p| romanize::reading(p));
+    // While the song is translated the second row is the translation (`lyric_tr::second_row`).
+    lyric_tr::second_row(&st.lyrics.tr, &st.lyrics.translated, i, reading)
 }
 
 /// Tells line `i`'s readings apart without building them: they change when
 /// readings are switched on or off, or when the Japanese readings add-on
 /// comes in and the song is read again.
 fn reading_sig(st: &AppState, i: usize) -> usize {
+    if st.lyrics.tr.row() {
+        return (1 << 24) + st.lyrics.translated.get(i).map_or(0, String::len);
+    }
     match st.lyrics.ruby.get(i) {
         Some(pieces) if st.settings.lyrics_pronunciation => pieces.iter().map(|p| p.roman.len() + 1).sum(),
         _ => 0,
@@ -525,7 +530,7 @@ mod tests {
             can_seek: true,
             track_key: key.clone(),
         });
-        st.lyrics = LyricsState { track_key: key, status: LyricsStatus::Found, lyrics: Some(parse_lrc(lrc)), source: "Sample".into(), ruby: Vec::new() };
+        st.lyrics = LyricsState { track_key: key, status: LyricsStatus::Found, lyrics: Some(parse_lrc(lrc)), source: "Sample".into(), ruby: Vec::new(), ..Default::default() };
         st
     }
 
@@ -818,6 +823,31 @@ mod tests {
         let mut st = song_ja();
         st.settings.lyrics = false;
         assert!(!reads(&st));
+    }
+
+    #[test]
+    fn a_translated_song_shows_the_translation_in_the_second_row() {
+        let mut st = song_ja();
+        let readings = reading_sig(&st, 0);
+        st.lyrics.tr = lyric_tr::TrState::Working;
+        st.lyrics.translated = vec!["paper boat".into(), String::new(), String::new()];
+        assert!(reads(&st));
+        assert_eq!(reading_at(&st, 0).as_deref(), Some("paper boat"));
+        // Not translated yet: nothing under the line (not its reading), and the row stays for the song.
+        assert_eq!(reading_at(&st, 2), None);
+        assert_ne!(reading_sig(&st, 0), readings);
+        // A line translated while it is on screen changes its signature, so it shows without a fade.
+        let before = reading_sig(&st, 2);
+        st.lyrics.translated[2] = "find the light".into();
+        assert_ne!(reading_sig(&st, 2), before);
+        // The engine can't: back to readings.
+        st.lyrics.tr = lyric_tr::TrState::Unavailable("no model".into());
+        assert_eq!(reading_at(&st, 0).as_deref(), Some("kami no fune yo"));
+        // A song with no readings still gets its second row while it is translated.
+        let mut plain = song(SONG);
+        assert!(!reads(&plain));
+        plain.lyrics.tr = lyric_tr::TrState::Ready;
+        assert!(reads(&plain));
     }
 
     #[test]

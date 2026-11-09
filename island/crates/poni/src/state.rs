@@ -72,11 +72,15 @@ pub struct LyricsState {
     /// Each line's pieces with their readings in Latin letters (Japanese,
     /// Korean, Chinese); empty for lines that need none.
     pub ruby: Vec<Vec<Ruby>>,
+    /// Each line translated into the person's target language (`""` = none yet or none needed),
+    /// and where the engine stands on it (`poni_core::lyric_tr`).
+    pub translated: Vec<String>,
+    pub tr: poni_core::lyric_tr::TrState,
 }
 
 impl Default for LyricsState {
     fn default() -> Self {
-        Self { track_key: String::new(), status: LyricsStatus::Idle, lyrics: None, source: String::new(), ruby: Vec::new() }
+        Self { track_key: String::new(), status: LyricsStatus::Idle, lyrics: None, source: String::new(), ruby: Vec::new(), translated: Vec::new(), tr: Default::default() }
     }
 }
 
