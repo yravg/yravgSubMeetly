@@ -597,7 +597,7 @@ mod tests {
         let cut = shorten_path("D:\\averyveryverylongfoldernamethatgoesonandon", 20);
         assert!(cut.chars().count() <= 20 && cut.contains('…'), "{cut}");
         let m = placed(r#""downloaded":true,"dir":"E:\\orca\\tmp\\claude\\e82400107c6fe069\\scratchpad\\hf\\hub","dirIsDefault":false,"dirAvailable":true,"freeBytes":412000000000"#);
-        assert_eq!(m.place(Kind::Asr).unwrap().text, "Your folder · 412 GB free · E:\\orca\\…\\hf\\hub");
+        assert_eq!(m.place(Kind::Asr).unwrap().text, "Your folder · 412.0 GB free · E:\\orca\\…\\hf\\hub");
     }
 
     #[test]
