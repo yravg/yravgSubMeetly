@@ -1959,7 +1959,12 @@ async function saveSettings() {
 // realtime session
 /** True when sidepanel runs under test/app.html (chrome-mock), not the extension. */
 function isLabHarness() {
-  return typeof window !== 'undefined' && !!window.__chromeMockStore;
+  return typeof window !== 'undefined' && (!!window.__chromeMockStore || isWebHost());
+}
+
+/** True when served by the engine at /app/ (Windows app window): src/web-host.js stands in for chrome.*. */
+function isWebHost() {
+  return typeof window !== 'undefined' && !!window.__ysmWebHost;
 }
 
 let labMediaEl = null;
@@ -2354,7 +2359,8 @@ async function onStart() {
         setStatus(t('loadingModels'));
         clearLivePreview();
         $('live-preview').classList.remove('hidden');
-        await acquireLabDemoStream();
+        // App window: Start asks which tab/window/screen to caption; the lab plays a sample instead.
+        await (isWebHost() ? acquireLabDisplayStream() : acquireLabDemoStream());
         await startWithStream(null, 'media');
       } catch (e) {
         releaseLabCapture();
