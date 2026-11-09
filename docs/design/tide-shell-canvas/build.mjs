@@ -16,7 +16,7 @@ import * as B from './boards.mjs';
 import { BOARDS, PRD } from './data.mjs';
 import { MIN_CSS } from './minutes-boards.mjs';
 import { PLAN_CSS } from './ask-plans-boards.mjs';
-import { WIN_CSS } from './minutes-window-boards.mjs';
+import { WIN_CSS, MO_CSS } from './minutes-window-boards.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const S = 1140 / 1440;
@@ -105,7 +105,7 @@ const boards = BOARDS.map((b) => {
 }).join('\n');
 
 const body = `<div class="page"><nav class="toc"><div class="tt">CANVAS</div><a href="#cover">Cover</a><a href="#status">Status</a><a href="#index">Story index</a><div class="tt">BOARDS</div>${idx}</nav><main class="cv">${cover}${status}${index}${boards}</main></div>`;
-const css = BOARD_CSS + '\n' + TIDE_CSS + '\n' + MIN_CSS + '\n' + PLAN_CSS + '\n' + WIN_CSS + '\n' + paneCss(body);
+const css = [BOARD_CSS, TIDE_CSS, MIN_CSS, PLAN_CSS, WIN_CSS, MO_CSS, paneCss(body)].join('\n');
 const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1640"><title>Tide app shell canvas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Geist:wght@400;500;600&family=Geist+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <style>${css}</style></head><body>${body}${ixScript}</body></html>`;
@@ -140,7 +140,7 @@ if (di > 0) {
   let blobs = {}; try { blobs = JSON.parse(fs.readFileSync(path.join(here, 'blobs.json'), 'utf8')); } catch {}
   let hts = {}; try { hts = JSON.parse(fs.readFileSync(path.join(here, 'heights.json'), 'utf8')); } catch {}
   const secs = page.split(/(?=<section class="[^"]*" id=")/).slice(1).map((s) => s.slice(0, s.lastIndexOf('</section>') + 10));
-  const fix = (h) => h.replace(/src="((?:shots|tide|ref)\/[^"]+)"/g, (m, p) => `src="${blobs[p] || p}"`).replace(/<(img|input)([^>]*?)\s*\/?>/g, '<$1$2 />').replace(/<(br|hr)>/g, '<$1/>').replace(/\{\{/g, '{&#8203;{');
+  const fix = (h) => h.replace(/src="((?:shots|tide|ref)\/[^"]+)"/g, (m, p) => `src="${blobs[p] || p}"`).replace(/<(img|input)([^>]*?)\s*\/?>/g, '<$1$2 />').replace(/<(br|hr)>/g, '<$1/>').replace(/\{\{/g, '{&#8203;{').replace(/href="#((?:A\d+[a-z]?)|K01)"/g, 'href="$1.dc.html"');
   const boardsOut = [];
   secs.forEach((s, i) => {
     const id = s.match(/id="([^"]+)"/)[1];
@@ -167,6 +167,9 @@ body{margin:0}
 ${BOARD_CSS}
 ${TIDE_CSS}
 ${MIN_CSS}
+${PLAN_CSS}
+${WIN_CSS}
+${MO_CSS}
 ${paneCss(s)}
 </style>
 </helmet>
