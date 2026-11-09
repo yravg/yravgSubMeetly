@@ -126,13 +126,33 @@ pub fn clip_fast_text(text: &str) -> String {
     }
 }
 
+/// The sentence that pins the output language. Qwen2.5-0.5B ignores a bare "X → Y" and
+/// answers in English for a non-English source, so say what the answer must not be.
+fn answer_in(src: &str, tgt: &str) -> String {
+    let (to, from) = (lang_name(tgt), lang_name(src));
+    let mut avoid = Vec::new();
+    if tgt != "en" {
+        avoid.push("English");
+    }
+    if src != "auto" && src != "en" && src != tgt {
+        avoid.push(from);
+    }
+    if avoid.is_empty() {
+        format!("Always answer in {to}.")
+    } else {
+        format!("Always answer in {to}, never in {}.", avoid.join(" or "))
+    }
+}
+
 /// (system, user, max_tokens) for `/translate`.
 pub fn translate_prompt(text: &str, src: &str, tgt: &str, fast: bool) -> (String, String, usize) {
+    let answer = answer_in(src, tgt);
     if fast {
         (
             format!(
-                "Live subtitle translator. {} → {}. Output ONLY the translation, concise.",
+                "You translate {} subtitles into {}. {answer} Output ONLY the {} translation, concise.",
                 lang_name(src),
+                lang_name(tgt),
                 lang_name(tgt)
             ),
             clip_fast_text(text),
@@ -141,9 +161,8 @@ pub fn translate_prompt(text: &str, src: &str, tgt: &str, fast: bool) -> (String
     } else {
         (
             format!(
-                "You are a professional subtitle translator. Translate the user's text from {} to {}. \
-                 Keep it natural and concise, preserve meaning and tone. Output ONLY the translation — \
-                 no notes, no quotes, no explanations.",
+                "You are a professional subtitle translator. Translate the user's text from {} to {}. {answer} Keep it natural and concise, preserve meaning and tone. \
+                 Output ONLY the translation — no notes, no quotes, no explanations.",
                 lang_name(src),
                 lang_name(tgt)
             ),
@@ -283,12 +302,12 @@ mod tests {
         let (system, user, max) = translate_prompt("hello", "en", "ja", true);
         assert_eq!(
             system,
-            "Live subtitle translator. English → Japanese. Output ONLY the translation, concise."
+            "You translate English subtitles into Japanese. Always answer in Japanese, never in English. Output ONLY the Japanese translation, concise."
         );
         assert_eq!((user.as_str(), max), ("hello", 24));
         let (system, _, max) = translate_prompt("hi", "auto", "id", false);
         assert!(system.starts_with(
-            "You are a professional subtitle translator. Translate the user's text from the source language to Indonesian. Keep it natural"
+            "You are a professional subtitle translator. Translate the user's text from the source language to Indonesian. Always answer in Indonesian, never in English. Keep it natural"
         ));
         assert_eq!(max, 256);
         let (_, user) = refine_prompt("full", "", "en", "de");
@@ -300,5 +319,45 @@ mod tests {
         let clipped = clip_fast_text(&long);
         assert!(clipped.len() <= 120 && clipped.ends_with("word"));
         assert_eq!(first_line("  Halo dunia\nnote: x "), "Halo dunia");
+    }
+
+    #[test]
+    fn every_prompt_names_the_target_language_and_forbids_the_usual_wrong_answer() {
+        let names = [
+            ("id", "Indonesian"),
+            ("zh", "Simplified Chinese"),
+            ("ja", "Japanese"),
+            ("ko", "Korean"),
+            ("de", "German"),
+            ("fr", "French"),
+            ("es", "Spanish"),
+            ("ar", "Arabic"),
+            ("ru", "Russian"),
+            ("th", "Thai"),
+            ("vi", "Vietnamese"),
+            ("nl", "Dutch"),
+        ];
+        for (code, name) in names {
+            assert_eq!(norm_lang(Some(code), "en"), code);
+            for fast in [true, false] {
+                // German speech to `code`: the answer must not fall back to English.
+                let (system, _, _) = translate_prompt("Hallo", "de", code, fast);
+                let wants = if code == "de" {
+                    format!("Always answer in {name}, never in English.")
+                } else {
+                    format!("Always answer in {name}, never in English or German.")
+                };
+                assert!(system.contains(&wants), "{code} fast={fast}: {system}");
+                assert!(!system.contains('\n') && !system.contains("  "), "{system}");
+            }
+        }
+        // English target: nothing forbids English.
+        let (system, _, _) = translate_prompt("Hallo", "de", "en", true);
+        assert!(
+            system.contains("Always answer in English, never in German."),
+            "{system}"
+        );
+        let (system, _, _) = translate_prompt("hi", "auto", "en", true);
+        assert!(system.contains("Always answer in English."), "{system}");
     }
 }
