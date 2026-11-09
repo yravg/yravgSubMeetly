@@ -145,6 +145,10 @@ pub enum Command {
     ModelPull(poni_core::models::Kind),
     /// Switch the engine to this model (`models::OFF` for no translation).
     ModelSelect(poni_core::models::Kind, String),
+    /// Pick a folder for this model and move it there (the engine copies, verifies, then switches).
+    ModelFolder(poni_core::models::Kind),
+    /// Move this model back to the engine's default folder.
+    ModelFolderReset(poni_core::models::Kind),
     /// The Downloads page (`pages::downloads`).
     Download(DownloadCmd),
     /// A Windows language feature (`poni_core::winlang`): Settings' rows and

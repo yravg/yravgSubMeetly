@@ -45,6 +45,20 @@ pub struct Status {
     pub total: u64,
     pub pct: Option<u8>,
     pub error: Option<String>,
+    /// Where the model lives (`None` from an engine that has no per-model folder), whether that is a
+    /// folder the person chose, whether it can be reached now (a drive may be unplugged), and what is free there.
+    pub dir: Option<String>,
+    pub dir_custom: bool,
+    pub dir_missing: bool,
+    pub free: Option<u64>,
+    /// A move to another folder: how far it is, the phase the engine reports, how the last one ended.
+    pub moving: bool,
+    pub move_done: u64,
+    pub move_total: u64,
+    pub move_pct: Option<u8>,
+    pub move_phase: Option<String>,
+    pub move_error: Option<String>,
+    pub move_warning: Option<String>,
 }
 
 fn num(v: &Value, k: &str) -> u64 {
@@ -70,6 +84,17 @@ impl Status {
             total: num(v, "bytesTotal"),
             pct: v.get("pct").and_then(Value::as_u64).map(|p| p.min(100) as u8),
             error: text(v, "pullError"),
+            dir: text(v, "dir"),
+            dir_custom: v.get("dirIsDefault").and_then(Value::as_bool) == Some(false),
+            dir_missing: v.get("dirAvailable").and_then(Value::as_bool) == Some(false),
+            free: v.get("freeBytes").and_then(Value::as_u64),
+            moving: flag(v, "moving"),
+            move_done: num(v, "moveBytesDone"),
+            move_total: num(v, "moveBytesTotal"),
+            move_pct: v.get("movePct").and_then(Value::as_u64).map(|p| p.min(100) as u8),
+            move_phase: text(v, "movePhase"),
+            move_error: text(v, "moveError"),
+            move_warning: text(v, "moveWarning"),
         }
     }
 }
@@ -177,6 +202,18 @@ pub struct Models {
     /// The download this island started, and the last one that failed.
     pub pulling: Option<Kind>,
     pub failed: Option<(Kind, String)>,
+    /// A folder picker or a move request is open for this model: no second one starts.
+    pub placing: Option<Kind>,
+}
+
+/// The "Folder" row of a model: where it lives, and which buttons make sense now.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Place {
+    pub text: String,
+    /// Choose another folder.
+    pub change: bool,
+    /// Go back to the default folder.
+    pub reset: bool,
 }
 
 /// A row's sentence and, when there is something to press, its button.
@@ -216,7 +253,9 @@ impl Models {
 
     /// Time to ask the engine again (every 10 s while Settings shows the models).
     pub fn due(&self, now: f64) -> bool {
-        !self.busy && self.checked_at.is_none_or(|t| now - t > 10.0)
+        // A move shows its progress: ask faster while one runs.
+        let every = if self.rows.iter().any(|r| r.st.moving) { 1.5 } else { 10.0 };
+        !self.busy && self.checked_at.is_none_or(|t| now - t > every)
     }
 
     pub fn status(&self, id: &str) -> Option<&Status> {
@@ -312,6 +351,43 @@ impl Models {
             None => format!("{id} · downloaded, switching to it…"),
         };
         said(text, None)
+    }
+
+    /// The folder row of the model Settings shows for `k`; `None` when it has none to show (an older
+    /// engine, translation off, or the engine not answering). Free space is the folder's volume.
+    pub fn place(&self, k: Kind) -> Option<Place> {
+        let id = self.chosen(k).filter(|id| id != OFF)?;
+        let st = self.status(&id)?;
+        let dir = st.dir.as_deref()?;
+        let busy = self.placing == Some(k) || self.pulling == Some(k) || st.pulling || st.moving;
+        let free = st.free.map(|f| format!("{} free", fmt_bytes(f)));
+        let kind = if st.dir_custom { "your folder" } else { "default folder" };
+        let (text, reset) = if st.moving {
+            let phase = st.move_phase.as_deref().unwrap_or("working");
+            let pct = st.move_pct.map_or(String::new(), |p| format!(" {p}%"));
+            let of = if st.move_total > 0 { format!(" ({} of {})", fmt_bytes(st.move_done), fmt_bytes(st.move_total)) } else { String::new() };
+            (format!("Moving the model out of {dir}: {phase}{pct}{of}. Captions keep working from the old copy until it is verified."), false)
+        } else if st.dir_missing {
+            (format!("Drive not available: plug it in or choose another location. ({dir})"), st.dir_custom)
+        } else if let Some(e) = &st.move_error {
+            (format!("The move failed: {e}. The model is still in {dir}."), st.dir_custom)
+        } else {
+            let need = self.catalog.iter().find(|c| c.id == id).map_or(0, |c| c.approx_bytes).saturating_sub(st.partial);
+            let mut text = format!("{dir} ({kind})");
+            match (st.free, st.downloaded) {
+                (Some(f), false) if need > f => text += &format!(" · not enough free space for the download: needs about {}, {} free", fmt_bytes(need), fmt_bytes(f)),
+                _ => {
+                    if let Some(f) = free {
+                        text += &format!(" · {f}");
+                    }
+                }
+            }
+            if let Some(w) = &st.move_warning {
+                text += &format!(" · {w}");
+            }
+            (text, st.dir_custom)
+        };
+        Some(Place { text, change: !busy, reset: reset && !busy })
     }
 
     /// The engine answers and its speech model is not on disk: captions cannot start yet.
@@ -433,6 +509,65 @@ mod tests {
         assert_eq!(translation_on_disk(r#"{"loaded":{"translate":true}}"#, || panic!("loaded needs no second request")), Some(true));
         assert_eq!(translation_on_disk(health, || Some(r#"{"models":[{"key":"translate","id":null}]}"#.into())), None, "translation off: nothing to download");
         assert_eq!(translation_on_disk(health, || None), None);
+    }
+
+    fn placed(row: &str) -> Models {
+        let mut m = Models::default();
+        let body = format!(
+            r#"{{"models":[{{"key":"asr","id":"org/speech-base",{row}}},{{"key":"translate","id":null}}],
+            "catalog":[{{"kind":"asr","id":"org/speech-base","label":"Base","approxBytes":150000000,{row}}}]}}"#
+        );
+        m.apply(Ok(parse(&body).unwrap()), 1.0);
+        m
+    }
+
+    #[test]
+    fn a_model_says_where_it_lives_and_how_much_room_is_left() {
+        let m = placed(r#""downloaded":true,"bytes":150000000,"dir":"C:\\hub","dirIsDefault":true,"dirAvailable":true,"freeBytes":50000000000"#);
+        let p = m.place(Kind::Asr).unwrap();
+        assert_eq!(p, Place { text: "C:\\hub (default folder) · 50.0 GB free".into(), change: true, reset: false });
+        // A folder the person chose can be given up.
+        let m = placed(r#""downloaded":true,"dir":"D:\\models","dirIsDefault":false,"dirAvailable":true,"freeBytes":50000000000"#);
+        assert_eq!(m.place(Kind::Asr).map(|p| (p.change, p.reset)), Some((true, true)));
+        // An engine without per-model folders, and a model that is off, have no row.
+        assert_eq!(placed(r#""downloaded":true"#).place(Kind::Asr), None);
+        assert_eq!(placed(r#""downloaded":true,"dir":"C:\\hub""#).place(Kind::Translate), None);
+    }
+
+    #[test]
+    fn a_missing_drive_and_a_full_one_are_said_plainly() {
+        let m = placed(r#""downloaded":true,"dir":"E:\\models","dirIsDefault":false,"dirAvailable":false,"dirError":"folder not found (is the drive connected?)""#);
+        let p = m.place(Kind::Asr).unwrap();
+        assert!(p.text.starts_with("Drive not available: plug it in or choose another location."), "{}", p.text);
+        assert!(p.change && p.reset, "another folder or the default is the way out");
+        // Not downloaded, and the folder cannot hold it: the person hears it before pressing Download.
+        let m = placed(r#""downloaded":false,"partialBytes":0,"dir":"D:\\m","dirIsDefault":false,"dirAvailable":true,"freeBytes":100000000"#);
+        assert!(m.place(Kind::Asr).unwrap().text.contains("not enough free space for the download: needs about 150 MB, 100 MB free"));
+        // Room enough: no warning.
+        let m = placed(r#""downloaded":false,"partialBytes":100000000,"dir":"D:\\m","dirIsDefault":false,"dirAvailable":true,"freeBytes":100000000"#);
+        assert!(!m.place(Kind::Asr).unwrap().text.contains("not enough"), "what is already partly downloaded counts");
+    }
+
+    #[test]
+    fn a_move_shows_progress_and_locks_the_buttons_and_a_failure_keeps_the_old_folder() {
+        let moving = r#""downloaded":true,"dir":"C:\\hub","dirIsDefault":true,"dirAvailable":true,"moving":true,"moveBytesDone":60000000,"moveBytesTotal":150000000,"movePct":40,"movePhase":"copying""#;
+        let m = placed(moving);
+        let p = m.place(Kind::Asr).unwrap();
+        assert!(p.text.contains("copying 40% (60 MB of 150 MB)"), "{}", p.text);
+        assert!(!p.change && !p.reset, "one job per model");
+        assert!(!m.due(2.0) && m.due(2.6), "asks every 1.5 s while moving");
+        // A download or an open picker blocks a second job too.
+        let mut m = placed(r#""downloaded":false,"dir":"C:\\hub","dirIsDefault":true,"dirAvailable":true,"pulling":true"#);
+        assert!(!m.place(Kind::Asr).unwrap().change);
+        m.rows[0].st.pulling = false;
+        m.catalog[0].st.pulling = false;
+        assert!(m.place(Kind::Asr).unwrap().change);
+        m.placing = Some(Kind::Asr);
+        assert!(!m.place(Kind::Asr).unwrap().change, "the picker is open");
+        let m = placed(r#""downloaded":true,"dir":"C:\\hub","dirIsDefault":true,"dirAvailable":true,"moving":false,"moveError":"disk full""#);
+        let p = m.place(Kind::Asr).unwrap();
+        assert_eq!(p.text, "The move failed: disk full. The model is still in C:\\hub.");
+        assert!(p.change);
     }
 
     #[test]

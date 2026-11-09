@@ -1889,6 +1889,26 @@ impl App {
         self.st.notify(icon, color, title, sub, 6.0, None);
     }
 
+    /// Choose the folder of the model Settings shows for `kind` (`pick`), or send it back to the default.
+    /// The Settings row is already locked while this runs (`Models::place`); this guards the commands too.
+    fn place_model(&mut self, kind: poni_core::models::Kind, pick: bool) {
+        let m = &mut self.st.models;
+        if m.place(kind).is_none_or(|p| !(if pick { p.change } else { p.reset })) {
+            return;
+        }
+        let Some(id) = m.chosen(kind) else { return };
+        m.placing = Some(kind);
+        services::models::relocate(self.sink.clone(), poni_core::helper::configured_port(), kind, id, pick);
+    }
+
+    fn on_model_placed(&mut self, kind: poni_core::models::Kind, result: std::result::Result<(), String>) {
+        self.st.models.placing = None;
+        if let Err(e) = result {
+            self.st.notify(Icon::Download, palette::ORANGE, format!("{} not moved", kind.label()), e, 8.0, None);
+        }
+        self.refresh_models();
+    }
+
     fn on_model_selected(&mut self, kind: poni_core::models::Kind, result: std::result::Result<(), String>) {
         if let Err(e) = result {
             self.st.models.set_pick(kind, None);
@@ -2244,7 +2264,7 @@ impl App {
         // What the Settings window shows that a service reports.
         let shown = matches!(
             ev,
-            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. }
+            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelPlaced { .. }
         );
         if let Some(w) = self.settings_win.as_mut().filter(|_| shown) {
             w.view.dirty = true;
@@ -2490,6 +2510,7 @@ impl App {
             AppEvent::Models(r) => self.st.models.apply(r, now),
             AppEvent::ModelPulled { kind, id, result } => self.on_model_pulled(kind, id, result),
             AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
+            AppEvent::ModelPlaced { kind, result } => self.on_model_placed(kind, result),
             AppEvent::LyricsTr { track_key, tgt, lines, state } => {
                 // A late answer for another song or another target language is dropped.
                 if self.st.lyrics.track_key == track_key && self.st.settings.target_lang == tgt && self.st.settings.lyrics_translate {
@@ -4307,6 +4328,8 @@ impl App {
                 Command::ModelsRefresh => self.refresh_models(),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),
+                Command::ModelFolder(k) => self.place_model(k, true),
+                Command::ModelFolderReset(k) => self.place_model(k, false),
             }
         }
         self.sync_phone_offer();

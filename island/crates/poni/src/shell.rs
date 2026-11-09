@@ -113,6 +113,31 @@ pub(crate) fn app_window_url_ok(url: &str) -> bool {
         && url.strip_prefix("http://127.0.0.1:").and_then(|rest| rest.split_once('/')).is_some_and(|(port, path)| port.parse::<u16>().is_ok() && path.starts_with("app/"))
 }
 
+/// Ask for a folder (Windows' own picker, on its own thread) and hand the choice to `then`
+/// (`None` when cancelled or the picker failed). Only an existing file-system folder comes back.
+pub fn pick_folder(title: &str, then: impl FnOnce(Option<String>) + Send + 'static) {
+    use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_INPROC_SERVER};
+    use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH};
+    let title = HSTRING::from(title);
+    run("pick-folder", move || {
+        // shortcut: no owner window, so the picker can open behind Settings; pass the Settings HWND when it bothers anyone.
+        let picked = unsafe {
+            (|| -> windows::core::Result<String> {
+                let dlg: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)?;
+                dlg.SetOptions(dlg.GetOptions()? | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM)?;
+                dlg.SetTitle(&title)?;
+                // Cancel is an error (HRESULT_FROM_WIN32(ERROR_CANCELLED)) and means "no folder".
+                dlg.Show(None)?;
+                let name = dlg.GetResult()?.GetDisplayName(SIGDN_FILESYSPATH)?;
+                let path = name.to_string();
+                CoTaskMemFree(Some(name.0 as *const _));
+                path.map_err(|_| windows::core::Error::from(windows::Win32::Foundation::E_FAIL))
+            })()
+        };
+        then(picked.ok().filter(|p| std::path::Path::new(p).is_dir()));
+    });
+}
+
 /// Open Settings > Apps > Startup (asynchronously). The Store build sends
 /// people there when they turned Poni's startup task off in Windows, the only
 /// place it can be turned back on.

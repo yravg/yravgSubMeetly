@@ -101,6 +101,30 @@ pub fn select(sink: EventSink, port: u16, kind: Kind, id: String) {
         .ok();
 }
 
+/// Move `id` to a folder: the one the person picks (`pick`), or back to the engine's default.
+/// The engine copies in the background and checks the copy before it switches, so `AppEvent::ModelPlaced`
+/// only says the request was taken; `AppEvent::Models` then shows the progress.
+pub fn relocate(sink: EventSink, port: u16, kind: Kind, id: String, pick: bool) {
+    let finish = move |result| sink.send(AppEvent::ModelPlaced { kind, result });
+    let post = move |dir: Option<String>| {
+        let body = serde_json::json!({ "id": id, "dir": dir }).to_string();
+        match helper::request(port, "POST", "/engine/models/location", Some(&body)) {
+            Ok((200, _)) => Ok(()),
+            Ok((code, reply)) => Err(sentence(&reply, code)),
+            Err(e) => Err(format!("The engine stopped answering ({e}).")),
+        }
+    };
+    if pick {
+        // Cancelled: no request (a null dir would mean "the default folder"), only the event that frees the row.
+        crate::shell::pick_folder(&format!("Folder for the {}", kind.label().to_lowercase()), move |dir| match dir.filter(|d| !d.trim().is_empty()) {
+            Some(d) => finish(post(Some(d))),
+            None => finish(Ok(())),
+        });
+    } else {
+        std::thread::Builder::new().name("poni-models-place".into()).spawn(move || finish(post(None))).ok();
+    }
+}
+
 /// The engine's own `error` text, or the status code.
 fn sentence(reply: &str, code: u16) -> String {
     serde_json::from_str::<Value>(reply).ok().and_then(|v| v.get("error").and_then(Value::as_str).map(str::to_string)).unwrap_or_else(|| format!("The engine said {code}."))

@@ -235,6 +235,12 @@ fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     if let Some(b) = d.button {
         rows.push(item(Key::ModelPull(k), &format!("{} download", k.label()), None, Ctl::Button(b)));
     }
+    if let Some(p) = m.place(k) {
+        rows.push(item(Key::ModelFolder(k), &format!("{} folder", k.label()), Some(&p.text), if p.change { Ctl::Button("Choose…") } else { Ctl::None }));
+        if p.reset {
+            rows.push(item(Key::ModelFolderReset(k), "Use the default folder", Some("Moves the model back"), Ctl::Button("Reset")));
+        }
+    }
     rows
 }
 
@@ -273,6 +279,10 @@ pub enum Key {
     ModelPick(poni_core::models::Kind),
     /// The Download (or Retry) button of a model.
     ModelPull(poni_core::models::Kind),
+    /// The folder a model is stored in, and its Choose button.
+    ModelFolder(poni_core::models::Kind),
+    /// Move a model back to the default folder.
+    ModelFolderReset(poni_core::models::Kind),
     HudVolume,
     HudPower,
     HudBluetooth,
@@ -706,6 +716,14 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::ModelPull(k) => {
             st.cmd(Command::ModelPull(k));
+            return;
+        }
+        Key::ModelFolder(k) => {
+            st.cmd(Command::ModelFolder(k));
+            return;
+        }
+        Key::ModelFolderReset(k) => {
+            st.cmd(Command::ModelFolderReset(k));
             return;
         }
         Key::HudVolume => s.hud_volume = !s.hud_volume,
@@ -1795,6 +1813,31 @@ mod tests {
         // While it downloads the button is gone.
         st.models.pulling = Some(Kind::Asr);
         assert_eq!(button(&st, Kind::Asr), None);
+    }
+
+    #[test]
+    fn a_model_row_offers_its_folder_and_locks_while_a_job_runs() {
+        use poni_core::models::{parse, Kind};
+        let mut st = state();
+        let find = |st: &AppState, key| row(Section::Models, st, key).map(|i| (i.sub.unwrap_or_default(), i.ctl));
+        let body = |extra: &str| {
+            format!(r#"{{"models":[{{"key":"asr","id":"org/speech-base","downloaded":true,"dir":"D:\\m","dirIsDefault":false,"dirAvailable":true,"freeBytes":5000000000{extra}}},{{"key":"translate","id":null}}],"catalog":[]}}"#)
+        };
+        // An engine without folders shows no row.
+        st.models.apply(Ok(parse(r#"{"models":[{"key":"asr","id":"org/speech-base","downloaded":true}]}"#).unwrap()), 1.0);
+        assert_eq!(find(&st, Key::ModelFolder(Kind::Asr)), None);
+        st.models.apply(Ok(parse(&body("")).unwrap()), 2.0);
+        assert_eq!(find(&st, Key::ModelFolder(Kind::Asr)), Some(("D:\\m (your folder) · 5.0 GB free".into(), Ctl::Button("Choose…"))));
+        assert!(find(&st, Key::ModelFolderReset(Kind::Asr)).is_some());
+        st.cmds.clear();
+        apply(&mut st, Key::ModelFolder(Kind::Asr), Act::Press);
+        apply(&mut st, Key::ModelFolderReset(Kind::Asr), Act::Press);
+        assert!(matches!(st.cmds[..], [Command::ModelFolder(Kind::Asr), Command::ModelFolderReset(Kind::Asr)]));
+        // A move under way: progress in the line, no buttons.
+        st.models.apply(Ok(parse(&body(r#","moving":true,"movePct":10,"movePhase":"copying""#)).unwrap()), 3.0);
+        let (line, ctl) = find(&st, Key::ModelFolder(Kind::Asr)).unwrap();
+        assert!(line.contains("copying 10%") && ctl == Ctl::None);
+        assert_eq!(find(&st, Key::ModelFolderReset(Kind::Asr)), None);
     }
 
     #[test]
