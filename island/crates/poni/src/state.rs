@@ -138,6 +138,8 @@ pub enum NoticeAction {
     /// Open the app another app's notification came from (its
     /// AppUserModelID; Notifications). The island stays closed.
     OpenApp(String),
+    /// Download the speech model the captions wait for (Settings shows the progress).
+    DownloadModel,
 }
 
 /// A one-click action shown as a small pill inside a notice (doesn't expand).
@@ -468,6 +470,8 @@ pub struct AppState {
     pub helper_notice: Option<(String, f64, bool)>,
     /// The island's own capture of what the PC plays (`services::capture`).
     pub capture: poni_core::capture::CaptureState,
+    /// The engine's models and the download under way (Settings, the Live page).
+    pub models: poni_core::models::Models,
     /// Side effects requested during the frame.
     pub cmds: Vec<Command>,
 }
@@ -537,6 +541,7 @@ impl AppState {
             engine: Default::default(),
             helper_notice: None,
             capture: Default::default(),
+            models: Default::default(),
             cmds: Vec::new(),
         };
         // On ones start by checking their files (the worker reports back);

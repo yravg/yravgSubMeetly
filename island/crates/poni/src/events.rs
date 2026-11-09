@@ -140,6 +140,10 @@ pub enum AppEvent {
     Capture(crate::services::capture::CaptureEvent),
     /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.
     LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
+    /// What the engine says its models are (or why it could not say), during a download too.
+    Models(Result<Vec<poni_core::models::Row>, String>),
+    /// A model download ended.
+    ModelPulled { kind: poni_core::models::Kind, result: Result<(), String> },
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

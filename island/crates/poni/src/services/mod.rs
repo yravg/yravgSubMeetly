@@ -18,6 +18,7 @@ pub mod imaging;
 pub mod lyric_translate;
 pub mod lyrics;
 pub mod media;
+pub mod models;
 pub mod pairdrop;
 pub mod phonedrop;
 pub mod power;

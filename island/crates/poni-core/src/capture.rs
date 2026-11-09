@@ -173,6 +173,10 @@ pub fn draft_path(src: &str, tgt: &str) -> String {
     format!("/draft?src={src}&tgt={tgt}")
 }
 
+/// What the capture says while the speech model is not on disk: a `/draft` would start a
+/// download of several hundred MB that nobody asked for, so no audio is sent until it is there.
+pub const SPEECH_MISSING: &str = "The speech model is not downloaded yet. Download it and captions start by themselves.";
+
 /// Where the island's own capture stands, for the Live page, the tray and the pill.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum CaptureState {
@@ -193,6 +197,11 @@ impl CaptureState {
         matches!(self, CaptureState::On | CaptureState::Warn(_))
     }
 
+    /// Captions wait for the speech model to be downloaded ([`SPEECH_MISSING`]).
+    pub fn needs_model(&self) -> bool {
+        matches!(self, CaptureState::Warn(m) if m == SPEECH_MISSING)
+    }
+
     /// The sentence to show, if there is a problem.
     pub fn problem(&self) -> Option<&str> {
         match self {
@@ -205,6 +214,13 @@ impl CaptureState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_missing_model_sentence_asks_for_a_download() {
+        assert!(CaptureState::Warn(SPEECH_MISSING.into()).needs_model());
+        assert!(!CaptureState::Warn("Loading the speech model.".into()).needs_model());
+        assert!(!CaptureState::On.needs_model());
+    }
 
     #[test]
     fn downmix_averages_the_channels() {

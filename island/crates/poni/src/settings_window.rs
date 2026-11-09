@@ -30,6 +30,7 @@ use crate::ui::{wid, wid_n, CursorKind, Hit, Input, MouseButton, PillStyle, Ui, 
 use crate::version::VERSION;
 use poni_core::capture;
 use poni_core::geom::{palette, Color, Point, Rect};
+use poni_core::models::Kind;
 use poni_core::settings::{IdleStyle, MonitorChoice, Theme, TranslationColor};
 use std::collections::HashMap;
 
@@ -210,6 +211,12 @@ impl Section {
     }
 }
 
+/// A model's row: what the engine says about it, with Download or Retry when that helps.
+fn model_item(m: &poni_core::models::Models, k: Kind) -> Item {
+    let d = m.describe(k);
+    item(Key::ModelPull(k), k.label(), Some(&d.text), d.button.map_or(Ctl::None, Ctl::Button))
+}
+
 /// The sections the sidebar lists now.
 pub fn sections(st: &AppState) -> Vec<Section> {
     Section::ALL.into_iter().filter(|s| s.shown(st)).collect()
@@ -241,6 +248,8 @@ pub enum Key {
     SpokenLang,
     TargetLang,
     LyricsTranslate,
+    /// The Download (or Retry) button of a model's row.
+    ModelPull(poni_core::models::Kind),
     HudVolume,
     HudPower,
     HudBluetooth,
@@ -270,6 +279,8 @@ pub enum Ctl {
     Stepper(String),
     /// A button with this label.
     Button(&'static str),
+    /// Nothing to press: the row only says something.
+    None,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -448,6 +459,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 ],
             ),
             Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
+            Block::Group(Some("Models"), [Kind::Asr, Kind::Translate].map(|k| model_item(&st.models, k)).to_vec()),
         ],
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
@@ -602,6 +614,10 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
         Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
         Key::LyricsTranslate => s.lyrics_translate = !s.lyrics_translate,
+        Key::ModelPull(k) => {
+            st.cmd(Command::ModelPull(k));
+            return;
+        }
         Key::HudVolume => s.hud_volume = !s.hud_volume,
         Key::HudPower => s.hud_power = !s.hud_power,
         Key::HudBluetooth => s.hud_bluetooth = !s.hud_bluetooth,
@@ -1029,6 +1045,9 @@ fn draw(ui: &mut Ui, st: &mut AppState, section: Section, frame: Frame, light: b
     ui.c.clip(view);
     let mut y = view.y - sc.at;
     let x = content.x;
+    if section == Section::Speech && st.models.due(st.now) {
+        st.cmd(Command::ModelsRefresh);
+    }
     for (bi, b) in blocks(section, st).into_iter().enumerate() {
         y = draw_block(ui, st, &b, bi, Rect::new(x, y, content.w, 0.0), view, &sf, m);
     }
@@ -1214,6 +1233,7 @@ fn draw_row(ui: &mut Ui, it: &Item, at: (usize, usize), row: Rect, view: Rect, a
         Ctl::Choice(names, _) => picker_width(ui, names),
         Ctl::Stepper(_) => 2.0 * STEP_BTN + STEP_VALUE_W,
         Ctl::Button(label) => ui.pill_width(label, true, true),
+        Ctl::None => 0.0,
     };
     let ctl_x = inner.right() - ctl_w;
     match &it.ctl {
@@ -1276,15 +1296,17 @@ fn draw_row(ui: &mut Ui, it: &Item, at: (usize, usize), row: Rect, view: Rect, a
             let vr = Rect::new(minus.right(), row.y, plus.x - minus.right(), row.h);
             ui.c.text(value, vr, &TextStyle::body().weight(Weight::Semibold).tabular().center());
         }
+        Ctl::None => {}
         Ctl::Button(label) => {
+            let icon = if matches!(it.key, Key::ModelPull(_)) { Icon::Download } else { Icon::Open };
             let r = Rect::new(ctl_x, row.center().y - PILL_SMALL / 2.0, ctl_w, PILL_SMALL);
             let clicked = match visible(r, view).filter(|v| v.h >= r.h - 0.5) {
-                Some(_) => ui.pill(id("button"), r, label, Some(Icon::Open), PillStyle::Utility).clicked,
+                Some(_) => ui.pill(id("button"), r, label, Some(icon), PillStyle::Utility).clicked,
                 None => {
                     let mut none = Input::default();
                     let mut no_hits = Vec::new();
                     let mut ghost = Ui::new(&mut *ui.c, &mut none, &mut no_hits, 0.0);
-                    ghost.pill(0, r, label, Some(Icon::Open), PillStyle::Utility);
+                    ghost.pill(0, r, label, Some(icon), PillStyle::Utility);
                     false
                 }
             };
@@ -1566,6 +1588,7 @@ mod tests {
                     Ctl::Choice(..) => Act::Pick(0),
                     Ctl::Stepper(_) => Act::Step(1),
                     Ctl::Button(_) => Act::Press,
+                    Ctl::None => continue,
                 };
                 apply(&mut st, it.key, act);
                 let saved = st.cmds.iter().any(|c| matches!(c, Command::SaveSettings));
@@ -1623,6 +1646,26 @@ mod tests {
         st.cmds.clear();
         apply(&mut st, Key::Captions, Act::Toggle);
         assert!(st.cmds.iter().any(|c| matches!(c, Command::Captions(true))));
+    }
+
+    #[test]
+    fn the_model_rows_say_what_is_missing_and_download_it() {
+        use poni_core::models::{parse, Kind};
+        let mut st = state();
+        let label = |st: &AppState, k| row(Section::Speech, st, Key::ModelPull(k)).map(|i| (i.sub.unwrap_or_default(), i.ctl));
+        // Before the engine answered: a line, nothing to press.
+        assert_eq!(label(&st, Kind::Asr), Some(("Checking…".into(), Ctl::None)));
+        let body = r#"{"models":[{"key":"asr","id":"org/speech-small","loaded":false},{"key":"translate","id":"org/mt-small","loaded":true}],
+            "cached":[{"id":"org/mt-small","bytes":5,"complete":true}]}"#;
+        st.models.apply(Ok(parse(body).unwrap()), 1.0);
+        assert_eq!(label(&st, Kind::Asr), Some(("org/speech-small · not downloaded".into(), Ctl::Button("Download"))));
+        assert_eq!(label(&st, Kind::Translate).map(|r| r.1), Some(Ctl::None), "a model on disk has nothing to download");
+        st.cmds.clear();
+        apply(&mut st, Key::ModelPull(Kind::Asr), Act::Press);
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelPull(Kind::Asr))));
+        // While it downloads the button is gone.
+        st.models.pulling = Some(Kind::Asr);
+        assert_eq!(label(&st, Kind::Asr).map(|r| r.1), Some(Ctl::None));
     }
 
     #[test]

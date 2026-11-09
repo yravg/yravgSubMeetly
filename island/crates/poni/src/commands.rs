@@ -122,4 +122,8 @@ pub enum Command {
     HelperPoll,
     /// Start (true) or stop (false) captions from what the PC plays.
     Captions(bool),
+    /// Ask the engine which models it has.
+    ModelsRefresh,
+    /// Download this model.
+    ModelPull(poni_core::models::Kind),
 }

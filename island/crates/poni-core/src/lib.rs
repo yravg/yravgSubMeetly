@@ -23,6 +23,7 @@ pub mod lrc;
 pub mod lrclib;
 pub mod lyric_tr;
 pub mod mediaremote;
+pub mod models;
 pub mod notifications;
 pub mod nowplaying;
 pub mod pairdrop;

@@ -149,8 +149,21 @@ impl Health {
 // The poster: one request in flight, newest window wins.
 
 fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mutex<Option<Vec<f32>>>>, health: Arc<Health>) {
+    // A speech model that is not on disk would be downloaded by the first /draft, silently and for
+    // minutes; the island says so and waits for the download Settings offers instead.
+    let (mut present, mut checked) = (false, None::<Instant>);
     while wake.recv().is_ok() {
         let Some(window) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
+        if !present {
+            if checked.is_none_or(|t| t.elapsed() > Duration::from_secs(2)) {
+                checked = Some(Instant::now());
+                present = speech_on_disk(port) != Some(false);
+            }
+            if !present {
+                health.engine(Some(poni_core::capture::SPEECH_MISSING.into()));
+                continue;
+            }
+        }
         match helper::post_draft(port, src, tgt, &pcm_bytes(&window)) {
             Ok(d) => {
                 health.engine(None);
@@ -160,6 +173,7 @@ fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mute
             }
             Err(e) => {
                 crate::pinfo!("capture: /draft failed: {e}");
+                present = false;
                 // A request that got no answer in its 25 s while /health still answers is a model loading.
                 // (On Windows a read timeout reads "os error 10060", so the test is `engine_unreachable`.)
                 let loading = engine_unreachable(&e).then(|| helper::request(port, "GET", "/health", None).ok()).flatten().filter(|(c, _)| *c == 200).and_then(|(_, b)| poni_core::capture::loading_notice(&b, src != tgt));
@@ -167,6 +181,15 @@ fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mute
             }
         }
     }
+}
+
+/// `None` when the engine does not answer or does not say (the /draft then reports what is wrong).
+fn speech_on_disk(port: u16) -> Option<bool> {
+    let (code, health) = helper::request(port, "GET", "/health", None).ok()?;
+    if code != 200 {
+        return None;
+    }
+    poni_core::models::speech_on_disk(&health, || helper::request(port, "GET", "/models", None).ok().filter(|(c, _)| *c == 200).map(|(_, b)| b))
 }
 
 /// The error came from the connection (refused, no answer in time), not from the engine's reply.

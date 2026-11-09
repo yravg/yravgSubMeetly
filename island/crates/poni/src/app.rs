@@ -982,6 +982,7 @@ impl App {
                     shell::open_app(&id);
                     opened = true;
                 }
+                Some(NoticeAction::DownloadModel) => self.pull_model(poni_core::models::Kind::Asr),
                 None => {}
             }
         }
@@ -1743,6 +1744,37 @@ impl App {
         self.request_frame();
     }
 
+    /// Ask the engine which models it has (Settings shows them, every 10 s while open).
+    fn refresh_models(&mut self) {
+        if self.st.models.busy {
+            return;
+        }
+        self.st.models.busy = true;
+        services::models::fetch(self.sink.clone(), poni_core::helper::configured_port());
+    }
+
+    /// Download a model the engine has configured but not on disk; the engine is started first.
+    fn pull_model(&mut self, kind: poni_core::models::Kind) {
+        let m = &mut self.st.models;
+        let Some(id) = m.row(kind).and_then(|r| r.id.clone()).filter(|_| m.pulling.is_none()) else { return };
+        m.pulling = Some(kind);
+        m.failed = None;
+        if let Some(svc) = self.services.as_mut() {
+            svc.engine_start();
+        }
+        services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
+    }
+
+    fn on_model_pulled(&mut self, kind: poni_core::models::Kind, result: std::result::Result<(), String>) {
+        self.st.models.pulling = None;
+        self.st.models.failed = result.err().map(|e| (kind, e));
+        self.refresh_models();
+        let title = if self.st.models.failed.is_none() { format!("{} downloaded", kind.label()) } else { format!("{} download failed", kind.label()) };
+        let (icon, color) = if self.st.models.failed.is_none() { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
+        let sub = self.st.models.failed.as_ref().map_or_else(|| "Captions start by themselves".to_string(), |(_, e)| e.clone());
+        self.st.notify(icon, color, title, sub, 6.0, None);
+    }
+
     /// Translate the song now followed (once; the engine answers from its cache file next time),
     /// or stop: translation off, no synced lyrics, or the song already in the target language.
     fn start_lyric_translation(&mut self) {
@@ -1773,6 +1805,11 @@ impl App {
                     svc.capture_stop();
                 }
                 self.st.helper.capturing = s.running();
+                // Captions cannot start without the speech model: the pill says so and a tap downloads it.
+                if s.needs_model() && !self.st.capture.needs_model() {
+                    self.st.notify(Icon::Download, palette::ORANGE, "Speech model needed", "Tap to download it for captions", 8.0, Some(NoticeAction::DownloadModel));
+                    self.refresh_models();
+                }
                 self.st.capture = s;
             }
             CaptureEvent::Heard => {
@@ -2037,7 +2074,7 @@ impl App {
         // What the Settings window shows that a service reports.
         let shown = matches!(
             ev,
-            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Notify(_)
+            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Notify(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. }
         );
         if let Some(w) = self.settings_win.as_mut().filter(|_| shown) {
             w.view.dirty = true;
@@ -2240,6 +2277,8 @@ impl App {
             }
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::Capture(e) => self.on_capture(e),
+            AppEvent::Models(r) => self.st.models.apply(r, now),
+            AppEvent::ModelPulled { kind, result } => self.on_model_pulled(kind, result),
             AppEvent::LyricsTr { track_key, tgt, lines, state } => {
                 // A late answer for another song or another target language is dropped.
                 if self.st.lyrics.track_key == track_key && self.st.settings.target_lang == tgt && self.st.settings.lyrics_translate {
@@ -3777,6 +3816,8 @@ impl App {
                     }
                 }
                 Command::Captions(on) => self.set_captions(on),
+                Command::ModelsRefresh => self.refresh_models(),
+                Command::ModelPull(k) => self.pull_model(k),
             }
         }
         self.sync_phone_offer();

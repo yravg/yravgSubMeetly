@@ -23,6 +23,7 @@ use crate::state::AppState;
 use crate::ui::{wid, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Rect};
 use poni_core::helper::PageState;
+use poni_core::models::Kind;
 
 const HEAD_H: f32 = 34.0;
 const HEIGHT: f32 = 168.0;
@@ -42,25 +43,43 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     }
 }
 
+/// What the button of the empty page does.
+enum Go {
+    Captions(bool),
+    Follow,
+    Download,
+}
+
 /// Nothing to show yet: say what to do, or what the capture is doing.
 fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let running = st.capture.running();
     let problem = st.capture.problem().map(str::to_string);
     // (title, line, bad, button label, what it does)
-    let (title, line, bad, label, start) = if !st.helper.following {
-        ("Unfollowed", "The island left the meeting alone. Follow shows the newest line again.".to_string(), false, "Follow", None)
+    let (title, line, bad, label, go) = if !st.helper.following {
+        ("Unfollowed", "The island left the meeting alone. Follow shows the newest line again.".to_string(), false, Some("Follow"), Go::Follow)
+    } else if st.capture.needs_model() {
+        // The first caption would otherwise start a download nobody asked for.
+        if st.models.due(st.now) {
+            st.cmd(Command::ModelsRefresh);
+        }
+        let d = st.models.describe(Kind::Asr);
+        let busy = st.models.pulling.is_some();
+        let line = if busy || st.models.failed.is_some() { d.text } else { "Captions need a speech model on this PC, and it is not downloaded yet. It downloads once and stays.".to_string() };
+        let label = (!busy).then_some(if st.models.failed.is_some() { "Retry" } else { "Download speech model" });
+        ("Speech model needed", line, st.models.failed.is_some(), label, Go::Download)
     } else if let Some(why) = problem {
         let label = if running { "Stop captions" } else { "Try again" };
-        ("Captions need attention", why, true, label, Some(!running))
+        ("Captions need attention", why, true, Some(label), Go::Captions(!running))
     } else if running {
-        ("Listening to this PC", "Play a video or join a meeting. Its captions show up here and in the island.".to_string(), false, "Stop captions", Some(false))
+        ("Listening to this PC", "Play a video or join a meeting. Its captions show up here and in the island.".to_string(), false, Some("Stop captions"), Go::Captions(false))
     } else {
-        ("Nothing to follow", "Start captions to caption whatever this PC plays, or record in the extension or the Mac app.".to_string(), false, "Start captions", Some(true))
+        ("Nothing to follow", "Start captions to caption whatever this PC plays, or record in the extension or the Mac app.".to_string(), false, Some("Start captions"), Go::Captions(true))
     };
-    if hkit::message(ui, area, st.accent, Icon::Lyrics, title, &line, bad, Some((label, wid("live.start")))) {
-        match start {
-            Some(on) => st.cmd(Command::Captions(on)),
-            None => st.helper.set_following(true),
+    if hkit::message(ui, area, st.accent, Icon::Lyrics, title, &line, bad, label.map(|l| (l, wid("live.start")))) {
+        match go {
+            Go::Captions(on) => st.cmd(Command::Captions(on)),
+            Go::Follow => st.helper.set_following(true),
+            Go::Download => st.cmd(Command::ModelPull(Kind::Asr)),
         }
     }
 }
