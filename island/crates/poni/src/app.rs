@@ -125,7 +125,7 @@ pub fn main_entry() -> i32 {
     let _mutex = unsafe { CreateMutexW(None, true, &mutex_name) };
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         pinfo!("another instance is running; exiting");
-        // A Start-menu "Minutes register" launch while the island runs: the running one has the engine.
+        // A Start-menu "Minutes register" or "Open yravgSubMeetly" launch while the island runs: the running one has the engine.
         if let Some(path) = services::engine::open_arg(&args) {
             services::engine::open_now(path);
         }
@@ -1953,6 +1953,12 @@ impl App {
             OpenLive => self.open_page(PageKind::Live),
             OpenMeeting => self.open_page(PageKind::Meeting),
             OpenInbox => self.open_page(PageKind::Inbox),
+            OpenApp => {
+                if let Some(svc) = &self.services {
+                    svc.engine_start();
+                }
+                crate::services::engine::open_when_ready("/app/app.html");
+            }
             OpenMinutes => {
                 if let Some(svc) = &self.services {
                     svc.engine_start();

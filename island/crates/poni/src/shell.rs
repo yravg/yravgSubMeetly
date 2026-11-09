@@ -385,6 +385,7 @@ mod tests {
     #[test]
     fn app_window_opens_only_engine_pages_on_loopback() {
         assert!(app_window_url_ok("http://127.0.0.1:17865/app/minutes.html"));
+        assert!(app_window_url_ok("http://127.0.0.1:17865/app/app.html"));
         for url in [
             "http://localhost:17865/app/minutes.html",
             "https://127.0.0.1:17865/app/minutes.html",

@@ -95,6 +95,7 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; Comment: "Live transcription and minutes at the edge of your screen"
+Name: "{autoprograms}\Open {#AppName} (full app)"; Filename: "{app}\{#AppExe}"; Parameters: "--open app"; Comment: "Today, live captions, minutes, history, files and settings in a window of their own"
 Name: "{autoprograms}\{#AppName} Minutes register"; Filename: "{app}\{#AppExe}"; Parameters: "--open minutes"; Comment: "Meeting minutes in a window of their own"
 Name: "{autoprograms}\Set up the {#AppName} Chrome extension"; Filename: "{app}\{#AppExe}"; Parameters: "--open setup-extension"; Comment: "Load the extension in Chrome, step by step"
 Name: "{autoprograms}\{#AppName} engine"; Filename: "{app}\{#EngineExe}"; Comment: "The local transcription helper the Chrome extension talks to"
