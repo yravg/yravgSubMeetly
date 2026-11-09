@@ -161,6 +161,18 @@ pub enum InlineAction {
     Open,
 }
 
+/// What a click on the Music page's Japanese-readings line does
+/// (`AppState::ja_offer`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JaClick {
+    /// Nothing: the line only says where it stands.
+    None,
+    /// Switch the readings add-on on.
+    GetAddon,
+    /// Add Japanese typing to Windows.
+    InstallWindows,
+}
+
 /// Whether this copy may read other apps' notifications (the Notifications
 /// add-on, `services::notifications`), for its page.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -542,6 +554,9 @@ pub struct AppState {
     pub downloader_offered: bool,
     /// Whether Windows lets the island read notifications.
     pub notify_access: NotifyAccess,
+    /// Where each Windows language feature stands (`poni_core::winlang`); one
+    /// not in the list isn't looked at yet.
+    pub winlang: Vec<(&'static str, poni_core::winlang::State)>,
     /// This copy can read other apps' notifications: Windows lets only an app
     /// with a package identity, the Microsoft Store copy, do it. The download
     /// can't, so it offers no Notifications at all. Set once at start (the
@@ -621,6 +636,7 @@ impl AppState {
             downloads: poni_core::downloads::Jobs::default(),
             downloader_offered: false,
             notify_access: NotifyAccess::Unknown,
+            winlang: Vec::new(),
             notify_can: false,
             helper: Default::default(),
             engine: Default::default(),
@@ -652,6 +668,46 @@ impl AppState {
     /// Where the add-on `id` stands (`Off` for one this version doesn't know).
     pub fn addon(&self, id: &str) -> AddonStatus {
         self.addons.get(id).copied().unwrap_or(AddonStatus::Off)
+    }
+
+    /// Where the Windows language feature `id` stands.
+    pub fn winlang_state(&self, id: &str) -> poni_core::winlang::State {
+        self.winlang.iter().find(|(i, _)| *i == id).map(|(_, s)| s.clone()).unwrap_or_default()
+    }
+
+    pub fn set_winlang(&mut self, id: &'static str, state: poni_core::winlang::State) {
+        match self.winlang.iter_mut().find(|(i, _)| *i == id) {
+            Some(slot) => slot.1 = state,
+            None => self.winlang.push((id, state)),
+        }
+    }
+
+    /// What the Music page says under a Japanese song whose kanji went unread,
+    /// and what a click does. The readings add-on's own line, except where
+    /// that line is a dead end (the download failed or can't be checked) and
+    /// Windows has no Japanese typing: then the line offers that instead
+    /// (`poni_core::winlang`). None while the song reads or needs nothing.
+    pub fn ja_offer(&self) -> Option<(String, JaClick)> {
+        use poni_core::winlang::{State, JAPANESE_TYPING};
+        let addon = poni_core::addons::ja_offer(self.addon(poni_core::addons::JAPANESE_READINGS.id))?;
+        let dead_end = matches!(self.addon(poni_core::addons::JAPANESE_READINGS.id), AddonStatus::Failed | AddonStatus::Unpinned);
+        match (self.winlang_state(JAPANESE_TYPING.id), dead_end) {
+            (State::Missing | State::Failed(_), true) => Some(("Romaji for kanji: add Japanese typing to Windows".to_string(), JaClick::InstallWindows)),
+            (State::Installing, true) => Some(("Adding Japanese typing to Windows\u{2026}".to_string(), JaClick::None)),
+            _ => Some((addon.0, if addon.1 { JaClick::GetAddon } else { JaClick::None })),
+        }
+    }
+
+    /// The Music page's offer was clicked: do what its line promised.
+    pub fn ja_offer_clicked(&mut self) {
+        match self.ja_offer() {
+            Some((_, JaClick::GetAddon)) => {
+                self.settings.set_addon(poni_core::addons::JAPANESE_READINGS.id, true);
+                self.cmd(Command::SaveSettings);
+            }
+            Some((_, JaClick::InstallWindows)) => self.cmd(Command::WinLang(crate::commands::WinLangCmd::Install(poni_core::winlang::JAPANESE_TYPING.id))),
+            _ => {}
+        }
     }
 
     /// The Script reader add-on is on: the Script tab shows.
@@ -774,5 +830,51 @@ impl AppState {
     /// Accent for media UI: art colour when available, else the system accent.
     pub fn media_accent(&self) -> Color {
         self.media.as_ref().and_then(|m| m.art_color).unwrap_or(self.accent)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use poni_core::addons::JAPANESE_READINGS;
+    use poni_core::winlang::{State, JAPANESE_TYPING};
+
+    fn st() -> AppState {
+        AppState::new(Settings::default(), Store::default())
+    }
+
+    #[test]
+    fn the_music_hint_offers_windows_japanese_typing_only_where_the_add_on_is_a_dead_end() {
+        let mut st = st();
+        st.winlang.push((JAPANESE_TYPING.id, State::Missing));
+        // The add-on can still come: its own line.
+        for ok in [AddonStatus::Off, AddonStatus::Checking, AddonStatus::Waiting] {
+            st.addons.insert(JAPANESE_READINGS.id, ok);
+            let (line, click) = st.ja_offer().unwrap();
+            assert!(line.contains("Japanese readings"), "{line}");
+            assert_eq!(click == JaClick::GetAddon, ok == AddonStatus::Off);
+        }
+        // It can't (the download failed): Windows' feature, one click.
+        st.addons.insert(JAPANESE_READINGS.id, AddonStatus::Failed);
+        assert_eq!(st.ja_offer(), Some(("Romaji for kanji: add Japanese typing to Windows".to_string(), JaClick::InstallWindows)));
+        st.ja_offer_clicked();
+        assert_eq!(st.cmds.pop(), Some(Command::WinLang(crate::commands::WinLangCmd::Install("ja-typing"))));
+        // While it installs the line only says so; nothing to click.
+        st.set_winlang(JAPANESE_TYPING.id, State::Installing);
+        assert_eq!(st.ja_offer().map(|o| o.1), Some(JaClick::None));
+        // Windows has it: the add-on's own line (it failed) stays; once the add-on is in place there is none.
+        st.set_winlang(JAPANESE_TYPING.id, State::Installed);
+        assert_eq!(st.ja_offer().map(|o| o.1), Some(JaClick::None));
+        st.addons.insert(JAPANESE_READINGS.id, AddonStatus::Ready);
+        assert_eq!(st.ja_offer(), None);
+    }
+
+    #[test]
+    fn the_add_on_line_switches_the_add_on_on() {
+        let mut st = st();
+        st.addons.insert(JAPANESE_READINGS.id, AddonStatus::Off);
+        st.ja_offer_clicked();
+        assert!(st.settings.addon_on(JAPANESE_READINGS.id));
+        assert!(matches!(st.cmds.pop(), Some(Command::SaveSettings)));
     }
 }

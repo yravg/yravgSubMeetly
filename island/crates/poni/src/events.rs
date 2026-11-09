@@ -138,6 +138,8 @@ pub enum AppEvent {
     /// Notifications: what Windows allows, and new notifications
     /// (`services::notifications`).
     Notify(crate::services::notifications::NotifyEvent),
+    /// Where a Windows language feature stands (`services::winlang`).
+    WinLang { id: &'static str, state: poni_core::winlang::State },
     /// The adzan finished playing, or couldn't play on.
     AdzanEnded,
     /// Start with Windows is on (true) or off, read for the Settings page.

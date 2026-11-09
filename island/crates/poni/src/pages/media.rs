@@ -21,9 +21,8 @@
 use crate::commands::{Command, MediaCmd};
 use crate::gfx::{ts, TextStyle, Weight};
 use crate::icons::Icon;
-use crate::state::{AppState, LyricsState, LyricsStatus, MediaSession, PageUiState};
+use crate::state::{AppState, JaClick, LyricsState, LyricsStatus, MediaSession, PageUiState};
 use crate::ui::{wid, wid_n, Ui, WidgetId};
-use poni_core::addons;
 use poni_core::datetime::fmt_duration;
 use poni_core::geom::{lerp, palette, Color, Point, Rect};
 use poni_core::lrc::Lyrics;
@@ -453,7 +452,7 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
         let pronounce = st.settings.lyrics_pronunciation;
         // A Japanese song whose kanji went unread: the readings add-on coming
         // in (the app switched it on), or offered after a switch-off by hand.
-        let offer = if pronounce && st.lyrics.wants_ja_readings { addons::ja_offer(st.addon(addons::JAPANESE_READINGS.id)) } else { None };
+        let offer = if pronounce && st.lyrics.wants_ja_readings { st.ja_offer().map(|(line, click)| (line, click != JaClick::None)) } else { None };
         let ctx = LyricsCtx { now, pos: lyric_pos, live: playing && has_dur, can_seek: m.can_seek, scale, track_key: &m.track_key, pronounce, offer };
         let out = draw_lyrics(ui, &st.lyrics, &mut st.ui, col, a, fr, &ctx, &mut acts);
         anim |= out.animating;
@@ -478,11 +477,10 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
         let url = source_url(lyrics_source(&st.lyrics)).to_string();
         st.cmd(Command::OpenUrl(url));
     }
-    // The same switch as the Add-ons tab's row: the app downloads it, then
-    // reads the song again.
+    // The same switch as the Add-ons tab's row (the app downloads it, then
+    // reads the song again), or Windows' Japanese typing.
     if get_ja_readings {
-        st.settings.set_addon(addons::JAPANESE_READINGS.id, true);
-        st.cmd(Command::SaveSettings);
+        st.ja_offer_clicked();
     }
 }
 
@@ -596,7 +594,7 @@ pub(crate) struct LyricsCtx<'a> {
     /// Show the pronunciation pieces (`LyricsState::ruby`) under lines.
     pub(crate) pronounce: bool,
     /// In the credit's place, always shown: the Japanese readings add-on's
-    /// line (`poni_core::addons::ja_offer`) and whether a click gets it.
+    /// line (`AppState::ja_offer`) and whether a click does anything.
     pub(crate) offer: Option<(String, bool)>,
 }
 

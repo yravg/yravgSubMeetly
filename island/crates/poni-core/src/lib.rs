@@ -45,6 +45,7 @@ pub mod todo;
 pub mod ttml;
 pub mod update;
 pub mod urlenc;
+pub mod winlang;
 pub mod ytdlp;
 pub mod ytdlp_info;
 pub mod ytdlp_partial;

@@ -19,7 +19,7 @@
 //! [`Surfaces`], and everything on them through the Glass look of that mode,
 //! which turns the island's white ink dark on the light window.
 
-use crate::commands::Command;
+use crate::commands::{Command, WinLangCmd};
 use crate::gfx::{Canvas, TextStyle, Weight};
 use crate::icons::Icon;
 use crate::pages::settings::picker_width;
@@ -259,6 +259,10 @@ pub enum Key {
     DataFolder,
     ReleaseNotes,
     LyricsCredit,
+    /// A Windows language feature's row (its place in `poni_core::winlang::ALL`).
+    WinLang(usize),
+    /// Open Windows' own page for adding a language.
+    WinLangSettings,
 }
 
 /// A row's control, at its right end.
@@ -376,6 +380,28 @@ fn offset_text(ms: i32) -> String {
     }
 }
 
+/// One row per Windows language feature (installed, or Install), and the way
+/// round: Windows' own page for adding a language.
+fn winlang_rows(st: &AppState) -> Vec<Item> {
+    use poni_core::winlang::{State, ALL};
+    let mut rows: Vec<Item> = ALL
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let (sub, label) = match st.winlang_state(f.id) {
+                State::Unknown => (f.why.to_string(), "Check"),
+                State::Installed => (format!("Installed \u{b7} {}", f.why), "Check again"),
+                State::Missing => (format!("Not installed \u{b7} {}", f.why), "Install"),
+                State::Installing => ("Installing\u{2026} allow Windows to make changes, then wait a moment".to_string(), "Installing\u{2026}"),
+                State::Failed(why) => (why, "Try again"),
+            };
+            item(Key::WinLang(i), f.name, Some(&sub), Ctl::Button(label))
+        })
+        .collect();
+    rows.push(item(Key::WinLangSettings, "Add a language yourself", Some("Windows Settings > Time & language"), Ctl::Button("Open")));
+    rows
+}
+
 /// What `section` shows for `st`.
 pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
     let s = &st.settings;
@@ -427,17 +453,24 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 Block::Group(Some("Where it shows"), shows),
             ]
         }
-        Section::Music => vec![
-            Block::Group(
-                Some("Lyrics"),
-                vec![
-                    switch(Key::Lyrics, "Synced lyrics", Some("Lyrics move with the song, from LRCLIB"), s.lyrics),
-                    switch(Key::Pronunciation, "Lyrics pronunciation", Some("Romaji, pinyin and Korean under the lines"), s.lyrics_pronunciation),
-                    item(Key::LyricsOffset, "Timing", Some("Shift every line earlier or later"), Ctl::Stepper(offset_text(s.lyrics_offset_ms))),
-                ],
-            ),
-            Block::Group(Some("Closed island"), vec![switch(Key::MediaActivity, "Show what's playing", Some("The song and its cover on the closed island"), s.show_media_activity)]),
-        ],
+        Section::Music => {
+            let mut blocks = vec![
+                Block::Group(
+                    Some("Lyrics"),
+                    vec![
+                        switch(Key::Lyrics, "Synced lyrics", Some("Lyrics move with the song, from LRCLIB"), s.lyrics),
+                        switch(Key::Pronunciation, "Lyrics pronunciation", Some("Romaji, pinyin and Korean under the lines"), s.lyrics_pronunciation),
+                        item(Key::LyricsOffset, "Timing", Some("Shift every line earlier or later"), Ctl::Stepper(offset_text(s.lyrics_offset_ms))),
+                    ],
+                ),
+                Block::Group(Some("Closed island"), vec![switch(Key::MediaActivity, "Show what's playing", Some("The song and its cover on the closed island"), s.show_media_activity)]),
+            ];
+            // Windows' own language features (the Mac has none).
+            if cfg!(windows) {
+                blocks.insert(1, Block::Group(Some("Windows language features"), winlang_rows(st)));
+            }
+            blocks
+        }
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
             vec![
@@ -648,6 +681,19 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::LyricsCredit => {
             st.cmd(Command::OpenUrl("https://lrclib.net".into()));
+            return;
+        }
+        Key::WinLang(i) => {
+            let Some(f) = poni_core::winlang::ALL.get(i) else { return };
+            let cmd = if st.winlang_state(f.id).can_install() { WinLangCmd::Install(f.id) } else { WinLangCmd::Check };
+            // A press while it installs adds nothing: the check would only race the install.
+            if st.winlang_state(f.id) != poni_core::winlang::State::Installing {
+                st.cmd(Command::WinLang(cmd));
+            }
+            return;
+        }
+        Key::WinLangSettings => {
+            st.cmd(Command::WinLang(WinLangCmd::OpenSettings));
             return;
         }
     }
@@ -1578,6 +1624,8 @@ mod tests {
                     // Start with Windows waits for its reading; the buttons open things.
                     Key::Autostart => assert!(st.cmds.is_empty()),
                     Key::SettingsFile | Key::DataFolder | Key::ReleaseNotes | Key::LyricsCredit => assert!(opens, "{:?}", it.key),
+                    // Windows' language rows ask the app, not the settings file.
+                    Key::WinLang(_) | Key::WinLangSettings => assert!(st.cmds.iter().any(|c| matches!(c, Command::WinLang(_))), "{:?}", it.key),
                     _ => assert!(saved, "{:?} didn't save", it.key),
                 }
             }
@@ -1766,5 +1814,37 @@ mod tests {
         assert_eq!(offset_text(0), "On time");
         assert_eq!(offset_text(300), "−0.3 s");
         assert_eq!(offset_text(-1200), "+1.2 s");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_language_rows_follow_where_the_feature_stands() {
+        use poni_core::winlang::{State, JAPANESE_TYPING};
+        let mut st = state();
+        let label = |st: &AppState| match row(Section::Music, st, Key::WinLang(0)).map(|r| r.ctl) {
+            Some(Ctl::Button(l)) => l,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(label(&st), "Check");
+        // Missing: Install asks the app to add exactly this feature.
+        st.set_winlang(JAPANESE_TYPING.id, State::Missing);
+        assert_eq!(label(&st), "Install");
+        apply(&mut st, Key::WinLang(0), Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::WinLang(WinLangCmd::Install("ja-typing"))));
+        // Installed: the button checks again; installing: a press adds nothing.
+        st.set_winlang(JAPANESE_TYPING.id, State::Installed);
+        assert!(row(Section::Music, &st, Key::WinLang(0)).unwrap().sub.unwrap().starts_with("Installed"));
+        apply(&mut st, Key::WinLang(0), Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::WinLang(WinLangCmd::Check)));
+        st.set_winlang(JAPANESE_TYPING.id, State::Installing);
+        apply(&mut st, Key::WinLang(0), Act::Press);
+        assert!(st.cmds.is_empty());
+        // A failure says why and offers another try.
+        st.set_winlang(JAPANESE_TYPING.id, State::Failed("Windows couldn't add it".into()));
+        assert_eq!(label(&st), "Try again");
+        assert_eq!(row(Section::Music, &st, Key::WinLang(0)).unwrap().sub.as_deref(), Some("Windows couldn't add it"));
+        // The way round is always there.
+        apply(&mut st, Key::WinLangSettings, Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::WinLang(WinLangCmd::OpenSettings)));
     }
 }

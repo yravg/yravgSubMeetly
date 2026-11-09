@@ -125,6 +125,21 @@ pub enum Command {
     HelperPoll,
     /// The Downloads page (`pages::downloads`).
     Download(DownloadCmd),
+    /// A Windows language feature (`poni_core::winlang`): Settings' rows and
+    /// the Music page's hint.
+    WinLang(WinLangCmd),
+}
+
+/// What the Windows language rows ask for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WinLangCmd {
+    /// Add the feature with this id (`poni_core::winlang::ALL`): Windows asks
+    /// for permission first.
+    Install(&'static str),
+    /// Look again at what Windows has.
+    Check,
+    /// Open Windows' own page for adding a language.
+    OpenSettings,
 }
 
 /// What the Downloads page asks for.

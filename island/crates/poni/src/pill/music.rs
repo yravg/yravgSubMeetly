@@ -31,11 +31,10 @@ use crate::commands::{Command, MediaCmd};
 use crate::gfx::{Image, TextStyle, Weight};
 use crate::icons::Icon;
 use crate::pages::media::{self as classic, Anim, Frame, LyricsCtx};
-use crate::state::AppState;
+use crate::state::{AppState, JaClick};
 use crate::ui::{wid, Ui, WidgetId};
 use poni_core::datetime::fmt_duration;
 use poni_core::geom::{lerp, palette, Color, Point, Rect};
-use poni_core::addons;
 use poni_core::nowplaying::lyrics_lead_s;
 use poni_core::svgpath::Seg;
 
@@ -272,7 +271,7 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     let mut get_ja_readings = false;
     if let Some(lyr_w) = cols.lyrics_w {
         let col = Rect::new(snap(x0 + area.w - lyr_w), y0, lyr_w, H_SESSION);
-        let offer = if pronounce && st.lyrics.wants_ja_readings { addons::ja_offer(st.addon(addons::JAPANESE_READINGS.id)) } else { None };
+        let offer = if pronounce && st.lyrics.wants_ja_readings { st.ja_offer().map(|(line, click)| (line, click != JaClick::None)) } else { None };
         let ctx = LyricsCtx { now, pos: lyric_pos, live: playing && has_dur, can_seek: m.can_seek, scale, track_key: &m.track_key, pronounce, offer };
         let out = classic::draw_lyrics(ui, &st.lyrics, &mut st.ui, col, a, fr, &ctx, &mut acts);
         anim |= out.animating;
@@ -307,11 +306,10 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
         let url = classic::source_url(classic::lyrics_source(&st.lyrics)).to_string();
         st.cmd(Command::OpenUrl(url));
     }
-    // As Classic's page: the Add-ons tab's switch; the app downloads it,
-    // then reads the song again.
+    // As Classic's page: the Add-ons tab's switch (the app downloads it,
+    // then reads the song again), or Windows' Japanese typing.
     if get_ja_readings {
-        st.settings.set_addon(addons::JAPANESE_READINGS.id, true);
-        st.cmd(Command::SaveSettings);
+        st.ja_offer_clicked();
     }
 }
 

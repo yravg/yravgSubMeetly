@@ -3,7 +3,7 @@
 
 use crate::activities::{self, Mode};
 use crate::clock;
-use crate::commands::{Command, MediaCmd, NotifyCmd, PairCmd, PhoneCmd};
+use crate::commands::{Command, MediaCmd, NotifyCmd, PairCmd, PhoneCmd, WinLangCmd};
 use crate::events::{AppEvent, AppleMusicStatus, EventSink, SendHwnd, WM_APP_APPBAR, WM_APP_EVENT, WM_APP_FRAME, WM_APP_TRAY};
 use crate::gfx::{px_rect, px_union, scale_about, union_rect, Canvas, Gfx, HitMask};
 use crate::icons::Icon;
@@ -695,6 +695,9 @@ impl App {
             if self.st.notifications_on() {
                 self.start_notify(false);
             }
+            // Which Windows language features the island can use (off the UI
+            // thread; Settings and the Music page show the answer).
+            services::winlang::check(self.sink.clone());
             self.try_add_tray();
             services::power::register_session(self.helper);
             if !crate::autostart::packaged() {
@@ -1989,7 +1992,7 @@ impl App {
         // What the Settings window shows that a service reports.
         let shown = matches!(
             ev,
-            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_)
+            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. }
         );
         if let Some(w) = self.settings_win.as_mut().filter(|_| shown) {
             w.view.dirty = true;
@@ -2239,6 +2242,7 @@ impl App {
             AppEvent::Located(found) => self.on_located(found),
             AppEvent::Cities { file, got } => pages::prayer::cities_came(&mut self.st, file, got),
             AppEvent::Notify(ev) => self.on_notify(ev),
+            AppEvent::WinLang { id, state } => self.on_winlang(id, state),
             AppEvent::AdzanEnded => self.adzan_ended(),
             AppEvent::Download { id, line } => self.download_line(id, line),
             AppEvent::DownloadEnded { id, ok } => self.download_ended(id, ok),
@@ -3940,6 +3944,7 @@ impl App {
                 }
                 Command::Download(c) => self.download_cmd(c),
                 Command::Notify(c) => self.notify_cmd(c),
+                Command::WinLang(c) => self.winlang_cmd(c),
                 Command::HelperPost(body) => {
                     if let Some(s) = self.services.as_ref() {
                         s.helper_post(body);
@@ -3958,6 +3963,44 @@ impl App {
     }
 
     // ------------------------------------------------------------ notifications
+
+    fn winlang_cmd(&mut self, c: WinLangCmd) {
+        match c {
+            WinLangCmd::Install(id) => {
+                // Only a feature of the fixed list, and not while one is running or already there.
+                let Some(f) = poni_core::winlang::by_id(id).filter(|_| self.st.winlang_state(id).can_install()) else {
+                    return;
+                };
+                self.st.set_winlang(f.id, poni_core::winlang::State::Installing);
+                services::winlang::install(f, self.sink.clone());
+            }
+            WinLangCmd::Check => services::winlang::check(self.sink.clone()),
+            WinLangCmd::OpenSettings => shell::open_language_settings(),
+        }
+    }
+
+    /// A Windows language feature was looked at or added. One that came in
+    /// reads the song that asked for it again (its lyrics come from the cache).
+    fn on_winlang(&mut self, id: &'static str, state: poni_core::winlang::State) {
+        let before = self.st.winlang_state(id);
+        // A check that began before the install and ended during it knows nothing new.
+        if before == poni_core::winlang::State::Installing && matches!(state, poni_core::winlang::State::Missing | poni_core::winlang::State::Unknown) {
+            return;
+        }
+        let came = state == poni_core::winlang::State::Installed && before != state;
+        if let poni_core::winlang::State::Failed(why) = &state {
+            self.st.notify(Icon::Sliders, palette::ORANGE, "Couldn't add the Windows language feature", why, 6.0, None);
+        }
+        self.st.set_winlang(id, state);
+        if came && id == poni_core::winlang::JAPANESE_TYPING.id && self.st.lyrics.wants_ja_readings {
+            if let (Some(svc), Some(m)) = (self.services.as_ref(), self.st.media.as_ref()) {
+                if m.track_key == self.st.lyrics.track_key {
+                    pinfo!("lyrics: Windows reads Japanese now; reading the song again");
+                    svc.request_lyrics(m);
+                }
+            }
+        }
+    }
 
     /// Notifications came on (`ask`: by its chip in Settings' tabs row, so
     /// Windows' question comes now) or the app started with it on.

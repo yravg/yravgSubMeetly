@@ -36,6 +36,7 @@ pub mod sysmon;
 pub mod sysstats;
 pub mod feed;
 pub mod update;
+pub mod winlang;
 
 use crate::commands::MediaCmd;
 use crate::events::EventSink;
