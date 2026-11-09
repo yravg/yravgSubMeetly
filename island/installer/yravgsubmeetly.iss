@@ -24,6 +24,9 @@
 #ifndef ExeSource
   #define ExeSource "..\target\release\poni.exe"
 #endif
+#ifndef ExtensionSource
+  #define ExtensionSource "..\..\dist"
+#endif
 #ifndef EngineSource
   #define EngineSource "..\..\engine-rs\target\release\submeetly-engine.exe"
 #endif
@@ -36,6 +39,8 @@
 #define IslandClass "yravgSubMeetly.Island"
 ; The Native Messaging host the Chrome extension talks to (engine-rs native_host.rs, native/install-host.bat).
 #define HostName "com.yraveragesubmin.helper"
+; The extension ID every unpacked load of {app}\extension gets (the manifest "key" in src/manifest.json).
+#define FixedExtId "llhpkcjflnepbpgldhbceifjbjgcbapi"
 
 [Setup]
 ; Never change the AppId: upgrades and the uninstaller find the install by it.
@@ -82,21 +87,26 @@ Name: "autostart"; Description: "Start with Windows"; GroupDescription: "Startup
 Source: "{#ExeSource}"; DestDir: "{app}"; DestName: "{#AppExe}"; Flags: ignoreversion
 Source: "{#EngineSource}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "submeetly-host.bat"; DestDir: "{app}"; Flags: ignoreversion
+; The built extension, loaded unpacked from here (Chrome: chrome://extensions > Load unpacked). The engine also
+; serves its pages at /app/<file>, so the Minutes register opens without the extension.
+Source: "{#ExtensionSource}\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; Comment: "Live transcription and minutes at the edge of your screen"
+Name: "{autoprograms}\{#AppName} Minutes register"; Filename: "{app}\{#AppExe}"; Parameters: "--open minutes"; Comment: "Meeting minutes in your browser"
+Name: "{autoprograms}\Set up the {#AppName} Chrome extension"; Filename: "{app}\{#AppExe}"; Parameters: "--open setup-extension"; Comment: "Load the extension in Chrome, step by step"
 Name: "{autoprograms}\{#AppName} engine"; Filename: "{app}\{#EngineExe}"; Comment: "The local transcription helper the Chrome extension talks to"
 
 [Registry]
 ; Same value the app writes from its "Start with Windows" menu item (autostart.rs): the quoted exe path.
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppName}"; ValueData: """{app}\{#AppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
 ; Native Messaging host for the Chrome extension: Chrome, Edge and Chromium find it by these keys
-; (same keys native/install-host.bat writes). Only when an extension ID is known (see [Code]).
-Root: HKCU; Subkey: "Software\Google\Chrome\NativeMessagingHosts\{#HostName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#HostName}.json"; Flags: uninsdeletekey; Check: HasExtensionId
-Root: HKCU; Subkey: "Software\Microsoft\Edge\NativeMessagingHosts\{#HostName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#HostName}.json"; Flags: uninsdeletekey; Check: HasExtensionId
-Root: HKCU; Subkey: "Software\Chromium\NativeMessagingHosts\{#HostName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#HostName}.json"; Flags: uninsdeletekey; Check: HasExtensionId
+; (same keys native/install-host.bat writes). Always: the extension ID is fixed (see FixedExtId).
+Root: HKCU; Subkey: "Software\Google\Chrome\NativeMessagingHosts\{#HostName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#HostName}.json"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Microsoft\Edge\NativeMessagingHosts\{#HostName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#HostName}.json"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Chromium\NativeMessagingHosts\{#HostName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#HostName}.json"; Flags: uninsdeletekey
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
@@ -120,29 +130,33 @@ const
   RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
   WM_CLOSE = $0010;
 
-var
-  ExtPage: TInputQueryWizardPage;
-
 { Dir, not the app constant: the wizard reads the old manifest before the app constant exists. }
 function ManifestPath(Dir: String): String;
 begin
   Result := AddBackslash(Dir) + '{#HostName}.json';
 end;
 
-{ The extension ID a previous install wrote into the host manifest, so an update (silent or not) keeps it. }
+{ The first extension ID other than the fixed one that a previous install wrote into the host manifest, so an
+  update (silent or not) keeps it. }
 function ExistingExtensionId(): String;
 var
   Json: AnsiString;
   P: Integer;
-  S: String;
+  S, Id: String;
 begin
   Result := '';
   if not LoadStringFromFile(ManifestPath(WizardDirValue()), Json) then
     Exit;
   S := String(Json);
   P := Pos('chrome-extension://', S);
-  if P > 0 then
-    Result := Copy(S, P + Length('chrome-extension://'), 32);
+  while (P > 0) and (Result = '') do
+  begin
+    Id := Copy(S, P + Length('chrome-extension://'), 32);
+    if Id <> '{#FixedExtId}' then
+      Result := Id;
+    Delete(S, 1, P + 18);
+    P := Pos('chrome-extension://', S);
+  end;
 end;
 
 { Chrome extension IDs are 32 letters a-p. }
@@ -156,9 +170,15 @@ begin
       Result := False;
 end;
 
-function HasExtensionId(): Boolean;
+{ An ID of another build (a Web Store copy): /EXTID=<id> wins, else the one a previous install kept. It is allowed
+  next to the fixed ID, never instead of it. }
+function OtherExtensionId(): String;
 begin
-  Result := IsExtensionId(Trim(ExtPage.Values[0]));
+  Result := Trim(ExpandConstant('{param:EXTID|}'));
+  if not IsExtensionId(Result) then
+    Result := ExistingExtensionId();
+  if (not IsExtensionId(Result)) or (Result = '{#FixedExtId}') then
+    Result := '';
 end;
 
 function ReopenRequested(): Boolean;
@@ -169,40 +189,6 @@ begin
   for I := 1 to ParamCount do
     if CompareText(ParamStr(I), '/reopen') = 0 then
       Result := True;
-end;
-
-procedure InitializeWizard();
-begin
-  ExtPage := CreateInputQueryPage(wpSelectTasks, 'Chrome extension',
-    'Connect the yravgSubMeetly Chrome extension to the local helper.',
-    'Paste the extension ID from chrome://extensions (Developer mode). Leave it empty to skip: ' +
-    'the island and the engine work without it, and you can run Setup again later.');
-  ExtPage.Add('Extension ID (32 letters):', False);
-  { /EXTID=<id> for silent installs; otherwise filled from a previous install once the folder is known. }
-  ExtPage.Values[0] := ExpandConstant('{param:EXTID|}');
-end;
-
-{ The folder is only known after the Select Folder step (or at once on an upgrade). }
-procedure FillExtensionId();
-begin
-  if Trim(ExtPage.Values[0]) = '' then
-    ExtPage.Values[0] := ExistingExtensionId();
-end;
-
-procedure CurPageChanged(CurPageID: Integer);
-begin
-  if CurPageID = ExtPage.ID then
-    FillExtensionId();
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if (CurPageID = ExtPage.ID) and (Trim(ExtPage.Values[0]) <> '') and not IsExtensionId(Trim(ExtPage.Values[0])) then
-  begin
-    MsgBox('An extension ID is 32 letters from a to p, as chrome://extensions shows it. Fix it, or leave the field empty.', mbError, MB_OK);
-    Result := False;
-  end;
 end;
 
 { Ask a running island to quit (it saves its data on the way out); force it if it doesn't within 3 s. }
@@ -228,15 +214,17 @@ end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  FillExtensionId();
   StopIsland();
   Result := '';
 end;
 
 procedure WriteHostManifest();
 var
-  Wrapper, Json: String;
+  Wrapper, Json, Other: String;
 begin
+  Other := OtherExtensionId();
+  if Other <> '' then
+    Other := ',' + #13#10 + '    "chrome-extension://' + Other + '/"';
   Wrapper := ExpandConstant('{app}\submeetly-host.bat');
   StringChangeEx(Wrapper, '\', '\\', True);
   { Same content native/install-host.bat writes, pointing at this install's launcher. }
@@ -246,7 +234,7 @@ begin
     '  "path": "' + Wrapper + '",' + #13#10 +
     '  "type": "stdio",' + #13#10 +
     '  "allowed_origins": [' + #13#10 +
-    '    "chrome-extension://' + Trim(ExtPage.Values[0]) + '/"' + #13#10 +
+    '    "chrome-extension://{#FixedExtId}/"' + Other + #13#10 +
     '  ]' + #13#10 + '}' + #13#10;
   SaveStringToFile(ManifestPath(ExpandConstant('{app}')), AnsiString(Json), False);
 end;
@@ -255,8 +243,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
-    if HasExtensionId() then
-      WriteHostManifest();
+    WriteHostManifest();
     { Unticking "Start with Windows" on a reinstall turns it off, even if the app's menu turned it on.
       A silent update has no ticks to read: it leaves the value as the person set it. }
     if (not WizardSilent) and (not WizardIsTaskSelected('autostart')) then

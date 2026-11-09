@@ -313,6 +313,8 @@ mod tests {
         assert!(serve(&req("GET", "/health", "127.0.0.1", true)).is_none());
         let setup = serve(&req("GET", "/app/setup-extension.html", "127.0.0.1", true)).unwrap();
         assert_eq!(setup.status, 200);
+        let page = String::from_utf8(setup.body.clone()).unwrap();
+        assert!(page.contains("Load unpacked") && page.contains("_status.json"));
         let head = serve(&req("HEAD", "/app/minutes.html", "127.0.0.1", true)).unwrap();
         assert!(head.body.is_empty());
     }
