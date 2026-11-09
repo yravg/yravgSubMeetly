@@ -216,6 +216,32 @@ pub struct Place {
     pub reset: bool,
 }
 
+/// Longest path shown in a row; longer ones lose their middle.
+const PATH_MAX: usize = 36;
+
+/// \p\ with the middle of a long path left out ("E:\orca\…\hub"): the drive and top folder, then the last ones.
+pub fn shorten_path(p: &str, max: usize) -> String {
+    let n = p.chars().count();
+    if n <= max {
+        return p.to_string();
+    }
+    let sep = if p.contains('\\') { '\\' } else { '/' };
+    let parts: Vec<&str> = p.split(sep).collect();
+    for tail in [2, 1] {
+        if parts.len() > 2 + tail {
+            let s = format!("{}{sep}{}{sep}…{sep}{}", parts[0], parts[1], parts[parts.len() - tail..].join(&sep.to_string()));
+            if s.chars().count() <= max && s.chars().count() < n {
+                return s;
+            }
+        }
+    }
+    // shortcut: a path of few or very long parts is cut by characters; upgrade if such paths turn up in practice.
+    let keep = max.saturating_sub(1);
+    let head: String = p.chars().take(keep / 2).collect();
+    let tail: String = p.chars().skip(n - (keep - keep / 2)).collect();
+    format!("{head}…{tail}")
+}
+
 /// A row's sentence and, when there is something to press, its button.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Described {
@@ -361,16 +387,17 @@ impl Models {
         if let Some(why) = failed {
             return said(format!("The download failed: {why}"), Some("Retry"));
         }
-        let pinned = if self.row(k).is_some_and(|r| r.pinned) { " · fixed by an environment variable" } else { "" };
+        // A short badge first, so a long line cannot cut it off.
+        let pinned = if self.row(k).is_some_and(|r| r.pinned) { format!("Set by {} · ", if k == Kind::Asr { "WHISPER_MODEL" } else { "TRANSLATE_MODEL" }) } else { String::new() };
         if !st.downloaded {
             let about = self.catalog.iter().find(|c| c.id == id).map(|c| c.approx_bytes).filter(|b| *b > 0).map_or(String::new(), |b| format!(", about {}", fmt_bytes(b)));
-            return said(format!("{id} · not downloaded{about}{pinned}"), Some("Download"));
+            return said(format!("{pinned}{id} · not downloaded{about}"), Some("Download"));
         }
         let text = match self.row(k).filter(|r| r.id.as_deref() == Some(&id)) {
-            Some(r) if r.loading => format!("{id} · loading into memory…{pinned}"),
-            Some(r) if r.loaded => format!("{id} · downloaded, in use{pinned}"),
-            Some(_) => format!("{id} · downloaded, loads when needed ({}){pinned}", fmt_bytes(st.bytes)),
-            None => format!("{id} · downloaded, switching to it…"),
+            Some(r) if r.loading => format!("{pinned}{id} · loading into memory…"),
+            Some(r) if r.loaded => format!("{pinned}{id} · downloaded, in use"),
+            Some(_) => format!("{pinned}{id} · downloaded, loads when needed ({})", fmt_bytes(st.bytes)),
+            None => format!("{pinned}{id} · downloaded, switching to it…"),
         };
         said(text, None)
     }
@@ -383,19 +410,21 @@ impl Models {
         let dir = st.dir.as_deref()?;
         let busy = self.placing == Some(k) || self.pulling == Some(k) || st.pulling || st.moving;
         let free = st.free.map(|f| format!("{} free", fmt_bytes(f)));
-        let kind = if st.dir_custom { "your folder" } else { "default folder" };
+        let kind = if st.dir_custom { "Your folder" } else { "Default folder" };
+        let short = shorten_path(dir, PATH_MAX);
         let (text, reset) = if st.moving {
             let phase = st.move_phase.as_deref().unwrap_or("working");
             let pct = st.move_pct.map_or(String::new(), |p| format!(" {p}%"));
             let of = if st.move_total > 0 { format!(" ({} of {})", fmt_bytes(st.move_done), fmt_bytes(st.move_total)) } else { String::new() };
-            (format!("Moving the model out of {dir}: {phase}{pct}{of}. Captions keep working from the old copy until it is verified."), false)
+            (format!("Moving the model out of {short}: {phase}{pct}{of}. Captions keep working from the old copy until it is verified."), false)
         } else if st.dir_missing {
-            (format!("Drive not available: plug it in or choose another location. ({dir})"), st.dir_custom)
+            (format!("Drive not available: plug it in or choose another location. ({short})"), st.dir_custom)
         } else if let Some(e) = &st.move_error {
-            (format!("The move failed: {e}. The model is still in {dir}."), st.dir_custom)
+            (format!("The move failed: {e}. The model is still in {short}."), st.dir_custom)
         } else {
             let need = self.catalog.iter().find(|c| c.id == id).map_or(0, |c| c.approx_bytes).saturating_sub(st.partial);
-            let mut text = format!("{dir} ({kind})");
+            // The short facts first, then the path with its middle left out: an ellipsis at the end hides the path's tail, not the facts.
+            let mut text = kind.to_string();
             match (st.free, st.downloaded) {
                 (Some(f), false) if need > f => text += &format!(" · not enough free space for the download: needs about {}, {} free", fmt_bytes(need), fmt_bytes(f)),
                 _ => {
@@ -404,6 +433,7 @@ impl Models {
                     }
                 }
             }
+            text += &format!(" · {short}");
             if let Some(w) = &st.move_warning {
                 text += &format!(" · {w}");
             }
@@ -505,7 +535,9 @@ mod tests {
         // A model an environment variable fixes cannot be stepped.
         m.rows[0].pinned = true;
         assert_eq!(m.step(Kind::Asr, 1), None);
-        assert!(m.describe(Kind::Asr).text.contains("fixed by an environment variable"));
+        let t = m.describe(Kind::Asr).text;
+        assert!(t.starts_with("Set by WHISPER_MODEL · org/speech-base"), "{t}");
+        assert!(!t.contains("environment variable"));
     }
 
     #[test]
@@ -547,13 +579,25 @@ mod tests {
     fn a_model_says_where_it_lives_and_how_much_room_is_left() {
         let m = placed(r#""downloaded":true,"bytes":150000000,"dir":"C:\\hub","dirIsDefault":true,"dirAvailable":true,"freeBytes":50000000000"#);
         let p = m.place(Kind::Asr).unwrap();
-        assert_eq!(p, Place { text: "C:\\hub (default folder) · 50.0 GB free".into(), change: true, reset: false });
+        assert_eq!(p, Place { text: "Default folder · 50.0 GB free · C:\\hub".into(), change: true, reset: false });
         // A folder the person chose can be given up.
         let m = placed(r#""downloaded":true,"dir":"D:\\models","dirIsDefault":false,"dirAvailable":true,"freeBytes":50000000000"#);
         assert_eq!(m.place(Kind::Asr).map(|p| (p.change, p.reset)), Some((true, true)));
         // An engine without per-model folders, and a model that is off, have no row.
         assert_eq!(placed(r#""downloaded":true"#).place(Kind::Asr), None);
         assert_eq!(placed(r#""downloaded":true,"dir":"C:\\hub""#).place(Kind::Translate), None);
+    }
+
+    #[test]
+    fn a_long_path_loses_its_middle_and_the_facts_come_first() {
+        assert_eq!(shorten_path("C:\\hub", 36), "C:\\hub");
+        assert_eq!(shorten_path("E:\\orca\\tmp\\claude\\scratch\\hf\\hub", 14),"E:\\orca\\…\\hub");
+        assert_eq!(shorten_path("E:\\orca\\tmp\\claude\\scratch\\hf\\hub", 16),"E:\\orca\\…\\hf\\hub");
+        assert_eq!(shorten_path("/home/me/a/b/c/models", 20), "/home/…/c/models");
+        let cut = shorten_path("D:\\averyveryverylongfoldernamethatgoesonandon", 20);
+        assert!(cut.chars().count() <= 20 && cut.contains('…'), "{cut}");
+        let m = placed(r#""downloaded":true,"dir":"E:\\orca\\tmp\\claude\\e82400107c6fe069\\scratchpad\\hf\\hub","dirIsDefault":false,"dirAvailable":true,"freeBytes":412000000000"#);
+        assert_eq!(m.place(Kind::Asr).unwrap().text, "Your folder · 412 GB free · E:\\orca\\…\\hf\\hub");
     }
 
     #[test]

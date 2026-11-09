@@ -1828,7 +1828,7 @@ mod tests {
         st.models.apply(Ok(parse(r#"{"models":[{"key":"asr","id":"org/speech-base","downloaded":true}]}"#).unwrap()), 1.0);
         assert_eq!(find(&st, Key::ModelFolder(Kind::Asr)), None);
         st.models.apply(Ok(parse(&body("")).unwrap()), 2.0);
-        assert_eq!(find(&st, Key::ModelFolder(Kind::Asr)), Some(("D:\\m (your folder) · 5.0 GB free".into(), Ctl::Button("Choose…"))));
+        assert_eq!(find(&st, Key::ModelFolder(Kind::Asr)), Some(("Your folder · 5.0 GB free · D:\\m".into(), Ctl::Button("Choose…"))));
         assert!(find(&st, Key::ModelFolderReset(Kind::Asr)).is_some());
         st.cmds.clear();
         apply(&mut st, Key::ModelFolder(Kind::Asr), Act::Press);
