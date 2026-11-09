@@ -492,8 +492,8 @@ main { padding: var(--space-3); display: flex; flex-direction: column; gap: var(
    header and bottom bar go (a second set of tabs overlapped Start captions on Files). */
 /* Engine-hosted window: install steps and diagnostics live behind Troubleshooting. */
 html[data-hosted] .helper-steps-block { display: none; }
-.hs-troubleshoot > summary { cursor: pointer; font-weight: var(--font-semibold); color: var(--text); padding: var(--space-2) 0; }
-.hs-troubleshoot[open] > summary { margin-bottom: var(--space-2); }
+.hs-troubleshoot > summary, .set-adv > summary { cursor: pointer; font-weight: var(--font-semibold); color: var(--text); padding: var(--space-2) 0; }
+.hs-troubleshoot[open] > summary, .set-adv[open] > summary { margin-bottom: var(--space-2); }
 html[data-embedded] .topbar,
 html[data-embedded] .bottom-nav { display: none; }
 /* Small chip text on the pale accent tint needs the solid green in light mode (accent-soft is 4.23:1 there). */

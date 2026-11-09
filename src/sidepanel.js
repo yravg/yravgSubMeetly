@@ -522,6 +522,7 @@ function filterSettings(query) {
   if (!modal) return;
   let visible = 0;
   modal.toggleAttribute('data-searching', !!q);
+  if (q) modal.querySelectorAll('details.set-adv').forEach((d) => { d.open = true; }); // a match must not hide behind Advanced
   modal.querySelectorAll('.setting-row, .m-item').forEach((el) => {
     const hit = !q || el.textContent.toLowerCase().includes(q);
     el.classList.toggle('search-hidden', !hit);
@@ -907,9 +908,41 @@ function updateWarning() {
   el.querySelector('.manage-models')?.addEventListener('click', () => {
     openSettings();
     requestAnimationFrame(() => {
-      document.querySelector('#asr-models')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const host = document.querySelector('#asr-models');
+      const adv = host?.closest('details'); // hosted window keeps browser models under Advanced
+      if (adv) adv.open = true;
+      host?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+}
+
+// Engine-hosted window: the engine's own models lead the Models tab; browser models, the
+// download mirror and the engine's dev controls sit behind one "Advanced" disclosure per tab.
+// shortcut: Start/Stop/Restart stay visible when the Engine choice is Browser (they only ever act on the engine); revisit if that choice gets a real use here.
+function arrangeHostedSettings() {
+  const advanced = (pane, nodes) => {
+    const d = document.createElement('details');
+    d.className = 'set-adv';
+    const sum = document.createElement('summary');
+    sum.textContent = t('advanced');
+    d.append(sum, ...nodes.filter(Boolean));
+    pane.append(d);
+  };
+  const models = document.querySelector('.set-card[data-pane="models"]');
+  const engine = document.querySelector('.set-card[data-pane="engine"]');
+  if (models && engine) {
+    const head = models.querySelector('.set-card-head');
+    const nm = $('native-models');
+    if (nm) head.after(nm);
+    advanced(models, [...models.children].filter((c) => c !== head && c !== nm));
+    advanced(engine, [
+      $('engine-toggle')?.closest('.setting-row'),
+      engine.querySelector('.native-row'),
+      engine.querySelector('.native-actions'),
+      $('native-host-hint'),
+      $('device-toggle')?.closest('.setting-row'),
+    ]);
+  }
 }
 
 // Satu pintu membuka Settings (topbar, nav bawah, About, peta fitur).
@@ -3305,6 +3338,7 @@ async function init() {
   await loadSettings();
   if (isWebHost()) {
     document.documentElement.dataset.hosted = '';
+    arrangeHostedSettings();
     // Status, model and Restart stay on top; the install guide and diagnostics go behind Troubleshooting.
     const guideMount = $('helper-guide-mount');
     if (guideMount) {
