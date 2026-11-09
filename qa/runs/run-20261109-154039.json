@@ -1,0 +1,35 @@
+{
+  "id": "run-20261109-154039",
+  "at": 1794210039076,
+  "commit": "37913ca",
+  "results": [
+    {
+      "case": "TC024",
+      "status": "fail",
+      "durationMs": 10405,
+      "note": "Error: page.evaluate: EncodingError: Unable to decode audio data",
+      "evidence": [
+        "run-20261109-154039/TC024-1.png",
+        "run-20261109-154039/TC024-2.webm"
+      ]
+    },
+    {
+      "case": "TC025",
+      "status": "skipped",
+      "durationMs": 0,
+      "evidence": []
+    },
+    {
+      "case": "TC026",
+      "status": "skipped",
+      "durationMs": 0,
+      "evidence": []
+    },
+    {
+      "case": "TC028",
+      "status": "skipped",
+      "durationMs": 0,
+      "evidence": []
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "run-20261109-154709",
+  "at": 1794210429686,
+  "commit": "37913ca",
+  "results": [
+    {
+      "case": "TC027",
+      "status": "pass",
+      "durationMs": 4382,
+      "evidence": []
+    }
+  ]
+}

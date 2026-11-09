@@ -1,0 +1,254 @@
+{
+  "id": "run-20261109-154750",
+  "at": 1794210470068,
+  "commit": "37913ca",
+  "results": [
+    {
+      "case": "TC001",
+      "status": "pass",
+      "durationMs": 1890,
+      "evidence": [
+        "run-20261109-154750/TC001-1.png",
+        "run-20261109-154750/TC001-2.webm"
+      ]
+    },
+    {
+      "case": "TC002",
+      "status": "pass",
+      "durationMs": 1740,
+      "evidence": [
+        "run-20261109-154750/TC002-1.png",
+        "run-20261109-154750/TC002-2.webm"
+      ]
+    },
+    {
+      "case": "TC003",
+      "status": "pass",
+      "durationMs": 1779,
+      "evidence": [
+        "run-20261109-154750/TC003-1.png",
+        "run-20261109-154750/TC003-2.webm"
+      ]
+    },
+    {
+      "case": "TC004",
+      "status": "pass",
+      "durationMs": 3206,
+      "evidence": [
+        "run-20261109-154750/TC004-1.png",
+        "run-20261109-154750/TC004-2.webm"
+      ]
+    },
+    {
+      "case": "TC005",
+      "status": "pass",
+      "durationMs": 10063,
+      "evidence": [
+        "run-20261109-154750/TC005-1.png",
+        "run-20261109-154750/TC005-2.webm"
+      ]
+    },
+    {
+      "case": "TC006",
+      "status": "pass",
+      "durationMs": 2656,
+      "evidence": [
+        "run-20261109-154750/TC006-1.png",
+        "run-20261109-154750/TC006-2.webm"
+      ]
+    },
+    {
+      "case": "TC007",
+      "status": "pass",
+      "durationMs": 3807,
+      "evidence": [
+        "run-20261109-154750/TC007-1.png",
+        "run-20261109-154750/TC007-2.png",
+        "run-20261109-154750/TC007-3.webm",
+        "run-20261109-154750/TC007-4.webm"
+      ]
+    },
+    {
+      "case": "TC008",
+      "status": "pass",
+      "durationMs": 2310,
+      "evidence": [
+        "run-20261109-154750/TC008-1.png",
+        "run-20261109-154750/TC008-2.webm"
+      ]
+    },
+    {
+      "case": "TC009",
+      "status": "pass",
+      "durationMs": 1534,
+      "evidence": [
+        "run-20261109-154750/TC009-1.png",
+        "run-20261109-154750/TC009-2.webm"
+      ]
+    },
+    {
+      "case": "TC010",
+      "status": "pass",
+      "durationMs": 2116,
+      "evidence": [
+        "run-20261109-154750/TC010-1.png",
+        "run-20261109-154750/TC010-2.webm"
+      ]
+    },
+    {
+      "case": "TC011",
+      "status": "pass",
+      "durationMs": 4023,
+      "evidence": [
+        "run-20261109-154750/TC011-1.png",
+        "run-20261109-154750/TC011-2.webm"
+      ]
+    },
+    {
+      "case": "TC012",
+      "status": "pass",
+      "durationMs": 2331,
+      "evidence": [
+        "run-20261109-154750/TC012-1.png",
+        "run-20261109-154750/TC012-2.webm"
+      ]
+    },
+    {
+      "case": "TC013",
+      "status": "pass",
+      "durationMs": 6410,
+      "evidence": [
+        "run-20261109-154750/TC013-1.png",
+        "run-20261109-154750/TC013-2.webm"
+      ]
+    },
+    {
+      "case": "TC014",
+      "status": "pass",
+      "durationMs": 46,
+      "evidence": []
+    },
+    {
+      "case": "TC015",
+      "status": "pass",
+      "durationMs": 26,
+      "evidence": []
+    },
+    {
+      "case": "TC016",
+      "status": "pass",
+      "durationMs": 1846,
+      "evidence": [
+        "run-20261109-154750/TC016-1.png",
+        "run-20261109-154750/TC016-2.webm"
+      ]
+    },
+    {
+      "case": "TC017",
+      "status": "pass",
+      "durationMs": 1773,
+      "evidence": [
+        "run-20261109-154750/TC017-1.png",
+        "run-20261109-154750/TC017-2.webm"
+      ]
+    },
+    {
+      "case": "TC018",
+      "status": "pass",
+      "durationMs": 1673,
+      "evidence": [
+        "run-20261109-154750/TC018-1.png",
+        "run-20261109-154750/TC018-2.webm"
+      ]
+    },
+    {
+      "case": "TC019",
+      "status": "pass",
+      "durationMs": 1705,
+      "evidence": [
+        "run-20261109-154750/TC019-1.png",
+        "run-20261109-154750/TC019-2.webm"
+      ]
+    },
+    {
+      "case": "TC020",
+      "status": "pass",
+      "durationMs": 7671,
+      "evidence": [
+        "run-20261109-154750/TC020-1.png",
+        "run-20261109-154750/TC020-2.webm"
+      ]
+    },
+    {
+      "case": "TC021",
+      "status": "pass",
+      "durationMs": 8900,
+      "evidence": [
+        "run-20261109-154750/TC021-1.png",
+        "run-20261109-154750/TC021-2.webm"
+      ]
+    },
+    {
+      "case": "TC022",
+      "status": "pass",
+      "durationMs": 6236,
+      "evidence": [
+        "run-20261109-154750/TC022-1.png",
+        "run-20261109-154750/TC022-2.webm"
+      ]
+    },
+    {
+      "case": "TC023",
+      "status": "pass",
+      "durationMs": 5154,
+      "evidence": [
+        "run-20261109-154750/TC023-1.png",
+        "run-20261109-154750/TC023-2.png",
+        "run-20261109-154750/TC023-3.webm",
+        "run-20261109-154750/TC023-4.webm"
+      ]
+    },
+    {
+      "case": "TC024",
+      "status": "pass",
+      "durationMs": 23435,
+      "evidence": [
+        "run-20261109-154750/TC024-1.png",
+        "run-20261109-154750/TC024-2.webm"
+      ]
+    },
+    {
+      "case": "TC025",
+      "status": "skipped",
+      "durationMs": 328,
+      "evidence": [
+        "run-20261109-154750/TC025-1.png",
+        "run-20261109-154750/TC025-2.webm"
+      ]
+    },
+    {
+      "case": "TC026",
+      "status": "pass",
+      "durationMs": 2488,
+      "evidence": [
+        "run-20261109-154750/TC026-1.png",
+        "run-20261109-154750/TC026-2.png"
+      ]
+    },
+    {
+      "case": "TC027",
+      "status": "pass",
+      "durationMs": 4377,
+      "evidence": []
+    },
+    {
+      "case": "TC028",
+      "status": "pass",
+      "durationMs": 15611,
+      "evidence": [
+        "run-20261109-154750/TC028-1.png",
+        "run-20261109-154750/TC028-2.webm"
+      ]
+    }
+  ]
+}

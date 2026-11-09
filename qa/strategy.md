@@ -15,6 +15,13 @@
 - Each run writes `qa/runs/<run>.json` and its screenshots and videos to `qa/evidence/<run>/` (gitignored).
 - Data: fixtures only (Selamat pagi / Good morning, sample register). No real names or project data.
 
+## Live cases (TC024-TC028)
+- Real engine, real Whisper weights, real audio. No mocked helper. Each spec starts its own engine on a free port with `HF_HUB_OFFLINE=1`, so a missing model fails fast and never downloads.
+- Needs: `QA_ENGINE_BIN` (built `submeetly-engine`), `QA_HF_HOME` (a hub cache that holds `openai/whisper-base`, 290 MB), `QA_PYTHON`. TC027 also needs `QA_ISLAND_EXE` (built `poni.exe`). TC025 needs `Qwen/Qwen2.5-0.5B-Instruct` in the same cache.
+- A case whose model or binary is missing is skipped with the reason, never passed. The suite never downloads models.
+- whisper-base translation quality is poor; the cases assert that the pipeline works and the text reads as English, not that it is good.
+- Not covered: full-extension tabCapture end to end (`npm run e2e`, `e2e:native`) and a picture of the island pill (DirectComposition window, PrintWindow returns black).
+
 ## Environments
 - Local, Windows or macOS. Needs `python3` (or `QA_PYTHON`), Node 20+, Rust toolchain for the engine cases.
 - Run: `npm run build && npm run qa`.

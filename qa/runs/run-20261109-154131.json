@@ -1,0 +1,44 @@
+{
+  "id": "run-20261109-154131",
+  "at": 1794210091119,
+  "commit": "37913ca",
+  "results": [
+    {
+      "case": "TC024",
+      "status": "fail",
+      "durationMs": 17890,
+      "note": "Error: expect(locator).toHaveText(expected) failed",
+      "evidence": [
+        "run-20261109-154131/TC024-1.png",
+        "run-20261109-154131/TC024-2.webm"
+      ]
+    },
+    {
+      "case": "TC025",
+      "status": "skipped",
+      "durationMs": 724,
+      "evidence": [
+        "run-20261109-154131/TC025-1.png",
+        "run-20261109-154131/TC025-2.webm"
+      ]
+    },
+    {
+      "case": "TC026",
+      "status": "pass",
+      "durationMs": 3889,
+      "evidence": [
+        "run-20261109-154131/TC026-1.png",
+        "run-20261109-154131/TC026-2.png"
+      ]
+    },
+    {
+      "case": "TC028",
+      "status": "pass",
+      "durationMs": 23450,
+      "evidence": [
+        "run-20261109-154131/TC028-1.png",
+        "run-20261109-154131/TC028-2.webm"
+      ]
+    }
+  ]
+}

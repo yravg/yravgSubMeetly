@@ -1,25 +1,377 @@
 [
-  {"id":"TC001","title":"Lab shell opens with the three Captions cards and both views","priority":"high","feature":"UI-002","description":"app.html hosts the production side panel. Captions view has Source, Task & Languages and Actions & Preview cards with the transcript lanes; History holds Export and Helper has its own tab (board D02). Notes view opens and Captions comes back.","steps":["Open /app.html","See the Captions view with 3 cards (source, languages, actions with transcript lanes)","Open Notes, then Captions again"]},
-  {"id":"TC002","title":"Live captions: interim line is replaced by the final line with direction tags","priority":"high","feature":"UI-002","description":"While someone speaks, a draft line shows; when the final arrives it replaces the draft. Two-way mode tags each line ID to EN or EN to ID.","steps":["Send pipeline status listening","Send an interim subtitle and see it","Send two final subtitles in opposite directions","See both lines with direction tags and no leftover draft"]},
-  {"id":"TC003","title":"Pipeline error shows a friendly card with technical detail","priority":"medium","feature":"UI-002","description":"A pipeline error must not be silent: the status line shows a title, the error box shows the same title and the raw message under technical detail.","steps":["Send an error message to the panel","See the error box, status line title and raw message"]},
-  {"id":"TC004","title":"Export captions as SRT, VTT and TXT","priority":"high","feature":"UI-002","description":"After one final subtitle, the Export card enables. SRT has index and comma timestamps, VTT starts with WEBVTT and a blank line, TXT has the plain text. Filenames carry the language pair.","steps":["Send a final subtitle (1.25 s to 3.5 s)","Open the History tab (export lives there since board D02)","Export SRT, VTT and TXT","Open each download and read its content"]},
-  {"id":"TC005","title":"Export options CRLF and BOM persist after reload","priority":"medium","feature":"UI-002","description":"Turning on CRLF and BOM changes the export bytes (BOM first, CRLF line ends) and the choice survives a page reload; the OS-default button resets both.","steps":["Send a final subtitle","Open the History tab (export lives there since board D02)","Tick CRLF and BOM","Export SRT and check the bytes","Reload and see both ticked","Press OS default and see both cleared"]},
-  {"id":"TC006","title":"Settings modal fits the screen, is centred and closes","priority":"medium","feature":"UI-002","description":"The Settings modal has a single card inside the screen at 1280 px and at phone width, with engine, theme and language controls, and the close button closes it.","steps":["Open Settings from the gear","See one centred card with engine, theme and interface-language toggles","Resize to 390 px wide and see it still inside the screen","Close it"]},
-  {"id":"TC007","title":"Notes view: load the sample meeting, see the register, export TXT and MD","priority":"high","feature":"UI-002","description":"The Notes view starts empty, the sample button fills it with a meeting with decisions and actions, and the TXT and MD buttons download a file with the meeting title.","steps":["Open Notes","Press the sample button","See the meeting and its items","Download TXT and MD and read them"]},
-  {"id":"TC008","title":"Native helper card: offline fallback shows a warning, fixture shows the engine","priority":"medium","feature":"UI-002","description":"Choosing the Native engine shows the helper card. With a healthy helper the status names the engine; when the helper is down the status says not running and the model warning appears.","steps":["Open Settings, choose Native engine","With a fixture helper press Recheck and see the engine name","Switch the mock helper to offline and Recheck","See not running and the warning","Choose Browser engine and see the card hide"]},
-  {"id":"TC009","title":"Minutes Register: empty state, then load sample data","priority":"high","feature":"UI-003","description":"With no meetings the empty state shows. Loading sample data opens the workspace with a meeting title, strip counts and rows in the register.","steps":["Open /dist/minutes.html with clean storage","See the empty state","Press Load sample data","See the meeting header and register rows"]},
-  {"id":"TC010","title":"Minutes Register: add a decision and an action","priority":"high","feature":"UI-003","description":"Add item opens a form; saving a decision and an action with an owner adds both to the register, bumping the type chip counts.","steps":["Load sample data","Add item, type Decision, fill text, add","Add item, type Action, fill text and owner, add","See both rows and the chip counts go up by one"]},
-  {"id":"TC011","title":"Minutes Register: type chips and search narrow the list","priority":"medium","feature":"UI-003","description":"Toggling a type chip limits the register to that type; typing in search limits rows to matches; clearing restores them.","steps":["Load sample data","Toggle the Decision chip and see only decisions","Clear it, open the dock (it starts as an icon since board D01), search for a word and see fewer rows","Clear the search"]},
-  {"id":"TC012","title":"Minutes Register: export Markdown, CSV and JSON","priority":"medium","feature":"UI-003","description":"The Export menu offers MD, CSV and JSON; each download is named after the meeting and has parseable content.","steps":["Load sample data","Open Export and pick each format","Check file names and content"]},
-  {"id":"TC013","title":"Minutes Register: view dock minimises and restores","priority":"low","feature":"UI-003","description":"The view dock starts as an icon while the navigator is open, shrinks to an icon and opens again on click; the tabs inside stay reachable.","steps":["Load sample data","See the dock start as an icon (board D01) and open it","Press minimise on the dock","See the mini icon","Click it and see the dock open"]},
-  {"id":"TC014","title":"Rust engine: /health answers and notes round-trip","priority":"high","feature":"ENG-001","description":"The engine on a free loopback port answers /health with ok, accepts a note by POST /notes, lists it by GET /notes and exports it as text.","steps":["Start the engine","GET /health","POST /notes with a fixture meeting","GET /notes and see it","POST /notes/export as txt"]},
-  {"id":"TC015","title":"Rust engine: refuses foreign origins and non-loopback Host, allows the lab and extension","priority":"high","feature":"ENG-001","description":"A web page on another site must not read local notes: foreign Origin gets 403 without an allow header; a non-loopback Host gets 403; the lab origin and a chrome-extension origin are allowed and echoed.","steps":["GET /health with Origin https://evil.example","See 403","GET /health with Host evil.example","See 403","GET /health with a chrome-extension origin and the lab origin","See 200 and the origin echoed"]},
-  {"id":"TC016","title":"Inbox: close an item, undo it","priority":"high","feature":"INBOX-001","description":"Minutes > Inbox lists open items; Close moves one to Finished and the open count drops; Undo restores it.","steps":["Load sample data","Open Inbox","Press Close on the first row","See the count drop","Press Undo and see it return"]},
-  {"id":"TC017","title":"Projects: librarian pause and resume","priority":"medium","feature":"LIB-001","description":"The Librarian can be paused (no suggestions) and resumed; no meeting changes without Accept.","steps":["Load sample data","Open Projects","Press Pause and see no suggestion card","Press Resume and see the cards return"]},
-  {"id":"TC018","title":"Highlights: counts, needs you, source line","priority":"medium","feature":"HIL-001","description":"Minutes > Highlights shows counts of decisions, actions, questions and risks, the Needs you list, the source line and Issue MoM.","steps":["Load sample data","Open Highlights","See four counts","See the source line and Issue MoM"]},
-  {"id":"TC019","title":"Draft options use the meeting transcript first","priority":"medium","feature":"DRAFT-003","description":"When a meeting has its own transcript, Draft options read it first and the panel says so.","steps":["Load sample data","Give the newest meeting a transcript","Open Draft options","See Source: this meeting's transcript"]},
-  {"id":"TC020","title":"Recap email: build, open draft, copy, nothing sent","priority":"high","feature":"RECAP-001","description":"Trust Recap email, press its chip in Notes: a card shows recipients with a known email, who has none, a preview, Open mail draft (a mailto link) and Copy. Nothing is sent.","steps":["Load sample data","Trust the three add-ins in Settings > Add-ins","Press Recap email in the Notes strip","See recipient count and the no-email names","Open the preview","Press Open mail draft and see one mailto link","Press Dismiss"]},
-  {"id":"TC021","title":"Glossary: needs input, add, CSV import and export, remove","priority":"high","feature":"GLOS-001","description":"The Glossary panel in Notes lists the series terms. An empty term shows a needs-input message; a term is added and shown; CSV export has the header; import reports good and skipped rows; a term can be removed.","steps":["Load sample data and trust Glossary","Press Add with no term and see the message","Add a term with heard-as spellings","Export CSV and read the header","Import a CSV with one bad row and see the counts","Remove the term"]},
-  {"id":"TC022","title":"Due dates to calendar: one .ics of open actions","priority":"high","feature":"ICS-001","description":"Press the chip: one .ics file downloads with an all-day VEVENT per open action that has a due date, CRLF lines folded at 75 bytes; the card says how many were saved.","steps":["Load sample data and trust the add-in","Press Due dates to calendar","Read the downloaded file","See the count on the card"]},
-  {"id":"TC023","title":"Add-ins tab: how-to for each new add-in, locked until trusted","priority":"high","feature":"ADD-001","description":"Before trust nothing from the three add-ins appears in Notes; each add-in shows its how-to text and a Needs trust state in Settings > Add-ins.","steps":["Load sample data","See no add-in strip in Notes","Open Settings > Add-ins","Select each new add-in and read its how-to text and state"]}
+  {
+    "id": "TC001",
+    "title": "Lab shell opens with the three Captions cards and both views",
+    "priority": "high",
+    "feature": "UI-002",
+    "description": "app.html hosts the production side panel. Captions view has Source, Task & Languages and Actions & Preview cards with the transcript lanes; History holds Export and Helper has its own tab (board D02). Notes view opens and Captions comes back.",
+    "steps": [
+      "Open /app.html",
+      "See the Captions view with 3 cards (source, languages, actions with transcript lanes)",
+      "Open Notes, then Captions again"
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Live captions: interim line is replaced by the final line with direction tags",
+    "priority": "high",
+    "feature": "UI-002",
+    "description": "While someone speaks, a draft line shows; when the final arrives it replaces the draft. Two-way mode tags each line ID to EN or EN to ID.",
+    "steps": [
+      "Send pipeline status listening",
+      "Send an interim subtitle and see it",
+      "Send two final subtitles in opposite directions",
+      "See both lines with direction tags and no leftover draft"
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Pipeline error shows a friendly card with technical detail",
+    "priority": "medium",
+    "feature": "UI-002",
+    "description": "A pipeline error must not be silent: the status line shows a title, the error box shows the same title and the raw message under technical detail.",
+    "steps": [
+      "Send an error message to the panel",
+      "See the error box, status line title and raw message"
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Export captions as SRT, VTT and TXT",
+    "priority": "high",
+    "feature": "UI-002",
+    "description": "After one final subtitle, the Export card enables. SRT has index and comma timestamps, VTT starts with WEBVTT and a blank line, TXT has the plain text. Filenames carry the language pair.",
+    "steps": [
+      "Send a final subtitle (1.25 s to 3.5 s)",
+      "Open the History tab (export lives there since board D02)",
+      "Export SRT, VTT and TXT",
+      "Open each download and read its content"
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Export options CRLF and BOM persist after reload",
+    "priority": "medium",
+    "feature": "UI-002",
+    "description": "Turning on CRLF and BOM changes the export bytes (BOM first, CRLF line ends) and the choice survives a page reload; the OS-default button resets both.",
+    "steps": [
+      "Send a final subtitle",
+      "Open the History tab (export lives there since board D02)",
+      "Tick CRLF and BOM",
+      "Export SRT and check the bytes",
+      "Reload and see both ticked",
+      "Press OS default and see both cleared"
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Settings modal fits the screen, is centred and closes",
+    "priority": "medium",
+    "feature": "UI-002",
+    "description": "The Settings modal has a single card inside the screen at 1280 px and at phone width, with engine, theme and language controls, and the close button closes it.",
+    "steps": [
+      "Open Settings from the gear",
+      "See one centred card with engine, theme and interface-language toggles",
+      "Resize to 390 px wide and see it still inside the screen",
+      "Close it"
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Notes view: load the sample meeting, see the register, export TXT and MD",
+    "priority": "high",
+    "feature": "UI-002",
+    "description": "The Notes view starts empty, the sample button fills it with a meeting with decisions and actions, and the TXT and MD buttons download a file with the meeting title.",
+    "steps": [
+      "Open Notes",
+      "Press the sample button",
+      "See the meeting and its items",
+      "Download TXT and MD and read them"
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Native helper card: offline fallback shows a warning, fixture shows the engine",
+    "priority": "medium",
+    "feature": "UI-002",
+    "description": "Choosing the Native engine shows the helper card. With a healthy helper the status names the engine; when the helper is down the status says not running and the model warning appears.",
+    "steps": [
+      "Open Settings, choose Native engine",
+      "With a fixture helper press Recheck and see the engine name",
+      "Switch the mock helper to offline and Recheck",
+      "See not running and the warning",
+      "Choose Browser engine and see the card hide"
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Minutes Register: empty state, then load sample data",
+    "priority": "high",
+    "feature": "UI-003",
+    "description": "With no meetings the empty state shows. Loading sample data opens the workspace with a meeting title, strip counts and rows in the register.",
+    "steps": [
+      "Open /dist/minutes.html with clean storage",
+      "See the empty state",
+      "Press Load sample data",
+      "See the meeting header and register rows"
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Minutes Register: add a decision and an action",
+    "priority": "high",
+    "feature": "UI-003",
+    "description": "Add item opens a form; saving a decision and an action with an owner adds both to the register, bumping the type chip counts.",
+    "steps": [
+      "Load sample data",
+      "Add item, type Decision, fill text, add",
+      "Add item, type Action, fill text and owner, add",
+      "See both rows and the chip counts go up by one"
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Minutes Register: type chips and search narrow the list",
+    "priority": "medium",
+    "feature": "UI-003",
+    "description": "Toggling a type chip limits the register to that type; typing in search limits rows to matches; clearing restores them.",
+    "steps": [
+      "Load sample data",
+      "Toggle the Decision chip and see only decisions",
+      "Clear it, open the dock (it starts as an icon since board D01), search for a word and see fewer rows",
+      "Clear the search"
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Minutes Register: export Markdown, CSV and JSON",
+    "priority": "medium",
+    "feature": "UI-003",
+    "description": "The Export menu offers MD, CSV and JSON; each download is named after the meeting and has parseable content.",
+    "steps": [
+      "Load sample data",
+      "Open Export and pick each format",
+      "Check file names and content"
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Minutes Register: view dock minimises and restores",
+    "priority": "low",
+    "feature": "UI-003",
+    "description": "The view dock starts as an icon while the navigator is open, shrinks to an icon and opens again on click; the tabs inside stay reachable.",
+    "steps": [
+      "Load sample data",
+      "See the dock start as an icon (board D01) and open it",
+      "Press minimise on the dock",
+      "See the mini icon",
+      "Click it and see the dock open"
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Rust engine: /health answers and notes round-trip",
+    "priority": "high",
+    "feature": "ENG-001",
+    "description": "The engine on a free loopback port answers /health with ok, accepts a note by POST /notes, lists it by GET /notes and exports it as text.",
+    "steps": [
+      "Start the engine",
+      "GET /health",
+      "POST /notes with a fixture meeting",
+      "GET /notes and see it",
+      "POST /notes/export as txt"
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Rust engine: refuses foreign origins and non-loopback Host, allows the lab and extension",
+    "priority": "high",
+    "feature": "ENG-001",
+    "description": "A web page on another site must not read local notes: foreign Origin gets 403 without an allow header; a non-loopback Host gets 403; the lab origin and a chrome-extension origin are allowed and echoed.",
+    "steps": [
+      "GET /health with Origin https://evil.example",
+      "See 403",
+      "GET /health with Host evil.example",
+      "See 403",
+      "GET /health with a chrome-extension origin and the lab origin",
+      "See 200 and the origin echoed"
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Inbox: close an item, undo it",
+    "priority": "high",
+    "feature": "INBOX-001",
+    "description": "Minutes > Inbox lists open items; Close moves one to Finished and the open count drops; Undo restores it.",
+    "steps": [
+      "Load sample data",
+      "Open Inbox",
+      "Press Close on the first row",
+      "See the count drop",
+      "Press Undo and see it return"
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Projects: librarian pause and resume",
+    "priority": "medium",
+    "feature": "LIB-001",
+    "description": "The Librarian can be paused (no suggestions) and resumed; no meeting changes without Accept.",
+    "steps": [
+      "Load sample data",
+      "Open Projects",
+      "Press Pause and see no suggestion card",
+      "Press Resume and see the cards return"
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Highlights: counts, needs you, source line",
+    "priority": "medium",
+    "feature": "HIL-001",
+    "description": "Minutes > Highlights shows counts of decisions, actions, questions and risks, the Needs you list, the source line and Issue MoM.",
+    "steps": [
+      "Load sample data",
+      "Open Highlights",
+      "See four counts",
+      "See the source line and Issue MoM"
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Draft options use the meeting transcript first",
+    "priority": "medium",
+    "feature": "DRAFT-003",
+    "description": "When a meeting has its own transcript, Draft options read it first and the panel says so.",
+    "steps": [
+      "Load sample data",
+      "Give the newest meeting a transcript",
+      "Open Draft options",
+      "See Source: this meeting's transcript"
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Recap email: build, open draft, copy, nothing sent",
+    "priority": "high",
+    "feature": "RECAP-001",
+    "description": "Trust Recap email, press its chip in Notes: a card shows recipients with a known email, who has none, a preview, Open mail draft (a mailto link) and Copy. Nothing is sent.",
+    "steps": [
+      "Load sample data",
+      "Trust the three add-ins in Settings > Add-ins",
+      "Press Recap email in the Notes strip",
+      "See recipient count and the no-email names",
+      "Open the preview",
+      "Press Open mail draft and see one mailto link",
+      "Press Dismiss"
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Glossary: needs input, add, CSV import and export, remove",
+    "priority": "high",
+    "feature": "GLOS-001",
+    "description": "The Glossary panel in Notes lists the series terms. An empty term shows a needs-input message; a term is added and shown; CSV export has the header; import reports good and skipped rows; a term can be removed.",
+    "steps": [
+      "Load sample data and trust Glossary",
+      "Press Add with no term and see the message",
+      "Add a term with heard-as spellings",
+      "Export CSV and read the header",
+      "Import a CSV with one bad row and see the counts",
+      "Remove the term"
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Due dates to calendar: one .ics of open actions",
+    "priority": "high",
+    "feature": "ICS-001",
+    "description": "Press the chip: one .ics file downloads with an all-day VEVENT per open action that has a due date, CRLF lines folded at 75 bytes; the card says how many were saved.",
+    "steps": [
+      "Load sample data and trust the add-in",
+      "Press Due dates to calendar",
+      "Read the downloaded file",
+      "See the count on the card"
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "Add-ins tab: how-to for each new add-in, locked until trusted",
+    "priority": "high",
+    "feature": "ADD-001",
+    "description": "Before trust nothing from the three add-ins appears in Notes; each add-in shows its how-to text and a Needs trust state in Settings > Add-ins.",
+    "steps": [
+      "Load sample data",
+      "See no add-in strip in Notes",
+      "Open Settings > Add-ins",
+      "Select each new add-in and read its how-to text and state"
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "Real-time captions: audio goes through the real engine, interim then final reach the panel",
+    "priority": "high",
+    "feature": "ENG-002",
+    "description": "A 20 s public-domain English recording is sent to a real engine in growing windows; the panel shows the interim line, then the final line replaces it, and the engine /live counters match.",
+    "steps": [
+      "Start the engine with openai/whisper-base",
+      "Open Captions in the lab shell",
+      "Send the first 5 s and 10 s: interim line shows the engine text",
+      "Send the first 15 s as final: interim line is gone, last line equals the engine text",
+      "GET /live: seq is at least 3, source equals the final text, rtf is above 0"
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Real-time translation with the Qwen model: English to Indonesian",
+    "priority": "medium",
+    "feature": "ENG-003",
+    "description": "POST /translate and /draft on an engine that has the Qwen translation model; the Indonesian text differs from the source and keeps the meaning. Skipped when the model is not on disk (about 1 GB, never downloaded by the suite).",
+    "steps": [
+      "Start the engine with TRANSLATE_MODEL set",
+      "POST /translate en to id for one sentence",
+      "POST /draft with 8 s of speech and read source and translation"
+    ]
+  },
+  {
+    "id": "TC026",
+    "title": "Meeting flow: session lines to End and draft, register, sync to the engine",
+    "priority": "high",
+    "feature": "NOTES",
+    "description": "Three finished caption lines are drafted into notes with End and draft; the register opens with a decision, an action and a question; Sync stores the note in the engine, which serves it back with GET /notes.",
+    "steps": [
+      "Select the native helper in Settings > Engine",
+      "Send three caption lines while capture is active",
+      "Open Notes and press End and draft",
+      "Check the drafted decision and action, and the register tab (3 register items)",
+      "Press Sync and GET /notes on the engine: one note with the decision, the action owned by Dewi and three items"
+    ]
+  },
+  {
+    "id": "TC027",
+    "title": "Island starts the engine itself and the engine serves the register the Meeting page reads",
+    "priority": "medium",
+    "feature": "ENG-004",
+    "description": "A dev island (own PONI_HOME and port) is started with no engine running. Within 60 s the engine answers /health, GET /notes lists the fixture meeting, and the island log shows the engine and helper links started. Skipped without a built poni.exe. Not photographed: the pill is a DirectComposition window.",
+    "steps": [
+      "Write settings.json (start page meeting) and a fixture notes.json",
+      "Start poni.exe with SUBMEETLY_ENGINE_EXE, YSM_HELPER_PORT and YSM_STATE_DIR",
+      "Wait for /health on the port",
+      "GET /notes: the fixture title is present",
+      "Read poni.log: engine link and helper link started"
+    ]
+  },
+  {
+    "id": "TC028",
+    "title": "Real-time translation through Whisper alone: German and Indonesian speech to English captions",
+    "priority": "high",
+    "feature": "ENG-002",
+    "description": "Real CC0 speech in two languages is transcribed and translated to English by the engine (task=translate); the English text differs from the source, reads as English, and the panel shows it with a DE to EN or ID to EN tag.",
+    "steps": [
+      "Decode 10 s of a German and an Indonesian sample",
+      "POST /transcribe with task=transcribe and task=translate",
+      "Emit a subtitle with source and translation",
+      "The target lane shows the direction tag and the English text"
+    ]
+  }
 ]
