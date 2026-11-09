@@ -5,6 +5,11 @@
  * Aturan: TIDAK ADA teks antarmuka yang ditulis langsung di markup. Semua lewat T().
  * Locale selain en/id mundur ke en, sama seperti I18N utama.
  */
+// Device and surface wording: this runs on Mac, Windows and Linux, in the extension and in the engine-hosted app window.
+const PLATFORM = (typeof navigator !== 'undefined' && navigator.platform) || '';
+const DEV_EN = /^Mac/i.test(PLATFORM) ? 'Mac' : /^Win/i.test(PLATFORM) ? 'PC' : 'computer';
+const DEV_ID = DEV_EN === 'computer' ? 'komputer' : DEV_EN;
+const APP = typeof location !== 'undefined' && String(location.pathname).startsWith('/app/');
 const en = {
   /* chrome */
   minutes: 'Minutes',
@@ -38,7 +43,7 @@ const en = {
   meetings: 'Meetings', next: 'Next', preparedBy: 'Prepared by', distribution: 'Distribution',
 
   /* provenance band */
-  draftedOnDevice: 'Drafted on this Mac',
+  draftedOnDevice: `Drafted on this ${DEV_EN}`,
   pipeline: (asr, seg, items) => `${asr} → ${seg} segments → ${items} register items`,
   needReview: 'need review',
   lowConfFlag: 'low-confidence flag',
@@ -257,7 +262,7 @@ const en = {
   layoutLine: (name, mem) => `Layout: ${name} \xB7 ${mem}`,
   layoutDefault: "default",
   layoutCustom: "custom",
-  layoutRemembered: "remembered on this Mac",
+  layoutRemembered: `remembered on this ${DEV_EN}`,
   layoutNotRemembered: "not remembered",
   settingsTitle: "Layout & appearance",
   theme: "Theme",
@@ -270,7 +275,7 @@ const en = {
   density: "Density",
   densityComfortable: "Comfortable",
   densityCompact: "Compact",
-  rememberLayout: "Remember panel sizes on this Mac",
+  rememberLayout: `Remember panel sizes on this ${DEV_EN}`,
   reduceMotion: "Reduce motion",
   kbdSearchTitle: "Search (/)",
   expandDock: "Expand view dock",
@@ -298,8 +303,9 @@ const en = {
   translateN: (n) => `Translate ${n} item${n === 1 ? "" : "s"}`,
   translated: "Translated",
   translating: (p) => `Translating ${p}%`,
-  translateDone: (n, lang) => `${n} item${n === 1 ? "" : "s"} translated into ${lang} on this Mac`,
-  translateOffline: "Native helper is not running \u2014 start it from the side panel to translate on this Mac.",
+  translateDone: (n, lang) => `${n} item${n === 1 ? "" : "s"} translated into ${lang} on this ${DEV_EN}`,
+  translateOffline: `Native helper is not running \u2014 start it from the ${APP ? "Helper page" : "side panel"} to translate on this ${DEV_EN}.`,
+  emptyHint: APP ? "Start captions from the Live captions page, or load a sample register to explore the workspace." : "Record a meeting from the side panel, or load a sample register to explore the workspace.",
   langDone: "translated",
   langPartial: (n, t) => `${n}/${t}`,
   langReady: "ready",
@@ -573,7 +579,7 @@ const id = {
   layoutLine: (name, mem) => `Tata letak: ${name} \xB7 ${mem}`,
   layoutDefault: "bawaan",
   layoutCustom: "kustom",
-  layoutRemembered: "diingat di Mac ini",
+  layoutRemembered: `diingat di ${DEV_ID} ini`,
   layoutNotRemembered: "tidak diingat",
   settingsTitle: "Tata letak & tampilan",
   theme: "Tema",
@@ -586,7 +592,7 @@ const id = {
   density: "Kepadatan",
   densityComfortable: "Nyaman",
   densityCompact: "Ringkas",
-  rememberLayout: "Ingat ukuran panel di Mac ini",
+  rememberLayout: `Ingat ukuran panel di ${DEV_ID} ini`,
   reduceMotion: "Kurangi gerakan",
   kbdSearchTitle: "Cari (/)",
   expandDock: "Buka dok tampilan",
@@ -614,8 +620,9 @@ const id = {
   translateN: (n) => `Terjemahkan ${n} butir`,
   translated: "Sudah diterjemahkan",
   translating: (p) => `Menerjemahkan ${p}%`,
-  translateDone: (n, lang) => `${n} butir diterjemahkan ke ${lang} di Mac ini`,
-  translateOffline: "Helper native tidak berjalan \u2014 nyalakan dari side panel untuk menerjemahkan di Mac ini.",
+  translateDone: (n, lang) => `${n} butir diterjemahkan ke ${lang} di ${DEV_ID} ini`,
+  translateOffline: `Helper native tidak berjalan \u2014 nyalakan dari ${APP ? "halaman Helper" : "side panel"} untuk menerjemahkan di ${DEV_ID} ini.`,
+  emptyHint: APP ? "Mulai teks langsung dari halaman Live captions, atau muat register contoh untuk menjelajahi workspace." : "Rekam rapat dari side panel, atau muat register contoh untuk menjelajahi workspace.",
   langDone: "sudah",
   langPartial: (n, t) => `${n}/${t}`,
   langReady: "siap",

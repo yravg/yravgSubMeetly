@@ -39,7 +39,7 @@ function buildW35() {
       { ref: 'A5', title: { en: 'HSE performance & yard audits', id: 'Kinerja K3 & audit yard' }, covered: true },
       { ref: 'A6', title: { en: 'Vessel selection (C900)', id: 'Pemilihan kapal (C900)' }, covered: false },
     ],
-    engine: { asr: 'Whisper large-v3-turbo (MLX)', mt: 'local NMT', extractor: 'heuristic v1', segments: 196, durationSec: 6900 },
+    engine: { asr: 'Whisper large-v3-turbo', mt: 'local NMT', extractor: 'heuristic v1', segments: 196, durationSec: 6900 },
   });
 
   const items = [
@@ -108,7 +108,7 @@ function buildW36(w35) {
       { ref: 'A7', title: { en: 'Marine budget & pipeline cargo', id: 'Anggaran marine & kargo pipa' }, covered: false },
       { ref: 'A8', title: { en: 'Look-ahead: 3-week plan', id: 'Look-ahead: rencana 3 minggu' }, covered: false },
     ],
-    engine: { asr: 'Whisper large-v3-turbo (MLX)', mt: 'local NMT', extractor: 'heuristic v1', segments: 214, durationSec: 7320 },
+    engine: { asr: 'Whisper large-v3-turbo', mt: 'local NMT', extractor: 'heuristic v1', segments: 214, durationSec: 7320 },
   });
 
   const items = [

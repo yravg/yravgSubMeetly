@@ -162,3 +162,17 @@ test('captions: Start in the app window reaches an active session through getDis
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test('wording: no Mac-only text on a non-Mac device, and the empty state points at the Live captions page', async () => {
+  const { page } = await open('/app/minutes.html');
+  const r = await page.evaluate(() => ({
+    mac: /^Mac/i.test(navigator.platform),
+    remember: document.querySelector('[data-t="rememberLayout"]').textContent,
+    drafted: document.querySelector('[data-t="draftedOnDevice"]').textContent,
+    hint: document.querySelector('[data-t="emptyHint"]').textContent,
+  }));
+  if (!r.mac) { assert.doesNotMatch(r.remember, /Mac/); assert.doesNotMatch(r.drafted, /Mac/); }
+  assert.match(r.hint, /Live captions page/);
+  assert.doesNotMatch(r.hint, /side panel/);
+  await page.close();
+});
