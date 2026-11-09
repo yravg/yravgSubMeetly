@@ -6,6 +6,10 @@ can't read them: Windows keeps its Japanese reading data in the Japanese
 typing feature, which most PCs outside Japan don't have. Kana, Korean and
 Chinese read without it.
 
+The installer carries these files too, in `addons\<id>\` beside the exe
+(installer/yravgsubmeetly.iss): the app installs a copy that matches its pin
+without the network, and downloads only a file the installer doesn't have.
+
 The first time a Japanese song's kanji go unread, it switches itself on, as
 its switch in the Add-ons tab (the "+" at the end of the tab row) would: the
 file downloads once and the song is read again once it's in place

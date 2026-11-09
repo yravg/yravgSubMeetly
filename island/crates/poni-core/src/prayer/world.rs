@@ -1,6 +1,6 @@
 //! Places outside Indonesia: GeoNames' cities of 15,000 people or more with
 //! their time zones, looked up online one small file at a time
-//! (`site/places/1/` in the repo, https://raw.githubusercontent.com/yraverage/yraverageSubMeetly/main/island/site/places/1/ live;
+//! (`site/places/1/` in the repo, https://raw.githubusercontent.com/yravg/yravgSubMeetly/main/island/site/places/1/ live;
 //! tools/make_world_places.py builds them and describes the format).
 //!
 //! The app never holds the whole list. While the place picker is open it
@@ -16,7 +16,7 @@ use super::{distance_km, Clock, Method, Place};
 pub const ID_PREFIX: &str = "w:";
 /// Where the files are (the website, `site/places/1/`). A new format goes
 /// in a new folder, so copies that read this one keep working.
-pub const BASE_URL: &str = "https://raw.githubusercontent.com/yraverage/yraverageSubMeetly/main/island/site/places/1/";
+pub const BASE_URL: &str = "https://raw.githubusercontent.com/yravg/yravgSubMeetly/main/island/site/places/1/";
 /// The squares of the `near/` files, in degrees.
 const SQUARE_DEG: f64 = 5.0;
 

@@ -456,7 +456,7 @@ fn a_location_reads_the_squares_around_it() {
     // Across 180 degrees: Fiji's squares on both sides.
     let fiji = world::files_near(-17.8, 179.9, 100.0);
     assert!(fiji.contains(&"near/-20_175".to_string()) && fiji.contains(&"near/-20_-180".to_string()), "{fiji:?}");
-    assert_eq!(world::url("near/55_-5"), "https://raw.githubusercontent.com/yraverage/yraverageSubMeetly/main/island/site/places/1/near/55_-5.txt");
+    assert_eq!(world::url("near/55_-5"), "https://raw.githubusercontent.com/yravg/yravgSubMeetly/main/island/site/places/1/near/55_-5.txt");
 }
 
 #[test]

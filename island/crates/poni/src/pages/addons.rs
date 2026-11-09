@@ -147,7 +147,7 @@ fn addon_row(ui: &mut Ui, st: &AppState, r: Rect, i: usize, a: &Addon, card: Opt
     // The size, while there is a choice to make.
     let mut text_right = edge - 16.0;
     if status == Status::Off {
-        let size = if a.downloads() { fmt_bytes(a.size()) } else { "Built in".to_string() };
+        let size = if a.downloads() { fmt_bytes(a.download_size()) } else { "Built in".to_string() };
         let style = TextStyle::footnote().color(palette::TEXT_DIM).right();
         let w = ui.c.measure(&size, &style, 200.0).0.ceil();
         ui.c.text(&size, Rect::new(edge - 10.0 - w, r.y, w, r.h), &style);

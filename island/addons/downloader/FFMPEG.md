@@ -1,5 +1,17 @@
 # FFmpeg in the Downloader add-on
 
+> **Windows no longer uses this build.** Since the add-on stopped hosting its
+> own `ffmpeg.exe`, the Windows Downloader fetches gyan.dev's official
+> "essentials" 9.0.2 build on first use (zip 114,768,076 bytes, SHA-256
+> `60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba`, from
+> https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2) and keeps its
+> `bin/ffmpeg.exe` (105,423,872 bytes, SHA-256
+> `3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec`). It
+> is GPL v3, run as a separate program, never shipped in the installer. See
+> `poni_core::addons::DOWNLOADER_WINDOWS` and `NOTICE.txt` here. The rest of
+> this file describes our small LGPL build, which the Mac's Downloader still
+> runs (see "On a Mac").
+
 yt-dlp fetches a video's picture and sound as separate files; `ffmpeg.exe`
 joins them into one file and fixes what HLS and DASH downloads leave behind.
 It only copies streams, never re-encodes, and runs only while a download

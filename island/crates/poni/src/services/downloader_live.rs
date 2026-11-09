@@ -66,10 +66,19 @@ fn fetch(bin: &Path) -> bool {
         }
         let url = DOWNLOADER.url(file);
         let started = Instant::now();
-        let (status, bytes) = client.get_bytes(&url, FETCH_TIMEOUT, file.size + 64 * 1024, |_| {}).unwrap_or_else(|e| panic!("{}: {url}: {e}", file.name));
+        // A zip (Windows' FFmpeg) is a big one: a second more for every 64 KB, as the add-on gives.
+        let budget = FETCH_TIMEOUT + Duration::from_secs(file.transfer() / (64 * 1024));
+        let (status, bytes) = client.get_bytes(&url, budget, file.transfer() + 64 * 1024, |_| {}).unwrap_or_else(|e| panic!("{}: {url}: {e}", file.name));
         assert_eq!(status, 200, "{}: {url}", file.name);
-        assert!(file.matches(&bytes), "{} from {url} isn't the pinned file: {} bytes, SHA-256 {}", file.name, bytes.len(), sha256::hex(&sha256::sha256(&bytes)));
-        fs::write(bin.join(file.name), &bytes).expect("the tool saves");
+        assert!(file.arrived(&bytes), "{} from {url} isn't the pinned file: {} bytes, SHA-256 {}", file.name, bytes.len(), sha256::hex(&sha256::sha256(&bytes)));
+        match file.unpack {
+            None => fs::write(bin.join(file.name), &bytes).expect("the tool saves"),
+            Some(u) => {
+                let part = bin.join(format!("{}.part", file.name));
+                crate::services::addons::unpack(&bytes, u.member, bin, &part, file).unwrap_or_else(|e| panic!("{}: {e}", file.name));
+                fs::rename(&part, bin.join(file.name)).expect("the tool saves");
+            }
+        }
         crate::services::addons::make_runnable(&bin.join(file.name)).expect("the tool can run");
         println!("{}: {} bytes from {url} in {:.1} s, as pinned", file.name, bytes.len(), started.elapsed().as_secs_f32());
         ffmpeg |= file.name == addons::FFMPEG_EXE;
