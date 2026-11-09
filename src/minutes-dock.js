@@ -133,8 +133,13 @@ export function mountDock(h) {
   }
 
   /* ---------------- theme / density / motion ---------------- */
+  // Embedded in the app shell (?follow=system): the register takes the OS light/dark scheme like the shell does,
+  // until the user picks a theme here.
+  let followSystem = new URLSearchParams(location.search).get('follow') === 'system';
+  const scheme = matchMedia('(prefers-color-scheme: light)');
+  scheme.addEventListener('change', () => { if (followSystem) applyAppearance(); });
   function applyAppearance() {
-    document.documentElement.dataset.theme = L.theme;
+    document.documentElement.dataset.theme = followSystem ? (scheme.matches ? 'coretax' : 'dark') : L.theme;
     document.documentElement.dataset.density = L.density;
     document.documentElement.classList.toggle('no-motion', !L.motion);
     // Cincin tunggu dan timer harus sepanjang yang sama, jadi CSS membacanya dari sini.
@@ -553,7 +558,7 @@ export function mountDock(h) {
   }
   $('#settings-pop').addEventListener('click', (e) => {
     const th = e.target.closest('[data-theme-pick]');
-    if (th) { L.theme = th.dataset.themePick; applyAppearance(); paintSettings(); save(); return; }
+    if (th) { followSystem = false; L.theme = th.dataset.themePick; applyAppearance(); paintSettings(); save(); return; }
     const an = e.target.closest('[data-anim]');
     if (an) { L.dockAnim = an.dataset.anim; applyAppearance(); paintSettings(); save(); return; }
     const sp = e.target.closest('[data-animspeed]');

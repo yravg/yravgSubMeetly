@@ -101,6 +101,7 @@
           </div>
         </div>
         <div class="sec"><button type="button" class="btn sm" id="btn-layout-reset" data-t="resetLayout">Reset layout to default</button></div>
+        <div class="sec" id="demo-sec" hidden><button type="button" class="btn sm" id="btn-remove-demo" data-t="removeDemo">Remove demo meetings</button></div>
       </div>
     </div>
   </div>
@@ -110,7 +111,7 @@
     <div class="empty">
       <h2 data-t="msgNoMeeting">No meeting selected.</h2>
       <p data-t="emptyHint">Record a meeting from the side panel, or load a sample register to explore the workspace.</p>
-      <button type="button" class="btn primary" id="btn-load-sample">Load sample data</button>
+      <button type="button" class="btn primary" id="btn-load-sample" data-t="loadDemo">Load demo meetings (removable)</button>
     </div>
   </div>
 
@@ -315,7 +316,7 @@
           <button type="button" class="btn sm" id="btn-dual" aria-pressed="false">⇄ <span data-t="dual">Dual text</span></button>
 
           <div class="menuwrap">
-            <button type="button" class="icon-btn langbtn" id="btn-lang" title="Translation" aria-expanded="false" aria-haspopup="dialog">
+            <button type="button" class="icon-btn langbtn" id="btn-lang" data-t-title="translateTitle" title="Translation" aria-expanded="false" aria-haspopup="dialog">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h8"/><path d="M8 3v2c0 4-2.5 7.5-5 9"/><path d="M6 9c1 2.5 3 4.5 6 6"/><path d="m13 21 4-9 4 9"/><path d="M14.5 17.5h5"/></svg>
               <i class="pend" hidden></i>
             </button>

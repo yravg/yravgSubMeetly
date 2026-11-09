@@ -32,6 +32,8 @@ import { TOURS, tourById, tourProgressPercent } from './lib/learning-tours.js';
 import { buildQuiz, gradeAnswer } from './lib/learning-quiz.js';
 
 const STR = {
+  learn: { en: 'Learn', id: 'Belajar' },
+  learnTitle: { en: 'Library and Training', id: 'Pustaka dan Latihan' },
   library: { en: 'Library', id: 'Pustaka' },
   training: { en: 'Training', id: 'Latihan' },
   close: { en: 'Close', id: 'Tutup' },
@@ -134,8 +136,13 @@ export function mountExtras(ctx) {
   const btns = document.createElement('div');
   btns.className = 'lt-appbar-btns';
   btns.innerHTML = `
-      <button type="button" class="btn sm collapsible" id="btn-library" data-tour="view-library" title="${esc(tx('library'))}">📚 <span>${esc(tx('library'))}</span></button>
-      <button type="button" class="btn sm collapsible" id="btn-training" title="${esc(tx('training'))}">🎓 <span>${esc(tx('training'))}</span> <span class="lt-lvl" id="learn-pill"></span></button>`;
+      <div class="menuwrap">
+        <button type="button" class="btn sm collapsible" id="btn-learn" aria-haspopup="menu" aria-expanded="false" aria-controls="learn-menu" title="${esc(tx('learnTitle'))}" aria-label="${esc(tx('learnTitle'))}">🎓 <span>${esc(tx('learn'))} ▾</span></button>
+        <div class="export-menu" id="learn-menu" role="menu" hidden>
+          <button type="button" role="menuitem" id="btn-library" data-tour="view-library" aria-label="${esc(tx('library'))}">📚 ${esc(tx('library'))}</button>
+          <button type="button" role="menuitem" id="btn-training" aria-label="${esc(tx('training'))}">🎓 ${esc(tx('training'))} <span class="lt-lvl" id="learn-pill"></span></button>
+        </div>
+      </div>`;
   // Sebelum pengalih rapat: tetap terlihat di keadaan kosong.
   (appbar?.querySelector('#m-switch') || appbar?.lastElementChild)?.insertAdjacentElement('beforebegin', btns);
 
@@ -183,8 +190,14 @@ export function mountExtras(ctx) {
 
   const open = (view) => { ui.view = view; overlay.hidden = false; draw(); };
   const close = () => { overlay.hidden = true; ui.view = null; stopTour(); };
-  btns.querySelector('#btn-library').addEventListener('click', () => open('library'));
-  btns.querySelector('#btn-training').addEventListener('click', () => open('training'));
+  const learnBtn = btns.querySelector('#btn-learn');
+  const learnMenu = btns.querySelector('#learn-menu');
+  const setLearnMenu = (on) => { learnMenu.hidden = !on; learnBtn.setAttribute('aria-expanded', String(on)); };
+  learnBtn.addEventListener('click', () => setLearnMenu(learnMenu.hidden));
+  document.addEventListener('click', (e) => { if (!btns.contains(e.target)) setLearnMenu(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !learnMenu.hidden) { setLearnMenu(false); learnBtn.focus(); } });
+  btns.querySelector('#btn-library').addEventListener('click', () => { setLearnMenu(false); open('library'); });
+  btns.querySelector('#btn-training').addEventListener('click', () => { setLearnMenu(false); open('training'); });
   overlay.querySelector('#lt-close').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !overlay.hidden && !ui.tour) close(); });

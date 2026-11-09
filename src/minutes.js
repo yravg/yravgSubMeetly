@@ -17,14 +17,14 @@ import {
   ITEM_TYPES, LIKELIHOODS, pickText, meetingStats, itemAgeDays, TYPE_COLOR, LOW_CONFIDENCE,
 } from './lib/notes-schema.js';
 import { makeT } from './lib/notes-i18n.js';
-import { listMeetings, saveMeeting, backendName } from './lib/notes-store.js';
+import { listMeetings, saveMeeting, deleteMeeting, backendName } from './lib/notes-store.js';
 import {
   acceptItemAndSave, editItemAndSave, addItemAndSave, removeItemAndSave,
   applyCorrectionAndSave, issueMeetingAndSave, createAmendment, setSummaryAndSave,
   startNextMeeting, carryCandidates, blockingItems, seriesSummary, metricSeries,
   seriesFlow, linkedItems, carryChain, RegisterError,
 } from './lib/notes-actions.js';
-import { seedSampleData } from './lib/notes-fixture.js';
+import { seedSampleData, isDemoMeeting } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
 import { slidingNumber, autoHeight, highlight } from './lib/motion.js';
 import { mountExtras } from './minutes-extras.js';
@@ -843,7 +843,7 @@ function buildSummary(host) {
     <div class="sum-mid"><div class="sum-stack" role="img"></div><ul class="sum-legend"></ul></div>
     <dl class="sum-stats"></dl>
     <div class="sum-act"><button type="button" class="btn sm sum-review" id="btn-sum-review"></button>
-    <button type="button" class="icon-btn sum-xp" id="btn-sum-expand" aria-controls="sum-rank" aria-expanded="false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+    <button type="button" class="icon-btn sum-xp" id="btn-sum-expand" title="${esc(T('expandPanel'))}" aria-label="${esc(T('expandPanel'))}" aria-controls="sum-rank" aria-expanded="false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
   </div><ul class="sum-rank" id="sum-rank" hidden></ul></div>`;
   sum = {
     host,
@@ -1229,6 +1229,7 @@ function paint() {
   const m = activeMeeting();
   $('#empty-state').hidden = !!m;
   $('#workspace').hidden = !m;
+  $('#demo-sec').hidden = !state.meetings.some(isDemoMeeting);
   if (!m) return;
 
   paintHeader();
@@ -1725,6 +1726,15 @@ function wireEvents() {
     paint();
   });
 
+  $('#btn-remove-demo').addEventListener('click', async () => {
+    const demo = state.meetings.filter(isDemoMeeting);
+    if (!demo.length || !confirm(T('confirmRemoveDemo'))) return;
+    for (const m of demo) await deleteMeeting(m.id);
+    await reloadAll(false);
+    toast(T('msgDemoRemoved', demo.length));
+    paint();
+  });
+
   document.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) || '';
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag) || e.target?.isContentEditable;
@@ -1748,7 +1758,8 @@ function paintStaticStrings() {
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = T(el.dataset.t); });
   // Tombol yang labelnya dilipat jadi ikon di layar sempit hanya menyisakan
   // tooltip, jadi tooltipnya harus ikut diterjemahkan.
-  document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = T(el.dataset.tTitle); });
+  // aria-label too: below 1100 px these buttons keep only their icon, and a title alone is not a reliable name.
+  document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = T(el.dataset.tTitle); el.setAttribute('aria-label', el.title); });
   // Halaman utama: di lab itu /app.html di root server; di ekstensi app.html
   // tidak ikut dipaket, jadi jalan pulangnya panel sisi.
   const home = $('#crumb-home');

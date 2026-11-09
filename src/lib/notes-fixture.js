@@ -206,6 +206,9 @@ export function buildSampleSeries() {
   return [w35, w36];
 }
 
+/** True for the two meetings seedSampleData() writes, so they can be removed again without touching real ones. */
+export const isDemoMeeting = (m) => m?.id === 'MOM-CPOC7-W35' || m?.id === 'MOM-CPOC7-W36';
+
 /** Bangun lalu simpan lewat notes-store.js — dipakai tombol "Muat data contoh". */
 export async function seedSampleData() {
   const { saveMeeting } = await import('./notes-store.js');

@@ -50,7 +50,7 @@ const STR = {
     emptyTitle: 'No meetings yet', emptyBody: 'Start captions in a meeting, or import a sample series from the Library on the Minutes page.', openMinutes: 'Open Minutes',
     welcomeTitle: 'Welcome to yravgSubMeetly', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it',
     caughtUp: 'All caught up: nothing overdue and yesterday is issued.',
-    openRegister: 'Open register', classic: 'Classic ↗', openWindow: 'Open Minutes window ↗', windowOpen: 'Minutes window is open · Focus',
+    registerStyle: 'Style', openRegister: 'Open register', classic: 'Classic ↗', openWindow: 'Open Minutes window ↗', windowOpen: 'Minutes window is open · Focus',
     minutesHint: 'Classic and Modern are the same register; edits show in both.', modern: 'Modern ↗',
     all: 'All features', dev: 'Developer', devArea: 'Developer area', devAreaBody: 'Lab tools: test pages, mock helper, guides, CC0 samples. Off unless you build or test the extension.',
     lockedLab: 'Needs the lab server', lockedLabBody: 'The Developer area shows the local lab. Start it with ./scripts/start-lab.sh, then reload.',
@@ -97,7 +97,7 @@ const STR = {
     emptyTitle: 'Belum ada rapat', emptyBody: 'Mulai teks di rapat, atau impor seri contoh dari Library di halaman Notulen.', openMinutes: 'Buka Notulen',
     welcomeTitle: 'Selamat datang di yravgSubMeetly', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti',
     caughtUp: 'Semua beres: tidak ada yang lewat tenggat dan notulen kemarin sudah terbit.',
-    openRegister: 'Buka register', classic: 'Klasik ↗', openWindow: 'Buka jendela Notulen ↗', windowOpen: 'Jendela Notulen terbuka · Fokus',
+    registerStyle: 'Gaya', openRegister: 'Buka register', classic: 'Klasik ↗', openWindow: 'Buka jendela Notulen ↗', windowOpen: 'Jendela Notulen terbuka · Fokus',
     minutesHint: 'Klasik dan Modern adalah register yang sama; suntingan tampil di keduanya.', modern: 'Modern ↗',
     all: 'Semua fitur', dev: 'Developer', devArea: 'Area developer', devAreaBody: 'Alat lab: halaman uji, mock helper, panduan, sampel CC0. Mati kecuali Anda membangun atau menguji ekstensi.',
     lockedLab: 'Perlu server lab', lockedLabBody: 'Area developer menampilkan lab lokal. Jalankan ./scripts/start-lab.sh, lalu muat ulang.',
@@ -165,7 +165,7 @@ const ALIAS = { glossary: 'notes' };
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
 
-const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'classic', developer: !HOSTED };
+const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', developer: !HOSTED };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* privat */ } },
@@ -290,16 +290,17 @@ function todayPage() {
 }
 
 /* ---------- Minutes (A04) ---------- */
-const registerSrc = (kind, meeting) => `minutes.html?lang=${LANG}${kind === 'modern' ? '&skin=tide' : ''}${meeting ? `&meeting=${encodeURIComponent(meeting)}` : ''}`;
+// embed: the iframe follows the shell's light/dark scheme (minutes-dock.js reads follow=system); a window of its own keeps its stored theme.
+const registerSrc = (kind, meeting, embed) => `minutes.html?lang=${LANG}${kind === 'modern' ? '&skin=tide' : ''}${embed ? '&follow=system' : ''}${meeting ? `&meeting=${encodeURIComponent(meeting)}` : ''}`;
 function minutesPage(params) {
   const meeting = params.get('meeting');
   // Pilihan terakhir tampil lebih dulu dan menentukan register yang dimuat di bawah.
   const kinds = state.register === 'modern' ? ['modern', 'classic'] : ['classic', 'modern'];
-  const links = kinds.map((k) => `<a href="${esc(registerSrc(k, meeting))}" target="_blank" rel="noopener" data-register="${k}">${esc(T(k))}</a>`).join('');
-  return `<div class="tool"><span class="seg-o"><span class="lb">${esc(T('openRegister'))}</span>${links}</span>
-    <button type="button" class="btn" data-act="win" aria-live="polite">${state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'))}</button>
+  const links = kinds.map((k) => `<a href="${esc(registerSrc(k, meeting))}" target="_blank" rel="noopener" role="menuitemradio" aria-checked="${k === state.register}" data-register="${k}">${esc(T(k))}</a>`).join('');
+  return `<div class="tool"><button type="button" class="btn primary" data-act="win" aria-live="polite">${state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'))}</button>
+    <details class="reg-menu"><summary class="btn sm">${esc(T('registerStyle'))}: ${esc(T(state.register).replace(' ↗', ''))}</summary><div class="reg-list" role="menu">${links}</div></details>
     <span class="mut hint">${esc(T('minutesHint'))}</span></div>
-    <iframe class="frame reg" title="${esc(T('minutes'))}" src="${esc(registerSrc(state.register, meeting))}"></iframe>`;
+    <iframe class="frame reg" title="${esc(T('minutes'))}" src="${esc(registerSrc(state.register, meeting, true))}"></iframe>`;
 }
 
 /* ---------- All features (A06) ---------- */
@@ -446,6 +447,7 @@ function wire() {
     else if (act === 'win') { await openMinutesWindow(globalThis.chrome, registerSrc(state.register)); refreshWin(); }
     else if (e.target.closest('[data-register]')) { state.register = e.target.closest('[data-register]').dataset.register; store.set('ysmShellRegister', state.register); lastRoute = null; render(); }
   });
+  document.addEventListener('click', (e) => { for (const d of document.querySelectorAll('.reg-menu[open]')) if (!d.contains(e.target)) d.open = false; });
   $('#page').addEventListener('change', (e) => {
     if (e.target.matches('[data-act="owner"]')) { state.owner = e.target.value; lastRoute = null; render(); }
     else if (e.target.matches('[data-act="island"]')) { $('#island-switch').checked = e.target.checked; $('#island-switch').dispatchEvent(new Event('change')); }
@@ -501,7 +503,7 @@ async function boot() {
   state.series = store.get('ysmShellSeries', '');
   state.hideNumbers = store.get('ysmShellHideNumbers', false);
   state.welcomed = store.get('ysmShellWelcomed', false);
-  state.register = store.get('ysmShellRegister', 'classic') === 'modern' ? 'modern' : 'classic';
+  state.register = store.get('ysmShellRegister', 'modern') === 'classic' ? 'classic' : 'modern';
   if (HOSTED) state.developer = !!(await globalThis.chrome?.storage?.local.get('ysmDeveloper'))?.ysmDeveloper;
   ask = mountAskTide({ lang: LANG, getMeetings: async () => state.meetings || listMeetings(), onSaved: () => loadRegister() });
   wire();

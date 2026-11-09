@@ -21,6 +21,7 @@ const norm = (k) => k.replace(/\d+/g, '#').replace(/\s+/g, ' ').trim();
 const RENAMED = {
   'button|Start Task': 'button|Start captions',
   'button|End Task': 'button|Stop captions',
+  'button|Load sample data': 'button|Load demo meetings (removable)',
 };
 const has = (found, k) => found.has(k) || found.has(RENAMED[k]);
 let server; let browser; let page;
@@ -117,8 +118,10 @@ before(async () => {
   // Register, kosong lalu dengan data contoh (seperti capture2.mjs).
   await route('#minutes');
   const reg = await frameOf('iframe.reg');
+  // Library and Training now live in the Learn menu; open it so the dump sees them.
+  await reg.evaluate(() => document.getElementById('btn-learn')?.click());
   add(await dump(reg));
-  await reg.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Load sample data/.test(b.textContent))?.click());
+  await reg.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Load demo meetings/.test(b.textContent))?.click());
   await wait(2500);
   add(await dump(reg));
 });

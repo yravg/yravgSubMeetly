@@ -150,12 +150,13 @@ test('Start captions di sidebar benar-benar memulai (bukan hanya membuka Live)',
   await page.evaluate(() => { location.hash = '#today'; });
 });
 
-test('A04: Minutes memasang register, tautan Klasik dan jendela Minutes', async () => {
+test('A04: Minutes memasang register Modern yang mengikuti tema shell, menu gaya dan jendela Minutes', async () => {
   await page.evaluate(() => { location.hash = '#minutes?meeting=Y1'; });
   await page.waitForSelector('#page iframe.reg');
-  const r = await page.evaluate(() => ({ frame: document.querySelector('#page iframe.reg').getAttribute('src'), classic: document.querySelector('.seg-o a').getAttribute('href') }));
-  assert.match(r.frame, /^minutes\.html\?lang=en&meeting=Y1$/);
-  assert.equal(r.classic, r.frame);
+  const r = await page.evaluate(() => ({ frame: document.querySelector('#page iframe.reg').getAttribute('src'), classic: document.querySelector('.reg-list a[data-register="classic"]').getAttribute('href'), primary: document.querySelector('.tool > .btn.primary')?.dataset.act }));
+  assert.equal(r.frame, 'minutes.html?lang=en&skin=tide&follow=system&meeting=Y1');
+  assert.equal(r.classic, 'minutes.html?lang=en&meeting=Y1', 'tautan Klasik membuka halaman sendiri tanpa follow');
+  assert.equal(r.primary, 'win', 'satu tombol utama: buka di jendela');
   const n = (await browser.pages()).length;
   await page.click('[data-act="win"]');
   await page.waitForFunction((k) => true, {}, n);
@@ -165,27 +166,29 @@ test('A04: Minutes memasang register, tautan Klasik dan jendela Minutes', async 
   assert.equal((await browser.pages()).length, n + 1, 'klik kedua tidak membuka jendela lain');
 });
 
-test('A04: Modern = minutes.html?skin=tide; pilihan terakhir diingat dan tampil lebih dulu', async () => {
+test('A04: Modern bawaan; Klasik lewat menu Style; pilihan diingat dan tampil lebih dulu', async () => {
   await page.evaluate(() => { location.hash = '#minutes'; });
   await page.waitForSelector('#page iframe.reg');
-  assert.deepEqual(await page.$$eval('.seg-o a', (l) => l.map((a) => a.dataset.register)), ['classic', 'modern']);
-  const n = (await browser.pages()).length;
-  await page.click('.seg-o a[data-register="modern"]');
-  await page.waitForFunction(() => document.querySelector('#page iframe.reg')?.getAttribute('src').includes('skin=tide'));
-  await wait(1500);
-  const tab = (await browser.pages()).slice(n)[0];
-  assert.ok(tab, 'Modern membuka tab sendiri');
-  assert.match(tab.url(), /minutes\.html\?lang=en&skin=tide/);
-  await tab.close();
-  assert.deepEqual(await page.$$eval('.seg-o a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
+  assert.deepEqual(await page.$$eval('.reg-list a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
   const frame = await (await page.$('#page iframe.reg')).contentFrame();
   await frame.waitForFunction(() => document.documentElement.dataset.reskin === 'tide' && getComputedStyle(document.body).fontFamily.includes('Plus Jakarta Sans'));
-  // Classic tanpa lapisan Tide (TIDE-024).
-  await page.click('.seg-o a[data-register="classic"]'); await wait(1200);
-  for (const p of (await browser.pages()).slice(n)) await p.close();
+  const n = (await browser.pages()).length;
+  await page.click('.reg-menu summary');
+  await page.click('.reg-list a[data-register="classic"]');
+  await page.waitForFunction(() => !document.querySelector('#page iframe.reg')?.getAttribute('src').includes('skin=tide'));
+  await wait(1500);
+  const tab = (await browser.pages()).slice(n)[0];
+  assert.ok(tab, 'Klasik membuka tab sendiri');
+  assert.ok(new URL(tab.url()).searchParams.get('skin') === null && tab.url().includes('minutes.html?lang=en'), 'Klasik: tanpa skin=tide');
+  await tab.close();
+  assert.deepEqual(await page.$$eval('.reg-list a', (l) => l.map((a) => a.dataset.register)), ['classic', 'modern']);
+  // Klasik tanpa lapisan Tide (TIDE-024).
   const cf = await (await page.$('#page iframe.reg')).contentFrame();
   await cf.waitForFunction(() => document.readyState === 'complete');
   assert.equal(await cf.evaluate(() => document.documentElement.dataset.reskin || null), null);
+  await page.click('.reg-menu summary');
+  await page.click('.reg-list a[data-register="modern"]'); await wait(1200);
+  for (const p of (await browser.pages()).slice(n)) await p.close();
 });
 
 test('A06: delapan fitur, Island dengan sakelar nyata, add-in terpasang di halaman yang sama', async () => {
