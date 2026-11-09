@@ -11,7 +11,7 @@ This repo holds two clients built on that same idea:
 | **macOS app** (`mac/`) | Menu-bar app putting subtitles over *any* application's audio — not just a browser tab — with file transcription and hold-to-talk dictation. See **[mac/README.md](mac/README.md)**. |
 
 An optional **native helper** — the Rust engine `submeetly-engine` (`engine-rs/`, launched
-from `native/`) — runs Whisper large-v3-turbo locally, giving both clients a faster and
+from `native/`) — runs Whisper locally (default `base`, larger models selectable), giving both clients a faster and
 more accurate engine. No Python needed.
 
 Inspired by the "Local AI Subtitle" extension, rebuilt from scratch on an open stack.
@@ -104,7 +104,7 @@ cd native && ./run.sh
 
 `run.sh` starts the prebuilt `submeetly-engine` (build it once with
 `cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml`, or use the
-Setup installer, which ships it). First use downloads `whisper-large-v3-turbo` (~1.6 GB) into `~/.cache/huggingface`. Then in the extension:
+Setup installer, which ships it). First use downloads `whisper-base` (~290 MB) and `Qwen2.5-0.5B-Instruct` (~1 GB, translation) into `~/.cache/huggingface`; `WHISPER_MODEL=large-v3-turbo` (~1.6 GB) and `TRANSLATE_MODEL=Qwen/Qwen2.5-3B-Instruct` are more accurate. Then in the extension:
 **Settings → Engine → Native helper** — the status dot shows online/offline, and you
 can **Start / Stop / Restart** the helper (after a one-time launcher install):
 

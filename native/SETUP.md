@@ -17,7 +17,7 @@ cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml
 
 ffmpeg **tidak** dibutuhkan: media didekode di dalam engine (symphonia).
 Bobot model (Whisper, Qwen untuk terjemahan) diunduh dari Hugging Face saat pertama kali dipakai
-(~1,6 GB untuk `large-v3-turbo`); pakai model kecil bila jaringan lambat: `WHISPER_MODEL=base`.
+(bawaan `base` ~290 MB dan `Qwen2.5-0.5B-Instruct` ~1 GB); model lebih akurat: `WHISPER_MODEL=large-v3-turbo` (~1,6 GB), `TRANSLATE_MODEL=Qwen/Qwen2.5-3B-Instruct`.
 
 ## Menemukan `<EXT_ID>`
 
