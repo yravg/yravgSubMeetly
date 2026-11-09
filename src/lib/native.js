@@ -148,6 +148,31 @@ export async function nativeGetModels(url, timeoutMs = 5000) {
   }
 }
 
+// Start a background download of one catalog model. 202 = started, 200 = already there.
+// Returns the parsed body, or { error } when refused or unreachable.
+export async function nativePullModel(url, id, timeoutMs = 5000) {
+  return postJson(`${base(url)}/models/pull`, { id }, timeoutMs);
+}
+
+// Choose the speech and/or translation model: { asr?: id, translate?: id | 'off' }.
+export async function nativeSetModels(url, patch, timeoutMs = 5000) {
+  return postJson(`${base(url)}/engine/models`, patch, timeoutMs);
+}
+
+async function postJson(u, body, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(u, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal });
+    const j = await r.json().catch(() => ({}));
+    return r.ok ? j : { ...j, error: j.error || `HTTP ${r.status}` };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Shared local UI prefs (theme + reskin) on the helper — same on-disk home
 // as notes (~/.yraveragesubmin/ui-prefs.json). Null when helper unreachable.
 export async function nativeGetUiPrefs(url, timeoutMs = 1500) {

@@ -899,6 +899,10 @@ input[type="range"] { accent-color: var(--accent); width: 130px; }
 .m-sub { font-size: var(--text-xs); color: var(--muted); }
 .m-state { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }
 .m-state.done { color: var(--accent-soft); }
+.m-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+.m-item[data-selected="true"] { border-color: var(--accent); }
+.m-error { color: var(--danger); }
+.m-item .bar { margin-top: var(--space-1); }
 
 .about { margin-top: var(--space-4); font-size: var(--text-sm); color: var(--muted); line-height: 1.6; }
 .about h3 { color: var(--text); margin-bottom: var(--space-1); }

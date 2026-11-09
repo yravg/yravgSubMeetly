@@ -18,6 +18,8 @@ import {
   nativeGetUiPrefs,
   nativeSetUiPrefs,
   nativeGetModels,
+  nativePullModel,
+  nativeSetModels,
   nativeGetDevice,
   nativeSetDevice,
   HELPER_DEVICE_OPTIONS,
@@ -1847,51 +1849,122 @@ function fmtBytes(n) {
   return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[u]}`;
 }
 
-// Daftar model terpasang di helper (GET /models) — read-only, refresh tiap
-// checkNative. Cache HF hanya dihitung server bila direktori ada.
+// Models of the engine (GET /models): the fixed catalog, what is on disk, a picker and
+// Download with progress. Refreshes on checkNative and, while a pull runs, every 1.5 s.
+let modelsPollTimer = null;
 async function renderNativeModels() {
   const host = $('native-models');
   if (!host) return;
-  host.innerHTML = '';
-  if (!nativeInfo) return;
-  const res = await nativeGetModels(state.settings.nativeUrl || DEFAULT_NATIVE_URL);
-  if (!res) return;
-  const rows = [];
-  for (const m of res.models || []) {
-    rows.push({
-      name: `${m.kind === 'asr' ? '🎙' : m.kind === 'draft' ? '⚡' : '🌐'} ${m.id || m.key}`,
-      sub: `${m.engine || ''}${m.device ? ` · ${m.device}` : ''}`,
-      state: m.available ? 'done' : '',
-      stateText: m.available ? '✅' : '—',
-    });
+  clearTimeout(modelsPollTimer);
+  if (!nativeInfo) {
+    host.replaceChildren();
+    return;
   }
-  for (const c of res.cached || []) {
-    rows.push({
-      name: `💾 ${c.id}`,
-      sub: `${fmtBytes(c.bytes)} · ${c.files} files${c.complete ? '' : ' · incomplete'}`,
-      state: c.complete ? 'done' : '',
-      stateText: c.complete ? '✅' : '…',
-    });
-  }
-  if (!rows.length) return;
-  for (const r of rows) {
+  const url = state.settings.nativeUrl || DEFAULT_NATIVE_URL;
+  const res = await nativeGetModels(url);
+  const catalog = res && Array.isArray(res.catalog) ? res.catalog : [];
+  host.replaceChildren();
+  if (!catalog.length) return; // an engine without the catalog: nothing to pick, nothing invented
+  const rerender = () => renderNativeModels();
+  const fail = (why) => showToast(t('modelsSetFailed', { why }), 'error');
+  const choose = async (patch) => {
+    const r = await nativeSetModels(url, patch);
+    if (r.error) fail(r.error);
+    rerender();
+  };
+  const row = ({ title, sub, selected, action, bar, error }) => {
     const div = document.createElement('div');
     div.className = 'm-item';
-    const name = document.createElement('div');
-    name.className = 'm-meta';
+    div.dataset.selected = selected ? 'true' : 'false';
+    const meta = document.createElement('div');
+    meta.className = 'm-meta';
     const t1 = document.createElement('div');
     t1.className = 'm-name';
-    t1.textContent = r.name;
+    t1.textContent = title;
     const t2 = document.createElement('div');
     t2.className = 'm-sub';
-    t2.textContent = r.sub;
-    name.append(t1, t2);
-    const st = document.createElement('span');
-    st.className = `m-state ${r.state}`.trim();
-    st.textContent = r.stateText;
-    div.append(name, st);
-    host.appendChild(div);
+    t2.textContent = sub;
+    meta.append(t1, t2);
+    if (bar != null) {
+      const b = document.createElement('div');
+      b.className = 'bar';
+      const f = document.createElement('div');
+      f.className = 'fill';
+      f.style.width = `${Math.max(2, Math.min(100, bar))}%`;
+      b.appendChild(f);
+      meta.appendChild(b);
+    }
+    if (error) {
+      const e = document.createElement('div');
+      e.className = 'm-sub m-error';
+      e.textContent = /^download failed/i.test(error) ? error : t('modelsFailed', { why: error }); // the engine's reason already says it
+      meta.appendChild(e);
+    }
+    div.appendChild(meta);
+    const side = document.createElement('div');
+    side.className = 'm-actions';
+    if (selected) {
+      const tag = document.createElement('span');
+      tag.className = 'm-state done';
+      tag.textContent = t('modelsInUse');
+      side.appendChild(tag);
+    }
+    if (action) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mini-btn';
+      btn.textContent = action.label;
+      btn.disabled = !!action.disabled;
+      btn.addEventListener('click', action.run);
+      side.appendChild(btn);
+    }
+    div.appendChild(side);
+    return div;
+  };
+  let pulling = false;
+  for (const [kind, heading] of [['asr', t('modelsAsr')], ['translate', t('modelsTranslate')]]) {
+    const rows = catalog.filter((m) => m.kind === kind);
+    if (!rows.length) continue;
+    const h = document.createElement('div');
+    h.className = 'models-title';
+    h.textContent = heading;
+    host.appendChild(h);
+    if (kind === 'translate') {
+      const anySelected = rows.some((m) => m.selected);
+      host.appendChild(row({
+        title: t('modelsOff'),
+        sub: t('modelsOffSub'),
+        selected: !anySelected,
+        action: anySelected ? { label: t('modelsUse'), run: () => choose({ translate: 'off' }) } : null,
+      }));
+    }
+    for (const m of rows) {
+      const base = m.downloaded
+        ? `${t('modelsOnDisk')} · ${fmtBytes(m.bytes)}`
+        : t('modelsNotDownloaded', { size: fmtBytes(m.approxBytes) });
+      const sub = !m.downloaded && m.partialBytes > 0 ? `${base}. ${t('modelsPartial', { done: fmtBytes(m.partialBytes) })}` : base;
+      let action = null;
+      let bar = null;
+      if (m.pulling) {
+        pulling = true;
+        bar = Number.isFinite(m.pct) ? m.pct : m.bytesTotal > 0 ? (100 * m.bytesDone) / m.bytesTotal : 0;
+        action = { label: t('modelsDownloading', { pct: `${Math.round(bar)}%` }), disabled: true, run() {} };
+      } else if (!m.downloaded) {
+        action = {
+          label: m.pullError ? t('modelsRetry') : t('modelsDownload'),
+          async run() {
+            const r = await nativePullModel(url, m.id);
+            if (r.error) fail(r.error);
+            rerender();
+          },
+        };
+      } else if (!m.selected) {
+        action = { label: t('modelsUse'), run: () => choose({ [kind]: m.id }) };
+      }
+      host.appendChild(row({ title: m.label || m.id, sub, selected: !!m.selected, action, bar, error: m.pulling ? '' : m.pullError }));
+    }
   }
+  if (pulling) modelsPollTimer = setTimeout(rerender, 1500);
 }
 
 function updateNativeHostHint() {
