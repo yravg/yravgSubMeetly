@@ -13,6 +13,7 @@
 use super::hkit;
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
+use crate::pages::PageKind;
 use crate::state::AppState;
 use crate::ui::{wid, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Point, Rect};
@@ -34,13 +35,22 @@ fn offline(ui: &mut Ui, st: &mut AppState, area: Rect, id: &str) {
     hkit::offline(ui, st, area, wid(id));
 }
 
+/// The Agenda timer: the tools' height and the guide row above it.
+pub fn timer_height(st: &AppState) -> f32 {
+    height(st) + hkit::GUIDE_H
+}
+
 pub fn draw_timer(ui: &mut Ui, st: &mut AppState, area: Rect) {
+    let area = hkit::guide(ui, st, area, PageKind::Timer, "How far through the agenda you are, and the meeting clock.");
     let accent = st.accent;
     let state = helper::timer_state(&st.helper.link, &st.helper.snap.notes);
     match state {
         PageState::Error => return offline(ui, st, area, "timer.retry"),
         PageState::Empty => {
-            hkit::message(ui, area, accent, Icon::Clock, "No meeting yet", "The timer counts an agenda once a meeting exists. The stopwatch works on its own after that.", false, None);
+            let line = "The timer counts an agenda once a meeting exists. Pick one in Calendar to start its notes.";
+            if hkit::message(ui, area, accent, Icon::Clock, "No meeting yet", line, false, Some(("Open Calendar", wid("timer.calendar")))) {
+                st.cmd(crate::commands::Command::SetPage(PageKind::Calendar));
+            }
             return;
         }
         _ => {}

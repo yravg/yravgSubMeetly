@@ -9,6 +9,7 @@ use super::hkit;
 use crate::commands::Command;
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
+use crate::pages::PageKind;
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Rect};
@@ -20,7 +21,7 @@ pub const MAX_ROWS: usize = 5;
 const FOOT_H: f32 = 16.0;
 
 pub fn height(_st: &AppState) -> f32 {
-    HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H
+    HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H + hkit::GUIDE_H
 }
 
 /// The buttons an item gets: Accept (or Answered for a question), Carry, Assign.
@@ -49,6 +50,7 @@ fn verb(d: Decision) -> &'static str {
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
+    let area = hkit::guide(ui, st, area, PageKind::Meeting, "Decisions, actions and questions from the latest meeting.");
     let accent = st.accent;
     let state = helper::meeting_state(&st.helper.link, &st.helper.snap.notes);
     match state {
@@ -57,7 +59,15 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
             return;
         }
         PageState::Empty => {
-            hkit::message(ui, area, accent, Icon::Clipboard, "No decisions yet", "A meeting lands here when you stop captions, or when you record in the extension or the Mac app. Items that wait on you get buttons.", false, None);
+            // A note from Calendar's Notes button exists but holds no items yet: say so, with its name.
+            let started = st.helper.note().map(|n| n.title.clone());
+            let (title, line) = match &started {
+                Some(t) => (t.as_str(), "Notes started from Calendar. Start captions during the meeting; when you stop, the draft decisions and actions land here."),
+                None => ("No decisions yet", "A meeting lands here when you stop captions. Pick a meeting in Calendar to start its notes. Items that wait on you get buttons."),
+            };
+            if hkit::message(ui, area, accent, Icon::Clipboard, title, line, false, Some(("Open Calendar", wid("meeting.calendar")))) {
+                st.cmd(Command::SetPage(PageKind::Calendar));
+            }
             return;
         }
         _ => {}

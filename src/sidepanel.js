@@ -565,6 +565,7 @@ async function restoreUiPrefs() {
   try {
     const { lastConfig, panelPrefs } = await chrome.storage.local.get(['lastConfig', 'panelPrefs']);
     if (lastConfig?.srcLang) state.srcLang = lastConfig.srcLang;
+    else if (isWebHost()) state.srcLang = 'auto'; // app window: detect the spoken language until the person picks one
     if (lastConfig?.tgtLang) state.tgtLang = lastConfig.tgtLang;
     return {
       task: lastConfig?.taskMode === 'transcribe' ? 'transcribe' : 'translate',
@@ -1501,6 +1502,9 @@ function pushUiPrefs() {
     theme: state.settings.theme,
     reskin: state.settings.reskin,
     captionSurface,
+    // App window: the engine keeps the language pair so the island and this window share one choice.
+    // shortcut: engine /ui-prefs drops keys it does not list; needs srcLang/tgtLang in its whitelist, harmless until then.
+    ...(isWebHost() ? { srcLang: state.srcLang, tgtLang: state.tgtLang } : {}),
   }).catch(() => {});
 }
 
@@ -1511,6 +1515,20 @@ async function pullUiPrefs() {
   const res = await nativeGetUiPrefs(state.settings.nativeUrl || DEFAULT_NATIVE_URL);
   if (!res?.stored) return;
   let changed = false;
+  if (isWebHost()) {
+    const src = res.prefs?.srcLang;
+    const tgt = res.prefs?.tgtLang;
+    let langs = false;
+    if (SOURCE_LANGS.some(([c]) => c === src) && src !== state.srcLang) { state.srcLang = src; langs = true; }
+    if (TARGET_LANGS.some(([c]) => c === tgt) && tgt !== state.tgtLang) { state.tgtLang = tgt; langs = true; }
+    if (langs) {
+      $('src-lang').value = state.srcLang;
+      $('tgt-lang').value = state.tgtLang;
+      renderInterpreterUi();
+      updateWarning();
+      persistLastConfig();
+    }
+  }
   if (['auto', 'light', 'dark'].includes(res.prefs?.theme) && res.prefs.theme !== state.settings.theme) {
     state.settings.theme = res.prefs.theme;
     changed = true;
@@ -3063,6 +3081,7 @@ function wire() {
     renderInterpreterUi();
     updateWarning();
     persistLastConfig();
+    if (isWebHost()) pushUiPrefs();
     redrawHelperStatus?.();
   });
   $('tgt-lang').addEventListener('change', (e) => {
@@ -3070,6 +3089,7 @@ function wire() {
     renderInterpreterUi();
     updateWarning();
     persistLastConfig();
+    if (isWebHost()) pushUiPrefs();
     redrawHelperStatus?.();
   });
 

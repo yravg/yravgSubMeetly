@@ -29,10 +29,11 @@ const HEAD_H: f32 = 34.0;
 const HEIGHT: f32 = 168.0;
 
 pub fn height(_st: &AppState) -> f32 {
-    HEIGHT
+    HEIGHT + hkit::GUIDE_H
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
+    let area = hkit::guide(ui, st, area, PageKind::Live, "Live captions of the meeting now, line by line.");
     let state = st.helper.live_state();
     match state {
         PageState::Error => {

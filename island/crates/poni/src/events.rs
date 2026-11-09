@@ -148,6 +148,10 @@ pub enum AppEvent {
     Helper(Result<(poni_core::helper::Snapshot, u32), String>),
     /// A decision the helper refused or could not be reached for.
     HelperNotice(String),
+    /// The engine's calendar, or why it could not be read.
+    Calendar(Result<poni_core::calendar::Calendar, String>),
+    /// The answer to "Open notes" on a meeting: the note's title, or why not.
+    CalendarNotes(Result<String, String>),
     /// The engine link: what answers /health, and whether the island started it.
     Engine(poni_core::engine_link::EngineInfo),
     /// System-audio captions: a state change, or words heard (`services::capture`).

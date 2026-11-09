@@ -26,4 +26,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 symphonia = { version = "0.5", features = ["aac", "flac", "isomp4", "mp3", "pcm", "wav"] }
+# Calendar sync (ICS links): https-only blocking client, rustls + bundled roots.
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
 tokenizers = { version = "0.22", default-features = false, features = ["onig"] }

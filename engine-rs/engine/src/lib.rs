@@ -2,8 +2,10 @@
 
 pub mod app;
 pub mod audio;
+pub mod calendar;
 pub mod engine;
 pub mod heuristic;
+pub mod ics;
 pub mod locations;
 pub mod ml;
 pub mod models;

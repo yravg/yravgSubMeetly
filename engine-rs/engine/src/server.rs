@@ -50,6 +50,15 @@ pub fn run(app: App) -> io::Result<()> {
 
 pub fn serve(listener: TcpListener, app: App) -> io::Result<()> {
     let app = Arc::new(app);
+    // Re-read calendar links in the background; a no-op when none are added.
+    let ticker = Arc::clone(&app);
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(5));
+        loop {
+            ticker.calendar_tick();
+            thread::sleep(Duration::from_secs(60));
+        }
+    });
     for incoming in listener.incoming() {
         let stream = match incoming {
             Ok(stream) => stream,

@@ -154,7 +154,7 @@ export function installWebHost(win = window) {
     const { lastConfig = {} } = await storage.local.get('lastConfig');
     const cfg = {
       tabId: 1,
-      srcLang: partial.srcLang ?? lastConfig.srcLang ?? 'ja',
+      srcLang: partial.srcLang ?? lastConfig.srcLang ?? 'auto', // spoken language: detect unless chosen
       tgtLang: partial.tgtLang ?? lastConfig.tgtLang ?? 'en',
       taskMode: partial.taskMode ?? lastConfig.taskMode ?? 'translate',
       dualLine: partial.dualLine ?? settings.dualLine ?? false,

@@ -575,6 +575,12 @@ pub struct AppState {
     /// A line the Meeting page shows for a moment: what a button did, or why
     /// the helper refused (until mono seconds; true: it went wrong).
     pub helper_notice: Option<(String, f64, bool)>,
+    /// Calendar page: the calendars list is open (else the meetings).
+    pub calendar_manage: bool,
+    /// Calendar page: the calendar whose Remove was pressed once; the second press removes it.
+    pub calendar_confirm: Option<String>,
+    /// The meeting the pill last announced ("Standup in 5 min"), so it speaks once per meeting.
+    pub calendar_pinged: Option<String>,
     /// The island's own capture of what the PC plays (`services::capture`).
     pub capture: poni_core::capture::CaptureState,
     /// The engine's models and the download under way (Settings, the Live page).
@@ -651,6 +657,9 @@ impl AppState {
             helper: Default::default(),
             engine: Default::default(),
             helper_notice: None,
+            calendar_manage: false,
+            calendar_confirm: None,
+            calendar_pinged: None,
             capture: Default::default(),
             models: Default::default(),
             cmds: Vec::new(),
