@@ -1,6 +1,8 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Island 1.2.3.** Translation answers in the chosen language: Qwen2.5-0.5B read the terse prompt as "translate to English" for non-English sources (Indonesian, Chinese, Japanese, Arabic, Russian, Thai, Vietnamese came back in English); the prompt now says to always answer in the target language. 0.5B Indonesian is in the right language but often wrong in meaning; pick Qwen2.5 1.5B or 3B under Settings > Models for usable Indonesian. Settings > Models shows "Default folder · N GB free · <short path>" and "Set by WHISPER_MODEL" first instead of cutting them off.
+- **Start captions runs once:** a double click or the app shell's retry no longer opens a second share picker.
 - **Island 1.2.2** (installer `yravgSubMeetly-Setup-1.2.2.exe`) carries everything above since 1.2.1.
 - **Engine: per-model storage folder.** `POST /engine/models/location` moves a model to any folder or drive (copy, verify size and SHA-256, switch, then delete the old copy; free-space and writability checks first); an unplugged drive shows as unavailable instead of re-downloading to C:. Island Settings > Models has the folder row with the Windows folder picker, move progress and drive-unavailable state.
 - **Engine: downloads only on request.** Only `POST /models/pull` and a model move download; a missing model answers 409 `model-not-downloaded`. `/draft` never waits for translation and reports `translateState`; English targets use Whisper's own translation until the translation model is ready. Models left in the old `C:	mp` cache are copied into the real cache at start. `/ui-prefs` keeps `srcLang`/`tgtLang`, shared by the island and the app window.
