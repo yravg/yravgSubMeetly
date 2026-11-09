@@ -37,6 +37,9 @@ pub fn run(app: App) -> io::Result<()> {
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(17865);
     let listener = TcpListener::bind((host.as_str(), port))?;
+    let _ = thread::Builder::new()
+        .name("legacy-models".into())
+        .spawn(app.legacy_migration());
     println!(
         "listening on http://{}:{}   (Ctrl-C to stop)",
         host,

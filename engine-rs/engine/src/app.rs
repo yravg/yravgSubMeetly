@@ -18,8 +18,8 @@ use crate::calendar::{Calendar, Fail};
 use crate::engine::{segments_json, Jobs, Ml, SavedModels, ASR_ENGINE, MT_ENGINE};
 use crate::heuristic::heuristic_notes;
 use crate::locations::{
-    dir_status, free_bytes, move_model, move_needs, probe_dir, pull_needs, validate_dir, Locations,
-    ModelDirUnavailable, MoveJob,
+    dir_status, free_bytes, legacy_hubs, migrate_legacy, move_model, move_needs, probe_dir,
+    pull_needs, validate_dir, Locations, ModelDirUnavailable, MoveJob,
 };
 use crate::models::{
     cache_state, catalog_spec, delete_cached, hub_cache_dir, model_root, scan_model_cache, Kind,
@@ -172,6 +172,19 @@ impl App {
     }
 
     /// Point the model-cache routes at another hub cache (tests).
+    /// One-time job for engine start: models older installs downloaded into `C:	mp` (HOME
+    /// was unset) are copied into the real cache. Run it on a thread: it can copy gigabytes.
+    pub fn legacy_migration(&self) -> impl FnOnce() + Send + 'static {
+        let locations = Arc::clone(&self.locations);
+        move || {
+            let wanted = |id: &str| locations.custom(id).is_none();
+            let lines = migrate_legacy(&legacy_hubs(), &locations.default_dir(), &wanted);
+            for line in lines {
+                eprintln!("[models] {line}");
+            }
+        }
+    }
+
     pub fn set_hf_cache(&mut self, dir: PathBuf) {
         self.locations.set_default(dir);
     }

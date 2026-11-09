@@ -586,6 +586,115 @@ pub fn move_model(
     Ok(None)
 }
 
+/// Hub folders older installs used. With HOME unset hf-hub fell back to `/tmp`, which on
+/// Windows is `<current drive>:\tmp`: an installed app downloaded into `C:\tmp`.
+// shortcut: Windows only, and only C: plus the drives of the working and exe folders;
+// upgrade to a user-given list if models turn up elsewhere.
+pub fn legacy_hubs() -> Vec<PathBuf> {
+    if !cfg!(windows) {
+        return Vec::new();
+    }
+    let drive_of = |path: &Path| match path.components().next() {
+        Some(Component::Prefix(prefix)) => Some(prefix.as_os_str().to_string_lossy().into_owned()),
+        _ => None,
+    };
+    let mut drives = vec!["C:".to_string()];
+    let here = std::env::current_dir().ok();
+    let exe = std::env::current_exe().ok();
+    for path in [here, exe].into_iter().flatten() {
+        if let Some(drive) = drive_of(&path) {
+            if !drives.iter().any(|d| d.eq_ignore_ascii_case(&drive)) {
+                drives.push(drive);
+            }
+        }
+    }
+    drives
+        .into_iter()
+        .map(|drive| PathBuf::from(format!("{drive}\\tmp\\.cache\\huggingface\\hub")))
+        .collect()
+}
+
+fn same_place(a: &Path, b: &Path) -> bool {
+    match (fs::canonicalize(a), fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
+    }
+}
+
+/// Copy the complete catalog models found in the `legacy` hub folders into `into`, when
+/// `into` does not have them yet and `wanted(id)` says the default folder is where they
+/// belong. The old copy is never touched. Each model is copied beside its target and
+/// renamed into place only once it checks out, so a crash leaves nothing half-there.
+/// Returns a line per model copied or skipped for a reason.
+pub fn migrate_legacy(
+    legacy: &[PathBuf],
+    into: &Path,
+    wanted: &dyn Fn(&str) -> bool,
+) -> Vec<String> {
+    let staging = into.join(".migrating");
+    let _ = fs::remove_dir_all(&staging); // leftover of a crash
+    let mut notes = Vec::new();
+    for hub in legacy {
+        if same_place(hub, into) {
+            continue;
+        }
+        let Ok(entries) = fs::read_dir(hub) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let Some(id) = name
+                .strip_prefix("models--")
+                .map(|s| s.replacen("--", "/", 1))
+            else {
+                continue;
+            };
+            let Some(spec) = crate::models::catalog_spec(&id) else {
+                continue;
+            };
+            let before = cache_state(hub, &id, spec.kind);
+            let target = model_root(into, &id);
+            if !before.downloaded || target.exists() || !wanted(&id) {
+                continue;
+            }
+            let need = before.bytes + SPACE_MARGIN;
+            if free_bytes(into).is_some_and(|free| free < need) {
+                notes.push(format!(
+                    "{id}: not enough free space in {} to bring it over",
+                    into.display()
+                ));
+                continue;
+            }
+            let copy = (|| -> Result<()> {
+                copy_tree(
+                    &entry.path(),
+                    &staging.join(&name),
+                    &AtomicU64::new(0),
+                    &mut |_| Ok(()),
+                )?;
+                let after = cache_state(&staging, &id, spec.kind);
+                if !after.downloaded || after.bytes != before.bytes {
+                    bail!(
+                        "the copy is incomplete ({} of {} bytes)",
+                        after.bytes,
+                        before.bytes
+                    );
+                }
+                fs::rename(staging.join(&name), &target).context("move into place")
+            })();
+            let _ = fs::remove_dir_all(&staging);
+            notes.push(match copy {
+                Ok(()) => format!(
+                    "{id}: copied from {} (the old copy was left in place)",
+                    hub.display()
+                ),
+                Err(error) => format!("{id}: could not copy from {}: {error:#}", hub.display()),
+            });
+        }
+    }
+    notes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1057,5 +1166,63 @@ mod tests {
         );
         let text = fs::read_to_string(scratch.path("state/engine-locations.json")).unwrap();
         assert!(text.contains("\"moves\":{}"), "{text}");
+    }
+    // ---- legacy hub migration
+
+    fn catalog_model_in(cache: &Path) -> Vec<(&'static str, Vec<u8>)> {
+        fake_model(cache)
+    }
+
+    #[test]
+    fn a_legacy_model_is_copied_once_and_the_old_copy_stays() {
+        let scratch = Scratch::new();
+        let (legacy, hub) = (scratch.path("tmp-hub"), scratch.path("hub"));
+        let files = catalog_model_in(&legacy);
+        let notes = migrate_legacy(&[legacy.clone()], &hub, &|_| true);
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert_whole(&hub, &files);
+        assert_whole(&legacy, &files); // never deleted
+        assert!(!hub.join(".migrating").exists());
+        // Second start: the target has it, nothing to do.
+        assert!(migrate_legacy(&[legacy], &hub, &|_| true).is_empty());
+    }
+
+    #[test]
+    fn migration_skips_what_it_must_not_touch() {
+        let scratch = Scratch::new();
+        let (legacy, hub) = (scratch.path("tmp-hub"), scratch.path("hub"));
+        catalog_model_in(&legacy);
+        // The model already there (even half there) is never overwritten.
+        fs::create_dir_all(model_root(&hub, ID).join("blobs")).unwrap();
+        assert!(migrate_legacy(&[legacy.clone()], &hub, &|_| true).is_empty());
+        assert!(!cache_state(&hub, ID, Kind::Asr).downloaded);
+        // A model the user keeps in its own folder is not copied to the default one.
+        let other = scratch.path("hub2");
+        assert!(migrate_legacy(&[legacy.clone()], &other, &|_| false).is_empty());
+        assert!(!model_root(&other, ID).exists());
+        // The same folder, and an unfinished download, are left alone.
+        assert!(migrate_legacy(&[legacy.clone()], &legacy, &|_| true).is_empty());
+        let partial = scratch.path("partial");
+        fake_model(&partial);
+        fs::remove_file(model_root(&partial, ID).join("snapshots/rev1/model.safetensors")).unwrap();
+        assert!(migrate_legacy(&[partial], &scratch.path("hub3"), &|_| true).is_empty());
+    }
+
+    #[test]
+    fn a_crash_during_migration_leaves_no_half_model_behind() {
+        let scratch = Scratch::new();
+        let (legacy, hub) = (scratch.path("tmp-hub"), scratch.path("hub"));
+        catalog_model_in(&legacy);
+        // Leftover staging from a crashed run is cleared and the copy is redone.
+        write_leftover(&hub.join(".migrating").join("models--openai--whisper-base"));
+        let notes = migrate_legacy(&[legacy], &hub, &|_| true);
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!(cache_state(&hub, ID, Kind::Asr).downloaded);
+        assert!(!hub.join(".migrating").exists());
+    }
+
+    fn write_leftover(dir: &Path) {
+        fs::create_dir_all(dir.join("blobs")).unwrap();
+        fs::write(dir.join("blobs/x.moving"), b"half").unwrap();
     }
 }
