@@ -29,6 +29,7 @@ const ENGINE_MODES: [&str; 3] = ["fast", "balanced", "accurate"];
 const DEVICE_CHOICES: [&str; 3] = ["auto", "cpu", "cuda"];
 const UI_THEMES: [&str; 3] = ["auto", "light", "dark"];
 const UI_RESKINS: [&str; 3] = ["yraverage", "coretax", "modern"];
+const UI_SURFACES: [&str; 3] = ["overlay", "island", "both"];
 const TARGET_LANGS: [&str; 11] = [
     "en", "zh", "de", "fr", "es", "ru", "it", "id", "vi", "ja", "ko",
 ];
@@ -809,7 +810,10 @@ impl App {
                 json!({ "error": "body needs theme and/or reskin" }),
             );
         };
-        if !patch.contains_key("theme") && !patch.contains_key("reskin") {
+        if !["theme", "reskin", "captionSurface"]
+            .iter()
+            .any(|k| patch.contains_key(*k))
+        {
             return self.json_response(
                 request,
                 400,
@@ -986,6 +990,12 @@ impl App {
                     prefs.insert("reskin".to_string(), Value::String(reskin.clone()));
                 }
             }
+            // Only present once set, so GET /ui-prefs stays as it was for older clients.
+            if let Some(Value::String(s)) = saved.get("captionSurface") {
+                if UI_SURFACES.contains(&s.as_str()) {
+                    prefs.insert("captionSurface".to_string(), Value::String(s.clone()));
+                }
+            }
         }
         (Value::Object(prefs), true)
     }
@@ -1003,6 +1013,11 @@ impl App {
         if let Some(Value::String(reskin)) = patch.get("reskin") {
             if UI_RESKINS.contains(&reskin.as_str()) {
                 prefs.insert("reskin".to_string(), Value::String(reskin.clone()));
+            }
+        }
+        if let Some(Value::String(s)) = patch.get("captionSurface") {
+            if UI_SURFACES.contains(&s.as_str()) {
+                prefs.insert("captionSurface".to_string(), Value::String(s.clone()));
             }
         }
         let prefs = Value::Object(prefs);

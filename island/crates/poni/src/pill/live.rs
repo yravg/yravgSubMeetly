@@ -42,6 +42,8 @@ const INK: Color = Color::white(1.0);
 /// needs a third minute digit.
 /// The caption pill: a dot, then the engine's line cut at the edge.
 pub const CAPTION_W: f32 = 300.0;
+/// The caption pill with a translation under the source line.
+pub const CAPTION_TWO_H: f32 = 52.0;
 const TIMER_W: f32 = 96.0;
 const TIMER_LONG_W: f32 = 112.0;
 const RING_D: f32 = 14.0;
@@ -70,7 +72,21 @@ fn capsule(w: f32) -> Geom {
     Geom::new(w, H, H / 2.0)
 }
 
+/// The caption pill's size: `h` and `r` for one line; a second line carries
+/// the translation when the engine made one.
+pub fn caption_geom(st: &AppState, h: f32, r: f32) -> Geom {
+    let two = st.helper.pill_text(poni_core::helper::now_ms()).is_some_and(|(_, t)| !t.is_empty());
+    if two {
+        Geom::new(CAPTION_W, CAPTION_TWO_H, 22.0)
+    } else {
+        Geom::new(CAPTION_W, h, r)
+    }
+}
+
 pub fn geom(a: Activity, st: &AppState) -> Option<Geom> {
+    if a == Activity::Caption {
+        return Some(caption_geom(st, H, H / 2.0));
+    }
     let w = match a {
         Activity::Media => return None,
         Activity::Timer if long_countdown(st) => TIMER_LONG_W,
@@ -125,11 +141,19 @@ fn snap(ui: &Ui, v: f32) -> f32 {
 // ------------------------------------------------------------------ caption
 
 pub(crate) fn draw_caption(ui: &mut Ui, st: &AppState, body: Rect) {
-    let line = st.helper.pill_line(poni_core::helper::now_ms()).map(|l| l.source.as_str()).unwrap_or_default();
+    let (line, translation) = st.helper.pill_text(poni_core::helper::now_ms()).unwrap_or_default();
     let cy = body.center().y;
     ui.c.fill_circle(Point::new(body.x + GLYPH_INSET + 3.0, cy), 3.0, palette::GREEN);
     let x = body.x + TEXT_INSET + 8.0;
-    ui.c.text(line, Rect::new(x, body.y, body.right() - TEXT_INSET - x, body.h), &TextStyle::body().color(INK));
+    let w = body.right() - TEXT_INSET - x;
+    if translation.is_empty() {
+        ui.c.text(line, Rect::new(x, body.y, w, body.h), &TextStyle::body().color(INK));
+    } else {
+        // Source over its translation, in the person's translation colour.
+        let color = crate::pages::hkit::translation_color(ui, st.settings.translation_color);
+        ui.c.text(line, Rect::new(x, cy - 21.0, w, 20.0), &TextStyle::body().color(INK));
+        ui.c.text(translation, Rect::new(x, cy + 1.0, w, 20.0), &TextStyle::footnote().color(color));
+    }
 }
 
 // -------------------------------------------------------------------- timer

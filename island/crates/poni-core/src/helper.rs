@@ -290,6 +290,35 @@ pub struct Snapshot {
     pub notes: Vec<Note>,
     /// None from a helper without `GET /live` (older than this island).
     pub live: Option<Live>,
+    /// Where the side panel wants live captions (`GET /ui-prefs`, `captionSurface`).
+    pub surface: Surface,
+}
+
+/// Where live captions show: the page overlay, the island, or both.
+/// Contract: missing or unknown = `Overlay`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Surface {
+    #[default]
+    Overlay,
+    Island,
+    Both,
+}
+
+impl Surface {
+    /// Whether the island's pill shows the engine's line.
+    pub fn island(self) -> bool {
+        self != Surface::Overlay
+    }
+}
+
+/// `{"prefs":{"captionSurface":"island"}}` (the helper's `GET /ui-prefs`); anything else is `Overlay`.
+pub fn parse_surface(body: &str) -> Surface {
+    let v: Option<Value> = serde_json::from_str(body).ok();
+    match v.as_ref().and_then(|v| v.pointer("/prefs/captionSurface")).and_then(Value::as_str) {
+        Some("island") => Surface::Island,
+        Some("both") => Surface::Both,
+        _ => Surface::Overlay,
+    }
 }
 
 /// Whether the helper answered the last time we asked.
@@ -515,7 +544,9 @@ pub fn fetch(port: u16) -> Result<Snapshot, String> {
     let notes = if code == 200 { parse_notes(&body) } else { None }.ok_or("The helper's notes could not be read.")?;
     // An older helper has no /live (404): the island falls back to the note's transcript.
     let live = request(port, "GET", "/live", None).ok().filter(|(code, _)| *code == 200).and_then(|(_, body)| parse_live(&body));
-    Ok(Snapshot { health, notes, live })
+    // Missing on an older helper (404) = the overlay only.
+    let surface = request(port, "GET", "/ui-prefs", None).ok().filter(|(code, _)| *code == 200).map(|(_, b)| parse_surface(&b)).unwrap_or_default();
+    Ok(Snapshot { health, notes, live, surface })
 }
 
 /// `POST /notes` with a body from [`decide`].
@@ -729,13 +760,19 @@ impl View {
         self.frozen.is_some() || self.held.is_some()
     }
 
-    /// What the collapsed pill shows: the engine's fresh line, unless Stop was pressed on the Live page.
+    /// What the collapsed pill shows: the engine's fresh line, unless Stop was pressed on the Live page
+    /// or the side panel sends captions to the page overlay only.
     pub fn pill_line(&self, now_ms: u64) -> Option<&Live> {
-        if self.following {
+        if self.following && self.snap.surface.island() {
             self.live_line(now_ms)
         } else {
             None
         }
+    }
+
+    /// The pill's two lines: the source, and its translation (empty when the engine made none).
+    pub fn pill_text(&self, now_ms: u64) -> Option<(&str, &str)> {
+        self.pill_line(now_ms).map(|l| (l.source.as_str(), l.translation.as_str()))
     }
 
     /// The engine's newest line while it is still fresh (the collapsed pill).
@@ -772,6 +809,29 @@ mod tests {
 
     fn notes() -> Vec<Note> {
         parse_notes(NOTES).unwrap()
+    }
+
+    #[test]
+    fn pill_shows_the_line_only_when_the_surface_is_island_or_both() {
+        assert_eq!(parse_surface(r#"{"prefs":{"captionSurface":"island"}}"#), Surface::Island);
+        assert_eq!(parse_surface(r#"{"prefs":{"captionSurface":"both"}}"#), Surface::Both);
+        for body in [r#"{"prefs":{"captionSurface":"overlay"}}"#, r#"{"prefs":{"theme":"auto"}}"#, r#"{"prefs":{"captionSurface":"x"}}"#, "nope"] {
+            assert_eq!(parse_surface(body), Surface::Overlay, "{body}");
+        }
+        let line = Live { seq: 1, source: "Halo".into(), at: Some(1000), ..Default::default() };
+        let pill = |surface| {
+            let mut v = View::default();
+            v.apply(Ok((Snapshot { live: Some(line.clone()), surface, ..Default::default() }, 5)));
+            v.pill_line(2000).is_some()
+        };
+        assert!(!pill(Surface::Overlay) && pill(Surface::Island) && pill(Surface::Both));
+        let mut v = View::default();
+        let heard = |t: &str| Snapshot { live: Some(Live { seq: 1, source: "Halo".into(), translation: t.into(), at: Some(1000), ..Default::default() }), surface: Surface::Both, ..Default::default() };
+        v.apply(Ok((heard("Hello"), 5)));
+        assert_eq!(v.pill_text(2000), Some(("Halo", "Hello")));
+        v.apply(Ok((heard(""), 5)));
+        assert_eq!(v.pill_text(2000), Some(("Halo", "")), "no translation: the second line is empty");
+        assert_eq!(v.pill_text(20_000), None, "an old line is not now");
     }
 
     #[test]

@@ -145,3 +145,50 @@ then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
   failures, store PNG wordmark, side panel dark + swatch contrast; specs/w-polish.md), island3
   ctx_ad370109b179 (Live caption stream, Pause/Stop honesty, Engine CPU/RTF, mac Oyenza strings, pairdrop
   default server, cargo test -p poni, Update sheet shot; specs/w-island3.md). Lead re-runs the Qwen test.
+
+## Moved to the VPS (2026-11-09, lead)
+
+Claude cannot run as root with `--dangerously-skip-permissions`, so the VPS work runs as Linux user `dev`
+(ssh alias `hostinger-vps-dev`, key auth only, no sudo). `/home/user/dev` is owned by `dev`.
+
+- VPS main checkout `/home/user/dev/yravgSubMeetly/yravgSubMeetly` fast-forwarded to local main 5b2092b
+  (pushed over SSH, nothing pushed to GitHub).
+- Worktrees `/home/user/dev/yravgSubMeetly/wt/sm-s5` (e08e787), `sm-addins2` (d472e38), `sm-desktop` (c66adbd),
+  each with `.checkpoints/<name>.md` (copied from the laptop) and `.ref/` (specs, old dispatch, `VPS-BRIEF.md`).
+  `.checkpoints/` and `.ref/` are in `.git/info/exclude`.
+- Installed: Rust 1.99.1 (dev, rustup), npm ci in all three worktrees, ffmpeg, cmake, clang, xvfb,
+  Chrome for Testing 152 at `/home/dev/cft/chrome-linux64/chrome`.
+- `tmux` session `sm-launcher` runs `~/start-submeetly-workers.sh`: it waits for Claude login, then starts
+  three Sonnet workers in tmux sessions `sm-s5`, `sm-addins2`, `sm-desktop`. Each finishes with `.ref/REPORT.md`.
+- Blocked, owner must act: (1) Claude on the VPS is logged out for root and dev
+  ("OAuth session expired and could not be refreshed"); log in as dev. (2) Chrome cannot start: Ubuntu 24.04
+  blocks unprivileged user namespaces, so Puppeteer tests fail with "No usable sandbox". Options: an AppArmor
+  profile for that Chrome path, or `--no-sandbox` for the test browser. The lead's attempts at both were refused
+  by the permission classifier. (3) First start of each worker may wait on the trust or bypass-permissions prompt.
+- Next: after login, attach each tmux session, accept prompts; when all three REPORT.md files exist, the lead
+  verifies each branch and merges.
+
+## Back on the laptop (2026-11-09 morning, lead)
+
+VPS SSH timed out twice (`hostinger-vps-dev`, banner exchange), so work runs locally again. Owner runs
+`/yravgvps:yravgvps-mode` to set up VPS sync (the lead cannot invoke that skill).
+
+Meeting test setup (owner testing in a live meeting this morning): `npm ci` + `npm run build` on main 4a1959a ok;
+Python helper started by the lead on 17865 (system Python 3.11, faster-whisper 1.2.1, large-v3-turbo, CUDA float16,
+TRANSLATE=off); lab server on 8799. `npm run e2e` (CfT 154): reaches "Listening — Whisper Tiny · WASM", then
+`Runtime.callFunctionOn timed out` — the same CDP stall as REL-03, now also in browser mode. `test/speech.wav` was
+missing on main (gitignored `*.wav`); copied from sm-s5.
+
+Agent team (Sonnet subagents, local worktrees under `C:\Users\Enrico D. Marlon\orca\workspaces\yraverageSubMeetly`,
+checkpoints `.checkpoints/<name>.md` in each):
+
+| Agent | Worktree / branch | Task |
+|---|---|---|
+| addins2 | sm-addins2 | ADD-001 gate: merge main, npm test, slop, review |
+| s5 | sm-s5 | ENG-004 gate: merge main, cargo, npm test, e2e on a non-default port |
+| desktop | sm-desktop | tray/menu, engine supervisor, fixed extension ID, Setup build (no install) |
+| overlay | sm-overlay (new) | owner: in-page caption overlay revamp, Apple look on our tokens; honours `captionSurface` |
+| surface | sm-surface (new) | owner: captions in the island pill; setting `captionSurface` overlay/island/both |
+
+Contract between overlay and surface: `chrome.storage.local.captionSurface` = 'overlay' | 'island' | 'both',
+default 'overlay'. Island captions come from helper `GET /live`, so they need Engine = Native Helper.

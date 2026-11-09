@@ -1,0 +1,16 @@
+{
+  "manifest": 0,
+  "id": "recap-email",
+  "name": "Recap email",
+  "version": "1",
+  "description": "One button builds a plain-text recap and opens it as a mail draft. Nothing is sent by the add-in.",
+  "appliesTo": "always",
+  "actions": [
+    {
+      "id": "recap",
+      "label": "Recap email",
+      "badge": "openActions",
+      "do": { "call": "recapEmail" }
+    }
+  ]
+}

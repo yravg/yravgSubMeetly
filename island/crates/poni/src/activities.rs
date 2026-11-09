@@ -225,7 +225,7 @@ pub fn geom(m: &Mode, st: &AppState) -> Geom {
             Geom::new(if long { 112.0 } else { 96.0 }, 32.0, 15.0)
         }
         Mode::Activity(Activity::MediaTimer) => Geom::new(132.0, 32.0, 15.0),
-        Mode::Activity(Activity::Caption) => Geom::new(crate::pill::live::CAPTION_W, 32.0, 15.0),
+        Mode::Activity(Activity::Caption) => crate::pill::live::caption_geom(st, 32.0, 15.0),
         Mode::Activity(Activity::Game) => Geom::new(if game_temp(st).is_some() { GAME_W } else { GAME_NO_TEMP_W }, 32.0, 15.0),
         Mode::Hud(HudTag::Volume) => Geom::new(316.0, 40.0, 19.0),
         Mode::Hud(HudTag::Charging) | Mode::Hud(HudTag::LowBattery) => Geom::new(300.0, 40.0, 19.0),
@@ -827,13 +827,22 @@ mod tests {
 
     #[test]
     fn the_engines_fresh_line_takes_the_collapsed_island_until_stop_or_a_game() {
-        use poni_core::helper::{now_ms, Live, Snapshot};
+        use poni_core::helper::{now_ms, Live, Snapshot, Surface};
         let mut st = AppState::new(Settings::default(), Store::default());
-        let heard = |ago: u64| Snapshot { live: Some(Live { seq: 1, source: "Halo dunia".into(), at: Some(now_ms() - ago), ..Default::default() }), ..Default::default() };
+        let heard = |ago: u64| Snapshot { live: Some(Live { seq: 1, source: "Halo dunia".into(), at: Some(now_ms() - ago), ..Default::default() }), surface: Surface::Island, ..Default::default() };
+        assert_eq!(collapsed_mode(&st), Mode::Idle);
+        // Captions sent to the page overlay only leave the island alone.
+        st.helper.apply(Ok((Snapshot { surface: Surface::Overlay, ..heard(500) }, 5)));
         assert_eq!(collapsed_mode(&st), Mode::Idle);
         st.helper.apply(Ok((heard(500), 5)));
         assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Caption));
         assert_eq!(geom(&collapsed_mode(&st), &st).w, crate::pill::live::CAPTION_W);
+        // Source only: the one-line capsule; with a translation: two lines tall.
+        assert_eq!(geom(&collapsed_mode(&st), &st).h, 32.0);
+        let with_tr = Snapshot { live: Some(Live { translation: "Hello world".into(), ..heard(500).live.unwrap() }), ..heard(500) };
+        st.helper.apply(Ok((with_tr, 5)));
+        assert_eq!(geom(&collapsed_mode(&st), &st).h, crate::pill::live::CAPTION_TWO_H);
+        st.helper.apply(Ok((heard(500), 5)));
         // Stop on the Live page lets the island go; an old line is not now.
         st.helper.set_following(false);
         assert_eq!(collapsed_mode(&st), Mode::Idle);

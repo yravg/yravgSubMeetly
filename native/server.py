@@ -1202,6 +1202,7 @@ def _normalize_note_doc(raw) -> tuple[dict | None, str | None]:
 UI_PREFS_PATH = Path(os.environ.get("UI_PREFS_PATH", STATE_DIR / "ui-prefs.json"))
 UI_PREFS_THEMES = {"auto", "light", "dark"}
 UI_PREFS_RESKINS = {"yraverage", "coretax", "modern"}
+UI_PREFS_SURFACES = {"overlay", "island", "both"}  # captionSurface: where live captions show
 UI_PREFS_DEFAULTS = {"theme": "auto", "reskin": "yraverage"}
 
 
@@ -1216,6 +1217,9 @@ def _load_ui_prefs() -> tuple[dict, bool]:
                     prefs["theme"] = raw["prefs"]["theme"]
                 if raw["prefs"].get("reskin") in UI_PREFS_RESKINS:
                     prefs["reskin"] = raw["prefs"]["reskin"]
+                # Only present once set, so GET /ui-prefs stays as it was for older clients.
+                if raw["prefs"].get("captionSurface") in UI_PREFS_SURFACES:
+                    prefs["captionSurface"] = raw["prefs"]["captionSurface"]
             return prefs, True
     except Exception:
         pass
@@ -1229,6 +1233,8 @@ def _save_ui_prefs(patch: dict) -> dict:
             prefs["theme"] = patch["theme"]
         if patch.get("reskin") in UI_PREFS_RESKINS:
             prefs["reskin"] = patch["reskin"]
+        if patch.get("captionSurface") in UI_PREFS_SURFACES:
+            prefs["captionSurface"] = patch["captionSurface"]
     UI_PREFS_PATH.parent.mkdir(parents=True, exist_ok=True)
     UI_PREFS_PATH.write_text(
         json.dumps({"updatedAt": time.strftime("%Y-%m-%dT%H:%M:%S"), "prefs": prefs}, ensure_ascii=False, indent=2),
@@ -1590,7 +1596,7 @@ class Handler(BaseHTTPRequestHandler):
                 except json.JSONDecodeError:
                     return self._json(400, {"error": "invalid JSON body"})
                 if not isinstance(payload, dict) or (
-                    "theme" not in payload and "reskin" not in payload
+                    "theme" not in payload and "reskin" not in payload and "captionSurface" not in payload
                 ):
                     return self._json(400, {"error": "body needs theme and/or reskin"})
                 prefs = _save_ui_prefs(payload)

@@ -1,0 +1,15 @@
+{
+  "manifest": 0,
+  "id": "glossary",
+  "name": "Glossary",
+  "version": "1",
+  "description": "Per-series terms (names, acronyms, project words) fixed in final captions and in the minutes draft.",
+  "appliesTo": "always",
+  "panels": [
+    { "id": "terms", "title": "Glossary", "source": "glossary" }
+  ],
+  "hooks": [
+    { "on": "caption.final", "do": { "call": "applyGlossary" } },
+    { "on": "meeting.draft", "do": { "call": "applyGlossary" } }
+  ]
+}

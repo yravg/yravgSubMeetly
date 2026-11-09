@@ -98,7 +98,8 @@ const builds = [
   { entryPoints: ['src/ai-worker.js'], outfile: 'dist/ai-worker.js', format: 'esm' },
   { entryPoints: ['src/sidepanel.js'], outfile: 'dist/sidepanel.js', format: 'esm' },
   { entryPoints: ['src/minutes.js'], outfile: 'dist/minutes.js', format: 'esm' },
-  { entryPoints: ['src/content.js'], outfile: 'dist/content.js', format: 'iife' },
+  // overlay.css and tokens.css are inlined into the overlay's shadow root as text.
+  { entryPoints: ['src/content.js'], outfile: 'dist/content.js', format: 'iife', loader: { '.css': 'text' } },
 ];
 
 for (const b of builds) {

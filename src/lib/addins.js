@@ -14,8 +14,13 @@
  *      appliesTo: 'always' | { projectType?: [..], seriesId?: [..] },   // either key matching = applies
  *      actions?: [{ id, label, when?, badge?, do }],                    // chips in the Notes panel
  *      panels?:  [{ id, title, source: 'seriesSummary', when?, badge? }],
- *      hooks?:   [{ on: 'meeting.end', do }] }                          // validated and shown, not fired in v0
+ *      hooks?:   [{ on, do }] }     // on = 'meeting.end' (validated and shown, not fired) | 'caption.final' | 'meeting.draft'
  *    do = { call: 'addItem', type: 'info'|'decision', text }  |  { call: 'openUrl', url: 'https://…' }
+ *       | { call: 'recapEmail' }   build a plain-text recap + mailto: draft of the open meeting (nothing is sent)
+ *       | { call: 'exportIcs' }    one .ics file with the series' open actions that have a due date
+ *       | { call: 'applyGlossary' }  only as the action of a caption.final / meeting.draft hook (and those hooks take
+ *                                    nothing else): rewrites caption / draft text with the series glossary
+ *    panels source 'glossary' = the per-series term editor (lib/glossary.js); 'seriesSummary' = open actions.
  *    when  = 'always' | '<counter> <op> <int>', op in > >= == <
  *    badge = a counter name.  Counters read the open meeting: see COUNTERS.
  *
@@ -30,6 +35,8 @@
  */
 import { PROJECT_TYPES, pickText } from './notes-schema.js';
 import { addItem, seriesSummary } from './notes-actions.js';
+import { buildRecap, mailtoUrl } from './recap-email.js';
+import { buildIcs, dueActionRows } from './ics-export.js';
 
 export const TRUST_KEY = 'ysmAddinTrust';
 export const REMOVED_KEY = 'ysmAddinRemoved';
@@ -37,8 +44,10 @@ export const REMOVED_KEY = 'ysmAddinRemoved';
 const ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
 const TOP = ['manifest', 'id', 'name', 'version', 'description', 'appliesTo', 'actions', 'panels', 'hooks'];
 const ADD_TYPES = ['info', 'decision'];
-const PANEL_SOURCES = ['seriesSummary'];
-const HOOK_EVENTS = ['meeting.end'];
+const PANEL_SOURCES = ['seriesSummary', 'glossary'];
+const HOOK_EVENTS = ['meeting.end', 'caption.final', 'meeting.draft'];
+const GLOSSARY_EVENTS = ['caption.final', 'meeting.draft'];
+const NO_ARG_CALLS = ['recapEmail', 'exportIcs', 'applyGlossary'];
 const OPS = ['>', '>=', '==', '<'];
 
 const COUNTERS = {
@@ -82,7 +91,10 @@ function checkDo(d) {
     if (Object.keys(d).some((k) => !['call', 'url'].includes(k))) return fail('bad-action', 'openUrl takes call, url only');
     return null;
   }
-  return fail('unknown-call', `"${String(d.call)}" is not an allowed call; v0 allows addItem and openUrl. Add-ins cannot run shell commands.`);
+  if (NO_ARG_CALLS.includes(d.call)) {
+    return Object.keys(d).length === 1 ? null : fail('bad-action', `${d.call} takes no arguments`);
+  }
+  return fail('unknown-call', `"${String(d.call)}" is not an allowed call; v0 allows addItem, openUrl, recapEmail, exportIcs and applyGlossary. Add-ins cannot run shell commands.`);
 }
 
 export function validateManifest(json) {
@@ -110,6 +122,7 @@ export function validateManifest(json) {
     if (bad) return fail('bad-expr', bad);
     const d = checkDo(x.do);
     if (d) return d;
+    if (x.do.call === 'applyGlossary') return fail('bad-action', 'applyGlossary runs from a caption.final or meeting.draft hook, not from a button');
   }
   for (const p of json.panels || []) {
     if (!isObj(p) || !ID_RE.test(p.id || '') || !isStr(p.title, 40) || !PANEL_SOURCES.includes(p.source)) return fail('bad-panel', `each panel needs id, title and source (${PANEL_SOURCES.join(', ')})`);
@@ -119,8 +132,10 @@ export function validateManifest(json) {
   }
   for (const h of json.hooks || []) {
     if (!isObj(h) || !HOOK_EVENTS.includes(h.on)) return fail('bad-hook', `hook "on" must be ${HOOK_EVENTS.join(' or ')}`);
+    if (Object.keys(h).some((k) => !['on', 'do'].includes(k))) return fail('bad-hook', 'hook takes on, do only');
     const d = checkDo(h.do);
     if (d) return d;
+    if (GLOSSARY_EVENTS.includes(h.on) !== (h.do.call === 'applyGlossary')) return fail('bad-hook', `${GLOSSARY_EVENTS.join(' and ')} hooks run applyGlossary, and applyGlossary runs from nothing else`);
   }
   return { ok: true, value: JSON.parse(JSON.stringify(json)) };
 }
@@ -178,9 +193,13 @@ export function mayCall(manifest) {
   const add = (label) => seen.has(label) || (seen.add(label), rows.push({ ok: true, label }));
   for (const d of calls) {
     if (d.call === 'addItem') add(`Register: add item (${d.type})`);
+    else if (d.call === 'recapEmail') add('Mail: open a draft in your mail app (mailto:, nothing is sent)');
+    else if (d.call === 'exportIcs') add('Calendar: save one .ics file of open actions with a due date');
+    else if (d.call === 'applyGlossary') add('Captions and draft: rewrite terms with the series glossary');
     else add(`Open ${new URL(d.url).origin} (https:// only)`);
   }
-  if ((manifest.panels || []).length) add('Register: read open actions (seriesSummary)');
+  for (const p of manifest.panels || []) add(p.source === 'glossary' ? 'Glossary: keep this series’ terms on this device' : 'Register: read open actions (seriesSummary)');
+  if ((manifest.actions || []).some((x) => x.do.call === 'recapEmail' || x.do.call === 'exportIcs')) add('Register: read this meeting and the series (no changes)');
   rows.push({ ok: false, label: 'Shell commands' }, { ok: false, label: 'Network, except open https://' });
   return rows;
 }
@@ -192,7 +211,7 @@ export function visibleActions(enabled, meeting) {
     if (!appliesTo(m, meeting)) continue;
     for (const x of m.actions || []) {
       if (!evalWhen(x.when, meeting)) continue;
-      out.push({ addinId: m.id, actionId: x.id, label: x.label, badge: x.badge ? badge(x.badge, meeting) : null });
+      out.push({ addinId: m.id, actionId: x.id, label: x.label, call: x.do.call, mutates: x.do.call === 'addItem', badge: x.badge ? badge(x.badge, meeting) : null });
     }
   }
   return out;
@@ -203,7 +222,7 @@ export function visiblePanels(enabled, meeting) {
   for (const m of enabled) {
     if (!appliesTo(m, meeting)) continue;
     for (const p of m.panels || []) {
-      if (evalWhen(p.when, meeting)) out.push({ addinId: m.id, panelId: p.id, title: p.title, badge: p.badge ? badge(p.badge, meeting) : null });
+      if (evalWhen(p.when, meeting)) out.push({ addinId: m.id, panelId: p.id, title: p.title, source: p.source, badge: p.badge ? badge(p.badge, meeting) : null });
     }
   }
   return out;
@@ -222,9 +241,21 @@ export function panelRows(manifest, panelId, meetings, { lang = 'en', now = new 
  * Run one action of an enabled add-in. addItem returns the new meeting (caller saves it);
  * openUrl returns the address (caller opens it). The engine's own errors (issued meeting) pass through.
  */
-export function runAction(manifest, actionId, meeting, { lang = 'en' } = {}) {
+export function runAction(manifest, actionId, meeting, { lang = 'en', meetings = [], now = new Date(), labels } = {}) {
   const x = (manifest.actions || []).find((a) => a.id === actionId);
   if (!x) throw new Error(`action ${actionId} not found in ${manifest.id}`);
+  const plural = (n) => (n === 1 ? '' : 's');
+  if (x.do.call === 'recapEmail') {
+    const recap = buildRecap(meeting, { lang, labels });
+    return { kind: 'recap', recap: { ...recap, ...mailtoUrl(recap) }, log: recap.empty ? `${x.label}: nothing to send yet` : `${x.label}: ${recap.to.length} recipient${plural(recap.to.length)}` };
+  }
+  if (x.do.call === 'exportIcs') {
+    const series = (meetings.length ? meetings : [meeting]).filter((m) => m.seriesId === meeting.seriesId);
+    const { rows, skipped } = dueActionRows(series, { lang, now });
+    const text = buildIcs(rows, { now });
+    const filename = `actions-${String(meeting.seriesId).replace(/[^A-Za-z0-9._-]/g, '-')}.ics`;
+    return { kind: 'ics', ics: { text, count: rows.length, skipped, filename }, log: text ? `${x.label}: ${rows.length} action${plural(rows.length)} saved` : `${x.label}: nothing with a due date` };
+  }
   if (x.do.call === 'openUrl') return { kind: 'open', url: x.do.url, log: `opened ${new URL(x.do.url).origin}` };
   const next = addItem(meeting, { type: x.do.type, text: { [lang]: x.do.text } }, { by: `addin:${manifest.id}` });
   return { kind: 'meeting', meeting: next, log: `${x.label}: added ${next.items.at(-1).ref}` };
@@ -245,4 +276,14 @@ export function listAddins(raws, trusted = {}, removed = []) {
       error: v.ok ? null : v.error,
     };
   });
+}
+
+/** True when running this action changes the meeting (the caller then refuses on an issued meeting). */
+export function actionMutates(manifest, actionId) {
+  return (manifest.actions || []).find((a) => a.id === actionId)?.do.call === 'addItem';
+}
+
+/** Does any enabled add-in hook `event` (caption.final / meeting.draft) for this meeting? Needs an open meeting: the glossary is per series. */
+export function hookActive(enabled, event, meeting) {
+  return !!meeting && enabled.some((m) => appliesTo(m, meeting) && (m.hooks || []).some((h) => h.on === event));
 }
