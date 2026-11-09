@@ -136,6 +136,8 @@ pub enum AppEvent {
     HelperNotice(String),
     /// The engine link: what answers /health, and whether the island started it.
     Engine(poni_core::engine_link::EngineInfo),
+    /// System-audio captions: a state change, or words heard (`services::capture`).
+    Capture(crate::services::capture::CaptureEvent),
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

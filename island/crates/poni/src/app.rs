@@ -314,7 +314,7 @@ fn run_deferred(d: Deferred) {
             let Some((helper, items)) = with_app(|app| {
                 // Right-clicked on the open island (the tray's menu leaves it as it is).
                 app.menu_open = app.expanded && app.hovering;
-                (app.helper, tray::menu_items(&app.st.settings, app.st.pinned, crate::updates::menu_line(&app.st, app.updater.is_some()), &app.st.engine))
+                (app.helper, tray::menu_items(&app.st.settings, app.st.pinned, crate::updates::menu_line(&app.st, app.updater.is_some()), &app.st.engine, app.st.capture.running()))
             }) else {
                 return;
             };
@@ -1717,6 +1717,47 @@ impl App {
         self.st.notify(Icon::Lyrics, palette::BLUE, "Apple Music lyrics off", "Lyrics from LRCLIB only", 4.0, None);
     }
 
+    /// Captions from what the PC plays on (true) or off. The languages are the
+    /// engine's own defaults for now: spoken language detected, translated to English
+    /// (shortcut: no Settings entry yet; add one when the island gets language settings).
+    fn set_captions(&mut self, on: bool) {
+        let sink = self.sink.clone();
+        let Some(svc) = self.services.as_mut() else { return };
+        if on {
+            svc.engine_start();
+            self.st.capture = match svc.capture_start(&sink, poni_core::helper::configured_port(), "auto", "en") {
+                Ok(()) => poni_core::capture::CaptureState::On,
+                Err(e) => poni_core::capture::CaptureState::Failed(e),
+            };
+            self.st.helper.set_following(true);
+        } else {
+            svc.capture_stop();
+            self.st.capture = poni_core::capture::CaptureState::Off;
+        }
+        self.st.helper.capturing = self.st.capture.running();
+        self.request_frame();
+    }
+
+    fn on_capture(&mut self, e: services::capture::CaptureEvent) {
+        use services::capture::CaptureEvent;
+        match e {
+            // A late report from before Stop does not bring it back.
+            CaptureEvent::State(_) | CaptureEvent::Heard if self.st.capture == poni_core::capture::CaptureState::Off => {}
+            CaptureEvent::State(s) => {
+                if let (poni_core::capture::CaptureState::Failed(_), Some(svc)) = (&s, self.services.as_mut()) {
+                    svc.capture_stop();
+                }
+                self.st.helper.capturing = s.running();
+                self.st.capture = s;
+            }
+            CaptureEvent::Heard => {
+                if let Some(s) = self.services.as_ref() {
+                    s.helper_poll();
+                }
+            }
+        }
+    }
+
     fn on_apple_music(&mut self, status: AppleMusicStatus) {
         let (color, title, subtitle) = match status {
             AppleMusicStatus::Accepted => (palette::GREEN, "Apple Music lyrics on", "LRCLIB fills in the rest"),
@@ -1934,6 +1975,8 @@ impl App {
                 }
                 crate::services::engine::open_when_ready("/app/setup-extension.html");
             }
+            StartCaptions => self.set_captions(true),
+            StopCaptions => self.set_captions(false),
             OpenCaptionsPanel => shell::open_in_chrome(&format!("chrome-extension://{}/sidepanel.html", crate::services::engine::EXTENSION_ID)),
             Quit => {
                 self.quit(0);
@@ -2145,6 +2188,7 @@ impl App {
             AppEvent::Helper(r) => self.st.helper.apply(r),
             AppEvent::Engine(info) => self.st.engine = info,
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
+            AppEvent::Capture(e) => self.on_capture(e),
             AppEvent::Addon { id, status } => {
                 // A late report from before a switch-off doesn't bring it back.
                 if self.st.settings.addon_on(id) || status == AddonStatus::Off {
@@ -3674,6 +3718,7 @@ impl App {
                         s.helper_poll();
                     }
                 }
+                Command::Captions(on) => self.set_captions(on),
             }
         }
         self.sync_phone_offer();

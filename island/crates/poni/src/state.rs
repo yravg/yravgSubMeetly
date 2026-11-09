@@ -462,6 +462,8 @@ pub struct AppState {
     /// A line the Meeting page shows for a moment: what a button did, or why
     /// the helper refused (until mono seconds; true: it went wrong).
     pub helper_notice: Option<(String, f64, bool)>,
+    /// The island's own capture of what the PC plays (`services::capture`).
+    pub capture: poni_core::capture::CaptureState,
     /// Side effects requested during the frame.
     pub cmds: Vec<Command>,
 }
@@ -530,6 +532,7 @@ impl AppState {
             helper: Default::default(),
             engine: Default::default(),
             helper_notice: None,
+            capture: Default::default(),
             cmds: Vec::new(),
         };
         // On ones start by checking their files (the worker reports back);

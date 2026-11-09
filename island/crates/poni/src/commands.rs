@@ -120,4 +120,6 @@ pub enum Command {
     HelperPost(String),
     /// Ask the helper again now.
     HelperPoll,
+    /// Start (true) or stop (false) captions from what the PC plays.
+    Captions(bool),
 }

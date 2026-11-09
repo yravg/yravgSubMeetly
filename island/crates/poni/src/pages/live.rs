@@ -6,9 +6,10 @@
 //! it is fresh), else from the tail of the newest note's `transcript[]`
 //! (`poni_core::helper`). Hold (was Pause) keeps the page on the line it shows; Unfollow (was Stop)
 //! leaves the note alone and stops following until Start. Neither controls
-//! capture: it lives in the Chrome extension and the Mac app, and the helper
-//! has no capture route (ISL-002 gap), so the labels and a line on the page
-//! say "this view".
+//! capture, so the labels and a line on the page say "this view". Capture has
+//! two sources: the Chrome extension and the Mac app, and (Windows) the
+//! island's own "Start captions", a loopback capture of what the PC plays
+//! (`services::capture`), whose state and problems show on this page.
 //! The five states are `PageState`: normal, empty (nothing to follow, or
 //! stopped), error (helper offline), locked (an issued meeting) and needs
 //! input (items wait on a person; a pill opens the Meeting page).
@@ -31,24 +32,36 @@ pub fn height(_st: &AppState) -> f32 {
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
-    let accent = st.accent;
     let state = st.helper.live_state();
     match state {
         PageState::Error => {
             hkit::offline(ui, st, area, wid("live.retry"));
         }
-        PageState::Empty => {
-            let (title, line) = if st.helper.following {
-                ("Nothing to follow", "Start a recording in the extension or the Mac app. The newest line shows up here.")
-            } else {
-                ("Unfollowed", "The island left the meeting alone. Follow shows the newest line again.")
-            };
-            let button = if st.helper.following { None } else { Some(("Follow", wid("live.start"))) };
-            if hkit::message(ui, area, accent, Icon::Lyrics, title, line, false, button) {
-                st.helper.set_following(true);
-            }
-        }
+        PageState::Empty => empty(ui, st, area),
         _ => lines(ui, st, area, state),
+    }
+}
+
+/// Nothing to show yet: say what to do, or what the capture is doing.
+fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
+    let running = st.capture.running();
+    let problem = st.capture.problem().map(str::to_string);
+    // (title, line, bad, button label, what it does)
+    let (title, line, bad, label, start) = if !st.helper.following {
+        ("Unfollowed", "The island left the meeting alone. Follow shows the newest line again.".to_string(), false, "Follow", None)
+    } else if let Some(why) = problem {
+        let label = if running { "Stop captions" } else { "Try again" };
+        ("Captions need attention", why, true, label, Some(!running))
+    } else if running {
+        ("Listening to this PC", "Play a video or join a meeting. Its captions show up here and in the island.".to_string(), false, "Stop captions", Some(false))
+    } else {
+        ("Nothing to follow", "Start captions to caption whatever this PC plays, or record in the extension or the Mac app.".to_string(), false, "Start captions", Some(true))
+    };
+    if hkit::message(ui, area, st.accent, Icon::Lyrics, title, &line, bad, Some((label, wid("live.start")))) {
+        match start {
+            Some(on) => st.cmd(Command::Captions(on)),
+            None => st.helper.set_following(true),
+        }
     }
 }
 
@@ -66,6 +79,14 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     // Right to left: Unfollow, Hold, then the "waiting" pill.
     let mut right = head.right();
     if !locked {
+        let on = st.capture.running();
+        let label = if on { "Stop captions" } else { "Start captions" };
+        let w = ui.pill_width(label, false, true);
+        let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+        if ui.pill(wid("live.captions"), b, label, None, if on { PillStyle::Neutral } else { PillStyle::Primary(st.accent) }).clicked {
+            st.cmd(Command::Captions(!on));
+        }
+        right = b.x - PILL_GAP;
         let w = ui.pill_width("Unfollow", false, true);
         let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
         if ui.pill(wid("live.stop"), b, "Unfollow", None, PillStyle::Utility).clicked {
@@ -115,11 +136,16 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     if !cap.translation.is_empty() {
         ui.c.text(&cap.translation, Rect::new(area.x, y, area.w, 40.0), &TextStyle::body().color(color).wrap().top());
     }
-    // Capture runs in the Chrome extension or the Mac app, which the helper has no
-    // route to control: these two buttons act on this view only, and it says so.
+    // Hold and Unfollow act on this view only. Start captions is the island's own capture of what
+    // the PC plays; recordings in the extension or the Mac app are theirs. A capture problem
+    // is said here, never silently.
     if !locked {
-        let note = "Hold and Unfollow change this view. Recording runs in the extension.";
-        ui.c.text(note, Rect::new(area.x, area.bottom() - 14.0, (area.w - 70.0).max(0.0), 14.0), &TextStyle::caption().color(palette::TEXT_FAINT));
+        let (note, tone) = match st.capture.problem() {
+            Some(why) => (why, palette::ORANGE),
+            None if st.capture.running() => ("Captioning what this PC plays. Hold and Unfollow change this view.", palette::TEXT_FAINT),
+            None => ("Hold and Unfollow change this view. Start captions listens to what this PC plays.", palette::TEXT_FAINT),
+        };
+        ui.c.text(note, Rect::new(area.x, area.bottom() - 14.0, (area.w - 70.0).max(0.0), 14.0), &TextStyle::caption().color(tone));
     }
     if total > 0 {
         let n = st.helper.frozen.map_or(total, |i| i + 1);

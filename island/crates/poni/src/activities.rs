@@ -858,6 +858,21 @@ mod tests {
         assert_eq!(collapsed_mode(&st), Mode::Idle);
     }
     #[test]
+    fn our_own_capture_shows_its_line_in_the_pill_though_the_extension_says_overlay_only() {
+        use poni_core::helper::{now_ms, Live, Snapshot, Surface};
+        let mut st = AppState::new(Settings::default(), Store::default());
+        let snap = Snapshot { live: Some(Live { seq: 1, source: "Guten Tag".into(), translation: "Good day".into(), at: Some(now_ms() - 500), ..Default::default() }), surface: Surface::Overlay, ..Default::default() };
+        st.helper.apply(Ok((snap, 5)));
+        assert_eq!(collapsed_mode(&st), Mode::Idle, "the extension's overlay-only pref still hides a line nobody asked for");
+        st.capture = poni_core::capture::CaptureState::On;
+        st.helper.capturing = st.capture.running();
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Caption));
+        // Unfollow on the Live page still lets the island go.
+        st.helper.set_following(false);
+        assert_eq!(collapsed_mode(&st), Mode::Idle);
+    }
+
+    #[test]
     fn a_notice_that_stays_waits_under_a_volume_change_and_a_games_readout() {
         let mut st = AppState::new(Settings::default(), Store::default());
         st.notify(Icon::Download, palette::GREEN, "Update available", "", f64::INFINITY, None);

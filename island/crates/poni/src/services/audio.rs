@@ -172,12 +172,12 @@ impl IMMNotificationClient_Impl for DeviceClient_Impl {
 // Worker thread.
 
 /// COM apartment membership for the current thread.
-struct ComApartment {
-    initialized: bool,
+pub(crate) struct ComApartment {
+    pub(crate) initialized: bool,
 }
 
 impl ComApartment {
-    fn enter_mta() -> Self {
+    pub(crate) fn enter_mta() -> Self {
         // S_OK and S_FALSE both need a matching CoUninitialize; a failure
         // (e.g. RPC_E_CHANGED_MODE) must not be balanced.
         let hr = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
@@ -327,7 +327,7 @@ fn bind(device: &IMMDevice, id: String, gate: &Arc<Gate>, generation: u32) -> Re
 }
 
 /// The endpoint id string ("" if it cannot be read).
-fn device_id(device: &IMMDevice) -> String {
+pub(crate) fn device_id(device: &IMMDevice) -> String {
     match unsafe { device.GetId() } {
         Ok(p) if !p.is_null() => {
             // SAFETY: GetId returns a NUL-terminated, CoTaskMemAlloc'ed string

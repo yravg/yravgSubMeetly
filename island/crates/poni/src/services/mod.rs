@@ -7,6 +7,7 @@ pub mod applemusic_ui;
 pub mod audio;
 pub mod backdrop;
 pub mod bluetooth;
+pub mod capture;
 pub mod engine;
 pub mod clipboard;
 pub mod frames;
@@ -45,6 +46,7 @@ pub struct Services {
     pairdrop: Option<pairdrop::PairDropService>,
     addons: Option<addons::AddonService>,
     helper: Option<helper::HelperService>,
+    capture: Option<capture::CaptureService>,
     engine: Option<engine::EngineService>,
 }
 
@@ -75,10 +77,11 @@ impl Services {
         let addons = started("add-ons", addons::AddonService::start(sink.clone(), on));
         let helper = started("helper link", helper::HelperService::start(sink.clone()));
         let engine = started("engine link", engine::EngineService::start(sink.clone()));
-        Self { media, lyrics, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons, helper, engine }
+        Self { media, lyrics, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons, helper, capture: None, engine }
     }
 
-    pub fn stop(self, _helper: HWND) {
+    pub fn stop(mut self, _helper: HWND) {
+        self.capture_stop();
         if let Some(f) = self.fullscreen {
             f.stop();
         }
@@ -121,6 +124,17 @@ impl Services {
         if let Some(h) = &self.helper {
             h.post(body);
         }
+    }
+
+    /// Start capturing the PC's audio for captions, or say why not. Restarts a running one.
+    pub fn capture_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str) -> Result<(), String> {
+        self.capture = None; // the old one stops first: one device reader at a time
+        self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into()).map_err(|e| format!("Captions could not start ({e})."))?);
+        Ok(())
+    }
+
+    pub fn capture_stop(&mut self) {
+        self.capture = None;
     }
 
     pub fn helper_poll(&self) {
