@@ -21,6 +21,8 @@ const COLS: usize = 3;
 const ROW_H: f32 = 28.0;
 const COL_W: f32 = 150.0;
 const PANEL_PAD: f32 = 8.0;
+/// Space the rule between the pages and the product rows takes.
+const SEP: f32 = 10.0;
 const ICON: f32 = 16.0;
 /// The id the header's keyboard focus lives under.
 pub const KEY_ID: &str = "header.kb";
@@ -33,6 +35,14 @@ pub struct MenuUi {
     pub sel: usize,
     /// The header's focus ring: 0 = the Menu button, n = the n-th tab. None = the keyboard is elsewhere.
     pub ring: Option<usize>,
+    /// Set when Enter chose one of the product rows below the pages: its index among them.
+    pub run: Option<usize>,
+}
+
+/// The product rows under the pages: what the engine and extension let you do now.
+/// The first line of 	ray::product_actions is the engine's status, shown but not chosen.
+pub fn actions(st: &AppState) -> Vec<(String, crate::tray::MenuCmd)> {
+    crate::tray::product_actions(&st.engine, false).into_iter().filter_map(|(l, c)| c.map(|c| (l, c))).collect()
 }
 
 /// Every page the list names: the tab row's order (the board's), then
@@ -81,14 +91,25 @@ impl MenuUi {
     /// One key. `list` = the pages the list names, `tabs` = the tab row.
     /// Returns the page to open, if the key chose one. Esc is the caller's
     /// (it closes the list but keeps the keyboard).
-    pub fn key(&mut self, k: KeyInput, list: &[PageKind], tabs: &[PageKind], current: PageKind) -> Option<PageKind> {
+    pub fn key(&mut self, k: KeyInput, list: &[PageKind], tabs: &[PageKind], current: PageKind, extra: usize) -> Option<PageKind> {
         if self.open {
+            let total = list.len() + extra;
             match k {
                 KeyInput::Enter => {
                     self.open = false;
+                    if self.sel >= list.len() {
+                        self.run = Some(self.sel - list.len());
+                        return None;
+                    }
                     return list.get(self.sel).copied();
                 }
-                _ => self.sel = nav(self.sel, list.len(), k),
+                // Columns belong to the pages; the product rows below are one column.
+                KeyInput::Left | KeyInput::Right => {
+                    if self.sel < list.len() {
+                        self.sel = nav(self.sel, list.len(), k);
+                    }
+                }
+                _ => self.sel = nav(self.sel, total, k),
             }
             return None;
         }
@@ -118,6 +139,7 @@ impl MenuUi {
 pub(crate) fn keyboard(ui: &mut Ui, st: &mut AppState, clicked: bool, row: &[PageKind]) {
     let id = wid(KEY_ID);
     let list = pages(st);
+    let extra = actions(st).len();
     if clicked {
         if st.ui.menu.open {
             st.ui.menu.open = false;
@@ -146,8 +168,13 @@ pub(crate) fn keyboard(ui: &mut Ui, st: &mut AppState, clicked: bool, row: &[Pag
     }
     for k in keys {
         let page = st.page;
-        if let Some(p) = st.ui.menu.key(k, &list, row, page) {
+        if let Some(p) = st.ui.menu.key(k, &list, row, page, extra) {
             go(st, p);
+        }
+        if let Some(i) = st.ui.menu.run.take() {
+            if let Some((_, c)) = actions(st).into_iter().nth(i) {
+                st.cmd(Command::Menu(c));
+            }
         }
     }
 }
@@ -178,7 +205,10 @@ pub(crate) fn draw_list(ui: &mut Ui, st: &mut AppState, body: Rect, header: Rect
     }
     let cols = n.div_ceil(r);
     let w = (cols as f32 * COL_W + 2.0 * PANEL_PAD).min(body.w - 2.0 * super::PAD);
-    let h = r as f32 * ROW_H + 2.0 * PANEL_PAD;
+    let acts = actions(st);
+    // A rule, the engine's status line, then one row per thing to do.
+    let foot = SEP + ROW_H * (1 + acts.len()) as f32;
+    let h = r as f32 * ROW_H + 2.0 * PANEL_PAD + foot;
     let panel = Rect::new(super::snap(header.x, scale), super::snap(header.bottom() + 2.0, scale), w, h);
     ui.c.fill_rrect(panel, 14.0, super::TIP_FILL);
     ui.c.stroke_rrect(panel, 14.0, Color::white(0.14), 1.0);
@@ -207,6 +237,25 @@ pub(crate) fn draw_list(ui: &mut Ui, st: &mut AppState, body: Rect, header: Rect
             go(st, *p);
         }
     }
+    let fy = panel.y + PANEL_PAD + r as f32 * ROW_H;
+    ui.c.fill_rect(Rect::new(panel.x + PANEL_PAD, fy + SEP / 2.0, w - 2.0 * PANEL_PAD, 1.0), Color::white(0.10));
+    let status = st.engine.line.clone();
+    ui.c.text(&status, Rect::new(panel.x + PANEL_PAD + 8.0, fy + SEP, w - 2.0 * PANEL_PAD - 16.0, ROW_H), &TextStyle::body());
+    for (i, (label, cmd)) in acts.into_iter().enumerate() {
+        let cell = Rect::new(panel.x + PANEL_PAD, fy + SEP + ROW_H * (1 + i) as f32, w - 2.0 * PANEL_PAD, ROW_H);
+        let resp = ui.button(wid_n("menu.act", i as u64), cell);
+        if resp.hovered || resp.pressed {
+            ui.c.fill_rrect(cell, 8.0, if resp.pressed { palette::SURFACE_PRESSED } else { palette::SURFACE_HOVER });
+        }
+        if st.ui.menu.sel == n + i && st.ui.menu.ring.is_some() {
+            ui.c.stroke_rrect(cell, 8.0, st.accent, 1.5);
+        }
+        ui.c.text(&label, Rect::new(cell.x + 8.0, cell.y, cell.w - 16.0, cell.h), &name);
+        if resp.clicked {
+            st.ui.menu.open = false;
+            st.cmd(Command::Menu(cmd));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -218,6 +267,26 @@ mod tests {
 
     fn state() -> AppState {
         AppState::new(Settings::default(), Store::default())
+    }
+
+    #[test]
+    fn enter_on_a_product_row_runs_it_and_closes() {
+        let st = state();
+        let list = pages(&st);
+        let tabs = super::super::tabs(&st);
+        let mut m = MenuUi::default();
+        m.open_at(&list, Live);
+        // End goes to the last product row (2 of them); Up/Down walk into and out of the pages.
+        m.key(KeyInput::End, &list, &tabs, Live, 2);
+        assert_eq!(m.sel, list.len() + 1);
+        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Live, 2), None);
+        assert_eq!((m.open, m.run), (false, Some(1)));
+        m.open_at(&list, Live);
+        m.sel = list.len() - 1;
+        m.key(KeyInput::Down, &list, &tabs, Live, 2);
+        assert_eq!(m.sel, list.len());
+        m.key(KeyInput::Right, &list, &tabs, Live, 2);
+        assert_eq!(m.sel, list.len(), "columns belong to the pages");
     }
 
     #[test]
@@ -262,23 +331,23 @@ mod tests {
         let tabs = super::super::tabs(&st);
         let mut m = MenuUi { ring: Some(0), ..MenuUi::default() };
         // On the Menu button Enter opens the list on the page being shown.
-        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Inbox), None);
+        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Inbox, 0), None);
         assert!(m.open);
         assert_eq!(list[m.sel], Inbox);
         // In the list Down moves, Enter opens that page and closes the list.
-        m.key(KeyInput::Down, &list, &tabs, Inbox);
-        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Inbox), Some(list[m.sel]));
+        m.key(KeyInput::Down, &list, &tabs, Inbox, 0);
+        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Inbox, 0), Some(list[m.sel]));
         assert!(!m.open);
         // On a tab Enter opens that tab's page.
         let mut m = MenuUi { ring: Some(0), ..MenuUi::default() };
-        m.key(KeyInput::Right, &list, &tabs, Live);
-        m.key(KeyInput::Right, &list, &tabs, Live);
+        m.key(KeyInput::Right, &list, &tabs, Live, 0);
+        m.key(KeyInput::Right, &list, &tabs, Live, 0);
         assert_eq!(m.ring, Some(2));
-        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Live), Some(tabs[1]));
+        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Live, 0), Some(tabs[1]));
         // Settings is in the list even though it has no tab.
         let mut m = MenuUi::default();
         m.open_at(&list, Live);
-        m.key(KeyInput::End, &list, &tabs, Live);
-        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Live), Some(Settings));
+        m.key(KeyInput::End, &list, &tabs, Live, 0);
+        assert_eq!(m.key(KeyInput::Enter, &list, &tabs, Live, 0), Some(Settings));
     }
 }
