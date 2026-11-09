@@ -2442,7 +2442,8 @@ function showError(raw, { statusText } = {}) {
   btn.classList.toggle('hidden', !action);
   btn.dataset.action = action || '';
   btn.textContent =
-    action === 'pick' ? t('errActionPick') : action === 'settings' ? t('errActionSettings') : t('errActionRetry');
+    action === 'pick' ? t('errActionPick') : action === 'settings' ? t('errActionSettings') : action === 'download' ? t('errActionDownload') : t('errActionRetry');
+  missingModelId = action === 'download' ? (detail.match(/model-not-downloaded\s+(\S+)/)?.[1] || '') : '';
   box.classList.remove('hidden');
 }
 
@@ -2450,10 +2451,20 @@ function hideError() {
   $('error-box')?.classList.add('hidden');
 }
 
+let missingModelId = ''; // the model the last "not downloaded" error named
+async function pullMissingModel() {
+  const r = missingModelId ? await nativePullModel(state.settings.nativeUrl || DEFAULT_NATIVE_URL, missingModelId) : { error: 'no model named' };
+  if (r.error) return showToast(locMessage(r), 'error');
+  showToast(t('modelsPullStarted'));
+  openSettings();
+  setSettingsTab('models');
+}
+
 function onErrorAction() {
   const action = $('btn-error-action').dataset.action;
   hideError();
-  if (action === 'pick') onPickManually();
+  if (action === 'download') void pullMissingModel();
+  else if (action === 'pick') onPickManually();
   else if (action === 'settings') $('btn-settings').click();
   else if (action === 'retry') onStart();
 }
@@ -3017,7 +3028,8 @@ chrome.runtime.onMessage.addListener((msg) => {
         setStatus(t('warmingUp'));
         setStartStep('warmup');
       } else if (s === 'listening') {
-        setStatus(`${t('listening')} — ${activeAsrLabel()} (${msg.data.device || ''})`, 'ok');
+        const tr = msg.data.translate;
+        setStatus(`${t('listening')} — ${activeAsrLabel()} (${msg.data.device || ''})${tr === 'loading' ? ` · ${t('translateLoading')}` : tr === 'missing' ? ` · ${t('translateMissing')}` : ''}`, 'ok');
         setStartStep('listening');
       }
       break;

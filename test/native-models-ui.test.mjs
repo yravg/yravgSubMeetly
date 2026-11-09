@@ -199,3 +199,43 @@ test('Models: folder, free space, change location with the engine refusals in wo
   await page.close();
   cat = saved; refuse = null;
 });
+
+// Engine 204e979: a model that is not on disk is a 409, not a download. The panel says so and offers Download (pull on press only).
+test('Model not downloaded: the error card offers Download, which pulls that model and opens the Models tab', { timeout: 60_000 }, async () => {
+  calls = [];
+  const page = await browser.newPage();
+  await page.setViewport({ width: 520, height: 900 });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.evaluateOnNewDocument((engine) => localStorage.setItem('settings', JSON.stringify({ nativeUrl: engine, uiLang: 'en' })), origin);
+  const go = () => page.goto(`${origin}/app/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+  await go().catch((e) => { if (!/ERR_ABORTED/.test(e.message)) throw e; return go(); });
+  await page.waitForSelector('#btn-start');
+  await page.evaluate(() => chrome.runtime.sendMessage({ target: 'bg', type: 'pipeline-error', data: { message: 'model-not-downloaded openai/whisper-small' } }));
+  await waitRows(page, () => document.querySelector('#error-title')?.textContent === 'Model not downloaded' && !document.querySelector('#error-box').classList.contains('hidden'), 'error card');
+  assert.equal(await page.$eval('#btn-error-action', (b) => b.textContent), 'Download');
+  assert.equal(calls.filter((c) => c.path === '/models/pull').length, 0, 'nothing downloads before the press');
+  await page.click('#btn-error-action');
+  await waitRows(page, () => document.querySelector('#settings-modal')?.dataset.stab === 'models', 'Models tab');
+  assert.deepEqual(calls.at(-1), { path: '/models/pull', body: { id: 'openai/whisper-small' } });
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('Listening status names a translation model that is loading or missing, and nothing when it is ready', { timeout: 60_000 }, async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 520, height: 900 });
+  await page.evaluateOnNewDocument((engine) => localStorage.setItem('settings', JSON.stringify({ nativeUrl: engine, uiLang: 'en' })), origin);
+  const go = () => page.goto(`${origin}/app/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+  await go().catch((e) => { if (!/ERR_ABORTED/.test(e.message)) throw e; return go(); });
+  await page.waitForSelector('#btn-start');
+  const status = async (translate) => {
+    await page.evaluate((tr) => chrome.runtime.sendMessage({ target: 'bg', type: 'pipeline-status', data: { state: 'listening', device: 'cpu', translate: tr } }), translate);
+    await new Promise((r) => setTimeout(r, 150));
+    return page.$eval('#status-text', (e) => e.textContent);
+  };
+  assert.match(await status('loading'), /Loading translation model…/);
+  assert.match(await status('missing'), /Translation model not downloaded \(Models tab\)/);
+  assert.doesNotMatch(await status('ready'), /translation model/i);
+  await page.close();
+});

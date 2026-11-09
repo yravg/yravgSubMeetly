@@ -3,8 +3,10 @@
 // string. Pure and UI-free: the panel resolves `key` through i18n.
 //
 // Each rule: { key, test: RegExp, action?: 'pick' | 'settings' | 'retry' }
-//   action = the one-click recovery the panel should offer (optional).
+//   action = the one-click recovery the panel should offer (optional): 'download' pulls the missing engine model.
 const RULES = [
+  // before nativeOffline: the engine answered, it only lacks the model (the message is `model-not-downloaded <id>`)
+  { key: 'modelMissing', test: /model-not-downloaded/, action: 'download' },
   { key: 'cancelled', test: /^cancelled$|cancelled/i, action: null },
   { key: 'captureBlocked', test: /invoked|activeTab|not been invoked/i, action: 'pick' },
   { key: 'pageNotCapturable', test: /cannot be captured|normal website tab|chrome:\/\/|chrome-extension:/i, action: null },

@@ -3,6 +3,23 @@
 import { DEFAULT_NATIVE_URL } from './registry.js';
 import { assertLocalUrl } from './native-protocol.js';
 
+// The Rust engine downloads nothing by itself: a speech or translation model that is not on disk answers 409
+// { code: 'model-not-downloaded', id }. The error carries that code so the panel can offer Download instead of a generic failure.
+function refused(status, text, what) {
+  const e = new Error(`native ${what} ${status}: ${text}`);
+  if (status === 409) {
+    try {
+      const j = JSON.parse(text);
+      if (j?.code === 'model-not-downloaded') {
+        e.code = j.code;
+        e.modelId = j.id || '';
+        e.message = `model-not-downloaded ${e.modelId}`.trim();
+      }
+    } catch { /* not the engine's JSON: keep the plain message */ }
+  }
+  return e;
+}
+
 function base(url) {
   return assertLocalUrl(url || DEFAULT_NATIVE_URL);
 }
@@ -35,7 +52,7 @@ export async function nativeTranscribeDetailed(
     headers: { 'Content-Type': 'application/octet-stream' },
     body: audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength),
   });
-  if (!r.ok) throw new Error(`native /transcribe ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw refused(r.status, await r.text(), '/transcribe');
   const j = await r.json();
   const lang = typeof j.language === 'string' ? j.language : typeof j.lang === 'string' ? j.lang : null;
   return { text: (j.text || '').trim(), language: lang || null };
@@ -48,7 +65,7 @@ export async function nativeTranscribe(url, audio, { language = 'auto', task = '
     headers: { 'Content-Type': 'application/octet-stream' },
     body: audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength),
   });
-  if (!r.ok) throw new Error(`native /transcribe ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw refused(r.status, await r.text(), '/transcribe');
   const j = await r.json();
   return (j.text || '').trim();
 }
@@ -75,7 +92,7 @@ export async function nativeTranscribeFile(
     headers: { 'Content-Type': 'application/octet-stream' },
     body,
   });
-  if (!r.ok) throw new Error(`native /transcribe_file ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw refused(r.status, await r.text(), '/transcribe_file');
   const j = await r.json();
   onProgress?.(100);
   return (j.segments || []).map((s) => ({
@@ -94,11 +111,12 @@ export async function nativeDraft(url, audio, src, tgt, { language = 'auto' } = 
     body: audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength),
   });
   if (r.status === 501) return null;
-  if (!r.ok) throw new Error(`native /draft ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw refused(r.status, await r.text(), '/draft');
   const j = await r.json();
   return {
     source: (j.source || '').trim(),
     translation: (j.translation || '').trim(),
+    translateState: typeof j.translateState === 'string' ? j.translateState : '', // off | missing | loading | ready (Rust engine)
   };
 }
 
@@ -113,7 +131,7 @@ export async function nativeTranslate(url, text, src, tgt, { fast = false } = {}
     body: text,
   });
   if (r.status === 501) return null;
-  if (!r.ok) throw new Error(`native /translate ${r.status}`);
+  if (!r.ok) throw refused(r.status, await r.text(), '/translate');
   const j = await r.json();
   return (j.text || '').trim();
 }
@@ -127,7 +145,7 @@ export async function nativeTranslateRefine(url, text, draft, src, tgt) {
     body: JSON.stringify({ text, draft: draft || '' }),
   });
   if (r.status === 501) return null;
-  if (!r.ok) throw new Error(`native /translate_refine ${r.status}`);
+  if (!r.ok) throw refused(r.status, await r.text(), '/translate_refine');
   const j = await r.json();
   return (j.text || '').trim();
 }
@@ -332,7 +350,7 @@ export function nativeStartFileJob(
     xhr.onabort = () => reject(new Error('cancelled'));
     xhr.onload = () => {
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new Error(`native /transcribe_file_job ${xhr.status}: ${xhr.responseText}`));
+        reject(refused(xhr.status, xhr.responseText, '/transcribe_file_job'));
         return;
       }
       try {

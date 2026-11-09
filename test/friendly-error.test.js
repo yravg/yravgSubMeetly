@@ -27,3 +27,9 @@ test('cancellation is neutral and unknown errors fall back to generic with the r
   assert.equal(g.key, 'generic');
   assert.equal(g.detail, 'something odd happened');
 });
+
+test('an engine without the model is modelMissing with Download, not nativeOffline', () => {
+  const r = classifyError(new Error('model-not-downloaded openai/whisper-small'));
+  assert.equal(r.key, 'modelMissing');
+  assert.equal(r.action, 'download');
+});

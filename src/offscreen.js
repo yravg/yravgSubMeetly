@@ -253,11 +253,13 @@ async function runPartialRefine() {
           language: srcLang,
         });
         perfSample('draft', performance.now() - tDraft, { device: 'native', audioSec: audio.length / 16000, chars: (draft?.source || '').length });
+        noteTranslateState(draft?.translateState);
         if (draft?.source) {
           text = draft.source;
           translation = draft.translation || '';
         }
       } catch (e) {
+        if (await reportMissingModel(e)) return;
         console.warn('native draft failed, falling back', e);
       }
     }
@@ -297,11 +299,26 @@ async function runPartialRefine() {
       t1,
     });
   } catch (e) {
-    console.warn('partial refine failed', e);
+    if (!(await reportMissingModel(e))) console.warn('partial refine failed', e);
   } finally {
     rt.partialBusy = false;
     schedulePartialRefine();
   }
+}
+
+// The engine has no speech model on disk and downloads nothing by itself: say so once and stop, the panel offers Download.
+async function reportMissingModel(e) {
+  if (e?.code !== 'model-not-downloaded' || !rt.active) return false;
+  toBG('pipeline-error', { message: e.message });
+  await stopCapture();
+  return true;
+}
+// Translation model state from /draft (off | missing | loading | ready): the panel shows it next to "Listening" when it matters.
+let lastTranslateState = '';
+function noteTranslateState(state) {
+  if (!state || state === lastTranslateState) return;
+  lastTranslateState = state;
+  toBG('pipeline-status', { state: 'listening', device: rt.device, translate: state });
 }
 
 function startRefineLoop() {
@@ -402,6 +419,8 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
       rt.translator = await makeTranslator(config, mtProgress(config), { ...engineOpts(), rpc });
     }
 
+    rt.device = info.device;
+    lastTranslateState = '';
     toBG('pipeline-status', { state: 'warmup', device: info.device });
     await rpc('warmup');
   } catch (e) {
@@ -487,7 +506,7 @@ async function processQueue() {
       try {
         await processUtterance(item);
       } catch (e) {
-        console.warn('utterance failed', e);
+        if (!(await reportMissingModel(e))) console.warn('utterance failed', e);
       }
     }
   } finally {
