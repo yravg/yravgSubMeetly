@@ -119,7 +119,9 @@ pub fn current_activity(st: &AppState) -> Option<Activity> {
         return Some(Activity::Game);
     }
     // A line the engine just heard is what the island is for while a meeting runs.
-    if st.helper.pill_line(poni_core::helper::now_ms()).is_some() {
+    // While a synced song plays, the lyrics are the line (the engine hears the song too).
+    let song = crate::pill::lyric::sings(st) && st.media.as_ref().is_some_and(|m| m.is_playing());
+    if !song && st.helper.pill_line(poni_core::helper::now_ms()).is_some() {
         return Some(Activity::Caption);
     }
     let media = st.settings.show_media_activity
@@ -276,6 +278,11 @@ pub fn next_wake(m: &Mode, st: &AppState) -> Option<f64> {
     if !matches!(m, Mode::Expanded(_)) {
         if let Some(end) = media_grace_end(st) {
             consider(end);
+        }
+    }
+    if *m == Mode::Activity(Activity::Caption) {
+        if let Some(t) = crate::pill::live::caption_wake(st) {
+            consider(t);
         }
     }
     if *m == Mode::Activity(Activity::Media) {
@@ -857,6 +864,26 @@ mod tests {
         st.helper.apply(Err("down".into()));
         assert_eq!(collapsed_mode(&st), Mode::Idle);
     }
+    #[test]
+    fn a_playing_synced_song_keeps_the_pill_from_the_captions_of_its_own_audio() {
+        use poni_core::helper::{now_ms, Live, Snapshot, Surface};
+        let heard = Snapshot { live: Some(Live { seq: 1, source: "line one".into(), at: Some(now_ms() - 500), ..Default::default() }), surface: Surface::Island, ..Default::default() };
+        let lrc = "[00:10.00]line one
+[00:20.00]line two
+";
+        // No synced lyrics: the caption shows, as before.
+        let mut st = playing(None);
+        st.helper.apply(Ok((heard.clone(), 5)));
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Caption));
+        // A synced song playing: its lyrics win.
+        let mut st = playing(Some(lrc));
+        st.helper.apply(Ok((heard, 5)));
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Media));
+        // Paused: the song is not the audio any more, the caption is back.
+        st.media.as_mut().unwrap().timeline = Timeline::new(12.0, 200.0, 0.0, false);
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Caption));
+    }
+
     #[test]
     fn our_own_capture_shows_its_line_in_the_pill_though_the_extension_says_overlay_only() {
         use poni_core::helper::{now_ms, Live, Snapshot, Surface};

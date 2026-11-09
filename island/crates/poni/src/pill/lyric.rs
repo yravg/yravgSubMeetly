@@ -436,34 +436,57 @@ impl State {
             return None;
         };
         let shown = self.show(now, on_screen, i, text, reading_sig(st, i), || reading_at(st, i));
-        let line_w = ui.c.measure(&shown.text, &style(), 10_000.0).0;
-        let reading_w = shown.reading.as_ref().map_or(0.0, |r| ui.c.measure(r, &reading_style(), 10_000.0).0);
-        let w = line_w.max(reading_w);
-        if area.w < MIN_W {
-            return Some(w);
-        }
-        let area = area.inset(-SLACK, 0.0);
-        shown.slot_w = area.w;
-        // On battery saver a change is a plain swap: one frame a line, not a
-        // fade's worth (the change repeats all song long).
-        let k = if st.power.saver { 1.0 } else { ((now - shown.since) / FADE_S) as f32 };
-        if k >= 1.0 {
-            shown.leaving = None;
-            words(ui.c, &shown.text, shown.reading.as_deref(), area);
-            return Some(w);
-        }
-        // Moving lines glide between pixels; at rest they sit on whole pixels.
-        ui.request_anim();
-        let snap = ui.c.set_text_snap(false);
-        let ((come_a, come_dy), (gone_a, gone_dy)) = fade(k);
-        if let Some((old, old_reading, w)) = shown.leaving.as_ref().filter(|_| gone_a > 0.0) {
-            let r = Rect::from_center(area.center(), *w, area.h).offset(0.0, gone_dy);
-            ui.c.with_alpha(gone_a, |c| words(c, old, old_reading.as_deref(), r));
-        }
-        ui.c.with_alpha(come_a, |c| words(c, &shown.text, shown.reading.as_deref(), area.offset(0.0, come_dy)));
-        ui.c.set_text_snap(snap);
-        Some(w)
+        Some(paint(ui, shown, now, st.power.saver, area))
     }
+}
+
+/// Draw `shown` in `area` (cross-fading from the line it replaced) and say how wide it is.
+fn paint(ui: &mut Ui, shown: &mut Shown, now: f64, saver: bool, area: Rect) -> f32 {
+    let line_w = ui.c.measure(&shown.text, &style(), 10_000.0).0;
+    let reading_w = shown.reading.as_ref().map_or(0.0, |r| ui.c.measure(r, &reading_style(), 10_000.0).0);
+    let w = line_w.max(reading_w);
+    if area.w < MIN_W {
+        return w;
+    }
+    let area = area.inset(-SLACK, 0.0);
+    shown.slot_w = area.w;
+    // On battery saver a change is a plain swap: one frame a line, not a
+    // fade's worth (the change repeats all song long).
+    let k = if saver { 1.0 } else { ((now - shown.since) / FADE_S) as f32 };
+    if k >= 1.0 {
+        shown.leaving = None;
+        words(ui.c, &shown.text, shown.reading.as_deref(), area);
+        return w;
+    }
+    // Moving lines glide between pixels; at rest they sit on whole pixels.
+    ui.request_anim();
+    let snap = ui.c.set_text_snap(false);
+    let ((come_a, come_dy), (gone_a, gone_dy)) = fade(k);
+    if let Some((old, old_reading, w)) = shown.leaving.as_ref().filter(|_| gone_a > 0.0) {
+        let r = Rect::from_center(area.center(), *w, area.h).offset(0.0, gone_dy);
+        ui.c.with_alpha(gone_a, |c| words(c, old, old_reading.as_deref(), r));
+    }
+    ui.c.with_alpha(come_a, |c| words(c, &shown.text, shown.reading.as_deref(), area.offset(0.0, come_dy)));
+    ui.c.set_text_snap(snap);
+    w
+}
+
+thread_local! {
+    // The caption pill's own line on screen: same fade as a lyric line, apart from the song's.
+    static CAPTION: RefCell<State> = RefCell::new(State::default());
+}
+
+/// The engine's caption `seq` in `area`, its translation under it when it has one: the lyric
+/// pill's row layout and cross-fade. A new `seq` fades the old line out, as long as the pill
+/// was on screen up to `until` (app clock: when the line stops counting as fresh).
+pub fn draw_caption(ui: &mut Ui, st: &AppState, area: Rect, seq: u64, source: &str, translation: &str, until: f64) {
+    let _ = CAPTION.try_with(|s| {
+        let Ok(mut s) = s.try_borrow_mut() else { return };
+        let on_screen = s.seen(st.now, Some(until));
+        let reading = || Some(translation.to_string()).filter(|t| !t.is_empty());
+        let shown = s.show(st.now, on_screen, seq as usize, source, translation.len(), reading);
+        paint(ui, shown, st.now, st.power.saver, area);
+    });
 }
 
 /// Where a line and its reading go in `area`: a line alone in the middle,
@@ -925,5 +948,22 @@ mod tests {
             assert!(f.1 .0 <= prev.1 .0 && f.1 .1 <= prev.1 .1, "the old line only leaves");
             prev = f;
         }
+    }
+
+    #[test]
+    fn a_caption_fades_in_over_the_one_before_and_its_translation_arriving_does_not_fade() {
+        let mut s = State::default();
+        let a = s.show(100.0, false, 1, "zeile eins", 0, || None);
+        assert!(a.leaving.is_none(), "the first caption just shows");
+        // A translation for the same caption (same seq and text): new words under it, no fade.
+        let a = s.show(100.5, true, 1, "zeile eins", 9, || Some("line one".into()));
+        assert!(a.leaving.is_none());
+        assert_eq!(a.reading.as_deref(), Some("line one"));
+        // The next caption while the pill is on screen: the old one leaves with its translation.
+        let b = s.show(104.0, true, 2, "zeile zwei", 0, || None);
+        assert_eq!(b.leaving.as_ref().map(|l| (l.0.as_str(), l.1.as_deref())), Some(("zeile eins", Some("line one"))));
+        // Away for a while: it just shows.
+        let c = s.show(120.0, false, 3, "zeile drei", 0, || None);
+        assert!(c.leaving.is_none());
     }
 }

@@ -140,20 +140,25 @@ fn snap(ui: &Ui, v: f32) -> f32 {
 
 // ------------------------------------------------------------------ caption
 
+/// A dot, then the line the engine just heard in the lyric pill's layout: the source, its
+/// translation under it, a new line cross-fading in ([`crate::pill::lyric::draw_caption`]).
 pub(crate) fn draw_caption(ui: &mut Ui, st: &AppState, body: Rect) {
-    let (line, translation) = st.helper.pill_text(poni_core::helper::now_ms()).unwrap_or_default();
-    let cy = body.center().y;
-    ui.c.fill_circle(Point::new(body.x + GLYPH_INSET + 3.0, cy), 3.0, palette::GREEN);
+    let now_ms = poni_core::helper::now_ms();
+    let Some(live) = st.helper.pill_line(now_ms) else { return };
+    ui.c.fill_circle(Point::new(body.x + GLYPH_INSET + 3.0, body.center().y), 3.0, palette::GREEN);
     let x = body.x + TEXT_INSET + 8.0;
-    let w = body.right() - TEXT_INSET - x;
-    if translation.is_empty() {
-        ui.c.text(line, Rect::new(x, body.y, w, body.h), &TextStyle::body().color(INK));
-    } else {
-        // Source over its translation, in the person's translation colour.
-        let color = crate::pages::hkit::translation_color(ui, st.settings.translation_color);
-        ui.c.text(line, Rect::new(x, cy - 21.0, w, 20.0), &TextStyle::body().color(INK));
-        ui.c.text(translation, Rect::new(x, cy + 1.0, w, 20.0), &TextStyle::footnote().color(color));
-    }
+    let area = Rect::new(x, body.y, body.right() - TEXT_INSET - x, body.h);
+    // The line counts as on screen until it stops being fresh (app clock).
+    let left_ms = live.at.map_or(0, |a| (a + poni_core::helper::LIVE_FRESH_MS).saturating_sub(now_ms));
+    crate::pill::lyric::draw_caption(ui, st, area, live.seq, &live.source, &live.translation, st.now + left_ms as f64 / 1000.0);
+}
+
+/// When the caption line stops being fresh (app clock), so the pill gives way on its own.
+pub fn caption_wake(st: &AppState) -> Option<f64> {
+    let now_ms = poni_core::helper::now_ms();
+    let live = st.helper.pill_line(now_ms)?;
+    let left_ms = (live.at? + poni_core::helper::LIVE_FRESH_MS).saturating_sub(now_ms);
+    Some(st.now + left_ms as f64 / 1000.0 + 0.05)
 }
 
 // -------------------------------------------------------------------- timer
