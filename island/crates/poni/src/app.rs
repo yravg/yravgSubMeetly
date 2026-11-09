@@ -1896,7 +1896,8 @@ impl App {
         }
         let Some(id) = m.chosen(kind) else { return };
         m.placing = Some(kind);
-        services::models::relocate(self.sink.clone(), poni_core::helper::configured_port(), kind, id, pick);
+        let owner = self.settings_win.as_ref().map(|w| crate::events::SendHwnd::new(w.hwnd));
+        services::models::relocate(self.sink.clone(), poni_core::helper::configured_port(), kind, id, pick, owner);
     }
 
     fn on_model_placed(&mut self, kind: poni_core::models::Kind, result: std::result::Result<(), String>) {

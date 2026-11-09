@@ -115,19 +115,19 @@ pub(crate) fn app_window_url_ok(url: &str) -> bool {
 
 /// Ask for a folder (Windows' own picker, on its own thread) and hand the choice to `then`
 /// (`None` when cancelled or the picker failed). Only an existing file-system folder comes back.
-pub fn pick_folder(title: &str, then: impl FnOnce(Option<String>) + Send + 'static) {
+/// `owner`: the window it opens in front of (without one it can open behind it).
+pub fn pick_folder(title: &str, owner: Option<crate::events::SendHwnd>, then: impl FnOnce(Option<String>) + Send + 'static) {
     use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_INPROC_SERVER};
     use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH};
     let title = HSTRING::from(title);
     run("pick-folder", move || {
-        // shortcut: no owner window, so the picker can open behind Settings; pass the Settings HWND when it bothers anyone.
         let picked = unsafe {
             (|| -> windows::core::Result<String> {
                 let dlg: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)?;
                 dlg.SetOptions(dlg.GetOptions()? | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM)?;
                 dlg.SetTitle(&title)?;
                 // Cancel is an error (HRESULT_FROM_WIN32(ERROR_CANCELLED)) and means "no folder".
-                dlg.Show(None)?;
+                dlg.Show(owner.map_or(windows::Win32::Foundation::HWND::default(), |h| h.hwnd()))?;
                 let name = dlg.GetResult()?.GetDisplayName(SIGDN_FILESYSPATH)?;
                 let path = name.to_string();
                 CoTaskMemFree(Some(name.0 as *const _));

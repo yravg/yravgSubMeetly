@@ -102,9 +102,10 @@ pub fn select(sink: EventSink, port: u16, kind: Kind, id: String) {
 }
 
 /// Move `id` to a folder: the one the person picks (`pick`), or back to the engine's default.
+/// `owner`: the window the picker opens in front of.
 /// The engine copies in the background and checks the copy before it switches, so `AppEvent::ModelPlaced`
 /// only says the request was taken; `AppEvent::Models` then shows the progress.
-pub fn relocate(sink: EventSink, port: u16, kind: Kind, id: String, pick: bool) {
+pub fn relocate(sink: EventSink, port: u16, kind: Kind, id: String, pick: bool, owner: Option<crate::events::SendHwnd>) {
     let finish = move |result| sink.send(AppEvent::ModelPlaced { kind, result });
     let post = move |dir: Option<String>| {
         let body = serde_json::json!({ "id": id, "dir": dir }).to_string();
@@ -116,7 +117,7 @@ pub fn relocate(sink: EventSink, port: u16, kind: Kind, id: String, pick: bool) 
     };
     if pick {
         // Cancelled: no request (a null dir would mean "the default folder"), only the event that frees the row.
-        crate::shell::pick_folder(&format!("Folder for the {}", kind.label().to_lowercase()), move |dir| match dir.filter(|d| !d.trim().is_empty()) {
+        crate::shell::pick_folder(&format!("Folder for the {}", kind.label().to_lowercase()), owner, move |dir| match dir.filter(|d| !d.trim().is_empty()) {
             Some(d) => finish(post(Some(d))),
             None => finish(Ok(())),
         });
