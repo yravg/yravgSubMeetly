@@ -228,6 +228,25 @@ pub fn catalog_spec(id: &str) -> Option<&'static Spec> {
     CATALOG.iter().find(|spec| spec.id == id)
 }
 
+/// A route needs a model that is not (fully) downloaded. Only `POST /models/pull` downloads.
+#[derive(Debug)]
+pub struct ModelNotDownloaded {
+    pub id: String,
+    pub kind: Kind,
+}
+
+impl std::fmt::Display for ModelNotDownloaded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let what = match self.kind {
+            Kind::Asr => "speech",
+            Kind::Translate => "translation",
+        };
+        write!(f, "{what} model not downloaded")
+    }
+}
+
+impl std::error::Error for ModelNotDownloaded {}
+
 /// What the hub cache holds for one model.
 #[derive(Debug, PartialEq, Eq)]
 pub struct CacheState {

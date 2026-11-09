@@ -577,3 +577,50 @@ fn a_missing_drive_is_a_clear_error_and_recovers_when_it_returns() {
         (json!(true), json!(true))
     );
 }
+
+// ---- no route downloads a model --------------------------------------------------------
+
+fn call_pcm(app: &App, method: &str, path: &str, samples: usize) -> (u16, Value) {
+    let request = Request {
+        method: method.to_string(),
+        target: path.to_string(),
+        headers: vec![("host".to_string(), "127.0.0.1:17865".to_string())],
+        body: vec![0u8; samples * 4],
+        peer_loopback: true,
+        body_file: None,
+    };
+    let response = app.handle(&request);
+    (response.status, response.body.unwrap_or(Value::Null))
+}
+
+#[test]
+fn a_missing_model_is_a_409_at_once_and_nothing_is_downloaded() {
+    let (app, _, cache) = app();
+    // Qwen is chosen (the default) but nothing is on disk; the Hub is a closed port.
+    let started = Instant::now();
+    for (path, what) in [
+        ("/transcribe", "speech"),
+        ("/transcribe_file", "speech"),
+        ("/draft?src=de&tgt=en", "speech"),
+        ("/translate?src=de&tgt=id", "translation"),
+        ("/translate_refine?src=de&tgt=id", "translation"),
+    ] {
+        let (status, body) = call_pcm(&app, "POST", path, 16_000);
+        assert_eq!(status, 409, "{path}: {body}");
+        assert_eq!(body["code"], "model-not-downloaded", "{path}");
+        assert_eq!(
+            body["error"],
+            format!("{what} model not downloaded"),
+            "{path}"
+        );
+        assert!(body["id"].is_string(), "{path}");
+    }
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "answered without trying the network"
+    );
+    assert!(
+        !cache.join("models--openai--whisper-base").exists(),
+        "no request created a download"
+    );
+}

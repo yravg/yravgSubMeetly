@@ -1178,7 +1178,7 @@ mod tests {
         let scratch = Scratch::new();
         let (legacy, hub) = (scratch.path("tmp-hub"), scratch.path("hub"));
         let files = catalog_model_in(&legacy);
-        let notes = migrate_legacy(&[legacy.clone()], &hub, &|_| true);
+        let notes = migrate_legacy(std::slice::from_ref(&legacy), &hub, &|_| true);
         assert_eq!(notes.len(), 1, "{notes:?}");
         assert_whole(&hub, &files);
         assert_whole(&legacy, &files); // never deleted
@@ -1194,14 +1194,14 @@ mod tests {
         catalog_model_in(&legacy);
         // The model already there (even half there) is never overwritten.
         fs::create_dir_all(model_root(&hub, ID).join("blobs")).unwrap();
-        assert!(migrate_legacy(&[legacy.clone()], &hub, &|_| true).is_empty());
+        assert!(migrate_legacy(std::slice::from_ref(&legacy), &hub, &|_| true).is_empty());
         assert!(!cache_state(&hub, ID, Kind::Asr).downloaded);
         // A model the user keeps in its own folder is not copied to the default one.
         let other = scratch.path("hub2");
-        assert!(migrate_legacy(&[legacy.clone()], &other, &|_| false).is_empty());
+        assert!(migrate_legacy(std::slice::from_ref(&legacy), &other, &|_| false).is_empty());
         assert!(!model_root(&other, ID).exists());
         // The same folder, and an unfinished download, are left alone.
-        assert!(migrate_legacy(&[legacy.clone()], &legacy, &|_| true).is_empty());
+        assert!(migrate_legacy(std::slice::from_ref(&legacy), &legacy, &|_| true).is_empty());
         let partial = scratch.path("partial");
         fake_model(&partial);
         fs::remove_file(model_root(&partial, ID).join("snapshots/rev1/model.safetensors")).unwrap();

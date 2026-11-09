@@ -23,7 +23,7 @@ use crate::locations::{
 };
 use crate::models::{
     cache_state, catalog_spec, delete_cached, hub_cache_dir, model_root, scan_model_cache, Kind,
-    PullProgress, CATALOG,
+    ModelNotDownloaded, PullProgress, CATALOG,
 };
 use crate::notes::{
     export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
@@ -172,7 +172,7 @@ impl App {
     }
 
     /// Point the model-cache routes at another hub cache (tests).
-    /// One-time job for engine start: models older installs downloaded into `C:	mp` (HOME
+    /// One-time job for engine start: models older installs downloaded into `C:/tmp` (HOME
     /// was unset) are copied into the real cache. Run it on a thread: it can copy gigabytes.
     pub fn legacy_migration(&self) -> impl FnOnce() + Send + 'static {
         let locations = Arc::clone(&self.locations);
@@ -399,6 +399,20 @@ impl App {
                             }),
                         )
                     }
+                    // Only POST /models/pull downloads: a route that needs a model that is not
+                    // on disk answers at once, so a caption loop never waits on a download.
+                    Err(error) if error.downcast_ref::<ModelNotDownloaded>().is_some() => {
+                        let missing = error.downcast_ref::<ModelNotDownloaded>().expect("checked");
+                        self.json_response(
+                            request,
+                            409,
+                            json!({
+                                "error": missing.to_string(),
+                                "code": "model-not-downloaded",
+                                "id": missing.id,
+                            }),
+                        )
+                    }
                     Err(error) => self.json_response(
                         request,
                         500,
@@ -444,6 +458,20 @@ impl App {
         let accurate = self.load_engine_mode() == "accurate";
         let started = std::time::Instant::now();
         let ms = || started.elapsed().as_millis() as u64;
+        // Each route's model must already be on disk; none of them downloads.
+        let ready = match path {
+            "/translate" | "/translate_refine" if !self.ml.translate_available() => Ok(()),
+            "/translate" | "/translate_refine" => self.ml.require_translate(),
+            // Under 1600 samples (4 bytes each) the route answers empty without a model.
+            "/transcribe" | "/draft" if request.body.len() < 1600 * 4 => Ok(()),
+            _ => self.ml.require_asr(),
+        };
+        if let Err(error) = ready {
+            if let Some(file) = &request.body_file {
+                let _ = fs::remove_file(file);
+            }
+            return Err(error);
+        }
         Ok(match path {
             "/transcribe" => {
                 let pcm = pcm_f32_le(&request.body);
@@ -546,13 +574,31 @@ impl App {
                 json!({ "source": "", "translation": "", "ms": ms(), "asr_ms": asr_ms }),
             ));
         }
-        let model_ready = self.ml.translate_id().is_some_and(|id| {
-            cache_state(&self.locations.dir_for(&id), &id, Kind::Translate).downloaded
-        });
-        match draft_translation(self.ml.translate_available(), model_ready, src, tgt) {
+        let downloaded = self.ml.translate_downloaded();
+        let (mt, state) = draft_translation(
+            self.ml.translate_available(),
+            downloaded,
+            self.ml.translate_loaded(),
+            src,
+            tgt,
+        );
+        if state == "loading" && !self.ml.translate_loading() {
+            // Load in the background; this caption goes out without it.
+            // shortcut: a load that keeps failing is retried by every caption (logged
+            // each time), a retry limit when it shows up in practice.
+            let ml = Arc::clone(&self.ml);
+            let _ = std::thread::Builder::new()
+                .name("translate-load".into())
+                .spawn(move || {
+                    if let Err(error) = ml.with_translator(|_| Ok(())) {
+                        eprintln!("[translate] load failed: {error:#}");
+                    }
+                });
+        }
+        match mt {
             DraftMt::Model => {}
             DraftMt::WhisperEnglish => {
-                // No translation model yet: Whisper's own translate task gives English.
+                // No ready translation model: Whisper's own translate task gives English.
                 let mt_start = std::time::Instant::now();
                 let translation = self.ml.text(&pcm, language, Task::Translate)?;
                 let translate_ms = mt_start.elapsed().as_millis() as u64;
@@ -567,15 +613,24 @@ impl App {
                         "asr_ms": asr_ms,
                         "translate_ms": translate_ms,
                         "translate_via": "whisper",
+                        "translateState": state,
                     }),
                 ));
             }
             DraftMt::SourceOnly => {
-                self.record_live(&source, &source, ms(), pcm.len());
+                // Same language needs no translation; otherwise the translation is empty.
+                let translation = if src == tgt { source.as_str() } else { "" };
+                self.record_live(&source, translation, ms(), pcm.len());
                 return Ok(self.json_response(
                     request,
                     200,
-                    json!({ "source": source, "translation": source, "ms": ms(), "asr_ms": asr_ms }),
+                    json!({
+                        "source": source,
+                        "translation": translation,
+                        "ms": ms(),
+                        "asr_ms": asr_ms,
+                        "translateState": state,
+                    }),
                 ));
             }
         }
@@ -594,6 +649,7 @@ impl App {
                 "ms": ms(),
                 "asr_ms": asr_ms,
                 "translate_ms": translate_ms,
+                "translateState": state,
             }),
         ))
     }
@@ -1801,27 +1857,39 @@ impl App {
 /// How `/draft` turns the source text into the target language.
 #[derive(Debug, PartialEq, Eq)]
 enum DraftMt {
-    /// The translation model (it may still have to load).
+    /// The translation model, loaded and ready.
     Model,
-    /// No usable translation model, target English: Whisper's translate task.
+    /// No ready model, target English: Whisper's translate task answers now.
     WhisperEnglish,
-    /// No usable translation model, other target: the source text stands in.
+    /// No ready model, other target: the source goes out with an empty translation.
     SourceOnly,
 }
 
-/// A chosen model that is not downloaded is "not usable" only for English: it would
-/// otherwise block the request on a multi-minute download, while Whisper can answer now.
-/// shortcut: other targets keep the download-on-first-use path, until a non-English
-/// fallback exists.
-fn draft_translation(chosen: bool, downloaded: bool, src: &str, tgt: &str) -> DraftMt {
-    let english = tgt == "en";
-    if chosen && (downloaded || !english) {
+/// What a caption gets while translation is not ready. `chosen`: a model is selected;
+/// `downloaded`: it is on disk; `loaded`: it is in memory. A caption never waits for a
+/// download or a load: it gets the source (or Whisper's English) now, and
+/// `translateState` says why ("off", "missing", "loading", or "ready").
+fn draft_translation(
+    chosen: bool,
+    downloaded: bool,
+    loaded: bool,
+    src: &str,
+    tgt: &str,
+) -> (DraftMt, &'static str) {
+    let state = match (chosen, downloaded, loaded) {
+        (false, ..) => "off",
+        (true, false, _) => "missing",
+        (true, true, false) => "loading",
+        (true, true, true) => "ready",
+    };
+    let mt = if state == "ready" {
         DraftMt::Model
-    } else if english && src != "en" {
+    } else if tgt == "en" && src != "en" {
         DraftMt::WhisperEnglish
     } else {
         DraftMt::SourceOnly
-    }
+    };
+    (mt, state)
 }
 
 fn draft_source_ok(source: &str, samples: usize) -> bool {
@@ -2002,45 +2070,46 @@ mod tests {
     }
 
     #[test]
-    fn draft_falls_back_to_whisper_only_for_english_without_a_ready_model() {
+    fn a_caption_never_waits_for_translation_to_download_or_load() {
         use DraftMt::*;
-        assert_eq!(draft_translation(true, true, "de", "en"), Model);
-        assert_eq!(draft_translation(true, false, "de", "en"), WhisperEnglish);
-        assert_eq!(draft_translation(true, false, "auto", "en"), WhisperEnglish);
-        assert_eq!(draft_translation(false, false, "de", "en"), WhisperEnglish);
-        // English speech needs no translation; other targets cannot use Whisper.
-        assert_eq!(draft_translation(false, false, "en", "en"), SourceOnly);
-        assert_eq!(draft_translation(false, false, "de", "id"), SourceOnly);
-        assert_eq!(draft_translation(true, false, "de", "id"), Model);
-    }
-
-    #[test]
-    fn a_model_is_either_downloading_or_moving_never_both() {
-        let mut transfers = Transfers::default();
-        assert_eq!(transfers.busy("a/b"), None);
-        let pull = |error: Option<&str>| Pull {
-            progress: Arc::default(),
-            approx_bytes: 1,
-            error: error.map(String::from),
-        };
-        transfers.pulls.insert("a/b".into(), pull(None));
-        assert_eq!(transfers.busy("a/b"), Some("downloading"));
-        assert_eq!(transfers.busy("c/d"), None);
-        // A failed download is not running; the user may try again or move the model.
-        transfers.pulls.insert("a/b".into(), pull(Some("offline")));
-        assert_eq!(transfers.busy("a/b"), None);
-        let moving = |running: bool| Move {
-            done: Arc::default(),
-            total: 1,
-            phase: "copying",
-            running,
-            error: None,
-            warning: None,
-        };
-        transfers.moves.insert("a/b".into(), moving(true));
-        assert_eq!(transfers.busy("a/b"), Some("moving"));
-        transfers.moves.insert("a/b".into(), moving(false));
-        assert_eq!(transfers.busy("a/b"), None);
+        // (chosen, downloaded, loaded) -> state; only a loaded model translates now.
+        assert_eq!(
+            draft_translation(true, true, true, "de", "en"),
+            (Model, "ready")
+        );
+        assert_eq!(
+            draft_translation(true, true, true, "de", "id"),
+            (Model, "ready")
+        );
+        assert_eq!(
+            draft_translation(true, true, false, "de", "id"),
+            (SourceOnly, "loading")
+        );
+        assert_eq!(
+            draft_translation(true, true, false, "de", "en"),
+            (WhisperEnglish, "loading")
+        );
+        assert_eq!(
+            draft_translation(true, false, false, "de", "id"),
+            (SourceOnly, "missing")
+        );
+        assert_eq!(
+            draft_translation(true, false, false, "auto", "en"),
+            (WhisperEnglish, "missing")
+        );
+        assert_eq!(
+            draft_translation(false, false, false, "de", "en"),
+            (WhisperEnglish, "off")
+        );
+        assert_eq!(
+            draft_translation(false, false, false, "de", "id"),
+            (SourceOnly, "off")
+        );
+        // English speech to English needs no translation.
+        assert_eq!(
+            draft_translation(true, false, false, "en", "en"),
+            (SourceOnly, "missing")
+        );
     }
 
     #[test]

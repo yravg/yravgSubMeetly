@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 
 use crate::audio::{self, MonoStream, Windows, SAMPLE_RATE};
 use crate::locations::Locations;
-use crate::models::{catalog_spec, Kind};
+use crate::models::{cache_state, catalog_spec, Kind, ModelNotDownloaded};
 use crate::translate::{Translator, DEFAULT_TRANSLATE_MODEL};
 use crate::whisper::DEFAULT_ASR_MODEL;
 use crate::whisper::{repo_for, Segment, Task, WhisperAsr};
@@ -201,6 +201,38 @@ impl Ml {
         read(&self.translate_model).is_some()
     }
 
+    /// The folder holding a fully downloaded `id`. A loader never fetches: a model that is
+    /// not on disk (or whose folder is away) is an error the route reports at once.
+    fn downloaded_dir(&self, id: &str, kind: Kind) -> Result<std::path::PathBuf> {
+        let cache = self.locations.usable_dir(id)?;
+        if !cache_state(&cache, id, kind).downloaded {
+            return Err(ModelNotDownloaded {
+                id: id.to_string(),
+                kind,
+            }
+            .into());
+        }
+        Ok(cache)
+    }
+
+    /// Fails with `ModelNotDownloaded` / `ModelDirUnavailable` unless the speech model is ready to load.
+    pub fn require_asr(&self) -> Result<()> {
+        self.downloaded_dir(&self.asr_id(), Kind::Asr).map(drop)
+    }
+
+    pub fn require_translate(&self) -> Result<()> {
+        let id = self
+            .translate_id()
+            .ok_or_else(|| anyhow!("translation is off"))?;
+        self.downloaded_dir(&id, Kind::Translate).map(drop)
+    }
+
+    /// True when the translation model is on disk (its folder present) and the choice is on.
+    pub fn translate_downloaded(&self) -> bool {
+        self.translate_id()
+            .is_some_and(|id| self.downloaded_dir(&id, Kind::Translate).is_ok())
+    }
+
     pub fn with_asr<R>(&self, f: impl FnOnce(&mut WhisperAsr) -> Result<R>) -> Result<R> {
         let want = self.asr_id();
         let mut guard = lock(&self.asr);
@@ -208,8 +240,8 @@ impl Ml {
             // Free the old weights first: two Whisper models at once is gigabytes.
             *guard = None;
             *write(&self.asr_loaded_id) = None;
-            // Not loaded and its folder is away: say so, never fetch it somewhere else.
-            let cache = self.locations.usable_dir(&want)?;
+            // Not on disk, or its folder is away: say so. Only POST /models/pull downloads.
+            let cache = self.downloaded_dir(&want, Kind::Asr)?;
             eprintln!("[asr] loading {want} ...");
             self.asr_loading.store(true, Ordering::Relaxed);
             let loaded = WhisperAsr::load(&want, self.device.clone(), &cache);
@@ -228,7 +260,7 @@ impl Ml {
         if guard.as_ref().map(|(id, _)| id) != Some(&want) {
             *guard = None;
             *write(&self.mt_loaded_id) = None;
-            let cache = self.locations.usable_dir(&want)?;
+            let cache = self.downloaded_dir(&want, Kind::Translate)?;
             eprintln!("[translate] loading {want} ...");
             self.mt_loading.store(true, Ordering::Relaxed);
             let loaded = Translator::load(&want, self.device.clone(), &cache);
