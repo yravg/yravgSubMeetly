@@ -98,9 +98,11 @@ Order: T1, T2, T3 before any code. T4 first in build. T5 before T6. T7 after T6.
 
 ## Open questions
 
-| Question | Who | Recommendation |
+Answered 2026-11-09 (owner: "Yes for all", margin left to the lead's recommendation):
+
+| Question | Decision | Why |
 |---|---|---|
-| "Same 100% for credits": copy solvarium-chat's credit rules exactly (margin 0.35 over OpenRouter cost), or charge cloud answers at cost (margin 0)? | owner | Copy exactly (margin 0.35), as TIDE-020 says; solvarium-chat has no "100%" figure. |
-| Pro monthly allowance: Oyenza gives 1,000 coins. At 1 credit = Rp100, 1,000 credits sell for Rp100.000 (~$6.3) and cost about $4.6 wholesale, against a $4.99 price. | owner | 400 credits / month on Pro, 1,000 on Agent; review after a month of real usage. |
-| Server for credits and plans | owner | Share the solvarium-chat backend (one yravg wallet); until it ships its debit code, ship TIDE-018/019 with Local, Register-only and the owner's OpenRouter key only. |
-| Rotate the OpenRouter key pasted in chat on 2026-11-09 | owner | Yes; the lead replaces `%USERPROFILE%/.yravg/openrouter.key`. |
+| Credit margin | Copy solvarium-chat exactly: margin per model 0.20–0.40, default 0.35 over OpenRouter `usage.cost` | One rule for both products and one shared wallet; 35% covers payment fees (Xendit/Paddle ~3–5%), IDR/USD swings between top-up and use, retries and failed answers, and the free starter credits; cheap models can sit at 0.20 |
+| Pro / Agent allowance | 400 credits / month on Pro, 1,000 on Agent; review after one month of real usage | 1,000 credits on a $4.99 plan cost about $4.6 in model fees |
+| Server | Share the solvarium-chat backend (one yravg wallet); until its debit code (T06–T08) ships, Ask Tide runs Local, Register-only and the owner's OpenRouter key only | No second billing stack |
+| OpenRouter key | Owner rotates the key pasted in chat; the lead replaces `%USERPROFILE%/.yravg/openrouter.key` when the new key arrives | Key is in the chat log |
