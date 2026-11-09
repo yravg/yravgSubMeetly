@@ -1335,6 +1335,37 @@ function applyTabRows() {
   });
 }
 
+// Where live captions show: 'overlay' (page), 'island' (pill on the desktop) or 'both'.
+// Key `captionSurface` in chrome.storage.local is read by content.js; the helper keeps a
+// copy (ui-prefs) because the island reads captions from the helper, which has none with
+// the in-browser engine.
+const CAPTION_SURFACES = ['overlay', 'island', 'both'];
+let captionSurface = 'overlay';
+
+function applyCaptionSurface() {
+  document.querySelectorAll('#surface-toggle button').forEach((b) => {
+    const on = b.dataset.surface === captionSurface;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  $('surface-engine-hint')?.classList.toggle(
+    'hidden',
+    captionSurface === 'overlay' || state.settings.engine === 'native',
+  );
+}
+
+async function setCaptionSurface(value) {
+  captionSurface = CAPTION_SURFACES.includes(value) ? value : 'overlay';
+  await chrome.storage.local.set({ captionSurface });
+  applyCaptionSurface();
+  pushUiPrefs();
+}
+
+async function loadCaptionSurface() {
+  const { captionSurface: v } = await chrome.storage.local.get('captionSurface');
+  captionSurface = CAPTION_SURFACES.includes(v) ? v : 'overlay';
+}
+
 async function setTabRows(rows) {
   state.settings.tabRows = rows === 'two' ? 'two' : 'one';
   await saveSettings();
@@ -1344,6 +1375,14 @@ async function setTabRows(rows) {
 function applyTranslationColour() {
   const c = TCOLOURS.includes(state.settings.translationColour) ? state.settings.translationColour : 'indigo';
   document.documentElement.dataset.tcolor = c;
+  document.querySelectorAll('#surface-toggle button').forEach((b) =>
+    b.addEventListener('click', () => setCaptionSurface(b.dataset.surface)),
+  );
+  $('btn-surface-native')?.addEventListener('click', () => {
+    const sel = $('engine-toggle');
+    sel.value = 'native';
+    sel.dispatchEvent(new Event('change'));
+  });
   document.querySelectorAll('#tcolor-toggle button').forEach((b) => {
     const on = b.dataset.tcolor === c;
     b.classList.toggle('active', on);
@@ -1457,6 +1496,7 @@ function pushUiPrefs() {
   nativeSetUiPrefs(state.settings.nativeUrl || DEFAULT_NATIVE_URL, {
     theme: state.settings.theme,
     reskin: state.settings.reskin,
+    captionSurface,
   }).catch(() => {});
 }
 
@@ -1490,6 +1530,7 @@ async function pullUiPrefs() {
 async function loadSettings() {
   const { settings } = await chrome.storage.local.get('settings');
   if (settings) Object.assign(state.settings, settings);
+  await loadCaptionSurface();
   if (!UI_LANGS.some(([c]) => c === state.settings.uiLang)) {
     state.settings.uiLang = 'en';
   }
@@ -1512,6 +1553,7 @@ async function loadSettings() {
   applyReskin();
   if (!['one', 'two'].includes(state.settings.tabRows)) state.settings.tabRows = 'one';
   applyTabRows();
+  applyCaptionSurface();
   if (!TCOLOURS.includes(state.settings.translationColour)) state.settings.translationColour = 'indigo';
   applyTranslationColour();
   renderEngineLine();
@@ -1669,6 +1711,7 @@ async function checkNative({ allowAutoStart = false } = {}) {
     if (started) nativeInfo = await nativeHealth(state.settings.nativeUrl || DEFAULT_NATIVE_URL);
   }
   if (nativeInfo) {
+    pushUiPrefs(); // the island reads captionSurface from the helper
     const stale =
       nativeInfo.translate &&
       nativeInfo.features &&

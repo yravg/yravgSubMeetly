@@ -1,6 +1,7 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Subtitel tampil di (Settings, tab Output):** pilihan Page overlay / Island / Both (`captionSurface`, bawaan overlay). Nilainya disalin ke helper (`/ui-prefs`, Python dan Rust) dan pil island hanya menampilkan baris langsung saat Island atau Both; island membaca baris dari helper, jadi dengan mesin Browser panel menampilkan petunjuk dengan tombol "Use Native Helper"
 - **Overlay subtitel di halaman (`src/content.js`, `src/overlay.css`):** tampilan ulang ala macOS dengan token desain (`tokens.css` ikut masuk ke shadow root): kaca buram, tema gelap/terang otomatis, sakelar On/Off, tombol Force Translate dengan menu (membuka ke atas bila tak ada ruang), ikon SVG bergaris, status bar bertitik, wordmark yravgSubMeetly, keadaan kosong dan titik pemuatan, aksesibilitas (aria, Escape, gerak berkurang, kontras tinggi). Warna terjemahan mengikuti `settings.translationColour`. Kontrak pesan tidak berubah. Tinggi minimum panel 140 menjadi 190 px karena toolbar kini dua baris
 - **Kontrak `captionSurface` (chrome.storage.local):** `overlay` (bawaan) | `island` | `both`; overlay dilepas penuh untuk `island` dan dipasang lagi langsung saat nilainya berubah, baris dan sesi tetap utuh
 - **Perbaikan:** tombol kunci panel overlay tidak lagi mengunci dirinya sendiri (dulu `pointer-events: none` pada toolbar membuat panel terkunci tak bisa dibuka); kini kunci hanya menahan seret dan ubah ukuran

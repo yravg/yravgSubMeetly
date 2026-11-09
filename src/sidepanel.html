@@ -470,6 +470,20 @@
           <input type="range" id="font-size" min="14" max="40" value="24" />
         </div>
 
+        <div class="setting-row">
+          <label data-i18n="captionSurface">Captions show on</label>
+          <div class="seg" id="surface-toggle" role="radiogroup" aria-label="Captions show on">
+            <button type="button" data-surface="overlay" class="active" role="radio" aria-checked="true" data-i18n="surfaceOverlay">Page overlay</button>
+            <button type="button" data-surface="island" role="radio" aria-checked="false" data-i18n="surfaceIsland">Island</button>
+            <button type="button" data-surface="both" role="radio" aria-checked="false" data-i18n="surfaceBoth">Both</button>
+          </div>
+        </div>
+        <div class="hint" id="surface-hint" data-i18n="surfaceHint">The island is the pill at the top of your screen (Windows app).</div>
+        <div class="hint hidden" id="surface-engine-hint">
+          <span data-i18n="surfaceNeedsNative">Island captions need the Native Helper engine.</span>
+          <button type="button" class="link-btn" id="btn-surface-native" data-i18n="surfaceUseNative">Use Native Helper</button>
+        </div>
+
 
         </section>
 

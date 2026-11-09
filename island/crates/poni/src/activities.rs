@@ -827,9 +827,12 @@ mod tests {
 
     #[test]
     fn the_engines_fresh_line_takes_the_collapsed_island_until_stop_or_a_game() {
-        use poni_core::helper::{now_ms, Live, Snapshot};
+        use poni_core::helper::{now_ms, Live, Snapshot, Surface};
         let mut st = AppState::new(Settings::default(), Store::default());
-        let heard = |ago: u64| Snapshot { live: Some(Live { seq: 1, source: "Halo dunia".into(), at: Some(now_ms() - ago), ..Default::default() }), ..Default::default() };
+        let heard = |ago: u64| Snapshot { live: Some(Live { seq: 1, source: "Halo dunia".into(), at: Some(now_ms() - ago), ..Default::default() }), surface: Surface::Island, ..Default::default() };
+        assert_eq!(collapsed_mode(&st), Mode::Idle);
+        // Captions sent to the page overlay only leave the island alone.
+        st.helper.apply(Ok((Snapshot { surface: Surface::Overlay, ..heard(500) }, 5)));
         assert_eq!(collapsed_mode(&st), Mode::Idle);
         st.helper.apply(Ok((heard(500), 5)));
         assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Caption));
