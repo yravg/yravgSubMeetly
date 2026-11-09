@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -16,9 +16,13 @@ use serde_json::{json, Map, Value};
 use crate::audio::pcm_f32_le;
 use crate::engine::{segments_json, Jobs, Ml, SavedModels, ASR_ENGINE, MT_ENGINE};
 use crate::heuristic::heuristic_notes;
+use crate::locations::{
+    dir_status, free_bytes, move_model, move_needs, probe_dir, pull_needs, validate_dir, Locations,
+    ModelDirUnavailable, MoveJob,
+};
 use crate::models::{
-    cache_state, catalog_spec, delete_cached, hub_cache_dir, scan_model_cache, Kind, PullProgress,
-    CATALOG,
+    cache_state, catalog_spec, delete_cached, hub_cache_dir, model_root, scan_model_cache, Kind,
+    PullProgress, CATALOG,
 };
 use crate::notes::{
     export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
@@ -52,18 +56,54 @@ struct Pull {
     error: Option<String>,
 }
 
-type Pulls = Arc<Mutex<HashMap<String, Pull>>>;
+/// A model move started by `POST /engine/models/location`. A finished one is dropped (the
+/// row shows the new folder); a failed one stays until the next try, with its reason.
+struct Move {
+    done: Arc<AtomicU64>,
+    total: u64,
+    phase: &'static str,
+    running: bool,
+    error: Option<String>,
+    /// Moved and switched, but the old copy could not be deleted yet.
+    warning: Option<String>,
+}
+
+/// Downloads and moves in flight, by model id. One lock, so a model is never both.
+#[derive(Default)]
+struct Transfers {
+    pulls: HashMap<String, Pull>,
+    moves: HashMap<String, Move>,
+}
+
+impl Transfers {
+    /// What is running on `id` right now.
+    fn busy(&self, id: &str) -> Option<&'static str> {
+        if self.moves.get(id).is_some_and(|m| m.running) {
+            Some("moving")
+        } else if self.pulls.get(id).is_some_and(|p| p.error.is_none()) {
+            Some("downloading")
+        } else {
+            None
+        }
+    }
+}
+
+type SharedTransfers = Arc<Mutex<Transfers>>;
+
+fn transfers_lock(transfers: &Mutex<Transfers>) -> std::sync::MutexGuard<'_, Transfers> {
+    transfers.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 pub struct App {
     state_dir: PathBuf,
     models_path: PathBuf,
-    pulls: Pulls,
+    transfers: SharedTransfers,
+    locations: Arc<Locations>,
     notes_path: PathBuf,
     engine_mode_path: PathBuf,
     device_pref_path: PathBuf,
     ui_prefs_path: PathBuf,
     allowed_origins: Vec<String>,
-    hf_cache: PathBuf,
     ml: Arc<Ml>,
     jobs: Jobs,
     shutdown: AtomicBool,
@@ -94,17 +134,34 @@ impl App {
                 translate: text("translate"),
             }
         });
+        let locations = Arc::new(Locations::load(
+            env_path(
+                "ENGINE_LOCATIONS_PATH",
+                state_dir.join("engine-locations.json"),
+            ),
+            hub_cache_dir(),
+        ));
+        // Finish what a crash or an unplugged drive left half done (can take a while: a
+        // multi-gigabyte delete), so not on the start path.
+        let cleanup = Arc::clone(&locations);
+        let _ = std::thread::Builder::new()
+            .name("locations-recover".into())
+            .spawn(move || {
+                for note in cleanup.recover() {
+                    eprintln!("[models] {note}");
+                }
+            });
         Self {
             state_dir,
             models_path,
-            pulls: Pulls::default(),
+            transfers: SharedTransfers::default(),
             notes_path,
             engine_mode_path,
             device_pref_path,
             ui_prefs_path,
             allowed_origins,
-            hf_cache: hub_cache_dir(),
-            ml: Arc::new(Ml::from_env(&device_pref, &saved)),
+            ml: Arc::new(Ml::from_env(&device_pref, &saved, Arc::clone(&locations))),
+            locations,
             jobs: Jobs::default(),
             shutdown: AtomicBool::new(false),
             live: Mutex::new(live_idle()),
@@ -113,7 +170,7 @@ impl App {
 
     /// Point the model-cache routes at another hub cache (tests).
     pub fn set_hf_cache(&mut self, dir: PathBuf) {
-        self.hf_cache = dir;
+        self.locations.set_default(dir);
     }
 
     /// True once `POST /shutdown` answered; the server exits after the reply.
@@ -280,6 +337,7 @@ impl App {
             "/engine/device" => self.post_engine_device(request),
             "/engine/mode" => self.post_engine_mode(request),
             "/engine/models" => self.post_engine_models(request),
+            "/engine/models/location" => self.post_models_location(request),
             "/ui-prefs" => self.post_ui_prefs(request),
             "/notes/export" => self.post_notes_export(request),
             "/notes" => self.post_notes(request),
@@ -299,6 +357,23 @@ impl App {
                 // The oracle answers any exception in these routes with 500.
                 match self.ml_route(request, path) {
                     Ok(response) => response,
+                    // The model's folder is away: say which, so the UI can ask to reconnect it.
+                    Err(error) if error.downcast_ref::<ModelDirUnavailable>().is_some() => {
+                        let away = error
+                            .downcast_ref::<ModelDirUnavailable>()
+                            .expect("checked");
+                        self.json_response(
+                            request,
+                            503,
+                            json!({
+                                "error": format!("Error: {error:#}"),
+                                "code": "model-dir-unavailable",
+                                "id": away.id,
+                                "dir": away.dir.to_string_lossy(),
+                                "reason": away.reason,
+                            }),
+                        )
+                    }
                     Err(error) => self.json_response(
                         request,
                         500,
@@ -446,10 +521,9 @@ impl App {
                 json!({ "source": "", "translation": "", "ms": ms(), "asr_ms": asr_ms }),
             ));
         }
-        let model_ready = self
-            .ml
-            .translate_id()
-            .is_some_and(|id| cache_state(&self.hf_cache, &id, Kind::Translate).downloaded);
+        let model_ready = self.ml.translate_id().is_some_and(|id| {
+            cache_state(&self.locations.dir_for(&id), &id, Kind::Translate).downloaded
+        });
         match draft_translation(self.ml.translate_available(), model_ready, src, tgt) {
             DraftMt::Model => {}
             DraftMt::WhisperEnglish => {
@@ -635,11 +709,18 @@ impl App {
         )
     }
 
-    /// Cache and download state of one model, the same fields on every row.
+    /// Cache, folder, download and move state of one model, the same fields on every row.
     fn model_status(&self, id: &str, kind: Kind) -> Map<String, Value> {
-        let cache = cache_state(&self.hf_cache, id, kind);
-        let pulls = self.pulls.lock().unwrap_or_else(|e| e.into_inner());
-        let pull = pulls.get(id);
+        let dir = self.locations.dir_for(id);
+        let custom = self.locations.custom(id).is_some();
+        let dir_state = if custom { dir_status(&dir) } else { Ok(()) };
+        let cache = cache_state(&dir, id, kind);
+        let transfers = transfers_lock(&self.transfers);
+        let pull = transfers.pulls.get(id);
+        let moved = transfers.moves.get(id);
+        let moving = moved.is_some_and(|m| m.running);
+        let (move_done, move_total) =
+            moved.map_or((0, 0), |m| (m.done.load(Ordering::Relaxed), m.total));
         let running = pull.is_some_and(|p| p.error.is_none());
         let (done, total) = pull.filter(|_| running).map_or((0, 0), |p| {
             // The hub reports a file's size when it starts, so before the last file
@@ -657,6 +738,19 @@ impl App {
             // Held at 99 until the last file lands: the total is an estimate.
             "pct": if running && total > 0 { json!((done * 99 / total).min(99)) } else { Value::Null },
             "pullError": pull.and_then(|p| p.error.clone()),
+            // Where the model lives: the default cache, or the folder the user chose.
+            "dir": dir.to_string_lossy(),
+            "dirIsDefault": !custom,
+            "dirAvailable": dir_state.is_ok(),
+            "dirError": dir_state.as_ref().err(),
+            "freeBytes": if dir_state.is_ok() { json!(free_bytes(&dir)) } else { Value::Null },
+            "moving": moving,
+            "moveBytesDone": move_done,
+            "moveBytesTotal": move_total,
+            "movePct": if moving && move_total > 0 { json!((move_done * 99 / move_total).min(99)) } else { Value::Null },
+            "movePhase": moved.filter(|_| moving).map(|m| m.phase),
+            "moveError": moved.and_then(|m| m.error.clone()),
+            "moveWarning": moved.and_then(|m| m.warning.clone()),
         }) else {
             unreachable!("object literal")
         };
@@ -732,8 +826,31 @@ impl App {
         json!({
             "models": self.model_inventory(),
             "catalog": self.catalog_rows(),
-            "cached": scan_model_cache(&self.hf_cache),
+            "cached": self.cached_rows(),
         })
+    }
+
+    /// `cached[]`: the scan of the default cache, plus the models kept in a folder of
+    /// their own, each tagged with it.
+    fn cached_rows(&self) -> Vec<Value> {
+        let mut rows = scan_model_cache(&self.locations.default_dir());
+        let mut seen: Vec<PathBuf> = Vec::new();
+        for (_, dir) in self.locations.all_custom() {
+            if seen.contains(&dir) {
+                continue;
+            }
+            seen.push(dir.clone());
+            for mut row in scan_model_cache(&dir) {
+                let mine = row["id"]
+                    .as_str()
+                    .is_some_and(|id| self.locations.custom(id).as_ref() == Some(&dir));
+                if mine {
+                    row["dir"] = json!(dir.to_string_lossy());
+                    rows.push(row);
+                }
+            }
+        }
+        rows
     }
 
     /// Ids the engine runs now: the ones `/models/cache` must not delete.
@@ -772,45 +889,80 @@ impl App {
             );
         };
         let status = |started: bool| {
-            let mut body = json!({ "ok": true, "id": want, "started": started });
-            body.as_object_mut()
-                .expect("object")
-                .extend(self.model_status(&want, kind));
-            body
+            self.model_reply(&want, kind, json!({ "ok": true, "started": started }))
         };
-        if cache_state(&self.hf_cache, &want, kind).downloaded {
+        let refuse = |code: u16, tag: &str, error: String| {
+            let body = self.model_reply(
+                &want,
+                kind,
+                json!({ "ok": false, "error": error, "code": tag }),
+            );
+            self.json_response(request, code, body)
+        };
+        // A custom folder that is away is an error, never a download somewhere else.
+        let cache = match self.locations.usable_dir(&want) {
+            Ok(cache) => cache,
+            Err(away) => return refuse(409, "model-dir-unavailable", away.to_string()),
+        };
+        let state = cache_state(&cache, &want, kind);
+        if state.downloaded {
             return self.json_response(request, 200, status(false));
         }
-        {
-            let mut pulls = self.pulls.lock().unwrap_or_else(|e| e.into_inner());
-            if pulls.get(&want).is_some_and(|p| p.error.is_none()) {
-                drop(pulls);
-                return self.json_response(request, 202, status(false));
+        let approx_bytes = catalog_spec(&want).map_or(0, |spec| spec.approx_bytes);
+        if approx_bytes > 0 {
+            let need = pull_needs(approx_bytes, state.bytes + state.partial_bytes);
+            if let Some(free) = free_bytes(&cache).filter(|free| *free < need) {
+                return refuse(
+                    400,
+                    "not-enough-space",
+                    format!(
+                        "not enough free space in {}: {want} needs about {} MB, {} MB is free",
+                        cache.display(),
+                        need / 1_000_000,
+                        free / 1_000_000
+                    ),
+                );
             }
-            pulls.insert(
-                want.clone(),
-                Pull {
-                    progress: Arc::default(),
-                    approx_bytes: catalog_spec(&want).map_or(0, |spec| spec.approx_bytes),
-                    error: None,
-                },
-            );
         }
-        let progress =
-            Arc::clone(&self.pulls.lock().unwrap_or_else(|e| e.into_inner())[&want].progress);
-        let (pulls, id) = (Arc::clone(&self.pulls), want.clone());
+        let progress = {
+            let mut transfers = transfers_lock(&self.transfers);
+            match transfers.busy(&want) {
+                Some("moving") => {
+                    drop(transfers);
+                    return refuse(
+                        409,
+                        "busy",
+                        format!("{want} is being moved; try again when it is done"),
+                    );
+                }
+                Some(_) => {
+                    drop(transfers);
+                    return self.json_response(request, 202, status(false));
+                }
+                None => {}
+            }
+            let pull = Pull {
+                progress: Arc::default(),
+                approx_bytes,
+                error: None,
+            };
+            let progress = Arc::clone(&pull.progress);
+            transfers.pulls.insert(want.clone(), pull);
+            progress
+        };
+        let (transfers, id) = (Arc::clone(&self.transfers), want.clone());
         std::thread::Builder::new()
             .name(format!("pull-{id}"))
             .spawn(move || {
-                let result = crate::models::pull(&id, kind, &progress);
-                let mut pulls = pulls.lock().unwrap_or_else(|e| e.into_inner());
+                let result = crate::models::pull(&cache, &id, kind, &progress);
+                let mut transfers = transfers_lock(&transfers);
                 match result {
                     Ok(()) => {
-                        pulls.remove(&id);
+                        transfers.pulls.remove(&id);
                     }
                     Err(error) => {
                         eprintln!("[pull] {id}: {error:#}");
-                        if let Some(pull) = pulls.get_mut(&id) {
+                        if let Some(pull) = transfers.pulls.get_mut(&id) {
                             pull.error = Some(format!("download failed: {error:#}"));
                         }
                     }
@@ -818,6 +970,237 @@ impl App {
             })
             .expect("spawn pull thread");
         self.json_response(request, 202, status(true))
+    }
+
+    /// The body every models answer carries: what the caller asked, plus the model's row.
+    fn model_reply(&self, id: &str, kind: Kind, mut body: Value) -> Value {
+        body.as_object_mut()
+            .expect("object")
+            .extend(self.model_status(id, kind));
+        body["id"] = json!(id);
+        body
+    }
+
+    /// Choose the folder one model is stored in (`dir` null = the default cache). A
+    /// downloaded model is moved there in the background; nothing changes until the copy
+    /// is verified, and a failure leaves the old copy and the old folder in place.
+    fn post_models_location(&self, request: &Request) -> Response {
+        let Some(payload) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let id = payload
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let Some(kind) = self.model_kind(id) else {
+            return self.json_response(
+                request,
+                400,
+                json!({ "error": "id must be one of the /models inventory ids" }),
+            );
+        };
+        let refuse = |status: u16, code: &str, error: String, extra: Value| {
+            let mut body = self.model_reply(
+                id,
+                kind,
+                json!({ "ok": false, "error": error, "code": code }),
+            );
+            body.as_object_mut()
+                .expect("object")
+                .extend(extra.as_object().cloned().unwrap_or_default());
+            self.json_response(request, status, body)
+        };
+        let target = match payload.get("dir") {
+            None => {
+                return refuse(
+                    400,
+                    "bad-dir",
+                    "body needs dir: an absolute folder, or null for the default".into(),
+                    json!({}),
+                );
+            }
+            Some(Value::Null) => None,
+            Some(Value::String(dir)) if dir.trim().is_empty() => None,
+            Some(Value::String(dir)) => match validate_dir(dir) {
+                Ok(dir) => Some(dir),
+                Err(error) => return refuse(400, "bad-dir", error, json!({})),
+            },
+            Some(_) => {
+                return refuse(
+                    400,
+                    "bad-dir",
+                    "dir must be a string or null".into(),
+                    json!({}),
+                )
+            }
+        };
+        let to = target
+            .clone()
+            .unwrap_or_else(|| self.locations.default_dir());
+        let from = self.locations.dir_for(id);
+        let busy = |transfers: &Transfers| {
+            transfers.busy(id).map(|what| {
+                refuse(
+                    409,
+                    "busy",
+                    format!("{id} is {what}; try again when it is done"),
+                    json!({}),
+                )
+            })
+        };
+        if let Some(response) = busy(&transfers_lock(&self.transfers)) {
+            return response;
+        }
+        let same = from == to
+            || from
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&to.to_string_lossy());
+        if same {
+            return self.json_response(
+                request,
+                200,
+                self.model_reply(
+                    id,
+                    kind,
+                    json!({ "ok": true, "started": false, "moved": false }),
+                ),
+            );
+        }
+        let probe = match probe_dir(&to) {
+            Ok(probe) => probe,
+            Err(error) => return refuse(400, "dir-not-writable", error, json!({})),
+        };
+        let state = cache_state(&from, id, kind);
+        if !state.downloaded {
+            // Nothing to copy: the model will download into the new folder.
+            let transfers = transfers_lock(&self.transfers);
+            if let Some(response) = busy(&transfers) {
+                return response;
+            }
+            let saved = self.locations.set(id, target.as_deref());
+            drop(transfers);
+            return match saved {
+                Ok(()) => self.json_response(
+                    request,
+                    200,
+                    self.model_reply(
+                        id,
+                        kind,
+                        json!({ "ok": true, "started": false, "moved": false }),
+                    ),
+                ),
+                Err(error) => refuse(
+                    500,
+                    "save-failed",
+                    format!("could not save the folder: {error}"),
+                    json!({}),
+                ),
+            };
+        }
+        if model_root(&to, id).exists() {
+            return refuse(
+                409,
+                "target-has-copy",
+                format!(
+                    "{} already holds a copy of {id}; remove it or pick another folder",
+                    to.display()
+                ),
+                json!({}),
+            );
+        }
+        let need = move_needs(state.bytes, probe.hard_links);
+        if let Some(free) = free_bytes(&to).filter(|free| *free < need) {
+            return refuse(
+                400,
+                "not-enough-space",
+                format!(
+                    "not enough free space in {}: needs about {} MB, {} MB is free",
+                    to.display(),
+                    need / 1_000_000,
+                    free / 1_000_000
+                ),
+                json!({ "needBytes": need, "freeBytes": free }),
+            );
+        }
+        let done = Arc::new(AtomicU64::new(0));
+        {
+            let mut transfers = transfers_lock(&self.transfers);
+            if let Some(response) = busy(&transfers) {
+                return response;
+            }
+            transfers.moves.insert(
+                id.to_string(),
+                Move {
+                    done: Arc::clone(&done),
+                    total: state.bytes,
+                    phase: "copying",
+                    running: true,
+                    error: None,
+                    warning: None,
+                },
+            );
+        }
+        let (transfers, locations, id_owned) = (
+            Arc::clone(&self.transfers),
+            Arc::clone(&self.locations),
+            id.to_string(),
+        );
+        std::thread::Builder::new()
+            .name(format!("move-{id}"))
+            .spawn(move || {
+                let phase_to = |phase: &'static str| {
+                    if let Some(entry) = transfers_lock(&transfers).moves.get_mut(&id_owned) {
+                        entry.phase = phase;
+                    }
+                };
+                let job = MoveJob {
+                    id: &id_owned,
+                    kind,
+                    from: &from,
+                    to: &to,
+                };
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    move_model(
+                        &locations,
+                        &job,
+                        &done,
+                        &mut |phase| phase_to(phase),
+                        &mut |_| Ok(()),
+                    )
+                }))
+                .unwrap_or_else(|_| Err(anyhow::anyhow!("the move stopped unexpectedly")));
+                let mut transfers = transfers_lock(&transfers);
+                match result {
+                    Ok(None) => {
+                        transfers.moves.remove(&id_owned);
+                    }
+                    Ok(Some(warning)) => {
+                        eprintln!("[move] {id_owned}: {warning}");
+                        if let Some(entry) = transfers.moves.get_mut(&id_owned) {
+                            entry.running = false;
+                            entry.warning = Some(warning);
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("[move] {id_owned}: {error:#}");
+                        if let Some(entry) = transfers.moves.get_mut(&id_owned) {
+                            entry.running = false;
+                            entry.error = Some(format!("{error:#}"));
+                        }
+                    }
+                }
+            })
+            .expect("spawn move thread");
+        self.json_response(
+            request,
+            202,
+            self.model_reply(
+                id,
+                kind,
+                json!({ "ok": true, "started": true, "moved": false }),
+            ),
+        )
     }
 
     /// Choose the speech and/or translation model. Saved like `/engine/mode`, applied
@@ -882,12 +1265,20 @@ impl App {
                 q.get("confirm").map(String::as_str),
                 Some("1" | "true" | "yes")
             );
-            let (status, body) = delete_cached(
-                &self.hf_cache,
-                &percent_decode(rest),
-                &self.inventory_ids(),
-                confirm,
-            );
+            let slug = percent_decode(rest);
+            let id = slug.replacen("--", "/", 1);
+            let busy = transfers_lock(&self.transfers).busy(&id);
+            let (status, body) = match (busy, self.locations.usable_dir(&id)) {
+                (Some(what), _) => (
+                    409,
+                    json!({ "error": format!("{id} is {what}; try again when it is done"), "code": "busy" }),
+                ),
+                (None, Err(away)) => (
+                    409,
+                    json!({ "error": away.to_string(), "code": "model-dir-unavailable" }),
+                ),
+                (None, Ok(dir)) => delete_cached(&dir, &slug, &self.inventory_ids(), confirm),
+            };
             return self.json_response(request, status, body);
         }
         if let Some(rest) = path.strip_prefix("/notes/") {
@@ -1471,6 +1862,35 @@ mod tests {
         assert_eq!(draft_translation(false, false, "en", "en"), SourceOnly);
         assert_eq!(draft_translation(false, false, "de", "id"), SourceOnly);
         assert_eq!(draft_translation(true, false, "de", "id"), Model);
+    }
+
+    #[test]
+    fn a_model_is_either_downloading_or_moving_never_both() {
+        let mut transfers = Transfers::default();
+        assert_eq!(transfers.busy("a/b"), None);
+        let pull = |error: Option<&str>| Pull {
+            progress: Arc::default(),
+            approx_bytes: 1,
+            error: error.map(String::from),
+        };
+        transfers.pulls.insert("a/b".into(), pull(None));
+        assert_eq!(transfers.busy("a/b"), Some("downloading"));
+        assert_eq!(transfers.busy("c/d"), None);
+        // A failed download is not running; the user may try again or move the model.
+        transfers.pulls.insert("a/b".into(), pull(Some("offline")));
+        assert_eq!(transfers.busy("a/b"), None);
+        let moving = |running: bool| Move {
+            done: Arc::default(),
+            total: 1,
+            phase: "copying",
+            running,
+            error: None,
+            warning: None,
+        };
+        transfers.moves.insert("a/b".into(), moving(true));
+        assert_eq!(transfers.busy("a/b"), Some("moving"));
+        transfers.moves.insert("a/b".into(), moving(false));
+        assert_eq!(transfers.busy("a/b"), None);
     }
 
     #[test]

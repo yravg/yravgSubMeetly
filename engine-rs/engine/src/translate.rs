@@ -20,12 +20,13 @@ pub struct QwenFiles {
 
 /// Download (or find cached) the files of a Qwen repo; `finished` sees each one.
 pub fn fetch_files(
+    cache: &Path,
     repo_id: &str,
     progress: Option<&Progress>,
     finished: &mut dyn FnMut(&Path),
 ) -> Result<QwenFiles> {
     let mut fetch = |name: &str| -> Result<PathBuf> {
-        let path = crate::ml::hub_file_with(repo_id, None, name, progress.cloned())?;
+        let path = crate::ml::hub_file_with(cache, repo_id, None, name, progress.cloned())?;
         finished(&path);
         Ok(path)
     };
@@ -197,8 +198,8 @@ pub struct Translator {
 }
 
 impl Translator {
-    pub fn load(repo_id: &str, device: Device) -> Result<Self> {
-        let files = fetch_files(repo_id, None, &mut |_| {})?;
+    pub fn load(repo_id: &str, device: Device, cache: &Path) -> Result<Self> {
+        let files = fetch_files(cache, repo_id, None, &mut |_| {})?;
         let config: Config =
             serde_json::from_slice(&std::fs::read(files.config)?).context("qwen config")?;
         let tokenizer = Tokenizer::from_file(files.tokenizer).map_err(|e| anyhow!("{e}"))?;

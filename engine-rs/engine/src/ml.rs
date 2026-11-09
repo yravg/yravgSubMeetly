@@ -1,6 +1,6 @@
 //! Shared ML plumbing: compute device and Hugging Face downloads.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use candle_core::Device;
@@ -35,19 +35,19 @@ pub fn gpu_available() -> bool {
     !matches!(pick_device(true), Device::Cpu)
 }
 
-/// The cache is pinned to `models::hub_cache_dir()`, the folder `/models` scans.
+/// The cache is always passed in (the model's folder, `Locations::usable_dir`).
 /// hf-hub resolves `$HOME` alone and falls back to `/tmp` (so `C:\tmp` on Windows),
 /// and an app started from Explorer has no `HOME`: downloads would land where
 /// nothing looks and the model would never show as downloaded.
-fn async_client() -> Result<HFClient> {
+fn async_client(cache: &Path) -> Result<HFClient> {
     HFClient::builder()
-        .cache_dir(crate::models::hub_cache_dir())
+        .cache_dir(cache)
         .build()
         .context("hugging face client")
 }
 
-fn client() -> Result<HFClientSync> {
-    HFClientSync::from_inner(async_client()?).context("hugging face client")
+fn client(cache: &Path) -> Result<HFClientSync> {
+    HFClientSync::from_inner(async_client(cache)?).context("hugging face client")
 }
 
 /// hf-hub waits only 10 s for another downloader of the same blob (a second
@@ -66,20 +66,27 @@ fn wait_for_lock<T>(mut attempt: impl FnMut() -> Result<T, HFError>) -> Result<T
     }
 }
 
-/// One file of `repo_id` at `revision` (None = main), via the hub cache.
+/// One file of `repo_id` at `revision` (None = main), via the default hub cache.
 pub fn hub_file(repo_id: &str, revision: Option<&str>, filename: &str) -> Result<PathBuf> {
-    hub_file_with(repo_id, revision, filename, None)
+    hub_file_with(
+        &crate::models::hub_cache_dir(),
+        repo_id,
+        revision,
+        filename,
+        None,
+    )
 }
 
-/// [`hub_file`] reporting byte progress to `progress` (must not block).
+/// [`hub_file`] in `cache`, reporting byte progress to `progress` (must not block).
 pub fn hub_file_with(
+    cache: &Path,
     repo_id: &str,
     revision: Option<&str>,
     filename: &str,
     progress: Option<Progress>,
 ) -> Result<PathBuf> {
     let (owner, name) = split_id(repo_id);
-    let repo = client()?.model(owner, name);
+    let repo = client(cache)?.model(owner, name);
     wait_for_lock(|| {
         repo.download_file()
             .filename(filename)
@@ -104,11 +111,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn downloads_go_where_the_models_scan_looks() {
-        assert_eq!(
-            async_client().unwrap().cache_dir(),
-            crate::models::hub_cache_dir()
-        );
+    fn downloads_go_to_the_folder_they_are_given() {
+        let dir = std::env::temp_dir().join("ml-cache-pin");
+        assert_eq!(async_client(&dir).unwrap().cache_dir(), dir);
     }
 
     #[test]

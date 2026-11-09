@@ -34,6 +34,8 @@ fn app() -> (App, PathBuf, PathBuf) {
             std::env::remove_var(key);
         }
         std::env::set_var("HF_ENDPOINT", "http://127.0.0.1:9");
+        // The free-space check is real; the disk this runs on may be full.
+        std::env::set_var("ENGINE_FREE_BYTES", "1000000000000");
     });
     let state = unique_dir("submeetly-models-api-state");
     let cache = state.join("hub");
@@ -274,7 +276,7 @@ fn a_pull_runs_in_the_background_and_its_failure_shows_on_the_row() {
     assert_eq!(status, 400);
 
     let started = Instant::now();
-    let id = "openai/whisper-medium";
+    let id = "openai/whisper-base";
     let (status, body) = call(&app, "POST", "/models/pull", json!({ "id": id }));
     assert_eq!(status, 202, "{body}");
     assert_eq!(body["started"], true);
@@ -329,4 +331,249 @@ fn pulling_a_model_that_is_already_there_starts_nothing() {
     assert_eq!(status, 200);
     assert_eq!(body["started"], false);
     assert_eq!(body["downloaded"], true);
+}
+
+// ---- per-model storage folder -------------------------------------------------------
+
+fn wait_until(what: &str, mut ready: impl FnMut() -> bool) {
+    let start = Instant::now();
+    while !ready() {
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "timed out: {what}"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn models_row(app: &App, id: &str) -> Value {
+    let (_, body) = call(app, "GET", "/models", Value::Null);
+    row(&body, "catalog", id).clone()
+}
+
+fn path_str(dir: &Path) -> String {
+    dir.to_string_lossy().to_string()
+}
+
+const WHISPER: &str = "openai/whisper-base";
+const BASE_FILES: [(&str, usize); 3] = [
+    ("config.json", 10),
+    ("tokenizer.json", 20),
+    ("model.safetensors", 3000),
+];
+
+#[test]
+fn a_folder_that_is_not_usable_is_refused_and_nothing_changes() {
+    let (app, state, cache) = app();
+    let file = state.join("a-file");
+    fs::write(&file, b"x").expect("file");
+    let cases = [
+        (
+            json!({ "id": WHISPER, "dir": "relative/models" }),
+            "bad-dir",
+        ),
+        (
+            json!({ "id": WHISPER, "dir": path_str(&state.join("..").join("x")) }),
+            "bad-dir",
+        ),
+        (json!({ "id": WHISPER, "dir": 7 }), "bad-dir"),
+        (json!({ "id": WHISPER }), "bad-dir"),
+        (
+            json!({ "id": WHISPER, "dir": path_str(&file) }),
+            "dir-not-writable",
+        ),
+    ];
+    for (body, code) in cases {
+        let (status, answer) = call(&app, "POST", "/engine/models/location", body.clone());
+        assert_eq!(status, 400, "{body}");
+        assert_eq!(answer["code"], code, "{body}");
+        assert_eq!(answer["ok"], false);
+    }
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/engine/models/location",
+        json!({ "id": "x/unknown", "dir": path_str(&state) }),
+    );
+    assert_eq!(status, 400);
+    let after = models_row(&app, WHISPER);
+    assert_eq!(after["dir"], path_str(&cache));
+    assert_eq!(after["dirIsDefault"], true);
+    assert!(
+        !state.join("engine-locations.json").exists(),
+        "no mapping was written"
+    );
+}
+
+#[test]
+fn a_model_that_is_not_downloaded_is_only_pointed_at_the_new_folder() {
+    let (app, state, cache) = app();
+    let target = state.join("ssd").join("models");
+    let (status, answer) = call(
+        &app,
+        "POST",
+        "/engine/models/location",
+        json!({ "id": WHISPER, "dir": path_str(&target) }),
+    );
+    assert_eq!(
+        (status, &answer["started"], &answer["moved"]),
+        (200, &json!(false), &json!(false)),
+        "{answer}"
+    );
+    let row = models_row(&app, WHISPER);
+    assert_eq!(row["dir"], path_str(&target));
+    assert_eq!(row["dirIsDefault"], false);
+    assert_eq!(row["dirAvailable"], true);
+    assert_eq!(row["freeBytes"], 1_000_000_000_000_u64);
+
+    // The choice survives a restart.
+    let again = App::new(state.clone());
+    assert_eq!(models_row(&again, WHISPER)["dir"], path_str(&target));
+
+    // And null returns to the default.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/engine/models/location",
+        json!({ "id": WHISPER, "dir": null }),
+    );
+    assert_eq!(status, 200);
+    let row = models_row(&app, WHISPER);
+    assert_eq!(
+        (row["dir"].clone(), row["dirIsDefault"].clone()),
+        (json!(path_str(&cache)), json!(true))
+    );
+}
+
+#[test]
+fn moving_a_downloaded_model_there_and_back_keeps_it_whole() {
+    let (app, state, cache) = app();
+    cache_files(&cache, WHISPER, &BASE_FILES);
+    let target = state.join("ssd");
+    let (status, answer) = call(
+        &app,
+        "POST",
+        "/engine/models/location",
+        json!({ "id": WHISPER, "dir": path_str(&target) }),
+    );
+    assert!(status == 202 || status == 200, "{status} {answer}");
+    wait_until("move out", || {
+        let row = models_row(&app, WHISPER);
+        !row["moving"].as_bool().unwrap_or(true) && row["dir"] == path_str(&target)
+    });
+    let row = models_row(&app, WHISPER);
+    assert_eq!(row["downloaded"], true);
+    assert_eq!(row["bytes"], 3030);
+    assert_eq!(row["moveError"], Value::Null);
+    assert_eq!(row["moveWarning"], Value::Null);
+    assert!(
+        !cache.join("models--openai--whisper-base").exists(),
+        "old copy deleted"
+    );
+
+    let (_, body) = call(&app, "GET", "/models", Value::Null);
+    let cached = row_in(&body["cached"], WHISPER);
+    assert_eq!(
+        cached["dir"],
+        path_str(&target),
+        "cached[] lists the model in its own folder"
+    );
+
+    // Back to the default folder.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/engine/models/location",
+        json!({ "id": WHISPER, "dir": null }),
+    );
+    assert!(status == 202 || status == 200);
+    wait_until("move back", || {
+        let row = models_row(&app, WHISPER);
+        !row["moving"].as_bool().unwrap_or(true) && row["dirIsDefault"] == true
+    });
+    assert_eq!(models_row(&app, WHISPER)["bytes"], 3030);
+    assert!(!target.join("models--openai--whisper-base").exists());
+}
+
+fn row_in<'a>(rows: &'a Value, id: &str) -> &'a Value {
+    rows.as_array()
+        .and_then(|rows| rows.iter().find(|row| row["id"] == id))
+        .unwrap_or_else(|| panic!("no {id} in cached"))
+}
+
+#[test]
+fn a_folder_that_already_holds_a_copy_is_never_overwritten() {
+    let (app, state, cache) = app();
+    cache_files(&cache, WHISPER, &BASE_FILES);
+    let target = state.join("ssd");
+    cache_files(&target, WHISPER, &[("config.json", 1)]);
+    let (status, answer) = call(
+        &app,
+        "POST",
+        "/engine/models/location",
+        json!({ "id": WHISPER, "dir": path_str(&target) }),
+    );
+    assert_eq!(
+        (status, &answer["code"]),
+        (409, &json!("target-has-copy")),
+        "{answer}"
+    );
+    assert_eq!(
+        models_row(&app, WHISPER)["dir"],
+        path_str(&cache),
+        "mapping unchanged"
+    );
+    assert_eq!(models_row(&app, WHISPER)["bytes"], 3030, "old copy intact");
+    assert!(target
+        .join("models--openai--whisper-base/blobs/blob-config.json")
+        .exists());
+}
+
+#[test]
+fn a_missing_drive_is_a_clear_error_and_recovers_when_it_returns() {
+    let (app, state, cache) = app();
+    let drive = state.join("usb");
+    let target = drive.join("models");
+    call(
+        &app,
+        "POST",
+        "/engine/models/location",
+        json!({ "id": WHISPER, "dir": path_str(&target) }),
+    );
+    cache_files(&target, WHISPER, &BASE_FILES);
+    assert_eq!(models_row(&app, WHISPER)["downloaded"], true);
+
+    fs::remove_dir_all(&drive).expect("unplug");
+    let row = models_row(&app, WHISPER);
+    assert_eq!(row["dirAvailable"], false);
+    assert!(row["dirError"].as_str().is_some_and(|why| !why.is_empty()));
+    assert_eq!(row["dir"], path_str(&target), "still points at the drive");
+
+    let (status, answer) = call(&app, "POST", "/models/pull", json!({ "id": WHISPER }));
+    assert_eq!(
+        (status, &answer["code"]),
+        (409, &json!("model-dir-unavailable")),
+        "{answer}"
+    );
+    let (status, answer) = call(
+        &app,
+        "DELETE",
+        "/models/cache/openai--whisper-base?confirm=1",
+        Value::Null,
+    );
+    assert_eq!(
+        (status, &answer["code"]),
+        (409, &json!("model-dir-unavailable"))
+    );
+    assert!(
+        !cache.join("models--openai--whisper-base").exists(),
+        "nothing was fetched into the default cache"
+    );
+
+    cache_files(&target, WHISPER, &BASE_FILES); // plug it back in
+    let row = models_row(&app, WHISPER);
+    assert_eq!(
+        (row["dirAvailable"].clone(), row["downloaded"].clone()),
+        (json!(true), json!(true))
+    );
 }

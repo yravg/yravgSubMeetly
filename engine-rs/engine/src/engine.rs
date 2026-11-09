@@ -12,6 +12,7 @@ use candle_core::Device;
 use serde_json::{json, Value};
 
 use crate::audio::{self, MonoStream, Windows, SAMPLE_RATE};
+use crate::locations::Locations;
 use crate::models::{catalog_spec, Kind};
 use crate::translate::{Translator, DEFAULT_TRANSLATE_MODEL};
 use crate::whisper::DEFAULT_ASR_MODEL;
@@ -34,6 +35,8 @@ pub struct Ml {
     asr_from_env: bool,
     translate_from_env: bool,
     pub device: Device,
+    /// Where each model is stored; a loader asks it for the folder.
+    locations: Arc<Locations>,
     /// The loaded model and the id it was loaded for; a changed choice reloads on next use.
     asr: Mutex<Option<(String, WhisperAsr)>>,
     mt: Mutex<Option<(String, Translator)>>,
@@ -115,7 +118,7 @@ fn write<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
 impl Ml {
     /// `device_pref` is the saved auto/cpu/cuda choice; env `DEVICE` wins, like the oracle.
     /// `saved` is the models chosen through `POST /engine/models`.
-    pub fn from_env(device_pref: &str, saved: &SavedModels) -> Self {
+    pub fn from_env(device_pref: &str, saved: &SavedModels, locations: Arc<Locations>) -> Self {
         let picked = pick_models(&|key| env::var(key).ok(), saved);
         let device =
             crate::ml::pick_device(wants_gpu(env::var("DEVICE").ok().as_deref(), device_pref));
@@ -125,6 +128,7 @@ impl Ml {
             asr_from_env: picked.asr_from_env,
             translate_from_env: picked.translate_from_env,
             device,
+            locations,
             asr: Mutex::new(None),
             mt: Mutex::new(None),
             asr_loaded_id: RwLock::new(None),
@@ -204,9 +208,11 @@ impl Ml {
             // Free the old weights first: two Whisper models at once is gigabytes.
             *guard = None;
             *write(&self.asr_loaded_id) = None;
+            // Not loaded and its folder is away: say so, never fetch it somewhere else.
+            let cache = self.locations.usable_dir(&want)?;
             eprintln!("[asr] loading {want} ...");
             self.asr_loading.store(true, Ordering::Relaxed);
-            let loaded = WhisperAsr::load(&want, self.device.clone());
+            let loaded = WhisperAsr::load(&want, self.device.clone(), &cache);
             self.asr_loading.store(false, Ordering::Relaxed);
             *guard = Some((want.clone(), loaded?));
             *write(&self.asr_loaded_id) = Some(want);
@@ -222,9 +228,10 @@ impl Ml {
         if guard.as_ref().map(|(id, _)| id) != Some(&want) {
             *guard = None;
             *write(&self.mt_loaded_id) = None;
+            let cache = self.locations.usable_dir(&want)?;
             eprintln!("[translate] loading {want} ...");
             self.mt_loading.store(true, Ordering::Relaxed);
-            let loaded = Translator::load(&want, self.device.clone());
+            let loaded = Translator::load(&want, self.device.clone(), &cache);
             self.mt_loading.store(false, Ordering::Relaxed);
             *guard = Some((want.clone(), loaded?));
             *write(&self.mt_loaded_id) = Some(want);

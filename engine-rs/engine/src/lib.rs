@@ -4,6 +4,7 @@ pub mod app;
 pub mod audio;
 pub mod engine;
 pub mod heuristic;
+pub mod locations;
 pub mod ml;
 pub mod models;
 pub mod native_host;

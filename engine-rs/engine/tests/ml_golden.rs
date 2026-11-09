@@ -15,6 +15,7 @@ use std::time::Instant;
 
 use serde::Deserialize;
 use submeetly_engine::audio::decode_file;
+use submeetly_engine::models::hub_cache_dir;
 use submeetly_engine::whisper::{Task, WhisperAsr};
 
 #[derive(Deserialize)]
@@ -81,7 +82,8 @@ fn candle_whisper_base_matches_faster_whisper() {
     )
     .expect("parse golden");
 
-    let mut asr = WhisperAsr::load("base", candle_core::Device::Cpu).expect("load whisper base");
+    let mut asr = WhisperAsr::load("base", candle_core::Device::Cpu, &hub_cache_dir())
+        .expect("load whisper base");
     let mut failures = Vec::new();
     println!("clip    WER    matched  max|dt|  RTF rust  RTF python");
     for clip in &golden.clips {
@@ -190,7 +192,8 @@ fn qwen_translation_properties() {
     use submeetly_engine::translate::Translator;
     let repo = std::env::var("TRANSLATE_TEST_MODEL")
         .unwrap_or_else(|_| "Qwen/Qwen2.5-0.5B-Instruct".to_string());
-    let mut mt = Translator::load(&repo, candle_core::Device::Cpu).expect("load translator");
+    let mut mt = Translator::load(&repo, candle_core::Device::Cpu, &hub_cache_dir())
+        .expect("load translator");
     let japanese =
         |c: char| ('\u{3040}'..='\u{30ff}').contains(&c) || ('\u{4e00}'..='\u{9fff}').contains(&c);
     let cjk = |c: char| ('\u{4e00}'..='\u{9fff}').contains(&c);

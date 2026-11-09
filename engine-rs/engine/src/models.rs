@@ -31,7 +31,7 @@ pub fn hub_cache_dir() -> PathBuf {
         .join("hub")
 }
 
-fn counted(name: &str) -> bool {
+pub(crate) fn counted(name: &str) -> bool {
     !(name.starts_with('.') || name.ends_with(".lock") || name.ends_with(".metadata"))
 }
 
@@ -259,8 +259,13 @@ fn shard_names(index: &Path) -> Option<Vec<String>> {
     Some(names)
 }
 
+/// `<cache>/models--org--name`, the folder hf-hub keeps one repo in.
+pub fn model_root(cache: &Path, repo_id: &str) -> PathBuf {
+    cache.join(format!("models--{}", repo_id.replace('/', "--")))
+}
+
 pub fn cache_state(cache: &Path, repo_id: &str, kind: Kind) -> CacheState {
-    let root = cache.join(format!("models--{}", repo_id.replace('/', "--")));
+    let root = model_root(cache, repo_id);
     let (mut bytes, mut partial_bytes) = (0, 0);
     for entry in fs::read_dir(root.join("blobs"))
         .into_iter()
@@ -352,15 +357,20 @@ impl ProgressHandler for PullProgress {
 }
 
 /// Download exactly the files the loader for `kind` reads (not the whole repo).
-pub fn pull(repo_id: &str, kind: Kind, progress: &Arc<PullProgress>) -> anyhow::Result<()> {
+pub fn pull(
+    cache: &Path,
+    repo_id: &str,
+    kind: Kind,
+    progress: &Arc<PullProgress>,
+) -> anyhow::Result<()> {
     let handler: Progress = (Arc::clone(progress) as Arc<dyn ProgressHandler>).into();
     let mut finished = |path: &Path| progress.file_finished(path);
     match kind {
         Kind::Asr => {
-            crate::whisper::fetch_files(repo_id, Some(&handler), &mut finished)?;
+            crate::whisper::fetch_files(cache, repo_id, Some(&handler), &mut finished)?;
         }
         Kind::Translate => {
-            crate::translate::fetch_files(repo_id, Some(&handler), &mut finished)?;
+            crate::translate::fetch_files(cache, repo_id, Some(&handler), &mut finished)?;
         }
     }
     Ok(())

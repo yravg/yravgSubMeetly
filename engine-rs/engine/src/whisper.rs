@@ -73,12 +73,14 @@ pub struct WhisperFiles {
 
 /// Download (or find cached) the files of a Whisper repo; `finished` sees each one.
 pub fn fetch_files(
+    cache: &Path,
     repo_id: &str,
     progress: Option<&Progress>,
     finished: &mut dyn FnMut(&Path),
 ) -> Result<WhisperFiles> {
     let mut fetch = |name: &str| -> Result<PathBuf> {
-        let file = |revision| crate::ml::hub_file_with(repo_id, revision, name, progress.cloned());
+        let file =
+            |revision| crate::ml::hub_file_with(cache, repo_id, revision, name, progress.cloned());
         // whisper-base and friends only have safetensors on this PR ref. Only a
         // 404 means "try the PR"; any other failure is the real error, not
         // something the PR ref's own 404 should overwrite.
@@ -225,9 +227,9 @@ fn argmax(values: &[f32]) -> usize {
 }
 
 impl WhisperAsr {
-    pub fn load(model: &str, device: Device) -> Result<Self> {
+    pub fn load(model: &str, device: Device, cache: &Path) -> Result<Self> {
         let repo_id = repo_for(model);
-        let files = fetch_files(&repo_id, None, &mut |_| {})?;
+        let files = fetch_files(cache, &repo_id, None, &mut |_| {})?;
         let config: Config =
             serde_json::from_slice(&std::fs::read(files.config)?).context("whisper config")?;
         let tokenizer = Tokenizer::from_file(files.tokenizer).map_err(|e| anyhow!("{e}"))?;
