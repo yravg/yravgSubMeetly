@@ -38,16 +38,34 @@ fn client() -> Result<HFClientSync> {
     HFClientSync::new().context("hugging face client")
 }
 
+/// hf-hub waits only 10 s for another downloader of the same blob (a second
+/// request, a second engine, the `hf` CLI) and then fails with `CacheLockTimeout`.
+/// Keep waiting instead: once they finish, the file is cached and the retry returns it.
+/// shortcut: gives up after ~1 h of waiting, raise if models outgrow a slow link.
+const LOCK_WAITS: u32 = 360;
+
+fn wait_for_lock<T>(mut attempt: impl FnMut() -> Result<T, HFError>) -> Result<T, HFError> {
+    let mut waits = 0;
+    loop {
+        match attempt() {
+            Err(HFError::CacheLockTimeout { .. }) if waits < LOCK_WAITS => waits += 1,
+            other => return other,
+        }
+    }
+}
+
 /// One file of `repo_id` at `revision` (None = main), via the hub cache.
 pub fn hub_file(repo_id: &str, revision: Option<&str>, filename: &str) -> Result<PathBuf> {
     let (owner, name) = split_id(repo_id);
     let repo = client()?.model(owner, name);
-    let builder = repo.download_file().filename(filename);
-    let path = match revision {
-        Some(revision) => builder.revision(revision).send(),
-        None => builder.send(),
-    };
-    path.with_context(|| format!("download {repo_id}/{filename}"))
+    wait_for_lock(|| {
+        let builder = repo.download_file().filename(filename);
+        match revision {
+            Some(revision) => builder.revision(revision).send(),
+            None => builder.send(),
+        }
+    })
+    .with_context(|| format!("download {repo_id}/{filename}"))
 }
 
 /// True when the Hub answered 404 for the file or revision, as opposed to a
@@ -62,11 +80,8 @@ pub fn is_not_found(err: &anyhow::Error) -> bool {
 /// Whole snapshot of `repo_id` into the hub cache (for `/models/pull`).
 pub fn hub_snapshot(repo_id: &str) -> Result<PathBuf> {
     let (owner, name) = split_id(repo_id);
-    client()?
-        .model(owner, name)
-        .snapshot_download()
-        .send()
-        .with_context(|| format!("download {repo_id}"))
+    let repo = client()?.model(owner, name);
+    wait_for_lock(|| repo.snapshot_download().send()).with_context(|| format!("download {repo_id}"))
 }
 
 #[cfg(test)]
@@ -83,5 +98,44 @@ mod tests {
         .context("download openai/whisper-base/model.safetensors");
         assert!(is_not_found(&missing));
         assert!(!is_not_found(&anyhow::anyhow!("connection reset")));
+    }
+
+    fn locked() -> HFError {
+        HFError::CacheLockTimeout {
+            path: "blob.lock".into(),
+        }
+    }
+
+    #[test]
+    fn lock_timeouts_are_waited_out() {
+        let mut calls = 0;
+        let got = wait_for_lock(|| {
+            calls += 1;
+            if calls < 4 {
+                Err(locked())
+            } else {
+                Ok(calls)
+            }
+        });
+        assert_eq!(got.unwrap(), 4);
+    }
+
+    #[test]
+    fn lock_wait_is_bounded_and_other_errors_pass_straight_through() {
+        let mut calls = 0;
+        let forever: Result<(), _> = wait_for_lock(|| {
+            calls += 1;
+            Err(locked())
+        });
+        assert!(matches!(forever, Err(HFError::CacheLockTimeout { .. })));
+        assert_eq!(calls, LOCK_WAITS + 1);
+
+        let mut calls = 0;
+        let other: Result<(), _> = wait_for_lock(|| {
+            calls += 1;
+            Err(HFError::CacheNotEnabled)
+        });
+        assert!(matches!(other, Err(HFError::CacheNotEnabled)));
+        assert_eq!(calls, 1);
     }
 }
