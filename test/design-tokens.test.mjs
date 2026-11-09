@@ -89,3 +89,108 @@ test('nama kelas dan kosakata easing seragam antar permukaan', () => {
   assert.ok(!/\biconbtn\b/.test(all), 'masih ada .iconbtn — ejaannya .icon-btn');
   assert.ok(!/--ease-(std|emph)\b/.test(all), 'masih ada --ease-std/--ease-emph — pakai --ease-sharp/--ease-emphasized');
 });
+
+/* ---------------------------------------------------------------------------
+ * TIDE-001 (papan K01): lapisan token Tide di src/theme-tide.css.
+ * Hanya berlaku di bawah [data-reskin='tide']; token global tidak disentuh.
+ * ------------------------------------------------------------------------- */
+const TIDE = 'src/theme-tide.css';
+const TIDE_NAMES = [
+  '--bg', '--card', '--card2', '--card3', '--border', '--text', '--text2', '--muted',
+  '--accent', '--accent-hover', '--accent-soft', '--accent-dim', '--accent-strong', '--on-accent',
+  '--warn-bg', '--warn-text', '--danger', '--danger-bg', '--pill-bg', '--pill-fg',
+];
+
+/** Deklarasi `--x: v` di semua blok yang selektornya memenuhi `pick`. */
+function tideVars(pick) {
+  const css = stripComments(read(TIDE));
+  const out = {};
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!pick(m[1].trim())) continue;
+    for (const d of m[2].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) out[d[1]] = d[2].trim();
+  }
+  return out;
+}
+const isDark = (sel) => /theme-dark|:not\(\.theme-light\)/.test(sel);
+const lightVars = () => tideVars((s) => /\[data-reskin='tide'\]/.test(s) && !isDark(s));
+const darkVars = () => ({ ...lightVars(), ...tideVars((s) => /\[data-reskin='tide'\]/.test(s) && isDark(s)) });
+
+function resolve(vars, v, depth = 0) {
+  const m = /^var\((--[a-z0-9-]+)\)$/.exec(v);
+  if (!m || depth > 5) return v;
+  assert.ok(m[1] in vars, `${m[1]} dipakai tetapi tidak didefinisikan di ${TIDE}`);
+  return resolve(vars, vars[m[1]], depth + 1);
+}
+function lum(hex) {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+
+test('TIDE-001: theme-tide.css hanya berlaku di bawah [data-reskin=tide]', () => {
+  const css = stripComments(read(TIDE));
+  for (const m of css.matchAll(/([^{}@]+)\{[^{}]*--[a-z]/g)) {
+    const sel = m[1].trim();
+    assert.match(sel, /\[data-reskin='tide'\]/, `blok token tanpa cakupan Tide: "${sel}"`);
+  }
+});
+
+test('TIDE-001: nama token aplikasi dipetakan, terang dan gelap', () => {
+  for (const [mode, vars] of [['terang', lightVars()], ['gelap', darkVars()]]) {
+    for (const n of TIDE_NAMES) {
+      assert.ok(n in vars, `${n} tidak ada (${mode})`);
+      assert.match(resolve(vars, vars[n]), /^#[0-9a-fA-F]{3,6}$|^rgba?\(/, `${n} (${mode}) bukan warna`);
+    }
+  }
+  const dark = tideVars((s) => /\[data-reskin='tide'\]/.test(s) && isDark(s));
+  for (const n of ['--bg', '--card', '--text', '--muted', '--accent-soft', '--pill-bg', '--pill-fg']) {
+    assert.ok(n in dark, `${n} tidak ditimpa untuk gelap`);
+  }
+});
+
+test('TIDE-001: setiap pasangan teks ≥ 4,5:1 (tabel kontras K01)', () => {
+  const PAIRS = [
+    ['--text', '--bg'], ['--text', '--card'], ['--text', '--card2'], ['--text2', '--card'],
+    ['--muted', '--bg'], ['--muted', '--card'], ['--muted', '--card2'],
+    ['--accent-soft', '--card'], ['--accent-soft', '--card2'],
+    ['--on-accent', '--accent-strong'], ['--pill-fg', '--pill-bg'],
+    ['--danger', '--card'], ['--danger', '--danger-bg'], ['--warn-text', '--warn-bg'],
+  ];
+  const rows = [];
+  for (const [mode, vars] of [['light', lightVars()], ['dark', darkVars()]]) {
+    for (const [fg, bg] of PAIRS) {
+      const a = resolve(vars, vars[fg]); const b = resolve(vars, vars[bg]);
+      const r = ratio(a, b);
+      rows.push(`${mode} ${fg} ${a} on ${bg} ${b} = ${r.toFixed(2)}`);
+      assert.ok(r >= 4.5, `${mode}: ${fg} ${a} di atas ${bg} ${b} hanya ${r.toFixed(2)}:1`);
+    }
+  }
+  assert.equal(rows.length, PAIRS.length * 2);
+});
+
+test('TIDE-001: hijau merek tidak pernah jadi warna teks di latar terang', () => {
+  const v = lightVars();
+  for (const n of ['--text', '--text2', '--muted', '--accent-soft']) {
+    assert.notEqual(resolve(v, v[n]).toUpperCase(), '#22C55E', `${n} memakai hijau merek sebagai teks`);
+  }
+  assert.equal(resolve(v, v['--accent']).toUpperCase(), '#22C55E', '--accent (isian) adalah hijau merek');
+});
+
+test('TIDE-001: Fredoka dan Plus Jakarta Sans ikut dipaket dengan lisensi OFL', () => {
+  const css = read(TIDE);
+  for (const fam of ['Fredoka', 'Plus Jakarta Sans']) {
+    const face = new RegExp(`@font-face\\s*\\{[^}]*font-family:\\s*'${fam}'[^}]*url\\('([^']+)'\\)`).exec(css);
+    assert.ok(face, `@font-face ${fam} tidak ada`);
+    const file = 'src/' + face[1].replace(/^\.\//, '');
+    assert.ok(readdirSync(root + file.replace(/\/[^/]+$/, '')).includes(file.split('/').pop()), `${file} tidak ada`);
+  }
+  for (const lic of ['src/fonts/OFL-Fredoka.txt', 'src/fonts/OFL-PlusJakartaSans.txt']) {
+    assert.match(read(lic), /SIL OPEN FONT LICENSE/i, `${lic} bukan lisensi OFL`);
+  }
+  const build = read('esbuild.config.mjs');
+  assert.match(build, /'src\/theme-tide\.css'/, 'theme-tide.css tidak disalin build');
+  assert.match(build, /src\/fonts/, 'folder fonts tidak disalin build');
+});

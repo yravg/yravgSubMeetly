@@ -1,0 +1,154 @@
+/* ==========================================================================
+   theme-tide.css — TIDE-001 (papan K01): lapisan token merek Tide.
+
+   Sumber warna, huruf dan gerak: yravgBuds brand/tokens.css (keputusan pemilik
+   2026-11-09), disalin dari papan K01 (docs/design/tide-shell-canvas/kit.mjs).
+   Skala jarak, ukuran teks dan tangga lapisan tetap dari tokens.css.
+
+   Cakupan: hanya di bawah [data-reskin='tide'] — token global tidak berubah.
+   Gelap: kelas .theme-dark, atau sistem gelap selama tidak ada .theme-light.
+
+   Aturan merek:
+   - --tide-green (#22C55E) adalah isian, bukan teks (2,28:1 di putih).
+     Teks hijau memakai --accent-soft = green-ink (#0E7A47; gelap #4ADE80).
+   - Satu aksi utama per layar memakai pil tinta: --pill-bg / --pill-fg.
+   - Kontras setiap pasangan teks diuji di test/design-tokens.test.mjs.
+
+   Huruf: Fredoka dan Plus Jakarta Sans, SIL Open Font License 1.1
+   (src/fonts/OFL-*.txt), dari github.com/google/fonts.
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Fredoka';
+  src: url('./fonts/Fredoka-Variable.ttf') format('truetype');
+  font-weight: 300 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('./fonts/PlusJakartaSans-Variable.ttf') format('truetype');
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+[data-reskin='tide'] {
+  /* ---- Primitif merek (tidak dipakai langsung oleh komponen) ---------- */
+  --tide-green: #22C55E;
+  --tide-lime: #B6F35C;
+  --tide-emerald: #0E9F6E;
+  --tide-ink: #0A0F0C;
+  --tide-green-ink: #0E7A47;
+  --tide-white: #FFFFFF;
+
+  /* ---- Permukaan Tide ------------------------------------------------- */
+  --tide-surface: #FFFFFF;
+  --tide-surface-2: #F3FBF6;
+  --tide-mint: #E9F7EE;
+  --tide-line: #DCE8E1;
+  --tide-sky-1: #DDF1F0;
+  --tide-sky-2: #EAF7F0;
+  --tide-sea-1: #BFE8D2;
+  --tide-shadow: 0 1px 2px rgba(10, 15, 12, 0.05), 0 10px 28px -14px rgba(11, 59, 36, 0.28);
+  --tide-scrim: rgba(10, 15, 12, 0.38);
+
+  /* ---- Nama token aplikasi (sama dengan sidepanel.css) ---------------- */
+  --bg: var(--tide-surface-2);
+  --card: var(--tide-surface);
+  --card2: var(--tide-mint);
+  --card3: var(--tide-line);
+  --border: var(--tide-line);
+  --text: var(--tide-ink);
+  --text2: #33443A;
+  --muted: #4B5A52;
+  --accent: var(--tide-green);
+  --accent-hover: var(--tide-emerald);
+  --accent-soft: var(--tide-green-ink);
+  --accent-dim: rgba(34, 197, 94, 0.14);
+  --accent-strong: var(--tide-green-ink);
+  --on-accent: var(--tide-white);
+  --warn-bg: #FFF4D6;
+  --warn-border: rgba(138, 90, 0, 0.35);
+  --warn-text: #8A5A00;
+  --danger: #B42318;
+  --danger-bg: #FDECEA;
+
+  /* ---- Khusus Tide ---------------------------------------------------- */
+  --pill-bg: var(--tide-ink);
+  --pill-fg: var(--tide-white);
+  --font-display: 'Fredoka', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-ui: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.25, 1.12);
+  /* Penimpaan radius per permukaan (seperti reskin modern/coretax):
+     papan K01 memakai 8 · 14 · 22 · pil, tokens.css 8 · 12 · 16. */
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  color-scheme: light;
+}
+
+/* ---- Gelap ------------------------------------------------------------ */
+[data-reskin='tide'].theme-dark {
+  --tide-surface: #0B1310;
+  --tide-surface-2: #111C18;
+  --tide-mint: #12241B;
+  --tide-line: #24372F;
+  --tide-sky-1: #0F2220;
+  --tide-sky-2: #12241B;
+  --tide-sea-1: #1A3B2E;
+  --tide-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+  --tide-scrim: rgba(0, 0, 0, 0.55);
+  --bg: var(--tide-surface);
+  --card: var(--tide-surface-2);
+  --text: #E8F2EC;
+  --text2: #C9D8CF;
+  --muted: #A3B5AB;
+  --accent-hover: #4ADE80;
+  --accent-soft: #4ADE80;
+  --accent-strong: #4ADE80;
+  --on-accent: var(--tide-ink);
+  --warn-bg: #2B2210;
+  --warn-border: rgba(245, 193, 108, 0.4);
+  --warn-text: #F5C16C;
+  --danger: #FF8A80;
+  --danger-bg: #2A1512;
+  --pill-bg: #E8F2EC;
+  --pill-fg: var(--tide-ink);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  [data-reskin='tide']:not(.theme-light) {
+    --tide-surface: #0B1310;
+    --tide-surface-2: #111C18;
+    --tide-mint: #12241B;
+    --tide-line: #24372F;
+    --tide-sky-1: #0F2220;
+    --tide-sky-2: #12241B;
+    --tide-sea-1: #1A3B2E;
+    --tide-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+    --tide-scrim: rgba(0, 0, 0, 0.55);
+    --bg: var(--tide-surface);
+    --card: var(--tide-surface-2);
+    --text: #E8F2EC;
+    --text2: #C9D8CF;
+    --muted: #A3B5AB;
+    --accent-hover: #4ADE80;
+    --accent-soft: #4ADE80;
+    --accent-strong: #4ADE80;
+    --on-accent: var(--tide-ink);
+    --warn-bg: #2B2210;
+    --warn-border: rgba(245, 193, 108, 0.4);
+    --warn-text: #F5C16C;
+    --danger: #FF8A80;
+    --danger-bg: #2A1512;
+    --pill-bg: #E8F2EC;
+    --pill-fg: var(--tide-ink);
+    color-scheme: dark;
+  }
+}
+
+/* Gerak berkurang: pegas jadi pudar 120 ms (papan K01). */
+@media (prefers-reduced-motion: reduce) {
+  [data-reskin='tide'] {
+    --ease-spring: ease-out;
+  }
+}

@@ -50,11 +50,14 @@ const statics = [
   ['src/notes-panel.css', 'notes-panel.css'],
   ['src/minutes.html', 'minutes.html'],
   ['src/minutes.css', 'minutes.css'],
+  ['src/theme-tide.css', 'theme-tide.css'],
 ];
 for (const [from, to] of statics) {
   await copyFile(path.join(root, from), path.join(dist, to));
 }
 await cp(path.join(root, 'icons'), path.join(dist, 'icons'), { recursive: true });
+// Fredoka + Plus Jakarta Sans (SIL OFL 1.1) for theme-tide.css, with their licences.
+await cp(path.join(root, 'src/fonts'), path.join(dist, 'fonts'), { recursive: true });
 
 // ---- vendor runtime assets (must ship in package: MV3 forbids CDN) ------
 // Copy EVERY ort-wasm-simd-threaded* variant (plain/jsep/asyncify/jspi) — the
