@@ -11,7 +11,8 @@ Updated 2026-11-09 by the lead (Claude Opus 5.5).
 |---|---|---|
 | T1 PRD | done | docs/roadmap/tide-shell.md |
 | T2 Canvas | done | Claude Design canvas https://claude.ai/artifact/QHTw3xufZj9nVZvpeJNBe6 (private, version 3): cover, status, story index, K01 + A01..A09. Worker `tide-canvas` (Sonnet) built it; lead fixed the `--dc` export (x-dc wrapper, v3 canvas.json, self-closed br). lint_boards 10/10 per board; render 0 errors / 0 broken images; slop scan 75 (B), 0 errors, 63 warnings (inline styles, pane `!important`); contrast table on the Status board (lowest text pair 4.88). Controls: 187 from today's pages, all assigned to a board, 110 drawn inside a frame |
-| T3 Owner review | open | owner comments on the canvas |
+| T3 Owner review | done | owner comments resolved (canvas version 8, 2026-11-09); owner said "go build everything through VPS" |
+| T4..T8 build | in progress (VPS) | worker `tide-build` (Claude Code in Orca tab `bd0f6219…`, env hostinger-vps-dev) in worktree `/home/dev/orca/workspaces/yraveragesub/burbot`, branch `burbot` from laptop main 1e0b913; brief and checkpoint in its `.checkpoints/`; preview http://100.108.253.30:33104/app.html (systemd `submeetly-dev-web`, Tailscale only); sync mode direct (`/home/user/dev/yravgSubMeetly/.yravgvps.json`): laptop pushes main to `laptop-main`, fetches `burbot` over SSH |
 | T4..T8 build | open | waits for T3 |
 
 ## Facts
