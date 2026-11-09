@@ -62,6 +62,11 @@ const mascots = () => page.$$eval('img.tide-art', (l) => l.map((i) => i.src.spli
 
 test('A09: sambutan pertama (wave) lalu kosong (sleep), satu maskot per layar', async () => {
   assert.deepEqual(await mascots(), ['tide-wave.webp']);
+  // First run: a real setup list (engine, speech model, test caption), each with a way forward.
+  const steps = await page.$$eval('.hero ol.setup li', (l) => l.map((li) => ({ text: li.textContent.trim(), link: li.querySelector('a')?.getAttribute('href') || '' })));
+  assert.ok(steps.length >= 2 && steps.length <= 3, JSON.stringify(steps));
+  assert.equal(steps.at(-1).link, '#live');
+  assert.match(steps.at(-1).text, /test caption/i);
   await page.click('[data-act="welcomed"]');
   await page.waitForSelector('.st.in-hero');
   assert.deepEqual(await mascots(), ['tide-sleep.webp']);

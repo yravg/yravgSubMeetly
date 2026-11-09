@@ -12,7 +12,7 @@
  */
 import { listMeetings } from './lib/notes-store.js';
 import { computeToday, greetingKey } from './lib/today.js';
-import { nativeHealth } from './lib/native.js';
+import { nativeHealth, nativeGetModels } from './lib/native.js';
 import { LOCAL_HELPER_ORIGIN } from './lib/native-protocol.js';
 import { TYPE_COLOR } from './lib/notes-schema.js';
 import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minutes-window.js';
@@ -48,7 +48,7 @@ const STR = {
     noOverlay: 'No page overlay in this window', noOverlayBody: 'Press Start and share a tab, window or screen with audio. Captions appear here and in the island pill; the overlay on a web page needs the Chrome extension.',
     loading: 'Reading your register…', errTitle: 'The register could not be read.', errBody: (m) => `${m} Reload the page; if it keeps failing, export your minutes from the Minutes page.`, reload: 'Reload',
     emptyTitle: 'No meetings yet', emptyBody: 'Start captions in a meeting, or import a sample series from the Library on the Minutes page.', openMinutes: 'Open Minutes',
-    welcomeTitle: 'Welcome to yravgSubMeetly', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it',
+    welcomeTitle: 'Welcome to yravgSubMeetly', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it', setupTitle: 'Set up in three steps', setupEngine: 'Engine running', setupEngineFix: 'Start the engine', setupAsr: 'Speech model on this device', setupAsrFix: 'Download one', setupTest: 'Try a test caption', setupTestGo: 'Start captions', setupDone: 'Ready', setupTodo: 'To do', setupChecking: 'Checking…',
     caughtUp: 'All caught up: nothing overdue and yesterday is issued.',
     registerStyle: 'Style', openRegister: 'Open register', classic: 'Classic ↗', openWindow: 'Open Minutes window ↗', windowOpen: 'Minutes window is open · Focus',
     minutesHint: 'Classic and Modern are the same register; edits show in both.', modern: 'Modern ↗',
@@ -95,7 +95,7 @@ const STR = {
     noOverlay: 'Tidak ada overlay halaman di jendela ini', noOverlayBody: 'Tekan Mulai lalu bagikan tab, jendela, atau layar beserta audionya. Teks muncul di sini dan di pil island; overlay di halaman web butuh ekstensi Chrome.',
     loading: 'Membaca register…', errTitle: 'Register tidak terbaca.', errBody: (m) => `${m} Muat ulang halaman; bila tetap gagal, ekspor notulen dari halaman Notulen.`, reload: 'Muat ulang',
     emptyTitle: 'Belum ada rapat', emptyBody: 'Mulai teks di rapat, atau impor seri contoh dari Library di halaman Notulen.', openMinutes: 'Buka Notulen',
-    welcomeTitle: 'Selamat datang di yravgSubMeetly', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti',
+    welcomeTitle: 'Selamat datang di yravgSubMeetly', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti', setupTitle: 'Siapkan dalam tiga langkah', setupEngine: 'Engine berjalan', setupEngineFix: 'Nyalakan engine', setupAsr: 'Model suara di perangkat ini', setupAsrFix: 'Unduh satu', setupTest: 'Coba teks uji', setupTestGo: 'Mulai teks', setupDone: 'Siap', setupTodo: 'Belum', setupChecking: 'Memeriksa…',
     caughtUp: 'Semua beres: tidak ada yang lewat tenggat dan notulen kemarin sudah terbit.',
     registerStyle: 'Gaya', openRegister: 'Buka register', classic: 'Klasik ↗', openWindow: 'Buka jendela Notulen ↗', windowOpen: 'Jendela Notulen terbuka · Fokus',
     minutesHint: 'Klasik dan Modern adalah register yang sama; suntingan tampil di keduanya.', modern: 'Modern ↗',
@@ -165,7 +165,7 @@ const ALIAS = { glossary: 'notes', all: 'addins' }; // All features became a sec
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
 
-const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
+const state = { setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* privat */ } },
@@ -243,6 +243,13 @@ function toggleBell(force) {
 /* ---------- Today (A01) ---------- */
 const seriesMeetings = () => (state.series ? state.meetings.filter((m) => m.seriesId === state.series) : state.meetings) || [];
 
+// First-run checklist: engine and speech model are read from the engine (GET /models); the test caption is the one action left.
+function setupList() {
+  const h = state.health; const asr = state.setup?.asr;
+  const row = (label, ok, fix, href) => `<li class="${ok ? 'ok' : ''}"><span class="dot ${ok ? 'ok' : ok === null ? 'wait' : 'off'}" aria-hidden="true"></span><span class="grow">${esc(label)}</span>${ok ? `<span class="mut small">${esc(T('setupDone'))}</span>` : ok === null ? `<span class="mut small">${esc(T('setupChecking'))}</span>` : `<a href="${href}">${esc(fix)}</a>`}</li>`;
+  return `<ol class="setup" aria-label="${esc(T('setupTitle'))}">${row(T('setupEngine'), h === undefined ? null : !!h, T('setupEngineFix'), '#helper')}${state.setup && asr === null && h ? '' : row(T('setupAsr'), !h ? (h === undefined ? null : false) : asr === undefined ? null : asr, T('setupAsrFix'), '#settings?stab=models')}<li><span class="dot wait" aria-hidden="true"></span><span class="grow">${esc(T('setupTest'))}</span><a href="#live" data-start>${esc(T('setupTestGo'))}</a></li></ol>`;
+}
+
 function todayPage() {
   if (state.error) return errorCard(state.error);
   if (!state.meetings) return stateCard({ pose: 'compass', title: T('loading'), body: '', cls: 'loading' });
@@ -262,7 +269,7 @@ function todayPage() {
     <div class="sub">${num(T('nMeetings', t.meetingsToday.length))}${caughtUp ? ` · ${esc(T('caughtUp'))}` : ''}</div>
     ${welcome || t.empty ? '' : `<div class="askbar">${pose === 'shell' ? `<span class="peek">${tide('shell', 'peek-art')}</span>` : ''}${ic('sparkle', 20)}<input type="text" data-act="askbar" placeholder="${esc(T('askBar'))}" aria-label="${esc(T('askBar'))}" /><button type="button" class="send" data-act="askgo" aria-label="${esc(T('send'))}">${ic('send', 20)}</button></div>
     <div class="chips">${T('chips').map((c, i) => `<button type="button" class="chip" data-act="chip" data-i="${i}">${ic(['chat', 'flag', 'list', 'globe'][i], 18)}${esc(c)}</button>`).join('')}</div>`}
-    ${welcome ? stateCard({ pose: 'wave', title: T('welcomeTitle'), body: T('welcomeBody'), actions: `<button type="button" class="pill-b" data-act="welcomed">${esc(T('gotIt'))}</button>`, cls: 'in-hero' }) : ''}
+    ${welcome ? stateCard({ pose: 'wave', title: T('welcomeTitle'), body: T('welcomeBody'), actions: `${setupList()}<button type="button" class="pill-b" data-act="welcomed">${esc(T('gotIt'))}</button>`, cls: 'in-hero' }) : ''}
     ${!welcome && t.empty ? stateCard({ pose: 'sleep', title: T('emptyTitle'), body: T('emptyBody'), actions: `<a class="pill-b" href="#live" data-start>${ic('play', 16)}${esc(T('startCaptions'))}</a><a class="btn" href="#minutes">${esc(T('openMinutes'))}</a>`, cls: 'in-hero' }) : ''}
   </section>`;
 
@@ -345,9 +352,9 @@ function plansPage() {
 }
 
 /* ---------- Settings: Developer switch (extension) ---------- */
-function settingsPage() {
+function settingsPage(params) {
   const sw = HOSTED ? `<div class="cd devsw"><div><b>${esc(T('devArea'))}</b><p class="mut">${esc(T('devAreaBody'))}</p></div><label class="sw-chip bare"><input type="checkbox" role="switch" data-act="dev"${state.developer ? ' checked' : ''} aria-label="${esc(T('devArea'))}" /></label></div>` : '';
-  return `${sw}<iframe class="frame panel" title="${esc(T('settings'))}" src="${esc(panelUrl(PANEL.settings))}"></iframe>`;
+  return `${sw}<iframe class="frame panel" title="${esc(T('settings'))}" src="${esc(panelUrl(params?.get('stab') ? ['settings', params.get('stab').replace(/[^a-z]/g, '')] : PANEL.settings))}"></iframe>`;
 }
 
 /* ---------- panel-backed pages ---------- */
@@ -381,7 +388,7 @@ function render() {
     return;
   }
   lastRoute = route;
-  page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'addins' ? addinsPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage() : route === 'plans' ? plansPage() : panelPage(route);
+  page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'addins' ? addinsPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage(params) : route === 'plans' ? plansPage() : panelPage(route);
   if (route === 'addins' && params.get('pane') === 'addins') $('#addins-pane')?.scrollIntoView({ block: 'start' });
 }
 
@@ -487,7 +494,9 @@ async function loadRegister() {
 
 async function pollHelper() {
   // Windows window: the engine that served this page is the helper (it may not be on 17865).
-  state.health = await nativeHealth(WEB ? location.origin : LOCAL_HELPER_ORIGIN);
+  const origin = WEB ? location.origin : LOCAL_HELPER_ORIGIN;
+  state.health = await nativeHealth(origin);
+  if (!state.welcomed) { const m = state.health ? await nativeGetModels(origin) : null; state.setup = { asr: Array.isArray(m?.catalog) ? m.catalog.some((x) => x.kind === 'asr' && x.downloaded) : null }; }
   paintHelper();
   paintBell();
   if (parseHash().route === 'today') { lastRoute = null; render(); }
