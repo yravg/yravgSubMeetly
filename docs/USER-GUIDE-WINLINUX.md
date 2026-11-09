@@ -39,7 +39,7 @@ run.bat
 ```
 
 `run.bat` menjalankan `submeetly-engine.exe`; pertama kali dipakai ia
-mengunduh bobot model (~1,6 GB untuk `large-v3-turbo`). Jaringan lambat?
+mengunduh model bawaan (Whisper `base` ~290 MB dan Qwen2.5-0.5B ~1 GB; `large-v3-turbo` ~1,6 GB hanya bila dipilih). Jaringan lambat?
 
 ```bat
 set WHISPER_MODEL=base

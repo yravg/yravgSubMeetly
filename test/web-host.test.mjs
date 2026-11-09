@@ -42,7 +42,8 @@ before(async () => {
       });
       return undefined;
     }
-    if (!url.pathname.startsWith('/app/')) { res.statusCode = 404; return res.end('no'); }
+    // Any other engine endpoint (/models, /ui-prefs, /engine/device ...): an empty, successful answer.
+    if (!url.pathname.startsWith('/app/')) { res.setHeader('content-type', 'application/json'); return res.end('{}'); }
     const file = normalize(join(DIST, decodeURIComponent(url.pathname.slice(5)) || 'app.html'));
     if (!file.startsWith(normalize(DIST)) || !existsSync(file) || !statSync(file).isFile()) { res.statusCode = 404; return res.end('no'); }
     res.setHeader('content-type', MIME[extname(file)] || 'application/octet-stream');
@@ -63,6 +64,8 @@ async function open(path, viewport = { width: 1280, height: 900 }) {
   const page = await browser.newPage();
   await page.setViewport(viewport);
   const errors = [];
+  // Never let a page reach the real engine on 17865: point the helper at the stub.
+  await page.evaluateOnNewDocument((engine) => localStorage.setItem('settings', JSON.stringify({ nativeUrl: engine })), origin);
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('/favicon.ico')) errors.push(`${r.status()} ${r.url()}`); });
   await page.goto(`${origin}${path}`, { waitUntil: 'networkidle0' });
