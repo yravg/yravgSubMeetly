@@ -17,7 +17,9 @@ use poni_core::geom::{palette, Color, Rect};
 /// Width the Menu button takes at the left of the tab row (button + gap).
 pub const SLOT: f32 = 32.0;
 /// List columns, filled top to bottom: board order reads down, then across.
+/// Past 15 pages (every add-on on) a fourth column keeps the list short enough for the island.
 const COLS: usize = 3;
+const WIDE_FROM: usize = 16;
 const ROW_H: f32 = 28.0;
 const COL_W: f32 = 150.0;
 const PANEL_PAD: f32 = 8.0;
@@ -54,7 +56,7 @@ pub fn pages(st: &AppState) -> Vec<PageKind> {
 }
 
 fn rows(n: usize) -> usize {
-    n.div_ceil(COLS).max(1)
+    n.div_ceil(if n >= WIDE_FROM { COLS + 1 } else { COLS }).max(1)
 }
 
 /// Where the keys Up/Down/Left/Right/Tab/Home/End take row `sel` of `n`.
@@ -298,6 +300,12 @@ mod tests {
         assert!(pages(&st).contains(&System));
         // Every page in the list has a name to show.
         assert!(pages(&st).iter().all(|p| !p.title().is_empty()));
+    }
+
+    #[test]
+    fn every_page_on_is_five_rows_at_most() {
+        // 18 pages (every add-on on) go to four columns, so the list never outgrows the island.
+        assert_eq!((rows(13), rows(15), rows(16), rows(18)), (5, 5, 4, 5));
     }
 
     #[test]

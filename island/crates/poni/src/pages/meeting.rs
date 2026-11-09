@@ -59,8 +59,13 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
             return;
         }
         PageState::Empty => {
-            let line = "Notes from the extension or the Mac app land here. Pick a meeting in Calendar to start its notes.";
-            if hkit::message(ui, area, accent, Icon::Clipboard, "No decisions yet", line, false, Some(("Open Calendar", wid("meeting.calendar")))) {
+            // A note from Calendar's Notes button exists but holds no items yet: say so, with its name.
+            let started = st.helper.note().map(|n| n.title.clone());
+            let (title, line) = match &started {
+                Some(t) => (t.as_str(), "Notes started from Calendar. Decisions and actions land here once the extension or the Mac app drafts them."),
+                None => ("No decisions yet", "Notes from the extension or the Mac app land here. Pick a meeting in Calendar to start its notes."),
+            };
+            if hkit::message(ui, area, accent, Icon::Clipboard, title, line, false, Some(("Open Calendar", wid("meeting.calendar")))) {
                 st.cmd(Command::SetPage(PageKind::Calendar));
             }
             return;

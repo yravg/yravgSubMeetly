@@ -218,7 +218,6 @@ fn meeting_row(ui: &mut Ui, st: &AppState, row: Rect, e: &Event, off: i64, slot:
     ui.c.text(&when, Rect::new(row.x + 8.0, cy - 9.0, when_w, 18.0), &wst);
     let tx = row.x + 8.0 + when_w + 6.0;
     let tw = (right - tx - 4.0).max(0.0);
-    ui.c.text(&e.title, Rect::new(tx, cy - 18.0, tw, 20.0), &TextStyle::body());
     let mut sub: Vec<String> = Vec::new();
     if let Some(l) = &e.location {
         sub.push(l.clone());
@@ -232,7 +231,11 @@ fn meeting_row(ui: &mut Ui, st: &AppState, row: Rect, e: &Event, off: i64, slot:
     if on {
         sub.insert(0, "Now".into());
     }
-    ui.c.text(&sub.join(" \u{b7} "), Rect::new(tx, cy + 2.0, tw, 16.0), &TextStyle::caption().weight(Weight::Regular).color(palette::TEXT_DIM));
+    // A title with nothing under it sits at the row's middle, level with the buttons.
+    ui.c.text(&e.title, Rect::new(tx, if sub.is_empty() { cy - 10.0 } else { cy - 18.0 }, tw, 20.0), &TextStyle::body());
+    if !sub.is_empty() {
+        ui.c.text(&sub.join(" \u{b7} "), Rect::new(tx, cy + 2.0, tw, 16.0), &TextStyle::caption().weight(Weight::Regular).color(palette::TEXT_DIM));
+    }
     hit
 }
 
