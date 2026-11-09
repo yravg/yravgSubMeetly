@@ -796,6 +796,11 @@ impl View {
         }
     }
 
+    /// The page shows the engine's own fresh line (not a saved meeting's lines): its header must not name an older note.
+    pub fn on_live_line(&self) -> bool {
+        self.followed_line(now_ms()).is_some()
+    }
+
     /// [`live_state`], plus: with no note to follow, a fresh engine line is enough.
     pub fn live_state_at(&self, now_ms: u64) -> PageState {
         match live_state(&self.link, &self.snap.notes, self.following) {
@@ -968,6 +973,8 @@ mod tests {
         assert_eq!(v.live_state_at(60_000), PageState::Normal, "a held page stays a page");
         v.toggle_pause_at(2000);
         assert_eq!((v.captions_at(2000).previous.as_str(), v.captions_at(2000).current.as_str()), ("Dua.", "Tiga."));
+        // A line older than LIVE_FRESH_MS is not the page's source: the saved note's lines are.
+        assert!(v.followed_line(2000).is_some() && v.followed_line(60_000).is_none());
     }
 
     #[test]

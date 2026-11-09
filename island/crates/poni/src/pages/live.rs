@@ -120,7 +120,9 @@ fn translation_hint(ui: &mut Ui, st: &mut AppState, area: Rect, y: f32, hint: Tr
 fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     let locked = state == PageState::Locked;
     // No note yet (a meeting is saved when it ends): the engine's line stands alone.
-    let (title, waiting, total) = match st.helper.note() {
+    // The engine's fresh line wins over a saved meeting: a new session is not that meeting.
+    let note = st.helper.note().filter(|_| !st.helper.on_live_line());
+    let (title, waiting, total) = match note {
         Some(n) => (n.title.clone(), n.waiting(), n.transcript.len()),
         None => ("Live from the engine".to_string(), 0, 0),
     };
