@@ -1603,6 +1603,29 @@ mod tests {
     }
 
     #[test]
+    fn the_language_rows_cycle_and_show_the_name() {
+        let mut st = state();
+        let value = |st: &AppState, k| match row(Section::Speech, st, k).map(|i| i.ctl) {
+            Some(Ctl::Stepper(v)) => v,
+            _ => String::new(),
+        };
+        // Spoken language starts on Auto-detect and also offers it; the target never does.
+        assert_eq!((value(&st, Key::SpokenLang).as_str(), value(&st, Key::TargetLang).as_str()), ("Auto-detect", "English"));
+        apply(&mut st, Key::SpokenLang, Act::Step(-1));
+        assert_eq!((st.settings.source_lang.as_str(), value(&st, Key::SpokenLang).as_str()), ("vi", "Vietnamese"));
+        apply(&mut st, Key::SpokenLang, Act::Step(1));
+        assert_eq!(st.settings.source_lang, "auto");
+        apply(&mut st, Key::TargetLang, Act::Step(-1));
+        assert_eq!(st.settings.target_lang, "vi");
+        apply(&mut st, Key::TargetLang, Act::Step(1));
+        assert_eq!(st.settings.target_lang, "en");
+        // Captions start and stop through the app, which remembers the choice.
+        st.cmds.clear();
+        apply(&mut st, Key::Captions, Act::Toggle);
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::Captions(true))));
+    }
+
+    #[test]
     fn delays_show_the_nearest_choice() {
         let mut st = state();
         let pick = |st: &AppState, k| match row(Section::Island, st, k).map(|i| i.ctl) {
