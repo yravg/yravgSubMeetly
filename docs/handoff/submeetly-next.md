@@ -55,6 +55,16 @@ the four canvas agents, merge their build.mjs edits, run build + lint + render, 
 boards, resolve threads; commit docs/design/ (still untracked). Owner gates: S5, D02 tab rows,
 add-in list, "ySub" label and theme names.
 
+## Owner decisions 2026-11-08 (late)
+
+- S5: yes, Rust is the default engine and Python goes. Worker s5 (Sonnet, dispatch ctx_c813ab8e5229, worktree sm-s5, branch yravg/sm-s5) builds it.
+- Add-in list (owner asked for the lead's recommendation, by real meeting pain): keep Agenda timer, Talk time (off by default), Engine monitor (off by default), Flag decision, Actions; add Recap email (mailto draft + Copy, nothing sent by the add-in), Glossary (per-series terms fix captions and minutes), Due dates to calendar (.ics of open actions with a due date); Quick capture on by default in the island. Worker addins2 (Sonnet, dispatch ctx_8d91260be656, worktree sm-addins2) builds the three new ones.
+- Overlay label "ySub" and theme names "Yraverage Klasik/Modern": keep as they are.
+- Release repo public: owner said yes; the lead's `gh repo edit --visibility public` was refused by the auto-mode classifier, so the owner runs it. Before that the lead scanned every remote branch: no keys or tokens; `.e2e-file-profile/` is a committed throwaway Chrome profile with empty Cookies/History/Login Data (junk, no personal data).
+- Release environment `release` (deployment limited to `v*` tags) created and `UPDATE_FEED_KEY` set from the PEM by stdin (never printed). Spare key 5693fbeec7bd596f made, listed in update-keys.txt; its private half is at %USERPROFILE%/.yravg/update-feed-key-spare-OFFLINE.pem until the owner moves it offline.
+- Island version 1.2.0 (6750711; was Oyenza's 0.2.26). The extension manifest stays 1.1.1 until its next store release, then 1.2.0 too.
+- Installed: island/dist/yravgSubMeetly-Setup-1.2.0.exe (sha256 558da68f...) silent install exit 0 into %LOCALAPPDATA%/Programs/yravgSubMeetly, uninstall entry "yravgSubMeetly 1.2.0", two Start menu shortcuts, island running (paper pill at top centre, screenshot checked). No Native Messaging host registered: the extension is not loaded in any Chrome/Edge profile on this PC, so the wizard had no extension ID. After loading the extension, run the Setup again (or `Setup /EXTID=<id>`) to register it. Port 17865 is held by a Python helper the lead did not start.
+
 ## Lead check-and-fix pass 2026-11-08 (branch yravg/lead-fixes, fast-forwarded to main)
 
 - 5be78f3: Minutes at 390 px overflowed sideways (Add item, Export, Issue MoM off screen). Toolbar now wraps under 560 px; folded buttons keep their icon tile. `test/dock-motion.test.mjs` gained width 390 and a reachability check; failed before the CSS change.
@@ -135,3 +145,25 @@ then qa re-run on main. S5 (Rust default, delete Python) stays an owner gate.
   failures, store PNG wordmark, side panel dark + swatch contrast; specs/w-polish.md), island3
   ctx_ad370109b179 (Live caption stream, Pause/Stop honesty, Engine CPU/RTF, mac Oyenza strings, pairdrop
   default server, cargo test -p poni, Update sheet shot; specs/w-island3.md). Lead re-runs the Qwen test.
+
+## Moved to the VPS (2026-11-09, lead)
+
+Claude cannot run as root with `--dangerously-skip-permissions`, so the VPS work runs as Linux user `dev`
+(ssh alias `hostinger-vps-dev`, key auth only, no sudo). `/home/user/dev` is owned by `dev`.
+
+- VPS main checkout `/home/user/dev/yravgSubMeetly/yravgSubMeetly` fast-forwarded to local main 5b2092b
+  (pushed over SSH, nothing pushed to GitHub).
+- Worktrees `/home/user/dev/yravgSubMeetly/wt/sm-s5` (e08e787), `sm-addins2` (d472e38), `sm-desktop` (c66adbd),
+  each with `.checkpoints/<name>.md` (copied from the laptop) and `.ref/` (specs, old dispatch, `VPS-BRIEF.md`).
+  `.checkpoints/` and `.ref/` are in `.git/info/exclude`.
+- Installed: Rust 1.99.1 (dev, rustup), npm ci in all three worktrees, ffmpeg, cmake, clang, xvfb,
+  Chrome for Testing 152 at `/home/dev/cft/chrome-linux64/chrome`.
+- `tmux` session `sm-launcher` runs `~/start-submeetly-workers.sh`: it waits for Claude login, then starts
+  three Sonnet workers in tmux sessions `sm-s5`, `sm-addins2`, `sm-desktop`. Each finishes with `.ref/REPORT.md`.
+- Blocked, owner must act: (1) Claude on the VPS is logged out for root and dev
+  ("OAuth session expired and could not be refreshed"); log in as dev. (2) Chrome cannot start: Ubuntu 24.04
+  blocks unprivileged user namespaces, so Puppeteer tests fail with "No usable sandbox". Options: an AppArmor
+  profile for that Chrome path, or `--no-sandbox` for the test browser. The lead's attempts at both were refused
+  by the permission classifier. (3) First start of each worker may wait on the trust or bypass-permissions prompt.
+- Next: after login, attach each tmux session, accept prompts; when all three REPORT.md files exist, the lead
+  verifies each branch and merges.
