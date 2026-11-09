@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overlay lab</title>
+    <!-- Stand-in page for the injected caption overlay: a neutral backdrop, the
+         chrome mock and the production dist/content.js. Drive it with
+         window.__mockEmit({ target: 'content', type, data }). -->
+    <style>
+      :root { --lab-a: #20314f; --lab-b: #4b3a6b; --lab-c: #7a4f3b; --lab-text: rgba(255, 255, 255, 0.35); }
+      html, body { margin: 0; height: 100%; }
+      body { background: linear-gradient(135deg, var(--lab-a), var(--lab-b) 55%, var(--lab-c)); font: 16px system-ui, sans-serif; }
+      .stage { position: fixed; inset: 0; display: grid; place-items: center; color: var(--lab-text); }
+    </style>
+  </head>
+  <body>
+    <div class="stage">Page behind the overlay</div>
+    <script src="chrome-mock.js"></script>
+    <script src="/dist/content.js"></script>
+  </body>
+</html>

@@ -6,6 +6,8 @@ import {
   cueToLine,
 } from './lib/translation-utils.js';
 import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
+import tokensCss from './tokens.css';
+import overlayCss from './overlay.css';
 
 (() => {
   if (window.__localTransSubInjected) return;
@@ -41,6 +43,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
   let activeKey = null;
   let sessionConfig = null;
   let forceTranslateBtn = null;
+  let forceLabel = null;
   let forceTranslateWrap = null;
   let forceTranslateMenu = null;
   let forceAllBtn = null;
@@ -63,10 +66,64 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
   let compactMode = false;
   let locked = false;
   let reskin = 'yraverage';
+  let translationColour = null;
+  const TCOLOURS = ['indigo', 'navy', 'teal', 'neutral', 'bronze'];
+  // chrome.storage.local `captionSurface`: 'overlay' | 'island' | 'both'. The overlay is hidden for 'island'.
+  let captionSurface = 'overlay';
+  const overlayAllowed = () => captionSurface !== 'island';
+
+  // 16px grid, 1.5px strokes (see .ic in overlay.css). Static strings, no user data.
+  const ICONS = {
+    compact: '<rect x="2" y="3" width="12" height="10" rx="2.5"/><path d="M5 10h6"/>',
+    expand: '<rect x="2" y="3" width="12" height="10" rx="2.5"/><path d="M5 6.5h6M5 9.5h6"/>',
+    unlock: '<rect x="3.5" y="7" width="9" height="6.5" rx="1.8"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 4.8-1"/>',
+    lock: '<rect x="3.5" y="7" width="9" height="6.5" rx="1.8"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>',
+    minimize: '<path d="M4 8h8"/>',
+    close: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',
+    chevrons: '<path d="M5.5 6.5L8 4l2.5 2.5M5.5 9.5L8 12l2.5-2.5"/>',
+    grip: '<path d="M13 6L6 13M13 10l-3 3"/>',
+  };
+  const svgIcon = (n) => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${ICONS[n]}</svg>`;
+
+  function setIconButton(btn, icon, title, pressed) {
+    btn.innerHTML = svgIcon(icon);
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
+    if (pressed !== undefined) btn.setAttribute('aria-pressed', String(pressed));
+  }
+
+  function iconButton(onClick, icon, title) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tool-close';
+    if (icon) setIconButton(b, icon, title);
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onClick();
+    });
+    return b;
+  }
+
+  function makeSwitch(text, title, onChange) {
+    const label = document.createElement('label');
+    label.className = 'tool-toggle';
+    label.title = title;
+    const wrap = document.createElement('span');
+    wrap.className = 'sw-wrap';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('role', 'switch');
+    input.addEventListener('change', onChange);
+    const track = document.createElement('span');
+    track.className = 'sw';
+    wrap.append(input, track);
+    label.append(wrap, document.createTextNode(text));
+    return { label, input };
+  }
   // Aksen corak untuk overlay gelap — varian identitas tiap pola.
   const RESKIN_ACCENTS = { yraverage: '#14b789', coretax: '#5b9bfa', modern: '#a78bfa' };
   let panelSize = { w: 720, h: 280 };
-  const PANEL_MIN = { w: 280, h: 140 };
+  const PANEL_MIN = { w: 280, h: 190 };
   const PANEL_MAX = { w: 1200, h: 560 };
 
   function findVideo() {
@@ -365,9 +422,9 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     if (forceTranslateBtn) {
       forceTranslateBtn.disabled = true;
       forceTranslateBtn.dataset.busy = '1';
-      forceTranslateBtn.textContent = 'Translating…';
+      forceLabel.textContent = 'Translating…';
     }
-    setStatus(`Force translating ${lines.length} line(s)…`);
+    setStatus(`Force translating ${lines.length} line(s)…`, 'busy');
     try {
       const res = await chrome.runtime.sendMessage({
         target: 'bg',
@@ -375,13 +432,13 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
         data: { lines, retranslate: true },
       });
       if (!res?.ok) {
-        setStatus(res?.error || 'Force translate failed');
+        setStatus(res?.error || 'Force translate failed', 'error');
         resetForceTranslateBtn();
       } else if (res.count) {
-        setStatus(`Translating ${res.count} line(s)…`);
+        setStatus(`Translating ${res.count} line(s)…`, 'busy');
       }
     } catch (e) {
-      setStatus(String(e.message || e));
+      setStatus(String(e.message || e), 'error');
       resetForceTranslateBtn();
     }
   }
@@ -398,8 +455,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
       ? 'Force translate — all, selected, or time range'
       : 'Switch to + Translate mode in the panel';
     if (forceTranslateBtn.dataset.busy !== '1') {
-      forceTranslateBtn.textContent =
-        untranslated > 0 ? `Force Translate (${untranslated}) ▾` : 'Force Translate ▾';
+      forceLabel.textContent = untranslated > 0 ? `Force Translate (${untranslated})` : 'Force Translate';
     }
     if (forceAllBtn) {
       forceAllBtn.textContent = `Re-translate all (${total})`;
@@ -498,6 +554,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
 
   function closeForceMenu() {
     forceTranslateMenu?.classList.add('hidden');
+    forceTranslateBtn?.setAttribute('aria-expanded', 'false');
   }
 
   function toggleForceMenu() {
@@ -508,6 +565,10 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
       if (forceRangeFrom) forceRangeFrom.value = fmtClock(t);
       if (forceRangeTo) forceRangeTo.value = fmtClock(Math.min(t + 60, video?.duration || t + 60));
       forceTranslateMenu.classList.remove('hidden');
+      forceTranslateBtn.setAttribute('aria-expanded', 'true');
+      // Open upward when the panel sits low in the viewport.
+      const below = window.innerHeight - forceTranslateBtn.getBoundingClientRect().bottom;
+      forceTranslateMenu.classList.toggle('up', below < forceTranslateMenu.offsetHeight + 16);
     } else {
       closeForceMenu();
     }
@@ -520,7 +581,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
   }
 
   function buildOverlay() {
-    if (host) return;
+    if (host || !overlayAllowed()) return;
     host = document.createElement('div');
     host.id = '__local_transsub_overlay';
     host.style.cssText =
@@ -528,387 +589,8 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
 
     const shadow = host.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
-    style.textContent = `
-      :host, * { box-sizing: border-box; }
-      .panel {
-        /* Cermin paket motion sidepanel.css (--ease-standard/--transition-base).
-           Shadow DOM terisolasi sehingga token halaman tak terbaca di sini. */
-        --lts-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        --lts-dur: 180ms;
-        position: fixed;
-        left: 50%;
-        bottom: 8%;
-        transform: translateX(-50%);
-        width: var(--panel-w, min(92vw, 720px));
-        height: var(--panel-h, min(42vh, 320px));
-        min-width: 280px;
-        min-height: 140px;
-        max-width: 95vw;
-        max-height: 70vh;
-        display: flex;
-        flex-direction: column;
-        border-radius: 14px;
-        background: rgba(0, 0, 0, 0.82);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
-        color: #fff;
-        font-family: "YouTube Noto", Roboto, Arial, "Hiragino Sans", "Microsoft YaHei", sans-serif;
-        pointer-events: auto;
-        opacity: 0;
-        transition: opacity var(--lts-dur) var(--lts-ease);
-        overflow: hidden;
-      }
-      .panel.visible { opacity: 1; }
-      .toolbar {
-        flex: none;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        padding: 5px 8px 5px 12px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        min-height: 34px;
-      }
-      .toolbar-title {
-        font-size: 11px;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.45);
-        cursor: grab;
-        user-select: none;
-        flex: 1;
-        min-width: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .toolbar-title.dragging { cursor: grabbing; }
-      .toolbar-actions {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex: none;
-      }
-      .tool-btn {
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.08);
-        color: rgba(255, 255, 255, 0.88);
-        border-radius: 8px;
-        padding: 3px 8px;
-        font-size: 10px;
-        font-family: inherit;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-      .tool-btn:hover:not(:disabled) {
-        background: rgba(255, 255, 255, 0.16);
-        border-color: rgba(255, 255, 255, 0.28);
-      }
-      .tool-btn:disabled {
-        opacity: 0.38;
-        cursor: default;
-      }
-      .force-wrap {
-        position: relative;
-        flex: none;
-      }
-      .force-menu {
-        position: absolute;
-        right: 0;
-        top: calc(100% + 4px);
-        min-width: 220px;
-        padding: 6px;
-        border-radius: 10px;
-        background: rgba(18, 18, 18, 0.96);
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-        z-index: 5;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .force-menu-item {
-        border: none;
-        background: rgba(255, 255, 255, 0.06);
-        color: rgba(255, 255, 255, 0.9);
-        border-radius: 8px;
-        padding: 7px 10px;
-        font-size: 11px;
-        font-family: inherit;
-        text-align: left;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-      .force-menu-item:hover:not(:disabled) {
-        background: rgba(255, 255, 255, 0.14);
-      }
-      .force-menu-item:disabled {
-        opacity: 0.38;
-        cursor: default;
-      }
-      .force-range {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 4px 6px;
-        padding: 6px 4px 2px;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-        margin-top: 2px;
-      }
-      .force-range label {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        font-size: 9px;
-        color: rgba(255, 255, 255, 0.5);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-      .force-range input {
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: rgba(0, 0, 0, 0.35);
-        color: #fff;
-        border-radius: 6px;
-        padding: 4px 6px;
-        font-size: 11px;
-        font-family: inherit;
-        font-variant-numeric: tabular-nums;
-      }
-      .force-range-btn {
-        grid-column: 1 / -1;
-        margin-top: 2px;
-      }
-      .tool-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.65);
-        cursor: pointer;
-        user-select: none;
-        white-space: nowrap;
-      }
-      .tool-toggle input {
-        margin: 0;
-        accent-color: #fff;
-        cursor: pointer;
-      }
-      .tool-close {
-        border: none;
-        background: none;
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 16px;
-        line-height: 1;
-        padding: 2px 4px;
-        cursor: pointer;
-        border-radius: 6px;
-      }
-      .tool-close:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
-      .reopen-fab {
-        position: fixed;
-        left: 50%;
-        bottom: 8%;
-        transform: translateX(-50%);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(0, 0, 0, 0.78);
-        color: #fff;
-        border-radius: 999px;
-        padding: 8px 14px;
-        font-size: 12px;
-        font-family: inherit;
-        cursor: pointer;
-        pointer-events: auto;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
-      }
-      .reopen-fab:hover { background: rgba(30, 30, 30, 0.92); }
-      .scroll {
-        flex: 1;
-        overflow-y: auto;
-        overflow-x: hidden;
-        padding: 6px 0 8px;
-        scroll-behavior: auto;
-      }
-      .scroll::-webkit-scrollbar { width: 6px; }
-      .scroll::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.22);
-        border-radius: 999px;
-      }
-      .row {
-        display: grid;
-        grid-template-columns: 18px 54px 1fr;
-        gap: 6px;
-        align-items: start;
-        padding: 3px 10px 3px 8px;
-      }
-      @keyframes rowIn {
-        from { opacity: 0; transform: translateY(4px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @media (prefers-reduced-motion: no-preference) {
-        .row.row-new { animation: rowIn var(--lts-dur) var(--lts-ease); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .panel, .row, .block, .reopen-fab { transition: none; animation: none; }
-      }
-      .row-check {
-        margin-top: 8px;
-        accent-color: #fff;
-        cursor: pointer;
-      }
-      .row-check:disabled {
-        opacity: 0.22;
-        cursor: default;
-      }
-      .row.active { background: rgba(255, 255, 255, 0.06); }
-      .time-btn {
-        margin-top: 6px;
-        padding: 2px 0;
-        border: none;
-        background: none;
-        color: rgba(255, 255, 255, 0.55);
-        font-size: 11px;
-        font-variant-numeric: tabular-nums;
-        cursor: pointer;
-        text-align: right;
-        font-family: inherit;
-        border-radius: 6px;
-      }
-      .time-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
-      .row.active .time-btn { color: #fff; font-weight: 600; }
-      .blocks { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-      .block {
-        padding: 7px 12px;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.1);
-        line-height: 1.55;
-        word-break: break-word;
-        overflow-wrap: anywhere;
-        text-rendering: optimizeLegibility;
-        -webkit-font-smoothing: antialiased;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-      }
-      .row.active .block {
-        background: rgba(255, 255, 255, 0.16);
-        box-shadow: inset 0 0 0 1px var(--lts-accent, rgba(255, 255, 255, 0.14));
-      }
-      .block.src {
-        font-size: var(--src-size, 18px);
-        color: rgba(255, 255, 255, 0.85);
-        font-weight: 400;
-      }
-      .block.tgt {
-        font-size: var(--tgt-size, 22px);
-        color: #fff;
-        font-weight: 600;
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.5);
-      }
-      .block.untranslated { color: rgba(255, 255, 255, 0.75); font-style: italic; }
-      .row.interim .block.loading {
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 14px;
-        letter-spacing: 3px;
-      }
-      .row.interim .block.draft {
-        opacity: 0.88;
-        border-left: 2px solid var(--lts-accent, rgba(255, 200, 100, 0.55));
-      }
-      .status-bar {
-        flex: none;
-        padding: 5px 12px 7px;
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.45);
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      .resize-handle {
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        width: 18px;
-        height: 18px;
-        cursor: nwse-resize;
-        opacity: 0.45;
-        z-index: 2;
-      }
-      .resize-handle::after {
-        content: '';
-        position: absolute;
-        right: 4px;
-        bottom: 4px;
-        width: 8px;
-        height: 8px;
-        border-right: 2px solid rgba(255,255,255,0.75);
-        border-bottom: 2px solid rgba(255,255,255,0.75);
-      }
-      .resize-handle:hover { opacity: 0.9; }
-      .resize-edge {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 7px;
-        z-index: 2;
-        cursor: ns-resize;
-      }
-      .resize-edge.top { top: 0; }
-      .resize-edge.bottom { bottom: 0; }
-      .resize-edge:hover { background: rgba(255, 255, 255, 0.06); }
-      .compact-cap {
-        display: none;
-        padding: 8px 14px 10px;
-        font-size: var(--tgt-size, 22px);
-        font-weight: 600;
-        line-height: 1.4;
-        color: #fff;
-        text-align: center;
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.5);
-        overflow: hidden;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-      }
-      .panel.compact .scroll, .panel.compact .status-bar { display: none; }
-      .panel.compact { height: auto; min-height: 0; }
-      .panel.compact .compact-cap { display: -webkit-box; }
-      .panel.locked .toolbar-actions { opacity: 0.3; pointer-events: none; }
-      .panel.locked .toolbar-title { cursor: default; }
-      .panel.locked .resize-handle, .panel.locked .resize-edge { display: none; }
-      .hidden { display: none !important; }
-    
-      /* ---- Keterbacaan di segala tema halaman induk ----------------------
-         Aturan di bawah menang karena datang belakangan: kontras dinaikkan
-         tanpa mengubah tata letak, dan tipografi halaman induk tidak bocor. */
-      :host {
-        color: #fff; font-size: 16px; line-height: normal; letter-spacing: normal;
-        word-spacing: normal; text-transform: none; text-indent: 0; text-align: left;
-        direction: ltr; font-style: normal; font-variant: normal; text-shadow: none; filter: none;
-      }
-      .panel, .reopen-fab, .status-bar { color-scheme: dark; }
-      .panel {
-        background: rgba(8, 8, 8, 0.9);
-        -webkit-backdrop-filter: blur(10px) saturate(1.1);
-        backdrop-filter: blur(10px) saturate(1.1);
-        border-color: rgba(255, 255, 255, 0.22);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.5);
-      }
-      .block { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.6); }
-      .block.src { color: rgba(255, 255, 255, 0.88); }
-      .block.tgt { color: #fff; }
-      .block.untranslated { color: rgba(255, 255, 255, 0.82); }
-      .row.interim .block.loading { color: rgba(255, 255, 255, 0.72); }
-      .time-btn { color: rgba(255, 255, 255, 0.72); }
-      .status-bar { color: rgba(255, 255, 255, 0.82); }
-      .reopen-fab { background: rgba(8, 8, 8, 0.9); border-color: rgba(255, 255, 255, 0.35); }
-
-      @media (prefers-contrast: more) {
-        .panel, .reopen-fab { background: rgba(0, 0, 0, 0.98); border-color: #fff; backdrop-filter: none; }
-        .block { background: rgba(255, 255, 255, 0.14); }
-        .row.active .block { background: rgba(255, 255, 255, 0.22); box-shadow: inset 0 0 0 1px #fff; }
-        .block.src, .block.untranslated, .time-btn, .status-bar { color: #fff; }
-      }
-      @media (forced-colors: active) {
-        .panel, .reopen-fab { background: Canvas; color: CanvasText; border: 2px solid CanvasText; backdrop-filter: none; }
-        .block { background: Canvas; color: CanvasText; border: 1px solid CanvasText; text-shadow: none; }
-        .block.src, .block.tgt, .block.untranslated, .time-btn, .status-bar { color: CanvasText; }
-        .row.active .block { border-color: Highlight; box-shadow: none; }
-      }
-`;
+    // tokens.css targets :root, which a shadow tree never matches.
+    style.textContent = tokensCss.replace(/^:root\s*\{/m, ':host {') + overlayCss;
 
     panel = document.createElement('div');
     panel.className = 'panel';
@@ -921,6 +603,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'resize-handle';
     resizeHandle.title = 'Drag to resize';
+    resizeHandle.innerHTML = svgIcon('grip');
     makeResizable(resizeHandle);
 
     const resizeBottom = document.createElement('div');
@@ -933,32 +616,31 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
 
     const title = document.createElement('div');
     title.className = 'toolbar-title';
-    title.textContent = 'yravgSubMeetly';
+    title.innerHTML =
+      '<span class="brand" role="img" aria-label="yravgSubMeetly"><span class="brand-word">yravg</span><span class="brand-pill">SubMeetly</span></span>';
 
     const actions = document.createElement('div');
     actions.className = 'toolbar-actions';
 
-    const refineLabel = document.createElement('label');
-    refineLabel.className = 'tool-toggle';
-    refineToggle = document.createElement('input');
-    refineToggle.type = 'checkbox';
-    refineToggle.checked = refineTranslation;
-    refineToggle.title = 'Live refine translation (draft while speaking, correct at end)';
-    refineToggle.addEventListener('change', () => {
+    const options = document.createElement('div');
+    options.className = 'options';
+
+    const refine = makeSwitch('RefineShort', 'Live refine translation (draft while speaking, correct at end)', () => {
       applyOverlaySetting({ refineTranslation: refineToggle.checked });
     });
-    refineLabel.append(refineToggle, document.createTextNode('RefineShort'));
-
-    const dualLineLabel = document.createElement('label');
-    dualLineLabel.className = 'tool-toggle';
-    dualLineToggle = document.createElement('input');
-    dualLineToggle.type = 'checkbox';
-    dualLineToggle.checked = dualLine;
-    dualLineToggle.title = 'Show original + translation';
-    dualLineToggle.addEventListener('change', () => {
+    refineToggle = refine.input;
+    const dual = makeSwitch('Dual Line', 'Show original + translation', () => {
       applyOverlaySetting({ dualLine: dualLineToggle.checked });
     });
-    dualLineLabel.append(dualLineToggle, document.createTextNode('Dual Line'));
+    dualLineToggle = dual.input;
+    const auto = makeSwitch('Auto scroll', 'Follow playback automatically', () => {
+      autoScrollEnabled = autoScrollToggle.checked;
+      chrome.storage.local.set({ overlayAutoScroll: autoScrollEnabled }).catch(() => {});
+      if (autoScrollEnabled) userPinnedScroll = false;
+      followPlayback(video?.currentTime ?? 0, { forceScroll: autoScrollEnabled });
+      if (autoScrollEnabled) schedulePlaybackFollow();
+    });
+    autoScrollToggle = auto.input;
 
     forceTranslateWrap = document.createElement('div');
     forceTranslateWrap.className = 'force-wrap';
@@ -966,7 +648,12 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     forceTranslateBtn = document.createElement('button');
     forceTranslateBtn.type = 'button';
     forceTranslateBtn.className = 'tool-btn force-btn';
-    forceTranslateBtn.textContent = 'Force Translate ▾';
+    forceTranslateBtn.setAttribute('aria-haspopup', 'menu');
+    forceTranslateBtn.setAttribute('aria-expanded', 'false');
+    forceLabel = document.createElement('span');
+    forceLabel.textContent = 'Force Translate';
+    forceTranslateBtn.append(forceLabel);
+    forceTranslateBtn.insertAdjacentHTML('beforeend', svgIcon('chevrons'));
     forceTranslateBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (forceTranslateBtn.dataset.busy === '1') return;
@@ -975,10 +662,18 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
 
     forceTranslateMenu = document.createElement('div');
     forceTranslateMenu.className = 'force-menu hidden';
+    forceTranslateMenu.setAttribute('role', 'menu');
+    forceTranslateMenu.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeForceMenu();
+        forceTranslateBtn.focus();
+      }
+    });
 
     forceAllBtn = document.createElement('button');
     forceAllBtn.type = 'button';
     forceAllBtn.className = 'force-menu-item';
+    forceAllBtn.setAttribute('role', 'menuitem');
     forceAllBtn.textContent = 'Re-translate all (0)';
     forceAllBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -988,6 +683,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     forceSomeBtn = document.createElement('button');
     forceSomeBtn.type = 'button';
     forceSomeBtn.className = 'force-menu-item';
+    forceSomeBtn.setAttribute('role', 'menuitem');
     forceSomeBtn.textContent = 'Selected lines (0)';
     forceSomeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1016,6 +712,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     const rangeBtn = document.createElement('button');
     rangeBtn.type = 'button';
     rangeBtn.className = 'force-menu-item force-range-btn';
+    rangeBtn.setAttribute('role', 'menuitem');
     rangeBtn.textContent = 'Translate time range';
     rangeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1027,70 +724,27 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     forceTranslateWrap.append(forceTranslateBtn, forceTranslateMenu);
     document.addEventListener('click', onForceMenuOutside);
 
-    const autoScrollLabel = document.createElement('label');
-    autoScrollLabel.className = 'tool-toggle';
-    autoScrollToggle = document.createElement('input');
-    autoScrollToggle.type = 'checkbox';
-    autoScrollToggle.checked = autoScrollEnabled;
-    autoScrollToggle.title = 'Follow playback automatically';
-    autoScrollToggle.addEventListener('change', () => {
-      autoScrollEnabled = autoScrollToggle.checked;
-      chrome.storage.local.set({ overlayAutoScroll: autoScrollEnabled }).catch(() => {});
-      if (autoScrollEnabled) userPinnedScroll = false;
-      followPlayback(video?.currentTime ?? 0, { forceScroll: autoScrollEnabled });
-      if (autoScrollEnabled) schedulePlaybackFollow();
-    });
-    autoScrollLabel.append(autoScrollToggle, document.createTextNode('Auto scroll'));
-
-    compactBtn = document.createElement('button');
-    compactBtn.type = 'button';
-    compactBtn.className = 'tool-close';
-    compactBtn.title = 'Compact caption bar';
-    compactBtn.textContent = '▣';
-    compactBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
+    compactBtn = iconButton(() => {
       compactMode = !compactMode;
       applyCompactLock();
     });
-
-    lockBtn = document.createElement('button');
-    lockBtn.type = 'button';
-    lockBtn.className = 'tool-close';
-    lockBtn.title = 'Lock panel (block drag & resize)';
-    lockBtn.textContent = '🔓';
-    lockBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
+    lockBtn = iconButton(() => {
       locked = !locked;
       applyCompactLock();
     });
+    minimizeBtn = iconButton(minimizeOverlay, 'minimize', 'Minimize to CC Subtitles');
+    closeBtn = iconButton(dismissOverlay, 'close', 'Close subtitles overlay');
+    applyCompactLock();
 
-    minimizeBtn = document.createElement('button');
-    minimizeBtn.type = 'button';
-    minimizeBtn.className = 'tool-close';
-    minimizeBtn.title = 'Minimize to CC Subtitles';
-    minimizeBtn.textContent = '−';
-    minimizeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      minimizeOverlay();
-    });
-
-    closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'tool-close';
-    closeBtn.title = 'Close subtitles overlay';
-    closeBtn.textContent = '×';
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dismissOverlay();
-    });
-
-    actions.append(refineLabel, dualLineLabel, forceTranslateWrap, autoScrollLabel, compactBtn, lockBtn, minimizeBtn, closeBtn);
+    options.append(refine.label, dual.label, auto.label, forceTranslateWrap);
+    actions.append(compactBtn, lockBtn, minimizeBtn, closeBtn);
     toolbar.append(title, actions);
 
     reopenFab = document.createElement('button');
     reopenFab.type = 'button';
     reopenFab.className = 'reopen-fab hidden';
-    reopenFab.textContent = 'CC Subtitles';
+    reopenFab.innerHTML = svgIcon('expand');
+    reopenFab.append(document.createTextNode('CC Subtitles'));
     reopenFab.title = 'Show subtitles panel';
     reopenFab.addEventListener('click', () => setPanelVisible(true));
 
@@ -1104,7 +758,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     statusBar = document.createElement('div');
     statusBar.className = 'status-bar hidden';
 
-    panel.append(resizeTop, toolbar, rowsEl, compactCap, statusBar, resizeHandle, resizeBottom);
+    panel.append(resizeTop, toolbar, options, rowsEl, compactCap, statusBar, resizeHandle, resizeBottom);
     shadow.append(style, panel, reopenFab);
     (document.fullscreenElement || document.documentElement).appendChild(host);
 
@@ -1157,6 +811,8 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
       '--lts-accent',
       RESKIN_ACCENTS[reskin] || RESKIN_ACCENTS.yraverage,
     );
+    if (TCOLOURS.includes(translationColour)) panel.dataset.tcolor = translationColour;
+    else delete panel.dataset.tcolor;
   }
 
   function applyCompactLock() {
@@ -1164,12 +820,10 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     panel.classList.toggle('compact', compactMode);
     panel.classList.toggle('locked', locked);
     if (compactBtn) {
-      compactBtn.textContent = compactMode ? '▦' : '▣';
-      compactBtn.title = compactMode ? 'Expand to full transcript' : 'Compact caption bar';
+      setIconButton(compactBtn, compactMode ? 'expand' : 'compact', compactMode ? 'Expand to full transcript' : 'Compact caption bar', compactMode);
     }
     if (lockBtn) {
-      lockBtn.textContent = locked ? '🔒' : '🔓';
-      lockBtn.title = locked ? 'Unlock panel (allow drag & resize)' : 'Lock panel (block drag & resize)';
+      setIconButton(lockBtn, locked ? 'lock' : 'unlock', locked ? 'Unlock panel (allow drag & resize)' : 'Lock panel (block drag & resize)', locked);
     }
     chrome.storage.local.set({ overlayCompact: compactMode, overlayLocked: locked }).catch(() => {});
   }
@@ -1327,15 +981,18 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     if (reopenFab) reopenFab.classList.add('hidden');
   }
 
-  function setStatus(text) {
+  // kind: 'busy' | 'ok' | 'error' | undefined (neutral dot)
+  function setStatus(text, kind) {
     if (!host) buildOverlay();
+    if (!statusBar) return;
+    statusBar.className = 'status-bar' + (kind ? ' ' + kind : '');
+    statusBar.setAttribute('role', 'status');
     if (!text) {
       statusBar.classList.add('hidden');
       statusBar.textContent = '';
       return;
     }
     statusBar.textContent = text;
-    statusBar.classList.remove('hidden');
     showPanel();
   }
 
@@ -1421,7 +1078,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
 
     updateForceTranslateBtn();
 
-    rowsEl.querySelectorAll('.row.interim').forEach((r) => r.remove());
+    rowsEl.querySelectorAll('.row.interim, .empty').forEach((r) => r.remove());
     if (pendingInterim) {
       const row = document.createElement('div');
       row.className = 'row interim';
@@ -1451,12 +1108,20 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
       } else {
         const loading = document.createElement('div');
         loading.className = 'block loading';
-        loading.textContent = '● ● ●';
+        loading.innerHTML = '<i></i><i></i><i></i>';
+        loading.setAttribute('aria-label', 'Recognising speech');
         blocks.appendChild(loading);
       }
 
       row.append(spacer, time, blocks);
       rowsEl.appendChild(row);
+    }
+
+    if (!sorted.length && !pendingInterim) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Captions appear here as speech is recognised.';
+      rowsEl.appendChild(empty);
     }
 
     if (compactCap) {
@@ -1513,6 +1178,10 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     activeKey = null;
     cacheMaxTime = 0;
     sessionConfig = null;
+    removeHost();
+  }
+
+  function removeHost() {
     document.removeEventListener('click', onForceMenuOutside);
     if (host) {
       host.remove();
@@ -1521,6 +1190,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
       rowsEl = null;
       statusBar = null;
       forceTranslateBtn = null;
+      forceLabel = null;
       forceTranslateWrap = null;
       forceTranslateMenu = null;
       forceAllBtn = null;
@@ -1541,8 +1211,10 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     }
   }
 
-  chrome.storage.local.get(['overlayPos', 'overlayAutoScroll', 'overlayPanelVisible', 'overlayPanelSize', 'overlayCompact', 'overlayLocked', 'settings']).then(
-    ({ overlayPos, overlayAutoScroll, overlayPanelVisible, overlayPanelSize, overlayCompact, overlayLocked, settings }) => {
+  chrome.storage.local.get(['overlayPos', 'overlayAutoScroll', 'overlayPanelVisible', 'overlayPanelSize', 'overlayCompact', 'overlayLocked', 'settings', 'captionSurface']).then(
+    ({ overlayPos, overlayAutoScroll, overlayPanelVisible, overlayPanelSize, overlayCompact, overlayLocked, settings, captionSurface: surface }) => {
+    captionSurface = normalizeSurface(surface);
+    translationColour = settings?.translationColour ?? null;
     if (overlayPos) pos = overlayPos;
     if (overlayAutoScroll !== undefined) autoScrollEnabled = !!overlayAutoScroll;
     if (overlayPanelVisible !== undefined) panelVisible = !!overlayPanelVisible;
@@ -1562,11 +1234,36 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
       applyPanelSize();
       applyPos();
     }
+    applySurface();
   });
 
+  const normalizeSurface = (v) => (v === 'island' || v === 'both' ? v : 'overlay');
+
+  // Show or fully remove the overlay to match `captionSurface`; cues and session state survive.
+  function applySurface() {
+    if (!overlayAllowed()) {
+      if (host) removeHost();
+      return;
+    }
+    if (sessionActive && !host) {
+      buildOverlay();
+      syncOverlayToggles();
+      setPanelVisible(panelVisible);
+      renderRows();
+    }
+  }
+
   chrome.storage.onChanged?.addListener((changes) => {
+    if (changes.captionSurface) {
+      captionSurface = normalizeSurface(changes.captionSurface.newValue);
+      applySurface();
+    }
     const s = changes.settings?.newValue;
     if (!s) return;
+    if (s.translationColour !== translationColour) {
+      translationColour = s.translationColour ?? null;
+      applyReskinOverlay();
+    }
     if (s.overlayFontSize && panel) {
       fontSize = s.overlayFontSize;
       panel.style.setProperty('--tgt-size', fontSize + 'px');
@@ -1589,9 +1286,9 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
 
   function applyPipelineStatus(pstate) {
     if (!sessionActive) return;
-    if (pstate === 'loading') setStatus('Loading local AI models…');
-    else if (pstate === 'warmup') setStatus('Warming up…');
-    else if (pstate === 'listening') setStatus('Listening — live translation active');
+    if (pstate === 'loading') setStatus('Loading local AI models…', 'busy');
+    else if (pstate === 'warmup') setStatus('Warming up…', 'busy');
+    else if (pstate === 'listening') setStatus('Listening — live translation active', 'ok');
   }
 
   function activateSession(data) {
@@ -1607,7 +1304,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
     loadInitialCues(data.cacheCues || []);
     startVideoTracking();
     const resume = cacheMaxTime > 0 ? ` — cached to ${fmtClock(cacheMaxTime)}` : '';
-    setStatus(`Loading models…${resume}`);
+    setStatus(`Loading models…${resume}`, 'busy');
   }
 
   // Gabungkan cue yang mungkin terlewat (tab sempat dibuang, dipulihkan dari
@@ -1714,7 +1411,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
         break;
       case 'force-translate-done':
         resetForceTranslateBtn();
-        if (msg.data?.error) setStatus(msg.data.error);
+        if (msg.data?.error) setStatus(msg.data.error, 'error');
         else if (msg.data?.translated > 0) {
           const skipped = msg.data.skipped || 0;
           const dirs = (msg.data.skippedDirections || []).join(', ');
@@ -1727,7 +1424,7 @@ import { clampOverlayPos, fitSizeToViewport } from './lib/overlay-geometry.js';
           );
           setTimeout(() => setStatus(''), skipped ? 6000 : 3000);
         } else {
-          setStatus('Translation model returned no results — download the language pair model in Settings');
+          setStatus('Translation model returned no results — download the language pair model in Settings', 'error');
         }
         break;
       case 'subtitle':

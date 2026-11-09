@@ -50,7 +50,8 @@ import {
 } from './lib/qa-samples.js';
 import { tile as colourTile } from './lib/colour-icons.js';
 import { renderFeatureMap } from './lib/feature-map.js';
-import { mountAddinsPane } from './addins-ui.js';
+import { mountAddinsPane, glossaryCaption } from './addins-ui.js';
+import { markedHtml } from './lib/glossary.js';
 import { springProgress, slidingNumber, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -2485,7 +2486,7 @@ async function pickFile(file) {
 
 // ---------------------------------------------------------------------------
 // subtitle stream + offline results
-function appendLiveLine(host, text, tag = '') {
+function appendLiveLine(host, text, tag = '', marks = []) {
   if (!text) return;
   const div = document.createElement('div');
   div.className = 'line';
@@ -2495,7 +2496,9 @@ function appendLiveLine(host, text, tag = '') {
     badge.textContent = tag;
     div.appendChild(badge);
   }
-  div.appendChild(document.createTextNode(text));
+  // Glossary add-in: wrap each fixed term in <mark> (markedHtml escapes the text).
+  if (marks.length) div.insertAdjacentHTML('beforeend', markedHtml(text, marks));
+  else div.appendChild(document.createTextNode(text));
   host.appendChild(div);
   while (host.children.length > 30) host.firstChild.remove();
   host.scrollTop = host.scrollHeight;
@@ -2531,14 +2534,18 @@ function pushLive({ source, translation, rawSource, rawTranslation, t0, t1, inte
   // Two-way lines say which way this utterance went; one-way stays untagged.
   const srcTag = dir?.src ? dir.src.toUpperCase() : '';
   const dirTag = dir?.src && dir?.tgt ? `${dir.src.toUpperCase()} \u2192 ${dir.tgt.toUpperCase()}` : '';
-  if (source) appendLiveLine($('live-src-lines'), source, srcTag);
-  if (translation) appendLiveLine($('live-tgt-lines'), translation, dirTag);
+  // Glossary add-in (caption.final hook): fix terms in the shown line and in the stored line the exports read.
+  const fix = (src, tgt) => glossaryCaption({ src, tgt }) || { src, tgt, marks: { src: [], tgt: [] } };
+  const shown = fix(source || '', translation || '');
+  if (source) appendLiveLine($('live-src-lines'), shown.src, srcTag, shown.marks.src);
+  if (translation) appendLiveLine($('live-tgt-lines'), shown.tgt, dirTag, shown.marks.tgt);
   if ((source || translation) && (t0 != null || t1 != null)) {
+    const kept = fix(rawSource ?? source ?? '', rawTranslation ?? translation ?? '');
     state.realtimeLines.push({
       t0: t0 ?? 0,
       t1: t1 ?? (t0 ?? 0) + 3,
-      src: rawSource ?? source ?? '',
-      tgt: rawTranslation ?? translation ?? '',
+      src: kept.src,
+      tgt: kept.tgt,
     });
     redrawHelperStatus?.();
   }
