@@ -13,6 +13,7 @@ use poni_core::geom::{palette, Color};
 use poni_core::lrc::Lyrics;
 use poni_core::phonedrop::QrMatrix;
 use poni_core::pomodoro::Pomodoro;
+use poni_core::prayer::{Place, PlaceList, PrayerMoment, Site, World};
 use poni_core::romanize::Ruby;
 use poni_core::settings::Settings;
 use poni_core::store::Store;
@@ -72,11 +73,20 @@ pub struct LyricsState {
     /// Each line's pieces with their readings in Latin letters (Japanese,
     /// Korean, Chinese); empty for lines that need none.
     pub ruby: Vec<Vec<Ruby>>,
+    /// Each line translated into the person's target language (`""` = none yet or none needed),
+    /// and where the engine stands on it (`poni_core::lyric_tr`).
+    pub translated: Vec<String>,
+    pub tr: poni_core::lyric_tr::TrState,
+    /// The song's kanji went unread because Windows has no Japanese reading
+    /// data and the Japanese readings add-on isn't on this PC: the app
+    /// switches the add-on on the first time, and the Music page shows how
+    /// it comes in (or offers it, after a switch-off by hand).
+    pub wants_ja_readings: bool,
 }
 
 impl Default for LyricsState {
     fn default() -> Self {
-        Self { track_key: String::new(), status: LyricsStatus::Idle, lyrics: None, source: String::new(), ruby: Vec::new() }
+        Self { track_key: String::new(), status: LyricsStatus::Idle, lyrics: None, source: String::new(), ruby: Vec::new(), translated: Vec::new(), tr: Default::default(), wants_ja_readings: false }
     }
 }
 
@@ -134,6 +144,8 @@ pub enum NoticeAction {
     /// Open the app another app's notification came from (its
     /// AppUserModelID; Notifications). The island stays closed.
     OpenApp(String),
+    /// Download the speech model the captions wait for (Settings shows the progress).
+    DownloadModel,
 }
 
 /// A one-click action shown as a small pill inside a notice (doesn't expand).
@@ -144,6 +156,8 @@ pub enum InlineAction {
     /// Put the notice's hidden words in place: an Oyenza sum (and sender),
     /// or a message and who it's from (Notifications).
     ShowAmount,
+    /// Stop the adzan (Prayer times).
+    StopAdzan,
     /// Put the notice away now (a new version's: the menu and Settings
     /// keep offering it).
     Hide,
@@ -151,6 +165,18 @@ pub enum InlineAction {
     WhatsNew,
     /// Open the app a notification came from (the notice's `OpenApp`).
     Open,
+}
+
+/// What a click on the Music page's Japanese-readings line does
+/// (`AppState::ja_offer`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JaClick {
+    /// Nothing: the line only says where it stands.
+    None,
+    /// Switch the readings add-on on.
+    GetAddon,
+    /// Add Japanese typing to Windows.
+    InstallWindows,
 }
 
 /// Whether this copy may read other apps' notifications (the Notifications
@@ -349,6 +375,8 @@ pub struct PageUiState {
     /// the side of the camera they peek out from (`mac/notch.rs`).
     #[cfg(target_os = "macos")]
     pub peek: poni_core::peek::Peek,
+    /// The Downloads page: its link field, mode and scroll.
+    pub downloads: crate::pages::downloads::DownloadsUi,
     /// The Pro add-on whose "what it does" page shows on the Add-ons page.
     pub addon_about: Option<&'static str>,
 }
@@ -389,6 +417,81 @@ pub struct GameState {
     /// Frames per second over the last minute in front.
     pub history: poni_core::sysmon::Series,
     pub access: FpsAccess,
+}
+
+/// Where finding the PC's place stands.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum Locate {
+    /// Not asked (following the location is off, or not yet).
+    #[default]
+    Idle,
+    Asking,
+    /// Picked the nearest place, this far from the PC (km).
+    Found { km: f64 },
+    /// The nearest place in either list is too far away to use (km).
+    Far { km: f64 },
+    /// Away from Kemenag's places, and the cities around couldn't be looked
+    /// up (offline): the place stays as it was.
+    Offline,
+    /// Windows' location is off, or not allowed for yravgSubMeetly.
+    Denied,
+    /// Windows couldn't tell where the PC is.
+    Unknown,
+}
+
+/// One of Prayer times' online city files, while it's wanted.
+#[derive(Clone, Debug)]
+pub enum CityFile {
+    Asking,
+    Here(std::sync::Arc<World>),
+    /// Offline, or the website didn't answer.
+    Failed,
+}
+
+/// The Prayer times add-on's live state.
+#[derive(Clone, Debug, Default)]
+pub struct PrayerState {
+    /// The add-on's place list, read once its files are in place.
+    pub places: Option<std::sync::Arc<PlaceList>>,
+    /// The online city files asked for (`poni_core::prayer::world`): the
+    /// picker's, dropped when it closes, and a location's squares, dropped
+    /// once its place is found.
+    pub cities: HashMap<String, CityFile>,
+    /// A location waiting for its squares: the point (never saved) and the
+    /// files it needs.
+    pub fix: Option<(f64, f64, Vec<String>)>,
+    /// The last location that went online and the place it found: the next
+    /// one within a kilometre takes it again without asking.
+    pub last_fix: Option<(f64, f64, Option<(Place, f64)>)>,
+    /// The picker's last search: what was typed, and what it found.
+    pub found: Option<(String, Vec<Place>)>,
+    /// The place the times are for: the chosen one, or the time zone's
+    /// suggestion while none is chosen.
+    pub place: Option<Place>,
+    /// `place` is the time zone's suggestion.
+    pub suggested: bool,
+    pub locate: Locate,
+    /// When the PC's location was last asked (UTC seconds).
+    pub located_at: Option<i64>,
+    /// The place picker shows (Change), and what's typed in it.
+    pub picking: bool,
+    pub query: String,
+    /// Prayer times up to this moment (UTC seconds) have had their moment.
+    pub handled_until: Option<i64>,
+    /// The adzan is playing.
+    pub adzan: bool,
+    /// OK on the countdown put it away until this prayer's time (UTC
+    /// seconds): the closed island shows what it would otherwise (the song
+    /// and its sung line) until then. Kept in memory only.
+    pub countdown_ok: Option<i64>,
+    /// Self-test only: moves the prayer clock by this many seconds.
+    pub clock_shift: i64,
+}
+
+impl PrayerState {
+    pub fn site(&self) -> Option<Site> {
+        self.place.as_ref().and_then(|p| p.site())
+    }
 }
 
 pub struct AppState {
@@ -441,6 +544,8 @@ pub struct AppState {
     /// New versions (`crate::updates`): what Settings, the menu and the
     /// island's notice show.
     pub update: UpdateView,
+    /// The Prayer times add-on, while it is on (its choices: `settings.prayer`).
+    pub prayer: PrayerState,
     /// The Script page's reading (its script and pace are in `store.script`).
     pub script: poni_core::script::Reader,
     /// A message under the script until a time (mono seconds).
@@ -448,8 +553,16 @@ pub struct AppState {
     /// Whether Windows leaves the island out of screen capture while the
     /// Script page shows (None = not asked yet, or not on Windows).
     pub script_hidden: Option<bool>,
+    /// The Downloads page's jobs (`poni_core::downloads`), in memory only.
+    pub downloads: poni_core::downloads::Jobs,
+    /// This app offers the Downloader: Windows outside the Microsoft Store
+    /// build, and the Mac (set at start).
+    pub downloader_offered: bool,
     /// Whether Windows lets the island read notifications.
     pub notify_access: NotifyAccess,
+    /// Where each Windows language feature stands (`poni_core::winlang`); one
+    /// not in the list isn't looked at yet.
+    pub winlang: Vec<(&'static str, poni_core::winlang::State)>,
     /// This copy can read other apps' notifications: Windows lets only an app
     /// with a package identity, the Microsoft Store copy, do it. The download
     /// can't, so it offers no Notifications at all. Set once at start (the
@@ -468,6 +581,10 @@ pub struct AppState {
     pub calendar_confirm: Option<String>,
     /// The meeting the pill last announced ("Standup in 5 min"), so it speaks once per meeting.
     pub calendar_pinged: Option<String>,
+    /// The island's own capture of what the PC plays (`services::capture`).
+    pub capture: poni_core::capture::CaptureState,
+    /// The engine's models and the download under way (Settings, the Live page).
+    pub models: poni_core::models::Models,
     /// Side effects requested during the frame.
     pub cmds: Vec<Command>,
 }
@@ -528,10 +645,14 @@ impl AppState {
             pair_server: None,
             addons: BTreeMap::new(),
             update: UpdateView::default(),
+            prayer: PrayerState::default(),
             script: poni_core::script::Reader::default(),
             script_note: None,
             script_hidden: None,
+            downloads: poni_core::downloads::Jobs::default(),
+            downloader_offered: false,
             notify_access: NotifyAccess::Unknown,
+            winlang: Vec::new(),
             notify_can: false,
             helper: Default::default(),
             engine: Default::default(),
@@ -539,6 +660,8 @@ impl AppState {
             calendar_manage: false,
             calendar_confirm: None,
             calendar_pinged: None,
+            capture: Default::default(),
+            models: Default::default(),
             cmds: Vec::new(),
         };
         // On ones start by checking their files (the worker reports back);
@@ -547,12 +670,13 @@ impl AppState {
             let on = st.settings.addon_on(a.id);
             st.addons.insert(a.id, if !on { AddonStatus::Off } else if a.downloads() { AddonStatus::Checking } else { AddonStatus::Ready });
         }
-        // Last open on the Script or System page, since switched
+        // Last open on the Script, System or Downloads page, since switched
         // off, or on a tab since hidden: open on the first tab.
         let off = match st.page {
             PageKind::Script => !st.script_on(),
             PageKind::System => !st.system_on(),
             PageKind::Timer | PageKind::Talk | PageKind::Engine => !crate::pages::tabs(&st).contains(&st.page),
+            PageKind::Downloads => !st.downloader_on(),
             PageKind::Notifications => !st.notifications_on(),
             p => st.tab_hidden(p),
         };
@@ -567,6 +691,46 @@ impl AppState {
         self.addons.get(id).copied().unwrap_or(AddonStatus::Off)
     }
 
+    /// Where the Windows language feature `id` stands.
+    pub fn winlang_state(&self, id: &str) -> poni_core::winlang::State {
+        self.winlang.iter().find(|(i, _)| *i == id).map(|(_, s)| s.clone()).unwrap_or_default()
+    }
+
+    pub fn set_winlang(&mut self, id: &'static str, state: poni_core::winlang::State) {
+        match self.winlang.iter_mut().find(|(i, _)| *i == id) {
+            Some(slot) => slot.1 = state,
+            None => self.winlang.push((id, state)),
+        }
+    }
+
+    /// What the Music page says under a Japanese song whose kanji went unread,
+    /// and what a click does. The readings add-on's own line, except where
+    /// that line is a dead end (the download failed or can't be checked) and
+    /// Windows has no Japanese typing: then the line offers that instead
+    /// (`poni_core::winlang`). None while the song reads or needs nothing.
+    pub fn ja_offer(&self) -> Option<(String, JaClick)> {
+        use poni_core::winlang::{State, JAPANESE_TYPING};
+        let addon = poni_core::addons::ja_offer(self.addon(poni_core::addons::JAPANESE_READINGS.id))?;
+        let dead_end = matches!(self.addon(poni_core::addons::JAPANESE_READINGS.id), AddonStatus::Failed | AddonStatus::Unpinned);
+        match (self.winlang_state(JAPANESE_TYPING.id), dead_end) {
+            (State::Missing | State::Failed(_), true) => Some(("Romaji for kanji: add Japanese typing to Windows".to_string(), JaClick::InstallWindows)),
+            (State::Installing, true) => Some(("Adding Japanese typing to Windows\u{2026}".to_string(), JaClick::None)),
+            _ => Some((addon.0, if addon.1 { JaClick::GetAddon } else { JaClick::None })),
+        }
+    }
+
+    /// The Music page's offer was clicked: do what its line promised.
+    pub fn ja_offer_clicked(&mut self) {
+        match self.ja_offer() {
+            Some((_, JaClick::GetAddon)) => {
+                self.settings.set_addon(poni_core::addons::JAPANESE_READINGS.id, true);
+                self.cmd(Command::SaveSettings);
+            }
+            Some((_, JaClick::InstallWindows)) => self.cmd(Command::WinLang(crate::commands::WinLangCmd::Install(poni_core::winlang::JAPANESE_TYPING.id))),
+            _ => {}
+        }
+    }
+
     /// The Script reader add-on is on: the Script tab shows.
     pub fn script_on(&self) -> bool {
         self.addon(poni_core::addons::SCRIPT_READER.id) == AddonStatus::Ready
@@ -575,6 +739,27 @@ impl AppState {
     /// The System add-on is on: the System tab shows.
     pub fn system_on(&self) -> bool {
         self.addon(poni_core::addons::SYSTEM.id) == AddonStatus::Ready
+    }
+
+    /// Prayer times is on and its places are read: the tab and reminders run.
+    pub fn prayer_on(&self) -> bool {
+        self.addon(poni_core::addons::PRAYER_TIMES.id) == AddonStatus::Ready && self.prayer.places.is_some()
+    }
+
+    /// The prayer clock, UTC seconds (the self-test moves it).
+    pub fn prayer_now(&self) -> i64 {
+        self.unix + self.prayer.clock_shift
+    }
+
+    /// OK on the countdown before a prayer: it goes away until that prayer's
+    /// time (`activities::prayer_countdown`). The adzan still comes then,
+    /// since what rings follows the prayer clock, not the countdown. Returns
+    /// the prayer put away (none when no countdown runs).
+    pub fn prayer_countdown_ok(&mut self) -> Option<PrayerMoment> {
+        let site = self.prayer.site()?;
+        let (m, _) = poni_core::prayer::countdown(&site, self.prayer_now(), self.settings.prayer.remind_before_min)?;
+        self.prayer.countdown_ok = Some(m.at);
+        Some(m)
     }
 
     /// Show `n` now or, while a full-screen app hides the island (`hidden`), keep
@@ -587,6 +772,11 @@ impl AppState {
         } else if self.held.as_ref().is_none_or(|(_, at)| self.now - at > HELD_MAX_S) {
             self.held = Some((n, self.now));
         }
+    }
+
+    /// The Downloader add-on is on, with its tools in place: the Downloads tab shows.
+    pub fn downloader_on(&self) -> bool {
+        self.downloader_offered && self.addon(poni_core::addons::DOWNLOADER.id) == AddonStatus::Ready
     }
 
     /// Notifications is on: its tab shows, and new notifications from the
@@ -661,5 +851,51 @@ impl AppState {
     /// Accent for media UI: art colour when available, else the system accent.
     pub fn media_accent(&self) -> Color {
         self.media.as_ref().and_then(|m| m.art_color).unwrap_or(self.accent)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use poni_core::addons::JAPANESE_READINGS;
+    use poni_core::winlang::{State, JAPANESE_TYPING};
+
+    fn st() -> AppState {
+        AppState::new(Settings::default(), Store::default())
+    }
+
+    #[test]
+    fn the_music_hint_offers_windows_japanese_typing_only_where_the_add_on_is_a_dead_end() {
+        let mut st = st();
+        st.winlang.push((JAPANESE_TYPING.id, State::Missing));
+        // The add-on can still come: its own line.
+        for ok in [AddonStatus::Off, AddonStatus::Checking, AddonStatus::Waiting] {
+            st.addons.insert(JAPANESE_READINGS.id, ok);
+            let (line, click) = st.ja_offer().unwrap();
+            assert!(line.contains("Japanese readings"), "{line}");
+            assert_eq!(click == JaClick::GetAddon, ok == AddonStatus::Off);
+        }
+        // It can't (the download failed): Windows' feature, one click.
+        st.addons.insert(JAPANESE_READINGS.id, AddonStatus::Failed);
+        assert_eq!(st.ja_offer(), Some(("Romaji for kanji: add Japanese typing to Windows".to_string(), JaClick::InstallWindows)));
+        st.ja_offer_clicked();
+        assert_eq!(st.cmds.pop(), Some(Command::WinLang(crate::commands::WinLangCmd::Install("ja-typing"))));
+        // While it installs the line only says so; nothing to click.
+        st.set_winlang(JAPANESE_TYPING.id, State::Installing);
+        assert_eq!(st.ja_offer().map(|o| o.1), Some(JaClick::None));
+        // Windows has it: the add-on's own line (it failed) stays; once the add-on is in place there is none.
+        st.set_winlang(JAPANESE_TYPING.id, State::Installed);
+        assert_eq!(st.ja_offer().map(|o| o.1), Some(JaClick::None));
+        st.addons.insert(JAPANESE_READINGS.id, AddonStatus::Ready);
+        assert_eq!(st.ja_offer(), None);
+    }
+
+    #[test]
+    fn the_add_on_line_switches_the_add_on_on() {
+        let mut st = st();
+        st.addons.insert(JAPANESE_READINGS.id, AddonStatus::Off);
+        st.ja_offer_clicked();
+        assert!(st.settings.addon_on(JAPANESE_READINGS.id));
+        assert!(matches!(st.cmds.pop(), Some(Command::SaveSettings)));
     }
 }

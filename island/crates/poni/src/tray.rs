@@ -86,6 +86,7 @@ pub enum MenuCmd {
     /// "Check for updates…": read the update file now (`crate::updates`).
     CheckForUpdates,
     /// Our own parts, from the product group of the menu.
+    OpenApp,
     OpenMinutes,
     OpenLive,
     OpenMeeting,
@@ -95,6 +96,9 @@ pub enum MenuCmd {
     /// Opens the how-to page for loading the Chrome extension.
     SetupExtension,
     OpenCaptionsPanel,
+    /// Captions from what the PC plays (the island's own capture).
+    StartCaptions,
+    StopCaptions,
     Quit,
 }
 
@@ -124,8 +128,13 @@ fn idle_label(s: IdleStyle) -> &'static str {
 /// The engine and extension entries of the product group, shared by the tray
 /// menu and the island's Menu list. `None` command = a greyed line.
 /// `check`: add "Check for updates…" (no newer version is on offer).
-pub fn product_actions(engine: &EngineInfo, check: bool) -> Vec<(String, Option<MenuCmd>)> {
+pub fn product_actions(engine: &EngineInfo, check: bool, capturing: bool) -> Vec<(String, Option<MenuCmd>)> {
     let mut v = vec![(engine.line.clone(), None)];
+    v.push(if capturing {
+        ("Stop live captions".into(), Some(MenuCmd::StopCaptions))
+    } else {
+        ("Start live captions (what this PC plays)".into(), Some(MenuCmd::StartCaptions))
+    });
     if !engine.running {
         v.push(("Start engine".into(), Some(MenuCmd::StartEngine)));
     } else if engine.ours {
@@ -144,18 +153,18 @@ pub fn product_actions(engine: &EngineInfo, check: bool) -> Vec<(String, Option<
 
 /// `update`: a later version the update file offers, or Check for updates…
 /// (`crate::updates::menu_line`). `engine`: the engine link's last word.
-pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &EngineInfo) -> Vec<MenuItem> {
+pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &EngineInfo, capturing: bool) -> Vec<MenuItem> {
     // The look the theme draws is the one checked: outside Pill, Status shows the clock.
     let shown = crate::pill::status::shown(s.theme, s.idle_style);
     let style = |st: IdleStyle| item(idle_label(st), MenuCmd::ToggleIdleStyle(st), shown == st);
     let theme = |label: &str, t: Theme| item(label, MenuCmd::SetTheme(t), s.theme == t);
     let fullscreen = |label: &str, hide: bool| item(label, MenuCmd::SetHideFullscreen(hide), s.hide_in_fullscreen == hide);
     let mut items = vec![MenuItem::Info { label: "yravgSubMeetly".into() }];
-    for (label, cmd) in [("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
+    for (label, cmd) in [("Open yravgSubMeetly", MenuCmd::OpenApp), ("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
         items.push(item(label, cmd, false));
     }
     items.push(MenuItem::Separator);
-    for (label, cmd) in product_actions(engine, matches!(update, UpdateLine::Check)) {
+    for (label, cmd) in product_actions(engine, matches!(update, UpdateLine::Check), capturing) {
         items.push(match cmd {
             Some(cmd) => item(&label, cmd, false),
             None => MenuItem::Info { label },
@@ -287,7 +296,7 @@ mod tests {
     use super::*;
 
     fn items(s: &Settings, update: UpdateLine, engine: &EngineInfo) -> Vec<MenuItem> {
-        menu_items(s, false, update, engine)
+        menu_items(s, false, update, engine, false)
     }
 
     /// Every command in the menu, submenus included, in order.
@@ -335,8 +344,16 @@ mod tests {
             .collect();
         assert_eq!(
             labels,
-            ["yravgSubMeetly", "Open Minutes register", "Live captions", "Meeting", "Inbox", "Engine: running (Rust) on 17865", "Restart engine", "Set up Chrome extension…", "Check for updates…"]
+            ["yravgSubMeetly", "Open yravgSubMeetly", "Open Minutes register", "Live captions", "Meeting", "Inbox", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…"]
         );
+    }
+
+    #[test]
+    fn the_menu_offers_start_or_stop_for_the_island_s_own_captions() {
+        let e = engine(true, true, false);
+        let has = |capturing: bool, cmd: MenuCmd| product_actions(&e, false, capturing).iter().any(|(_, c)| *c == Some(cmd));
+        assert!(has(false, MenuCmd::StartCaptions) && !has(false, MenuCmd::StopCaptions));
+        assert!(has(true, MenuCmd::StopCaptions) && !has(true, MenuCmd::StartCaptions));
     }
 
     #[test]

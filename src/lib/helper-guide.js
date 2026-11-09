@@ -303,7 +303,7 @@ export const TROUBLESHOOTING = [
     id: 'model-download',
     checks: [],
     symptom: { en: 'First start hangs on "Downloading model…"', id: 'Start pertama tertahan di "Downloading model…"' },
-    cause: { en: 'Whisper weights (~1.6 GB for large-v3-turbo) download once from Hugging Face; slow or blocked networks stall.', id: 'Bobot Whisper (~1,6 GB untuk large-v3-turbo) diunduh sekali dari Hugging Face; jaringan lambat/terblokir membuatnya tertahan.' },
+    cause: { en: 'The default models (Whisper base ~290 MB, Qwen2.5-0.5B ~1 GB) download once from Hugging Face; slow or blocked networks stall. large-v3-turbo (~1.6 GB) is opt-in.', id: 'Model bawaan (Whisper base ~290 MB, Qwen2.5-0.5B ~1 GB) diunduh sekali dari Hugging Face; jaringan lambat/terblokir membuatnya tertahan. large-v3-turbo (~1,6 GB) hanya bila dipilih.' },
     fix: { en: 'Wait for the first download, or start with a smaller model. After that everything runs offline.', id: 'Tunggu unduhan pertama, atau mulai dengan model kecil. Setelahnya semua jalan luring.' },
     cmd: { windows: 'set WHISPER_MODEL=base && run.bat', linux: 'WHISPER_MODEL=base ./run.sh', macos: 'WHISPER_MODEL=base ./run.sh' },
   },

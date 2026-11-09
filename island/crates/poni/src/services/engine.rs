@@ -66,8 +66,8 @@ pub fn open_now(path: &str) {
         std::thread::sleep(Duration::from_millis(300));
     }
     let url = format!("http://127.0.0.1:{port}{path}");
-    // Minutes is the app's own window; the setup page stays in the browser, next to chrome://extensions.
-    if path == "/app/minutes.html" {
+    // Minutes and the app shell are the app's own windows; the setup page stays in the browser, next to chrome://extensions.
+    if path == "/app/minutes.html" || path == "/app/app.html" {
         crate::shell::open_app_window(&url);
     } else {
         crate::shell::open(&url);
@@ -77,6 +77,7 @@ pub fn open_now(path: &str) {
 /// `--open <name>` on the command line: the engine page it names.
 pub fn open_arg(args: &[String]) -> Option<&'static str> {
     match args.iter().position(|a| a == "--open").and_then(|i| args.get(i + 1)).map(String::as_str) {
+        Some("app") => Some("/app/app.html"),
         Some("minutes") => Some("/app/minutes.html"),
         Some("setup-extension") => Some("/app/setup-extension.html"),
         _ => None,
@@ -183,6 +184,7 @@ mod tests {
     #[test]
     fn open_names_an_engine_page_and_nothing_else() {
         assert_eq!(open_arg(&a(&["poni.exe", "--open", "minutes"])), Some("/app/minutes.html"));
+        assert_eq!(open_arg(&a(&["poni.exe", "--open", "app"])), Some("/app/app.html"));
         assert_eq!(open_arg(&a(&["poni.exe", "--open", "setup-extension"])), Some("/app/setup-extension.html"));
         assert_eq!(open_arg(&a(&["poni.exe", "--open", "../x"])), None);
         assert_eq!(open_arg(&a(&["poni.exe", "--open"])), None);

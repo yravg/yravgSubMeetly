@@ -11,6 +11,7 @@ export function samplesBaseUrl() {
   try {
     const { protocol, hostname, port, pathname } = location;
     if (protocol === 'http:' || protocol === 'https:') {
+      if (pathname.startsWith('/app/')) return null; // engine-hosted app window: no lab samples there
       if (port === '8799' || hostname === '127.0.0.1' || hostname === 'localhost') {
         return '/samples/';
       }

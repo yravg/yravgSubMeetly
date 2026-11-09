@@ -2,25 +2,36 @@
 //! [`EventSink`]; a failing service is logged and skipped, never fatal.
 
 pub mod addons;
+pub mod adzan;
 pub mod applemusic;
 pub mod applemusic_ui;
 pub mod audio;
 pub mod backdrop;
 pub mod bluetooth;
+pub mod capture;
 pub mod engine;
 pub mod clipboard;
 pub mod frames;
 pub mod fullscreen;
 pub mod helper;
+pub mod cities;
+pub mod downloader;
+#[cfg(test)]
+mod downloader_live;
 pub mod http;
 pub mod imaging;
+pub mod lyric_translate;
+pub mod location;
 pub mod lyrics;
 pub mod media;
+pub mod models;
 pub mod pairdrop;
 pub mod phonedrop;
 pub mod power;
 pub mod psu;
 pub mod romanize;
+#[cfg(test)]
+mod romanize_compare;
 pub mod secret;
 pub mod sound;
 pub mod notifications;
@@ -28,6 +39,7 @@ pub mod sysmon;
 pub mod sysstats;
 pub mod feed;
 pub mod update;
+pub mod winlang;
 
 use crate::commands::MediaCmd;
 use crate::events::EventSink;
@@ -39,13 +51,18 @@ use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
 pub struct Services {
     media: Option<media::MediaService>,
     lyrics: Option<lyrics::LyricsService>,
+    lyric_tr: Option<lyric_translate::LyricTranslateService>,
     _audio: Option<audio::AudioService>,
     _bluetooth: Option<bluetooth::BluetoothService>,
     fullscreen: Option<fullscreen::FullscreenWatcher>,
     pairdrop: Option<pairdrop::PairDropService>,
     addons: Option<addons::AddonService>,
     helper: Option<helper::HelperService>,
+    capture: Option<capture::CaptureService>,
     engine: Option<engine::EngineService>,
+    /// Started at the first download ([`Services::download`]).
+    downloader: std::cell::OnceCell<Option<downloader::DownloaderService>>,
+    sink: EventSink,
 }
 
 fn started<T, E: std::fmt::Display>(name: &str, r: Result<T, E>) -> Option<T> {
@@ -65,20 +82,45 @@ impl Services {
     pub fn start(sink: &EventSink, _island: HWND, helper: HWND, settings: &Settings) -> Self {
         let media = started("media", media::MediaService::start(sink.clone()));
         let lyrics = started("lyrics", lyrics::LyricsService::start(sink.clone()));
+        let lyric_tr = started("lyrics translation", lyric_translate::LyricTranslateService::start(sink.clone()));
         let audio = started("audio", audio::AudioService::start(sink.clone()));
         let bluetooth = started("bluetooth", bluetooth::BluetoothService::start(sink.clone()));
         let fullscreen = started("fullscreen", fullscreen::FullscreenWatcher::start(helper, sink.clone()));
         // Asks nothing until a phone is paired.
         let pairdrop = started("pair drop", pairdrop::PairDropService::start(sink.clone()));
-        // Asleep unless an add-on with files is on; then it only checks the files it has.
-        let on = poni_core::addons::ALL.iter().filter(|a| settings.addon_on(a.id)).map(|a| a.id).collect();
+        // Asleep unless an add-on is on; then it only checks the files it has.
+        // The Microsoft Store build has no Downloader, whatever settings.json says.
+        // A Studio Pro add-on's files wait for Pro (`set_pro`): a filter here
+        // would delete the Downloader's tools at every start, before the
+        // server's answer, and fetch them again after it.
+        let store = crate::autostart::packaged();
+        let on = poni_core::addons::ALL
+            .iter()
+            .filter(|a| settings.addon_on(a.id) && !(store && a.id == poni_core::addons::DOWNLOADER.id))
+            .map(|a| a.id)
+            .collect();
         let addons = started("add-ons", addons::AddonService::start(sink.clone(), on));
         let helper = started("helper link", helper::HelperService::start(sink.clone()));
         let engine = started("engine link", engine::EngineService::start(sink.clone()));
-        Self { media, lyrics, _audio: audio, _bluetooth: bluetooth, fullscreen, pairdrop, addons, helper, engine }
+        Self {
+            media,
+            lyrics,
+            lyric_tr,
+            _audio: audio,
+            _bluetooth: bluetooth,
+            fullscreen,
+            pairdrop,
+            addons,
+            helper,
+            capture: None,
+            engine,
+            downloader: std::cell::OnceCell::new(),
+            sink: sink.clone(),
+        }
     }
 
-    pub fn stop(self, _helper: HWND) {
+    pub fn stop(mut self, _helper: HWND) {
+        self.capture_stop();
         if let Some(f) = self.fullscreen {
             f.stop();
         }
@@ -108,6 +150,20 @@ impl Services {
         self.addons.as_ref().map(|a| a.run(job)).is_some()
     }
 
+    /// Run yt-dlp for `req` (the Downloader add-on's tools are in place).
+    pub fn download(&self, req: poni_core::ytdlp::Request) {
+        if let Some(d) = self.downloader.get_or_init(|| started("downloader", downloader::DownloaderService::start(self.sink.clone()))) {
+            d.run(req);
+        }
+    }
+
+    /// Stop download `id` (its yt-dlp and whatever yt-dlp started).
+    pub fn stop_download(&self, id: u64) {
+        if let Some(Some(d)) = self.downloader.get() {
+            d.stop(id);
+        }
+    }
+
     /// An add-on was switched on (download its files) or off (delete them).
     /// A Studio Pro add-on's files come only with Pro (`set_pro`).
     pub fn set_addon(&self, id: &'static str, on: bool) {
@@ -121,6 +177,17 @@ impl Services {
         if let Some(h) = &self.helper {
             h.post(body);
         }
+    }
+
+    /// Start capturing the PC's audio for captions, or say why not. Restarts a running one.
+    pub fn capture_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str) -> Result<(), String> {
+        self.capture = None; // the old one stops first: one device reader at a time
+        self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into()).map_err(|e| format!("Captions could not start ({e})."))?);
+        Ok(())
+    }
+
+    pub fn capture_stop(&mut self) {
+        self.capture = None;
     }
 
     pub fn helper_poll(&self) {
@@ -154,6 +221,16 @@ impl Services {
     pub fn media_cmd(&self, c: MediaCmd) {
         if let Some(m) = &self.media {
             m.send(c);
+        }
+    }
+
+    /// Translate the song's lines once (or read them from the cache); `None` stops the one running.
+    pub fn translate_lyrics(&self, job: Option<lyric_translate::Job>) {
+        if let Some(t) = &self.lyric_tr {
+            match job {
+                Some(j) => t.request(j),
+                None => t.cancel(),
+            }
         }
     }
 

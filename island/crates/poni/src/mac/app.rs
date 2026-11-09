@@ -2567,7 +2567,7 @@ impl App {
             match n.action {
                 Some(NoticeAction::OpenPage(p)) => self.st.page = p,
                 Some(NoticeAction::OpenUpdate) => self.st.open_update(),
-                Some(NoticeAction::OpenApp(_)) => {}
+                Some(NoticeAction::OpenApp(_) | NoticeAction::DownloadModel) => {}
                 Some(NoticeAction::StartFocus) => {
                     self.st.page = PageKind::Focus;
                     if !self.st.pomodoro.is_active() {
@@ -2972,6 +2972,8 @@ impl App {
                 Command::Download(c) => self.download_cmd(c),
                 // Notifications is a Windows add-on: a Mac can't read other apps' notifications.
                 Command::Notify(_) => {}
+                // Windows' language features are Windows'.
+                Command::WinLang(_) => {}
                 Command::OpenSettings => self.show_settings(),
                 Command::Usage(c) => self.usage_cmd(c),
                 Command::Ielts(c) => self.ielts_cmd(c),

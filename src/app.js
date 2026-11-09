@@ -19,6 +19,9 @@ import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minute
 import { mountAskTide } from './ask-tide.js';
 
 const IS_EXT = location.protocol === 'chrome-extension:';
+// Engine-hosted (Windows app window): src/web-host.js installed a chrome stand-in, panels are sidepanel.html.
+const WEB = !!globalThis.__ysmWebHost;
+const HOSTED = IS_EXT || WEB;
 
 /* ---------- strings ---------- */
 const STR = {
@@ -42,6 +45,7 @@ const STR = {
     helperPill: (d) => `Helper · ${d}`, helperPillOff: 'Helper offline', helperChecking: 'Checking helper…',
     lockedHelper: 'Needs the helper', lockedHelperBody: 'Start the Native Helper to see the engine, device and model here.', openHelper: 'Open Helper',
     lockedExt: 'Needs the extension', lockedExtBody: 'Tab capture and the page overlay only run inside the Chrome extension. In the lab the panel plays a CC0 sample instead.',
+    noOverlay: 'No page overlay in this window', noOverlayBody: 'Press Start and share a tab, window or screen with audio. Captions appear here and in the island pill; the overlay on a web page needs the Chrome extension.',
     loading: 'Reading your register…', errTitle: 'The register could not be read.', errBody: (m) => `${m} Reload the page; if it keeps failing, export your minutes from the Minutes page.`, reload: 'Reload',
     emptyTitle: 'No meetings yet', emptyBody: 'Start captions in a meeting, or import a sample series from the Library on the Minutes page.', openMinutes: 'Open Minutes',
     welcomeTitle: 'Welcome to yravgSubMeetly', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it',
@@ -88,6 +92,7 @@ const STR = {
     helperPill: (d) => `Helper · ${d}`, helperPillOff: 'Helper mati', helperChecking: 'Memeriksa helper…',
     lockedHelper: 'Perlu helper', lockedHelperBody: 'Jalankan Native Helper untuk melihat mesin, perangkat dan model di sini.', openHelper: 'Buka Helper',
     lockedExt: 'Perlu ekstensi', lockedExtBody: 'Tangkap tab dan overlay halaman hanya berjalan di ekstensi Chrome. Di lab panel memutar sampel CC0.',
+    noOverlay: 'Tidak ada overlay halaman di jendela ini', noOverlayBody: 'Tekan Mulai lalu bagikan tab, jendela, atau layar beserta audionya. Teks muncul di sini dan di pil island; overlay di halaman web butuh ekstensi Chrome.',
     loading: 'Membaca register…', errTitle: 'Register tidak terbaca.', errBody: (m) => `${m} Muat ulang halaman; bila tetap gagal, ekspor notulen dari halaman Notulen.`, reload: 'Muat ulang',
     emptyTitle: 'Belum ada rapat', emptyBody: 'Mulai teks di rapat, atau impor seri contoh dari Library di halaman Notulen.', openMinutes: 'Buka Notulen',
     welcomeTitle: 'Selamat datang di yravgSubMeetly', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti',
@@ -156,9 +161,9 @@ const MEETING_ROUTES = ['today', 'live', 'minutes', 'history', 'files'];
 const FEATURE_ROUTES = ['addins', 'glossary', 'island', 'perf', 'all', 'settings'];
 // Halaman yang masih memasang panel samping: view (+ tab Pengaturan).
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], glossary: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
-const panelUrl = ([view, stab]) => `${IS_EXT ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
+const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
 
-const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'classic', developer: !IS_EXT };
+const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'classic', developer: !HOSTED };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* privat */ } },
@@ -318,8 +323,8 @@ function allPage() {
 /* ---------- Developer (A08) ---------- */
 function devPage() {
   // Lab: lab yang sudah ada (test/app.html) — setiap alat lab tetap di tempatnya.
-  const src = IS_EXT ? 'http://127.0.0.1:8799/app.html' : '/app.html';
-  return `${IS_EXT ? lockedCard(T('lockedLab'), T('lockedLabBody')) : ''}<iframe class="frame panel dev" title="${esc(T('devArea'))}" src="${src}"></iframe>`;
+  const src = HOSTED ? 'http://127.0.0.1:8799/app.html' : '/app.html';
+  return `${HOSTED ? lockedCard(T('lockedLab'), T('lockedLabBody')) : ''}<iframe class="frame panel dev" title="${esc(T('devArea'))}" src="${src}"></iframe>`;
 }
 
 /* ---------- Plans (A10): belum ada server akun ---------- */
@@ -336,13 +341,13 @@ function plansPage() {
 
 /* ---------- Settings: Developer switch (extension) ---------- */
 function settingsPage() {
-  const sw = IS_EXT ? `<div class="cd devsw"><div><b>${esc(T('devArea'))}</b><p class="mut">${esc(T('devAreaBody'))}</p></div><label class="sw-chip bare"><input type="checkbox" role="switch" data-act="dev"${state.developer ? ' checked' : ''} aria-label="${esc(T('devArea'))}" /></label></div>` : '';
+  const sw = HOSTED ? `<div class="cd devsw"><div><b>${esc(T('devArea'))}</b><p class="mut">${esc(T('devAreaBody'))}</p></div><label class="sw-chip bare"><input type="checkbox" role="switch" data-act="dev"${state.developer ? ' checked' : ''} aria-label="${esc(T('devArea'))}" /></label></div>` : '';
   return `${sw}<iframe class="frame panel" title="${esc(T('settings'))}" src="${esc(panelUrl(PANEL.settings))}"></iframe>`;
 }
 
 /* ---------- panel-backed pages ---------- */
 function panelPage(route) {
-  const lock = route === 'live' && !IS_EXT ? lockedCard(T('lockedExt'), T('lockedExtBody')) : '';
+  const lock = route !== 'live' || IS_EXT ? '' : WEB ? lockedCard(T('noOverlay'), T('noOverlayBody')) : lockedCard(T('lockedExt'), T('lockedExtBody'));
   return `${lock}<iframe class="frame panel" title="${esc(T(route))}" src="${esc(panelUrl(PANEL[route]))}"></iframe>`;
 }
 
@@ -473,7 +478,7 @@ async function boot() {
   state.hideNumbers = store.get('ysmShellHideNumbers', false);
   state.welcomed = store.get('ysmShellWelcomed', false);
   state.register = store.get('ysmShellRegister', 'classic') === 'modern' ? 'modern' : 'classic';
-  if (IS_EXT) state.developer = !!(await globalThis.chrome?.storage?.local.get('ysmDeveloper'))?.ysmDeveloper;
+  if (HOSTED) state.developer = !!(await globalThis.chrome?.storage?.local.get('ysmDeveloper'))?.ysmDeveloper;
   ask = mountAskTide({ lang: LANG, getMeetings: async () => state.meetings || listMeetings(), onSaved: () => loadRegister() });
   wire();
   paintHelper();

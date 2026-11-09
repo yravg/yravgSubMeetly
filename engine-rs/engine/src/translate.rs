@@ -1,14 +1,61 @@
 //! Translation LLM on candle: Qwen2.5 Instruct, greedy, with the exact
 //! prompts of `translate_text` / `refine_text` in native/server.py.
 
+use std::path::{Path, PathBuf};
+
 use anyhow::{anyhow, Context, Result};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::qwen2::{Config, ModelForCausalLM};
+use hf_hub::progress::Progress;
 use serde_json::Value;
 use tokenizers::Tokenizer;
 
-pub const DEFAULT_TRANSLATE_MODEL: &str = "Qwen/Qwen2.5-3B-Instruct";
+/// The cached files `Translator::load` reads; weights may be sharded.
+pub struct QwenFiles {
+    pub config: PathBuf,
+    pub tokenizer: PathBuf,
+    pub weights: Vec<PathBuf>,
+}
+
+/// Download (or find cached) the files of a Qwen repo; `finished` sees each one.
+pub fn fetch_files(
+    repo_id: &str,
+    progress: Option<&Progress>,
+    finished: &mut dyn FnMut(&Path),
+) -> Result<QwenFiles> {
+    let mut fetch = |name: &str| -> Result<PathBuf> {
+        let path = crate::ml::hub_file_with(repo_id, None, name, progress.cloned())?;
+        finished(&path);
+        Ok(path)
+    };
+    let config = fetch("config.json")?;
+    let tokenizer = fetch("tokenizer.json")?;
+    // Only a 404 means "not sharded"; a network error must not pick the single-file path.
+    let weights = match fetch("model.safetensors.index.json") {
+        Ok(index) => {
+            let index: Value = serde_json::from_slice(&std::fs::read(index)?)?;
+            let mut names: Vec<String> = index["weight_map"]
+                .as_object()
+                .ok_or_else(|| anyhow!("bad safetensors index"))?
+                .values()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect();
+            names.sort();
+            names.dedup();
+            names.iter().map(|n| fetch(n)).collect::<Result<Vec<_>>>()?
+        }
+        Err(error) if crate::ml::is_not_found(&error) => vec![fetch("model.safetensors")?],
+        Err(error) => return Err(error),
+    };
+    Ok(QwenFiles {
+        config,
+        tokenizer,
+        weights,
+    })
+}
+
+pub const DEFAULT_TRANSLATE_MODEL: &str = "Qwen/Qwen2.5-0.5B-Instruct";
 
 const LANG_NAMES: [(&str, &str); 20] = [
     ("en", "English"),
@@ -151,26 +198,11 @@ pub struct Translator {
 
 impl Translator {
     pub fn load(repo_id: &str, device: Device) -> Result<Self> {
-        let fetch = |name: &str| crate::ml::hub_file(repo_id, None, name);
-        let config: Config = serde_json::from_slice(&std::fs::read(fetch("config.json")?)?)
-            .context("qwen config")?;
-        let tokenizer =
-            Tokenizer::from_file(fetch("tokenizer.json")?).map_err(|e| anyhow!("{e}"))?;
-        let weights = match fetch("model.safetensors.index.json") {
-            Ok(index) => {
-                let index: Value = serde_json::from_slice(&std::fs::read(index)?)?;
-                let mut names: Vec<String> = index["weight_map"]
-                    .as_object()
-                    .ok_or_else(|| anyhow!("bad safetensors index"))?
-                    .values()
-                    .filter_map(|v| v.as_str().map(str::to_string))
-                    .collect();
-                names.sort();
-                names.dedup();
-                names.iter().map(|n| fetch(n)).collect::<Result<Vec<_>>>()?
-            }
-            Err(_) => vec![fetch("model.safetensors")?],
-        };
+        let files = fetch_files(repo_id, None, &mut |_| {})?;
+        let config: Config =
+            serde_json::from_slice(&std::fs::read(files.config)?).context("qwen config")?;
+        let tokenizer = Tokenizer::from_file(files.tokenizer).map_err(|e| anyhow!("{e}"))?;
+        let weights = files.weights;
         let dtype = if device.is_cpu() {
             DType::F32
         } else {

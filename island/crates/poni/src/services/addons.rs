@@ -2,6 +2,12 @@
 //! switched on, checks each one against the size and SHA-256 built into the
 //! app, and deletes them when the add-on is switched off.
 //!
+//! A copy the installer put next to the app (`<app folder>\addons\<id>\<name>`,
+//! [`bundle_dir`]) is taken first: checked against the same pin, then saved
+//! into the folder below without the network. Only a file the bundle doesn't
+//! have (or has wrong) is downloaded. The Downloader's tools aren't bundled:
+//! they download on first use, FFmpeg as a pinned zip it unpacks ([`unpack`]).
+//!
 //! Files live in `paths::addons_dir()/<id>/<tag>/<name>`; a finished set
 //! clears out any older tag's folder. At start an add-on that is on only
 //! has its files checked: no network unless one is missing or damaged, and
@@ -158,6 +164,7 @@ fn worker_main(shared: Arc<Shared>, sink: EventSink, dir: PathBuf) {
     let mut client: Option<Client> = None;
     let mut have: BTreeMap<&'static str, Have> = addons::ALL.iter().map(|a| (a.id, Have::Unknown)).collect();
     let mut was_on: BTreeMap<&'static str, bool> = BTreeMap::new();
+    let bundle = bundle_dir();
     loop {
         let (want, pro, jobs, shutdown) = {
             let mut q = shared.lock();
@@ -196,10 +203,7 @@ fn worker_main(shared: Arc<Shared>, sink: EventSink, dir: PathBuf) {
                                 Err(e) => crate::pwarn!("add-ons: no HTTP client ({e})"),
                             }
                         }
-                        match &client {
-                            Some(c) => ensure(&shared, c, &sink, &dir, addon, h == Have::Unknown, backoff),
-                            None => wait_retry(&sink, addon, backoff, "no HTTP client"),
-                        }
+                        ensure(&shared, client.as_ref(), bundle.as_deref(), &sink, &dir, addon, h == Have::Unknown, backoff)
                     }
                 }
             };
@@ -230,6 +234,11 @@ fn worker_main(shared: Arc<Shared>, sink: EventSink, dir: PathBuf) {
             };
         }
     }
+}
+
+/// Where the installer puts the add-ons' files: `addons` beside the exe.
+fn bundle_dir() -> Option<PathBuf> {
+    Some(std::env::current_exe().ok()?.parent()?.join("addons"))
 }
 
 /// The folder of this version's files.
@@ -306,7 +315,7 @@ fn save_stamp(folder: &Path, stamp: &str, lines: &mut [String]) -> String {
 /// Make every file of `addon` present: check the ones on disk, download the
 /// rest. Reports `Checking`, `Downloading`, `Waiting`, `Ready` or `Failed`,
 /// or `Unpinned` for one this build can't get.
-fn ensure(shared: &Shared, client: &Client, sink: &EventSink, dir: &Path, addon: &'static Addon, first: bool, backoff: Duration) -> Have {
+fn ensure(shared: &Shared, client: Option<&Client>, bundle: Option<&Path>, sink: &EventSink, dir: &Path, addon: &'static Addon, first: bool, backoff: Duration) -> Have {
     // A build made while one of its files is a placeholder: nothing it could
     // check, so nothing is fetched, however the switch came on (the Add-ons
     // page keeps it off). Off and on again gets the same answer.
@@ -319,13 +328,20 @@ fn ensure(shared: &Shared, client: &Client, sink: &EventSink, dir: &Path, addon:
         sink.send(AppEvent::Addon { id: addon.id, status: Status::Checking });
     }
     let folder = version_dir(dir, addon);
-    let total = addon.size();
+    let total = addon.download_size();
     let stamp = fs::read_to_string(folder.join(STAMP)).unwrap_or_default();
     let mut lines = Vec::new();
     let missing: Vec<&AddonFile> = addon.files.iter().filter(|f| !present(&folder.join(f.name), f, &stamp, &mut lines)).collect();
     // Kept now, so tries while the rest can't come don't read these again.
     let stamp = save_stamp(&folder, &stamp, &mut lines);
-    let mut done = total - missing.iter().map(|f| f.size).sum::<u64>();
+    // A Mac runs the Downloader's tools only with their execute bit, which
+    // each gets as it is saved (below); one that lost it gets it back.
+    for f in addon.files.iter().filter(|f| runs(addon, f) && !missing.contains(f)) {
+        if let Err(e) = make_runnable(&folder.join(f.name)) {
+            crate::pwarn!("add-ons: {}: {} can't be made runnable ({e})", addon.id, f.name);
+        }
+    }
+    let mut done = total - missing.iter().map(|f| f.transfer()).sum::<u64>();
     if !missing.is_empty() {
         if let Err(e) = fs::create_dir_all(&folder) {
             crate::pwarn!("add-ons: {}: could not make {} ({e})", addon.id, folder.display());
@@ -344,23 +360,36 @@ fn ensure(shared: &Shared, client: &Client, sink: &EventSink, dir: &Path, addon:
         if wants != Some(true) {
             return Have::Unknown;
         }
+        // The installer's copy first: no network, same pin.
+        if bundle.is_some_and(|b| take_bundled(b, &folder, addon, file)) {
+            crate::pinfo!("add-ons: {}: {} taken from the installer's copy", addon.id, file.name);
+            done += file.transfer();
+            sink.send(AppEvent::Addon { id: addon.id, status: Status::Downloading { done, total } });
+            continue;
+        }
+        let Some(client) = client else { return wait_retry(sink, addon, backoff, "no HTTP client") };
         let url = addon.url(file);
         let base = done;
         let progress_sink = sink.clone();
         let mut last = Instant::now();
         let id = addon.id;
         let started = Instant::now();
-        let got = client.get_bytes(&url, file_timeout(file.size), file.size + 64 * 1024, move |n| {
+        let got = client.get_bytes(&url, file_timeout(file.transfer()), file.transfer() + 64 * 1024, move |n| {
             if last.elapsed() >= PROGRESS_EVERY {
                 last = Instant::now();
-                progress_sink.send(AppEvent::Addon { id, status: Status::Downloading { done: base + n.min(file.size), total } });
+                progress_sink.send(AppEvent::Addon { id, status: Status::Downloading { done: base + n.min(file.transfer()), total } });
             }
         });
         match got {
-            Ok((200, bytes)) if file.matches(&bytes) => {
+            Ok((200, bytes)) if file.arrived(&bytes) => {
                 let path = folder.join(file.name);
                 let part = folder.join(format!("{}.part", file.name));
-                let saved = fs::write(&part, &bytes).and_then(|_| fs::rename(&part, &path));
+                let saved = match file.unpack {
+                    None => fs::write(&part, &bytes),
+                    Some(u) => unpack(&bytes, u.member, &folder, &part, file),
+                }
+                .and_then(|_| if runs(addon, file) { make_runnable(&part) } else { Ok(()) })
+                .and_then(|_| fs::rename(&part, &path));
                 if let Err(e) = saved {
                     let _ = fs::remove_file(&part);
                     crate::pwarn!("add-ons: {}: could not save {} ({e})", addon.id, file.name);
@@ -380,7 +409,7 @@ fn ensure(shared: &Shared, client: &Client, sink: &EventSink, dir: &Path, addon:
                 sink.send(AppEvent::Addon { id: addon.id, status: Status::Downloading { done, total } });
             }
             Ok((200, bytes)) => {
-                crate::pwarn!("add-ons: {}: {} came back different ({} bytes, expected {}); not saved", addon.id, file.name, bytes.len(), file.size);
+                crate::pwarn!("add-ons: {}: {} came back different ({} bytes, expected {}); not saved", addon.id, file.name, bytes.len(), file.transfer());
                 sink.send(AppEvent::Addon { id: addon.id, status: Status::Failed });
                 return Have::Failed;
             }
@@ -403,6 +432,101 @@ fn ensure(shared: &Shared, client: &Client, sink: &EventSink, dir: &Path, addon:
     crate::pinfo!("add-ons: {}: ready", addon.id);
     sink.send(AppEvent::Addon { id: addon.id, status: Status::Ready });
     Have::Complete
+}
+
+/// Whether `file` is a program the app runs (the Downloader's tools).
+fn runs(addon: &Addon, file: &AddonFile) -> bool {
+    addon.id == addons::DOWNLOADER.id && addons::is_downloader_tool(file.name)
+}
+
+/// Make a downloaded program runnable. A file the app writes on a Mac can be
+/// read but not run (0644), and yt-dlp, QuickJS and FFmpeg only start with
+/// the execute bit; setting it changes the file's mode, not its bytes or its
+/// last write time, so the stamp still vouches for it. On Windows an .exe
+/// runs as it is.
+#[cfg(unix)]
+pub fn make_runnable(path: &Path) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    if fs::metadata(path)?.permissions().mode() & 0o111 == 0o111 {
+        return Ok(());
+    }
+    fs::set_permissions(path, fs::Permissions::from_mode(0o755))
+}
+
+#[cfg(not(unix))]
+pub fn make_runnable(_: &Path) -> io::Result<()> {
+    Ok(())
+}
+
+/// Save the installer's copy of `file` into `folder`, if it has one and it is
+/// exactly the pinned file: copied to a `.part` first and checked there, so a
+/// copy changed after the check can't slip in. Anything else (no copy, the
+/// wrong bytes, no room) returns false with nothing left behind, and the file
+/// is downloaded as before.
+fn take_bundled(bundle: &Path, folder: &Path, addon: &Addon, file: &AddonFile) -> bool {
+    let from = bundle.join(addon.id).join(file.name);
+    if !from.is_file() {
+        return false;
+    }
+    let part = folder.join(format!("{}.part", file.name));
+    let saved = fs::copy(&from, &part)
+        .and_then(|_| if fs::File::open(&part).is_ok_and(|f| file.matches_read(f)) { Ok(()) } else { Err(io::Error::new(io::ErrorKind::InvalidData, "not the pinned file")) })
+        .and_then(|_| if runs(addon, file) { make_runnable(&part) } else { Ok(()) })
+        .and_then(|_| fs::rename(&part, folder.join(file.name)));
+    if let Err(e) = &saved {
+        crate::pwarn!("add-ons: {}: the installer's {} isn't usable ({e}); downloading it", addon.id, file.name);
+        let _ = fs::remove_file(&part);
+    }
+    saved.is_ok()
+}
+
+/// Write `member` of the zip `archive` (already checked against its pin) to
+/// `part`, and check the result against `file`'s own pin. Windows' own
+/// `tar.exe` (bsdtar, in System32 since Windows 10 1803) reads zips, so no
+/// unzip code is built into the app; it runs without a window, with the
+/// member's path as a plain argument. shortcut: the whole archive sits in
+/// memory while it downloads (115 MB for FFmpeg's), upgrade to streaming it to
+/// disk if one grows much bigger or a PC is short of memory.
+#[cfg(windows)]
+pub(crate) fn unpack(archive: &[u8], member: &str, folder: &Path, part: &Path, file: &AddonFile) -> io::Result<()> {
+    use std::os::windows::process::CommandExt;
+    let zip = folder.join(format!("{}.zip.part", file.name));
+    let out = folder.join(format!("{}.unpack", file.name));
+    let run = || -> io::Result<()> {
+        fs::create_dir_all(&out)?;
+        fs::write(&zip, archive)?;
+        let tar = std::env::var_os("SystemRoot").map(|r| Path::new(&r).join("System32").join("tar.exe")).filter(|t| t.is_file()).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no tar.exe in System32"))?;
+        let status = std::process::Command::new(tar)
+            .arg("-xf")
+            .arg(&zip)
+            .arg("-C")
+            .arg(&out)
+            .arg(member)
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+            .status()?;
+        if !status.success() {
+            return Err(io::Error::other(format!("tar.exe exited with {status}")));
+        }
+        fs::rename(out.join(member), part)?;
+        if fs::File::open(part).is_ok_and(|f| file.matches_read(f)) {
+            Ok(())
+        } else {
+            Err(io::Error::new(io::ErrorKind::InvalidData, "the unpacked file isn't the pinned one"))
+        }
+    };
+    let result = run();
+    let _ = fs::remove_file(&zip);
+    let _ = fs::remove_dir_all(&out);
+    if result.is_err() {
+        let _ = fs::remove_file(part);
+    }
+    result
+}
+
+/// Only the Windows build has an add-on that comes in an archive.
+#[cfg(not(windows))]
+pub(crate) fn unpack(_: &[u8], _: &str, _: &Path, _: &Path, _: &AddonFile) -> io::Result<()> {
+    Err(io::Error::new(io::ErrorKind::Unsupported, "unpacking an archive is only built for Windows"))
 }
 
 fn wait_retry(sink: &EventSink, addon: &Addon, backoff: Duration, why: &str) -> Have {
@@ -490,7 +614,7 @@ mod tests {
         let bytes: &[u8] = b"A notice kept beside an add-on's files.
 ";
         let hex: &'static str = Box::leak(sha256::hex(&sha256::sha256(bytes)).into_boxed_str());
-        let file = AddonFile { name: "NOTICE.txt", size: bytes.len() as u64, sha256: hex, url: None };
+        let file = AddonFile { name: "NOTICE.txt", size: bytes.len() as u64, sha256: hex, url: None, unpack: None };
         let dir = std::env::temp_dir().join(format!("poni-addon-stamp-{}", std::process::id()));
         let path = dir.join(file.name);
         fs::create_dir_all(&dir).unwrap();
@@ -522,5 +646,111 @@ mod tests {
         let other = AddonFile { sha256: "0000000000000000000000000000000000000000000000000000000000000000", ..file };
         assert!(!present(&path, &other, &stamp, &mut Vec::new()));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A throwaway folder for one test.
+    fn temp(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("poni-addon-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// A file pinned to exactly `bytes`.
+    fn pinned(name: &'static str, bytes: &[u8]) -> AddonFile {
+        let hex: &'static str = Box::leak(sha256::hex(&sha256::sha256(bytes)).into_boxed_str());
+        AddonFile { name, size: bytes.len() as u64, sha256: hex, url: None, unpack: None }
+    }
+
+    fn add_on(files: Vec<AddonFile>) -> &'static Addon {
+        Box::leak(Box::new(Addon { id: "bundled", title: "Bundled", blurb: "A test.", mac_blurb: None, tag: "addon-bundled-1", files: Box::leak(files.into_boxed_slice()), pro: false }))
+    }
+
+    /// `ensure` with nothing to download from: no HTTP client, an installer's folder.
+    fn ensure_offline(addon: &'static Addon, bundle: &Path, dir: &Path) -> (Have, Vec<AppEvent>) {
+        let shared = Shared { q: Mutex::new(Queue { want: BTreeMap::from([(addon.id, true)]), pro: false, jobs: Vec::new(), shutdown: false }), cv: Condvar::new() };
+        let (tx, rx) = std::sync::mpsc::channel();
+        #[cfg(windows)]
+        let sink = EventSink::new(tx, crate::events::SendHwnd(0));
+        #[cfg(target_os = "macos")]
+        let sink = EventSink::new(tx);
+        let have = ensure(&shared, None, Some(bundle), &sink, dir, addon, true, FIRST_RETRY);
+        (have, rx.try_iter().collect())
+    }
+
+    #[test]
+    fn the_installers_copy_is_taken_only_when_it_is_the_pinned_file() {
+        let (bundle, folder) = (temp("take-bundle"), temp("take-folder"));
+        let addon = add_on(vec![pinned("right.dat", b"the right bytes"), pinned("wrong.dat", b"the bytes the app expects"), pinned("absent.dat", b"never shipped")]);
+        fs::create_dir_all(bundle.join(addon.id)).unwrap();
+        fs::write(bundle.join(addon.id).join("right.dat"), b"the right bytes").unwrap();
+        fs::write(bundle.join(addon.id).join("wrong.dat"), b"changed since the pin!!!!!!!").unwrap();
+        assert!(take_bundled(&bundle, &folder, addon, &addon.files[0]));
+        assert_eq!(fs::read(folder.join("right.dat")).unwrap(), b"the right bytes");
+        assert!(!take_bundled(&bundle, &folder, addon, &addon.files[1]), "different bytes: downloaded instead");
+        assert!(!take_bundled(&bundle, &folder, addon, &addon.files[2]), "not in the installer: downloaded instead");
+        let mut left: Vec<_> = fs::read_dir(&folder).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        left.sort();
+        assert_eq!(left, ["right.dat"], "no half-copied or refused file stays");
+        let _ = fs::remove_dir_all(&bundle);
+        let _ = fs::remove_dir_all(&folder);
+    }
+
+    #[test]
+    fn an_add_on_the_installer_carries_is_ready_without_a_network() {
+        let (bundle, dir) = (temp("ready-bundle"), temp("ready-dir"));
+        let addon = add_on(vec![pinned("places.dat", b"some places"), pinned("NOTICE.txt", b"a licence")]);
+        fs::create_dir_all(bundle.join(addon.id)).unwrap();
+        fs::write(bundle.join(addon.id).join("places.dat"), b"some places").unwrap();
+        // One file short: it can't be had without the network, so it waits.
+        let (have, events) = ensure_offline(addon, &bundle, &dir);
+        assert!(matches!(have, Have::RetryAt(..)), "waits for a connection");
+        assert!(matches!(events.last(), Some(AppEvent::Addon { status: Status::Waiting, .. })));
+        assert_eq!(fs::read(version_dir(&dir, addon).join("places.dat")).unwrap(), b"some places", "what the installer has is kept meanwhile");
+        // Now the whole set is there: ready, no client at all, and checked as ever.
+        fs::write(bundle.join(addon.id).join("NOTICE.txt"), b"a licence").unwrap();
+        let (have, events) = ensure_offline(addon, &bundle, &dir);
+        assert!(have == Have::Complete);
+        assert!(matches!(events.last(), Some(AppEvent::Addon { status: Status::Ready, .. })), "{}", events.len());
+        for f in addon.files {
+            assert!(present(&version_dir(&dir, addon).join(f.name), f, "", &mut Vec::new()), "{}", f.name);
+        }
+        let _ = fs::remove_dir_all(&bundle);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A zip made by Windows' own tar.exe (it writes one for a `.zip` name),
+    /// unpacked as the Downloader's FFmpeg is.
+    #[cfg(windows)]
+    #[test]
+    fn a_member_of_a_zip_is_unpacked_and_checked() {
+        let (src, folder) = (temp("zip-src"), temp("zip-folder"));
+        fs::create_dir_all(src.join("pkg").join("bin")).unwrap();
+        fs::write(src.join("pkg").join("bin").join("tool.exe"), b"the tool itself").unwrap();
+        fs::write(src.join("pkg").join("README.txt"), b"not wanted").unwrap();
+        let tar = Path::new(&std::env::var_os("SystemRoot").unwrap()).join("System32").join("tar.exe");
+        let made = std::process::Command::new(tar).arg("-a").arg("-cf").arg(src.join("pkg.zip")).arg("-C").arg(&src).arg("pkg").status().unwrap();
+        assert!(made.success());
+        let zip = fs::read(src.join("pkg.zip")).unwrap();
+        let mut file = pinned("tool.exe", b"the tool itself");
+        file.url = Some("https://example.test/pkg.zip");
+        let archive_sha: &'static str = Box::leak(sha256::hex(&sha256::sha256(&zip)).into_boxed_str());
+        file.unpack = Some(poni_core::addons::Unpack { member: "pkg/bin/tool.exe", archive_size: zip.len() as u64, archive_sha256: archive_sha });
+        assert!(file.arrived(&zip) && !file.arrived(&zip[1..]) && file.pinned());
+        let part = folder.join("tool.exe.part");
+        unpack(&zip, "pkg/bin/tool.exe", &folder, &part, &file).unwrap();
+        assert_eq!(fs::read(&part).unwrap(), b"the tool itself");
+        let mut left: Vec<_> = fs::read_dir(&folder).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        left.sort();
+        assert_eq!(left, ["tool.exe.part"], "the archive and the unpacking folder are gone");
+        // A member that isn't the pinned file is refused, and nothing is left.
+        let other = pinned("tool.exe", b"some other tool");
+        assert!(unpack(&zip, "pkg/bin/tool.exe", &folder, &part, &other).is_err());
+        assert!(fs::read_dir(&folder).unwrap().next().is_none());
+        // So is a member the zip doesn't have.
+        assert!(unpack(&zip, "pkg/bin/none.exe", &folder, &part, &file).is_err());
+        assert!(fs::read_dir(&folder).unwrap().next().is_none());
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&folder);
     }
 }

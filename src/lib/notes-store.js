@@ -102,9 +102,16 @@ async function readStore() {
   return upgraded;
 }
 
+let writtenHook = null;
+/** Daftarkan satu pendengar yang dipanggil setelah setiap tulis (mis. sinkron ke engine). */
+export function onMeetingsWritten(fn) {
+  writtenHook = typeof fn === 'function' ? fn : null;
+}
+
 async function writeStore(meetings) {
   const env = wrapMeetingStore(meetings.slice(0, MAX_MEETINGS));
   await backend.set(KEY, env);
+  try { writtenHook?.(); } catch { /* a sync listener must never fail a save */ }
   return env;
 }
 

@@ -36,6 +36,7 @@ use crate::state::{AppState, LyricsStatus};
 use crate::ui::Ui;
 use poni_core::geom::{palette, Point, Rect};
 use poni_core::lrc::{LyricLine, Lyrics};
+use poni_core::lyric_tr;
 use poni_core::nowplaying::lyrics_lead_s;
 use poni_core::romanize;
 use poni_core::timeline::LyricClock;
@@ -133,7 +134,7 @@ pub fn sings(st: &AppState) -> bool {
 /// rows): it sings, readings are on, and some line has one. For the whole
 /// song, as [`sings`] is.
 pub fn reads(st: &AppState) -> bool {
-    sings(st) && st.settings.lyrics_pronunciation && st.lyrics.ruby.iter().any(|p| p.iter().any(|r| !r.roman.is_empty()))
+    sings(st) && (st.lyrics.tr.row() || (st.settings.lyrics_pronunciation && st.lyrics.ruby.iter().any(|p| p.iter().any(|r| !r.roman.is_empty()))))
 }
 
 /// The lyrics the pill follows for the song playing now (see [`sings`]).
@@ -320,14 +321,18 @@ fn line_text(st: &AppState, i: usize) -> Option<&str> {
 
 /// Line `i`'s reading in Latin letters, when readings are on and it has one.
 fn reading_at(st: &AppState, i: usize) -> Option<String> {
-    let pieces = st.lyrics.ruby.get(i).filter(|_| st.settings.lyrics_pronunciation)?;
-    romanize::reading(pieces)
+    let reading = st.lyrics.ruby.get(i).filter(|_| st.settings.lyrics_pronunciation).and_then(|p| romanize::reading(p));
+    // While the song is translated the second row is the translation (`lyric_tr::second_row`).
+    lyric_tr::second_row(&st.lyrics.tr, &st.lyrics.translated, i, reading)
 }
 
 /// Tells line `i`'s readings apart without building them: they change when
 /// readings are switched on or off, or when the Japanese readings add-on
 /// comes in and the song is read again.
 fn reading_sig(st: &AppState, i: usize) -> usize {
+    if st.lyrics.tr.row() {
+        return (1 << 24) + st.lyrics.translated.get(i).map_or(0, String::len);
+    }
     match st.lyrics.ruby.get(i) {
         Some(pieces) if st.settings.lyrics_pronunciation => pieces.iter().map(|p| p.roman.len() + 1).sum(),
         _ => 0,
@@ -431,34 +436,57 @@ impl State {
             return None;
         };
         let shown = self.show(now, on_screen, i, text, reading_sig(st, i), || reading_at(st, i));
-        let line_w = ui.c.measure(&shown.text, &style(), 10_000.0).0;
-        let reading_w = shown.reading.as_ref().map_or(0.0, |r| ui.c.measure(r, &reading_style(), 10_000.0).0);
-        let w = line_w.max(reading_w);
-        if area.w < MIN_W {
-            return Some(w);
-        }
-        let area = area.inset(-SLACK, 0.0);
-        shown.slot_w = area.w;
-        // On battery saver a change is a plain swap: one frame a line, not a
-        // fade's worth (the change repeats all song long).
-        let k = if st.power.saver { 1.0 } else { ((now - shown.since) / FADE_S) as f32 };
-        if k >= 1.0 {
-            shown.leaving = None;
-            words(ui.c, &shown.text, shown.reading.as_deref(), area);
-            return Some(w);
-        }
-        // Moving lines glide between pixels; at rest they sit on whole pixels.
-        ui.request_anim();
-        let snap = ui.c.set_text_snap(false);
-        let ((come_a, come_dy), (gone_a, gone_dy)) = fade(k);
-        if let Some((old, old_reading, w)) = shown.leaving.as_ref().filter(|_| gone_a > 0.0) {
-            let r = Rect::from_center(area.center(), *w, area.h).offset(0.0, gone_dy);
-            ui.c.with_alpha(gone_a, |c| words(c, old, old_reading.as_deref(), r));
-        }
-        ui.c.with_alpha(come_a, |c| words(c, &shown.text, shown.reading.as_deref(), area.offset(0.0, come_dy)));
-        ui.c.set_text_snap(snap);
-        Some(w)
+        Some(paint(ui, shown, now, st.power.saver, area))
     }
+}
+
+/// Draw `shown` in `area` (cross-fading from the line it replaced) and say how wide it is.
+fn paint(ui: &mut Ui, shown: &mut Shown, now: f64, saver: bool, area: Rect) -> f32 {
+    let line_w = ui.c.measure(&shown.text, &style(), 10_000.0).0;
+    let reading_w = shown.reading.as_ref().map_or(0.0, |r| ui.c.measure(r, &reading_style(), 10_000.0).0);
+    let w = line_w.max(reading_w);
+    if area.w < MIN_W {
+        return w;
+    }
+    let area = area.inset(-SLACK, 0.0);
+    shown.slot_w = area.w;
+    // On battery saver a change is a plain swap: one frame a line, not a
+    // fade's worth (the change repeats all song long).
+    let k = if saver { 1.0 } else { ((now - shown.since) / FADE_S) as f32 };
+    if k >= 1.0 {
+        shown.leaving = None;
+        words(ui.c, &shown.text, shown.reading.as_deref(), area);
+        return w;
+    }
+    // Moving lines glide between pixels; at rest they sit on whole pixels.
+    ui.request_anim();
+    let snap = ui.c.set_text_snap(false);
+    let ((come_a, come_dy), (gone_a, gone_dy)) = fade(k);
+    if let Some((old, old_reading, w)) = shown.leaving.as_ref().filter(|_| gone_a > 0.0) {
+        let r = Rect::from_center(area.center(), *w, area.h).offset(0.0, gone_dy);
+        ui.c.with_alpha(gone_a, |c| words(c, old, old_reading.as_deref(), r));
+    }
+    ui.c.with_alpha(come_a, |c| words(c, &shown.text, shown.reading.as_deref(), area.offset(0.0, come_dy)));
+    ui.c.set_text_snap(snap);
+    w
+}
+
+thread_local! {
+    // The caption pill's own line on screen: same fade as a lyric line, apart from the song's.
+    static CAPTION: RefCell<State> = RefCell::new(State::default());
+}
+
+/// The engine's caption `seq` in `area`, its translation under it when it has one: the lyric
+/// pill's row layout and cross-fade. A new `seq` fades the old line out, as long as the pill
+/// was on screen up to `until` (app clock: when the line stops counting as fresh).
+pub fn draw_caption(ui: &mut Ui, st: &AppState, area: Rect, seq: u64, source: &str, translation: &str, until: f64) {
+    let _ = CAPTION.try_with(|s| {
+        let Ok(mut s) = s.try_borrow_mut() else { return };
+        let on_screen = s.seen(st.now, Some(until));
+        let reading = || Some(translation.to_string()).filter(|t| !t.is_empty());
+        let shown = s.show(st.now, on_screen, seq as usize, source, translation.len(), reading);
+        paint(ui, shown, st.now, st.power.saver, area);
+    });
 }
 
 /// Where a line and its reading go in `area`: a line alone in the middle,
@@ -525,7 +553,7 @@ mod tests {
             can_seek: true,
             track_key: key.clone(),
         });
-        st.lyrics = LyricsState { track_key: key, status: LyricsStatus::Found, lyrics: Some(parse_lrc(lrc)), source: "Sample".into(), ruby: Vec::new() };
+        st.lyrics = LyricsState { track_key: key, status: LyricsStatus::Found, lyrics: Some(parse_lrc(lrc)), source: "Sample".into(), ruby: Vec::new(), ..Default::default() };
         st
     }
 
@@ -821,6 +849,31 @@ mod tests {
     }
 
     #[test]
+    fn a_translated_song_shows_the_translation_in_the_second_row() {
+        let mut st = song_ja();
+        let readings = reading_sig(&st, 0);
+        st.lyrics.tr = lyric_tr::TrState::Working;
+        st.lyrics.translated = vec!["paper boat".into(), String::new(), String::new()];
+        assert!(reads(&st));
+        assert_eq!(reading_at(&st, 0).as_deref(), Some("paper boat"));
+        // Not translated yet: nothing under the line (not its reading), and the row stays for the song.
+        assert_eq!(reading_at(&st, 2), None);
+        assert_ne!(reading_sig(&st, 0), readings);
+        // A line translated while it is on screen changes its signature, so it shows without a fade.
+        let before = reading_sig(&st, 2);
+        st.lyrics.translated[2] = "find the light".into();
+        assert_ne!(reading_sig(&st, 2), before);
+        // The engine can't: back to readings.
+        st.lyrics.tr = lyric_tr::TrState::Unavailable("no model".into());
+        assert_eq!(reading_at(&st, 0).as_deref(), Some("kami no fune yo"));
+        // A song with no readings still gets its second row while it is translated.
+        let mut plain = song(SONG);
+        assert!(!reads(&plain));
+        plain.lyrics.tr = lyric_tr::TrState::Ready;
+        assert!(reads(&plain));
+    }
+
+    #[test]
     fn a_line_brings_its_reading_and_takes_it_along_when_it_leaves() {
         let st = song_ja();
         let mut s = State::default();
@@ -895,5 +948,22 @@ mod tests {
             assert!(f.1 .0 <= prev.1 .0 && f.1 .1 <= prev.1 .1, "the old line only leaves");
             prev = f;
         }
+    }
+
+    #[test]
+    fn a_caption_fades_in_over_the_one_before_and_its_translation_arriving_does_not_fade() {
+        let mut s = State::default();
+        let a = s.show(100.0, false, 1, "zeile eins", 0, || None);
+        assert!(a.leaving.is_none(), "the first caption just shows");
+        // A translation for the same caption (same seq and text): new words under it, no fade.
+        let a = s.show(100.5, true, 1, "zeile eins", 9, || Some("line one".into()));
+        assert!(a.leaving.is_none());
+        assert_eq!(a.reading.as_deref(), Some("line one"));
+        // The next caption while the pill is on screen: the old one leaves with its translation.
+        let b = s.show(104.0, true, 2, "zeile zwei", 0, || None);
+        assert_eq!(b.leaving.as_ref().map(|l| (l.0.as_str(), l.1.as_deref())), Some(("zeile eins", Some("line one"))));
+        // Away for a while: it just shows.
+        let c = s.show(120.0, false, 3, "zeile drei", 0, || None);
+        assert!(c.leaving.is_none());
     }
 }

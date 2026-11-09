@@ -72,7 +72,9 @@ pub enum AppleMusicStatus {
 #[derive(Clone, Debug)]
 pub enum LyricsResult {
     /// `ruby`: each line's pieces with their readings (empty = none needed).
-    Found { lyrics: Lyrics, source: String, ruby: Vec<Vec<Ruby>> },
+    /// `wants_ja_readings`: kanji went unread for want of the Japanese
+    /// readings add-on (`services::romanize::Pronounced`).
+    Found { lyrics: Lyrics, source: String, ruby: Vec<Vec<Ruby>>, wants_ja_readings: bool },
     /// The song is marked instrumental (no words to show).
     Instrumental,
     NotFound,
@@ -125,9 +127,21 @@ pub enum AppEvent {
     Addon { id: &'static str, status: poni_core::addons::Status },
     /// What the update file said (`services::update`).
     Update(crate::services::update::UpdateEvent),
+    /// Where Windows says the PC is (`services::location`), for prayer times.
+    Located(crate::services::location::Located),
+    /// One of prayer times' online city files (`services::cities`).
+    Cities { file: String, got: Result<poni_core::prayer::World, String> },
+    /// One of yt-dlp's lines for download `id` (`services::downloader`).
+    Download { id: u64, line: poni_core::ytdlp::Line },
+    /// yt-dlp for download `id` ended (`ok`: it exited with 0).
+    DownloadEnded { id: u64, ok: bool },
     /// Notifications: what Windows allows, and new notifications
     /// (`services::notifications`).
     Notify(crate::services::notifications::NotifyEvent),
+    /// Where a Windows language feature stands (`services::winlang`).
+    WinLang { id: &'static str, state: poni_core::winlang::State },
+    /// The adzan finished playing, or couldn't play on.
+    AdzanEnded,
     /// Start with Windows is on (true) or off, read for the Settings page.
     Autostart(bool),
     /// The helper's answer: notes and health with the round trip in ms, or why not.
@@ -140,6 +154,16 @@ pub enum AppEvent {
     CalendarNotes(Result<String, String>),
     /// The engine link: what answers /health, and whether the island started it.
     Engine(poni_core::engine_link::EngineInfo),
+    /// System-audio captions: a state change, or words heard (`services::capture`).
+    Capture(crate::services::capture::CaptureEvent),
+    /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.
+    LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
+    /// What the engine says its models are (or why it could not say), during a download too.
+    Models(Result<poni_core::models::Inventory, String>),
+    /// A model download ended.
+    ModelPulled { kind: poni_core::models::Kind, id: String, result: Result<(), String> },
+    /// The engine switched (or refused to switch) its model.
+    ModelSelected { kind: poni_core::models::Kind, result: Result<(), String> },
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

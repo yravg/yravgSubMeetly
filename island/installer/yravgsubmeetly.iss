@@ -92,9 +92,20 @@ Source: "submeetly-host.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ExtensionSource}\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+; Add-on data the island installs from here, offline, before it ever downloads (services/addons.rs bundle_dir):
+; {app}\addons\<id>\<name>, checked there against the SHA-256 built into the app, so a changed file is ignored.
+; Prayer times and Japanese readings carry their data. The Downloader carries only its notice: yt-dlp,
+; QuickJS and FFmpeg download from their own official releases on first use.
+Source: "..\addons\sholat\places.json"; DestDir: "{app}\addons\sholat"; Flags: ignoreversion
+Source: "..\addons\sholat\adzan.m4a"; DestDir: "{app}\addons\sholat"; Flags: ignoreversion
+Source: "..\addons\sholat\NOTICE.txt"; DestDir: "{app}\addons\sholat"; Flags: ignoreversion
+Source: "..\crates\poni-core\data\ja-readings.dic.zst"; DestDir: "{app}\addons\ja"; Flags: ignoreversion
+Source: "..\addons\ja\NOTICE.txt"; DestDir: "{app}\addons\ja"; Flags: ignoreversion
+Source: "..\addons\downloader\NOTICE.txt"; DestDir: "{app}\addons\downloader"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; Comment: "Live transcription and minutes at the edge of your screen"
+Name: "{autoprograms}\Open {#AppName} (full app)"; Filename: "{app}\{#AppExe}"; Parameters: "--open app"; Comment: "Today, live captions, minutes, history, files and settings in a window of their own"
 Name: "{autoprograms}\{#AppName} Minutes register"; Filename: "{app}\{#AppExe}"; Parameters: "--open minutes"; Comment: "Meeting minutes in a window of their own"
 Name: "{autoprograms}\Set up the {#AppName} Chrome extension"; Filename: "{app}\{#AppExe}"; Parameters: "--open setup-extension"; Comment: "Load the extension in Chrome, step by step"
 Name: "{autoprograms}\{#AppName} engine"; Filename: "{app}\{#EngineExe}"; Comment: "The local transcription helper the Chrome extension talks to"

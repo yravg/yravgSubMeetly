@@ -72,7 +72,7 @@ const HEALTH_MASK = [
   'loaded',
   'media_decoder',
 ];
-const MODELS_MASK = ['models'];
+const MODELS_MASK = ['models', 'catalog']; // the Rust engine adds catalog; the Python oracle has none
 const NOTE_MASK = ['note.id', 'note.generatedAt'];
 const DEVICE_MASK = ['active', 'compute'];
 const LANGUAGES_MASK = ['engine'];

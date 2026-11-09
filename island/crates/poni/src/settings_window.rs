@@ -1,6 +1,6 @@
 //! The Settings window's content: every setting yravgSubMeetly has, in a
 //! sidebar of sections (General, Appearance, Island, Music and lyrics,
-//! Pop-ups, Tabs, Add-ons, Focus, AI, Oyenza, About), called
+//! Pop-ups, Tabs, Add-ons, Focus, Prayer, AI, Oyenza, About), called
 //! Advanced settings. The last row of the island's Settings page (behind
 //! the gear) and the menu's Advanced settings… open it, in a window of its
 //! own: on Windows a borderless one (`settings_host.rs`), on the Mac a real
@@ -19,7 +19,7 @@
 //! [`Surfaces`], and everything on them through the Glass look of that mode,
 //! which turns the island's white ink dark on the light window.
 
-use crate::commands::Command;
+use crate::commands::{Command, WinLangCmd};
 use crate::gfx::{Canvas, TextStyle, Weight};
 use crate::icons::Icon;
 use crate::pages::settings::picker_width;
@@ -28,8 +28,10 @@ use crate::pill::status;
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, CursorKind, Hit, Input, MouseButton, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use crate::version::VERSION;
+use poni_core::capture;
 use poni_core::geom::{palette, Color, Point, Rect};
-use poni_core::settings::{IdleStyle, MonitorChoice, Theme, TranslationColor};
+use poni_core::models::Kind;
+use poni_core::settings::{IdleStyle, MonitorChoice, PrayerSound, Theme, TranslationColor};
 use std::collections::HashMap;
 
 /// The card, in DIPs. Windows' window gives it room for its shadow and is
@@ -119,23 +121,27 @@ pub enum Section {
     Appearance,
     Island,
     Music,
+    Speech,
     Popups,
     Tabs,
     Addons,
     Focus,
+    Prayer,
     About,
 }
 
 impl Section {
-    pub const ALL: [Section; 9] = [
+    pub const ALL: [Section; 11] = [
         Section::General,
         Section::Appearance,
         Section::Island,
         Section::Music,
+        Section::Speech,
         Section::Popups,
         Section::Tabs,
         Section::Addons,
         Section::Focus,
+        Section::Prayer,
         Section::About,
     ];
 
@@ -145,10 +151,12 @@ impl Section {
             Section::Appearance => "Appearance",
             Section::Island => "Island",
             Section::Music => "Music and lyrics",
+            Section::Speech => "Captions and languages",
             Section::Popups => "Pop-ups",
             Section::Tabs => "Tabs",
             Section::Addons => "Add-ons",
             Section::Focus => "Focus",
+            Section::Prayer => "Prayer times",
             Section::About => "About",
         }
     }
@@ -160,10 +168,12 @@ impl Section {
             Section::Appearance => "appearance",
             Section::Island => "island",
             Section::Music => "music",
+            Section::Speech => "speech",
             Section::Popups => "popups",
             Section::Tabs => "tabs",
             Section::Addons => "addons",
             Section::Focus => "focus",
+            Section::Prayer => "prayer",
             Section::About => "about",
         }
     }
@@ -174,10 +184,12 @@ impl Section {
             Section::Appearance => Icon::Eye,
             Section::Island => Icon::AppWindow,
             Section::Music => Icon::Music,
+            Section::Speech => Icon::Lyrics,
             Section::Popups => Icon::Volume,
             Section::Tabs => Icon::App,
             Section::Addons => Icon::Addons,
             Section::Focus => Icon::Timer,
+            Section::Prayer => Icon::Moon,
             Section::About => Icon::Gear,
         }
     }
@@ -189,18 +201,35 @@ impl Section {
             Section::Appearance => Color::hex(0x5E5CE6),
             Section::Island => palette::BLUE,
             Section::Music => palette::PINK,
+            Section::Speech => palette::PURPLE,
             Section::Popups => palette::CYAN,
             Section::Tabs => palette::GREEN,
             Section::Addons => Color::hex(0x0A84FF),
             Section::Focus => palette::ORANGE,
+            Section::Prayer => Color::hex(0x30B0A0),
             Section::About => Color::hex(0x8E8E93),
         }
     }
 
-    /// Every section shows (a section may go with an add-on again).
-    pub fn shown(self, _st: &AppState) -> bool {
-        true
+    /// Prayer times has a section only while its add-on is on.
+    pub fn shown(self, st: &AppState) -> bool {
+        match self {
+            Section::Prayer => st.prayer_on(),
+            _ => true,
+        }
     }
+}
+
+/// A model's rows: the choice (steps through what the engine offers, with what is true of it
+/// underneath) and, when downloading helps, a Download or Retry button.
+fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
+    let d = m.describe(k);
+    let value = m.step(k, 1).and_then(|_| m.chosen(k)).map(|id| m.label_of(&id));
+    let mut rows = vec![item(Key::ModelPick(k), k.label(), Some(&d.text), value.map_or(Ctl::None, Ctl::Stepper))];
+    if let Some(b) = d.button {
+        rows.push(item(Key::ModelPull(k), &format!("{} download", k.label()), None, Ctl::Button(b)));
+    }
+    rows
 }
 
 /// The sections the sidebar lists now.
@@ -230,6 +259,14 @@ pub enum Key {
     Pronunciation,
     MediaActivity,
     LyricsOffset,
+    Captions,
+    SpokenLang,
+    TargetLang,
+    LyricsTranslate,
+    /// The choice of a model (steps through the engine's catalog).
+    ModelPick(poni_core::models::Kind),
+    /// The Download (or Retry) button of a model.
+    ModelPull(poni_core::models::Kind),
     HudVolume,
     HudPower,
     HudBluetooth,
@@ -242,10 +279,18 @@ pub enum Key {
     LongEvery,
     AutoBreaks,
     AutoFocus,
+    PrayerSound,
+    PrayerCountdown,
+    PrayerPause,
+    PrayerFollow,
     SettingsFile,
     DataFolder,
     ReleaseNotes,
     LyricsCredit,
+    /// A Windows language feature's row (its place in `poni_core::winlang::ALL`).
+    WinLang(usize),
+    /// Open Windows' own page for adding a language.
+    WinLangSettings,
 }
 
 /// A row's control, at its right end.
@@ -259,6 +304,8 @@ pub enum Ctl {
     Stepper(String),
     /// A button with this label.
     Button(&'static str),
+    /// Nothing to press: the row only says something.
+    None,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -307,6 +354,7 @@ const HOVER: [(u32, &str); 4] = [(220, "0.22 s"), (1500, "1.5 s"), (3000, "3 s")
 const CLOSE: [(u32, &str); 3] = [(0, "At once"), (400, "Short"), (1000, "Long")];
 const DISPLAYS: [(MonitorChoice, &str); 2] = [(MonitorChoice::Primary, "Main display"), (MonitorChoice::Cursor, "Under the pointer")];
 const FULLSCREEN: [(bool, &str); 2] = [(true, "Hide"), (false, "Stay on top")];
+const SOUNDS: [(PrayerSound, &str); 3] = [(PrayerSound::Adzan, "Adzan"), (PrayerSound::Tone, "Tone"), (PrayerSound::Silent, "Silent")];
 const THEMES: [(Theme, &str, &str); 4] = [
     (Theme::Classic, "Classic", "A black island at the top edge"),
     (Theme::Glass, "Glass", "Frosted glass over your screen"),
@@ -362,6 +410,28 @@ fn offset_text(ms: i32) -> String {
     }
 }
 
+/// One row per Windows language feature (installed, or Install), and the way
+/// round: Windows' own page for adding a language.
+fn winlang_rows(st: &AppState) -> Vec<Item> {
+    use poni_core::winlang::{State, ALL};
+    let mut rows: Vec<Item> = ALL
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let (sub, label) = match st.winlang_state(f.id) {
+                State::Unknown => (f.why.to_string(), "Check"),
+                State::Installed => (format!("Installed \u{b7} {}", f.why), "Check again"),
+                State::Missing => (format!("Not installed \u{b7} {}", f.why), "Install"),
+                State::Installing => ("Installing\u{2026} allow Windows to make changes, then wait a moment".to_string(), "Installing\u{2026}"),
+                State::Failed(why) => (why, "Try again"),
+            };
+            item(Key::WinLang(i), f.name, Some(&sub), Ctl::Button(label))
+        })
+        .collect();
+    rows.push(item(Key::WinLangSettings, "Add a language yourself", Some("Windows Settings > Time & language"), Ctl::Button("Open")));
+    rows
+}
+
 /// What `section` shows for `st`.
 pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
     let s = &st.settings;
@@ -413,16 +483,38 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 Block::Group(Some("Where it shows"), shows),
             ]
         }
-        Section::Music => vec![
+        Section::Music => {
+            let mut blocks = vec![
+                Block::Group(
+                    Some("Lyrics"),
+                    vec![
+                        switch(Key::Lyrics, "Synced lyrics", Some("Lyrics move with the song, from LRCLIB"), s.lyrics),
+                        switch(Key::Pronunciation, "Lyrics pronunciation", Some("Romaji, pinyin and Korean under the lines"), s.lyrics_pronunciation),
+                        item(Key::LyricsOffset, "Timing", Some("Shift every line earlier or later"), Ctl::Stepper(offset_text(s.lyrics_offset_ms))),
+                    ],
+                ),
+                Block::Group(Some("Closed island"), vec![switch(Key::MediaActivity, "Show what's playing", Some("The song and its cover on the closed island"), s.show_media_activity)]),
+            ];
+            // Windows' own language features (the Mac has none).
+            if cfg!(windows) {
+                blocks.insert(1, Block::Group(Some("Windows language features"), winlang_rows(st)));
+            }
+            blocks
+        }
+        Section::Speech => vec![
             Block::Group(
-                Some("Lyrics"),
+                Some("Captions"),
+                vec![switch(Key::Captions, "Caption what this PC plays", Some("The engine writes what it hears on the island, in the language it hears"), st.capture.running())],
+            ),
+            Block::Group(
+                Some("Languages"),
                 vec![
-                    switch(Key::Lyrics, "Synced lyrics", Some("Lyrics move with the song, from LRCLIB"), s.lyrics),
-                    switch(Key::Pronunciation, "Lyrics pronunciation", Some("Romaji, pinyin and Korean under the lines"), s.lyrics_pronunciation),
-                    item(Key::LyricsOffset, "Timing", Some("Shift every line earlier or later"), Ctl::Stepper(offset_text(s.lyrics_offset_ms))),
+                    item(Key::SpokenLang, "Spoken language", Some("What the sound is in; Auto-detect works it out"), Ctl::Stepper(capture::lang_name(&s.source_lang))),
+                    item(Key::TargetLang, "Translate into", Some("Captions and synced lyrics are translated into this"), Ctl::Stepper(capture::lang_name(&s.target_lang))),
                 ],
             ),
-            Block::Group(Some("Closed island"), vec![switch(Key::MediaActivity, "Show what's playing", Some("The song and its cover on the closed island"), s.show_media_activity)]),
+            Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
+            Block::Group(Some("Models"), [Kind::Asr, Kind::Translate].into_iter().flat_map(|k| model_items(&st.models, k)).collect()),
         ],
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
@@ -475,6 +567,22 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                         switch(Key::AutoFocus, "Focus sessions", Some("The next session starts when a break ends"), p.auto_start_focus),
                     ],
                 ),
+            ]
+        }
+        Section::Prayer => {
+            let p = &s.prayer;
+            let countdown = if p.remind_before_min == 0 { "Off".to_string() } else { minutes(p.remind_before_min) };
+            vec![
+                Block::Group(
+                    Some("When it's time"),
+                    vec![
+                        item(Key::PrayerSound, "Sound", Some("Subuh plays the tone"), Ctl::Choice(names(&SOUNDS), chosen(&SOUNDS, p.sound))),
+                        switch(Key::PrayerPause, "Pause music for the adzan", None, p.pause_music),
+                        item(Key::PrayerCountdown, "Countdown before each prayer", Some("On the closed island"), Ctl::Stepper(countdown)),
+                    ],
+                ),
+                Block::Group(Some("Place"), vec![switch(Key::PrayerFollow, "Follow my location", Some("Windows' location picks the nearest place"), p.follow_location)]),
+                Block::Note("Pick a place by hand on the island's Prayer page."),
             ]
         }
         Section::About => vec![
@@ -569,6 +677,28 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::MediaActivity => s.show_media_activity = !s.show_media_activity,
         // + shows the lines later, as people hear a late line.
         Key::LyricsOffset => s.lyrics_offset_ms = (s.lyrics_offset_ms - step * OFFSET_STEP).clamp(-5000, 5000),
+        Key::Captions => {
+            let on = st.capture.running();
+            st.cmd(Command::Captions(!on));
+            return;
+        }
+        Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
+        Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
+        Key::LyricsTranslate => s.lyrics_translate = !s.lyrics_translate,
+        Key::ModelPick(k) => {
+            // A model not on disk waits for its Download button; one that is switches at once.
+            let Some(id) = st.models.step(k, step).filter(|_| step != 0) else { return };
+            let now = st.models.selected(k).as_deref() == Some(id.as_str());
+            if st.models.switchable(k, &id) {
+                st.cmd(Command::ModelSelect(k, id.clone()));
+            }
+            st.models.set_pick(k, (!now).then_some(id));
+            return;
+        }
+        Key::ModelPull(k) => {
+            st.cmd(Command::ModelPull(k));
+            return;
+        }
         Key::HudVolume => s.hud_volume = !s.hud_volume,
         Key::HudPower => s.hud_power = !s.hud_power,
         Key::HudBluetooth => s.hud_bluetooth = !s.hud_bluetooth,
@@ -597,6 +727,13 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::LongEvery => s.pomodoro.long_every = (s.pomodoro.long_every as i32 + step).clamp(0, 12) as u32,
         Key::AutoBreaks => s.pomodoro.auto_start_breaks = !s.pomodoro.auto_start_breaks,
         Key::AutoFocus => s.pomodoro.auto_start_focus = !s.pomodoro.auto_start_focus,
+        Key::PrayerSound => match act {
+            Act::Pick(i) if i < SOUNDS.len() => s.prayer.sound = SOUNDS[i].0,
+            _ => return,
+        },
+        Key::PrayerCountdown => s.prayer.remind_before_min = step_min(s.prayer.remind_before_min, step, 0, 60),
+        Key::PrayerPause => s.prayer.pause_music = !s.prayer.pause_music,
+        Key::PrayerFollow => s.prayer.follow_location = !s.prayer.follow_location,
         Key::SettingsFile => {
             st.cmd(Command::OpenPath(crate::paths::settings_path().to_string_lossy().into_owned()));
             return;
@@ -611,6 +748,19 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::LyricsCredit => {
             st.cmd(Command::OpenUrl("https://lrclib.net".into()));
+            return;
+        }
+        Key::WinLang(i) => {
+            let Some(f) = poni_core::winlang::ALL.get(i) else { return };
+            let cmd = if st.winlang_state(f.id).can_install() { WinLangCmd::Install(f.id) } else { WinLangCmd::Check };
+            // A press while it installs adds nothing: the check would only race the install.
+            if st.winlang_state(f.id) != poni_core::winlang::State::Installing {
+                st.cmd(Command::WinLang(cmd));
+            }
+            return;
+        }
+        Key::WinLangSettings => {
+            st.cmd(Command::WinLang(WinLangCmd::OpenSettings));
             return;
         }
     }
@@ -770,7 +920,7 @@ impl View {
     /// Draw the window on `c` for `st`, light or dark.
     pub fn draw(&mut self, c: &mut Canvas, st: &mut AppState, now: f64, frame: Frame, light: bool) -> Painted {
         self.dirty = false;
-        // A section that went away (an add-on switched off) is General.
+        // A section that went away (Prayer times switched off) is General.
         if !self.section.shown(st) {
             self.section = Section::General;
             self.scroll = Scroll::default();
@@ -996,6 +1146,9 @@ fn draw(ui: &mut Ui, st: &mut AppState, section: Section, frame: Frame, light: b
     ui.c.clip(view);
     let mut y = view.y - sc.at;
     let x = content.x;
+    if section == Section::Speech && st.models.due(st.now) {
+        st.cmd(Command::ModelsRefresh);
+    }
     for (bi, b) in blocks(section, st).into_iter().enumerate() {
         y = draw_block(ui, st, &b, bi, Rect::new(x, y, content.w, 0.0), view, &sf, m);
     }
@@ -1181,6 +1334,7 @@ fn draw_row(ui: &mut Ui, it: &Item, at: (usize, usize), row: Rect, view: Rect, a
         Ctl::Choice(names, _) => picker_width(ui, names),
         Ctl::Stepper(_) => 2.0 * STEP_BTN + STEP_VALUE_W,
         Ctl::Button(label) => ui.pill_width(label, true, true),
+        Ctl::None => 0.0,
     };
     let ctl_x = inner.right() - ctl_w;
     match &it.ctl {
@@ -1243,15 +1397,17 @@ fn draw_row(ui: &mut Ui, it: &Item, at: (usize, usize), row: Rect, view: Rect, a
             let vr = Rect::new(minus.right(), row.y, plus.x - minus.right(), row.h);
             ui.c.text(value, vr, &TextStyle::body().weight(Weight::Semibold).tabular().center());
         }
+        Ctl::None => {}
         Ctl::Button(label) => {
+            let icon = if matches!(it.key, Key::ModelPull(_)) { Icon::Download } else { Icon::Open };
             let r = Rect::new(ctl_x, row.center().y - PILL_SMALL / 2.0, ctl_w, PILL_SMALL);
             let clicked = match visible(r, view).filter(|v| v.h >= r.h - 0.5) {
-                Some(_) => ui.pill(id("button"), r, label, Some(Icon::Open), PillStyle::Utility).clicked,
+                Some(_) => ui.pill(id("button"), r, label, Some(icon), PillStyle::Utility).clicked,
                 None => {
                     let mut none = Input::default();
                     let mut no_hits = Vec::new();
                     let mut ghost = Ui::new(&mut *ui.c, &mut none, &mut no_hits, 0.0);
-                    ghost.pill(0, r, label, Some(Icon::Open), PillStyle::Utility);
+                    ghost.pill(0, r, label, Some(icon), PillStyle::Utility);
                     false
                 }
             };
@@ -1533,6 +1689,7 @@ mod tests {
                     Ctl::Choice(..) => Act::Pick(0),
                     Ctl::Stepper(_) => Act::Step(1),
                     Ctl::Button(_) => Act::Press,
+                    Ctl::None => continue,
                 };
                 apply(&mut st, it.key, act);
                 let saved = st.cmds.iter().any(|c| matches!(c, Command::SaveSettings));
@@ -1540,7 +1697,10 @@ mod tests {
                 match it.key {
                     // Start with Windows waits for its reading; the buttons open things.
                     Key::Autostart => assert!(st.cmds.is_empty()),
+                    Key::Captions => assert!(st.cmds.iter().any(|c| matches!(c, Command::Captions(true))), "starts the captions"),
                     Key::SettingsFile | Key::DataFolder | Key::ReleaseNotes | Key::LyricsCredit => assert!(opens, "{:?}", it.key),
+                    // Windows' language rows ask the app, not the settings file.
+                    Key::WinLang(_) | Key::WinLangSettings => assert!(st.cmds.iter().any(|c| matches!(c, Command::WinLang(_))), "{:?}", it.key),
                     _ => assert!(saved, "{:?} didn't save", it.key),
                 }
             }
@@ -1561,11 +1721,71 @@ mod tests {
         for _ in 0..100 {
             apply(&mut st, Key::Width, Act::Step(-1));
             apply(&mut st, Key::FocusMin, Act::Step(-1));
+            apply(&mut st, Key::PrayerCountdown, Act::Step(-1));
         }
         let s = &st.settings;
-        assert_eq!((s.expanded_width, s.pomodoro.focus_min), (480.0, 1));
+        assert_eq!((s.expanded_width, s.pomodoro.focus_min, s.prayer.remind_before_min), (480.0, 1, 0));
         // Minutes go by five, and by one below five.
         assert_eq!((step_min(25, -1, 1, 180), step_min(5, -1, 1, 180), step_min(3, 1, 1, 180), step_min(5, 1, 1, 180)), (20, 4, 4, 10));
+    }
+
+    #[test]
+    fn the_language_rows_cycle_and_show_the_name() {
+        let mut st = state();
+        let value = |st: &AppState, k| match row(Section::Speech, st, k).map(|i| i.ctl) {
+            Some(Ctl::Stepper(v)) => v,
+            _ => String::new(),
+        };
+        // Spoken language starts on Auto-detect and also offers it; the target never does.
+        assert_eq!((value(&st, Key::SpokenLang).as_str(), value(&st, Key::TargetLang).as_str()), ("Auto-detect", "English"));
+        apply(&mut st, Key::SpokenLang, Act::Step(-1));
+        assert_eq!((st.settings.source_lang.as_str(), value(&st, Key::SpokenLang).as_str()), ("vi", "Vietnamese"));
+        apply(&mut st, Key::SpokenLang, Act::Step(1));
+        assert_eq!(st.settings.source_lang, "auto");
+        apply(&mut st, Key::TargetLang, Act::Step(-1));
+        assert_eq!(st.settings.target_lang, "vi");
+        apply(&mut st, Key::TargetLang, Act::Step(1));
+        assert_eq!(st.settings.target_lang, "en");
+        // Captions start and stop through the app, which remembers the choice.
+        st.cmds.clear();
+        apply(&mut st, Key::Captions, Act::Toggle);
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::Captions(true))));
+    }
+
+    #[test]
+    fn the_model_rows_offer_the_catalog_and_download_what_is_missing() {
+        use poni_core::models::{parse, Kind, OFF};
+        let mut st = state();
+        let pick = |st: &AppState, k| row(Section::Speech, st, Key::ModelPick(k)).map(|i| (i.sub.unwrap_or_default(), i.ctl));
+        let button = |st: &AppState, k| row(Section::Speech, st, Key::ModelPull(k)).map(|i| i.ctl);
+        // Before the engine answered: a line, nothing to step or press.
+        assert_eq!(pick(&st, Kind::Asr), Some(("Checking…".into(), Ctl::None)));
+        assert_eq!(button(&st, Kind::Asr), None);
+        let body = r#"{"models":[{"key":"asr","id":"org/speech-base","downloaded":false},{"key":"translate","id":"org/mt-small","loaded":true,"downloaded":true}],
+            "catalog":[{"kind":"asr","id":"org/speech-base","label":"Base","downloaded":false},{"kind":"asr","id":"org/speech-small","label":"Small","downloaded":true},
+                       {"kind":"translate","id":"org/mt-small","label":"Qwen small","downloaded":true},{"kind":"translate","id":"org/mt-big","label":"Qwen big","downloaded":false}]}"#;
+        st.models.apply(Ok(parse(body).unwrap()), 1.0);
+        assert_eq!(pick(&st, Kind::Asr), Some(("org/speech-base · not downloaded".into(), Ctl::Stepper("Base".into()))));
+        assert_eq!(button(&st, Kind::Asr), Some(Ctl::Button("Download")));
+        assert_eq!(button(&st, Kind::Translate), None, "a model on disk has nothing to download");
+        st.cmds.clear();
+        apply(&mut st, Key::ModelPull(Kind::Asr), Act::Press);
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelPull(Kind::Asr))));
+        // Stepping to a model on disk switches at once; to one that is not, it waits for Download.
+        st.cmds.clear();
+        apply(&mut st, Key::ModelPick(Kind::Asr), Act::Step(1));
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(Kind::Asr, id) if id == "org/speech-small")));
+        st.cmds.clear();
+        apply(&mut st, Key::ModelPick(Kind::Translate), Act::Step(1));
+        assert!(st.cmds.is_empty());
+        assert_eq!(button(&st, Kind::Translate), Some(Ctl::Button("Download")));
+        assert_eq!(pick(&st, Kind::Translate).map(|r| r.1), Some(Ctl::Stepper("Qwen big".into())));
+        // Off needs no files.
+        apply(&mut st, Key::ModelPick(Kind::Translate), Act::Step(1));
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(Kind::Translate, id) if id == OFF)));
+        // While it downloads the button is gone.
+        st.models.pulling = Some(Kind::Asr);
+        assert_eq!(button(&st, Kind::Asr), None);
     }
 
     #[test]
@@ -1622,6 +1842,14 @@ mod tests {
         assert!(!st.notifications_on() && st.cmds.iter().any(|c| matches!(c, Command::SaveSettings)));
         apply(&mut st, Key::Tab(PageKind::Notifications), Act::Toggle);
         assert!(st.notifications_on());
+    }
+
+    #[test]
+    fn prayer_has_a_section_only_while_its_add_on_is_on() {
+        let st = state();
+        assert!(!sections(&st).contains(&Section::Prayer));
+        assert_eq!(sections(&st).first(), Some(&Section::General));
+        assert_eq!(sections(&st).last(), Some(&Section::About));
     }
 
     #[test]
@@ -1720,5 +1948,37 @@ mod tests {
         assert_eq!(offset_text(0), "On time");
         assert_eq!(offset_text(300), "−0.3 s");
         assert_eq!(offset_text(-1200), "+1.2 s");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_language_rows_follow_where_the_feature_stands() {
+        use poni_core::winlang::{State, JAPANESE_TYPING};
+        let mut st = state();
+        let label = |st: &AppState| match row(Section::Music, st, Key::WinLang(0)).map(|r| r.ctl) {
+            Some(Ctl::Button(l)) => l,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(label(&st), "Check");
+        // Missing: Install asks the app to add exactly this feature.
+        st.set_winlang(JAPANESE_TYPING.id, State::Missing);
+        assert_eq!(label(&st), "Install");
+        apply(&mut st, Key::WinLang(0), Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::WinLang(WinLangCmd::Install("ja-typing"))));
+        // Installed: the button checks again; installing: a press adds nothing.
+        st.set_winlang(JAPANESE_TYPING.id, State::Installed);
+        assert!(row(Section::Music, &st, Key::WinLang(0)).unwrap().sub.unwrap().starts_with("Installed"));
+        apply(&mut st, Key::WinLang(0), Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::WinLang(WinLangCmd::Check)));
+        st.set_winlang(JAPANESE_TYPING.id, State::Installing);
+        apply(&mut st, Key::WinLang(0), Act::Press);
+        assert!(st.cmds.is_empty());
+        // A failure says why and offers another try.
+        st.set_winlang(JAPANESE_TYPING.id, State::Failed("Windows couldn't add it".into()));
+        assert_eq!(label(&st), "Try again");
+        assert_eq!(row(Section::Music, &st, Key::WinLang(0)).unwrap().sub.as_deref(), Some("Windows couldn't add it"));
+        // The way round is always there.
+        apply(&mut st, Key::WinLangSettings, Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::WinLang(WinLangCmd::OpenSettings)));
     }
 }

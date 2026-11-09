@@ -509,14 +509,17 @@ pub fn talk_share(note: &Note) -> Vec<(String, f32)> {
 
 /// One HTTP/1.1 request to the helper on loopback. Returns the status and body.
 pub fn request(port: u16, method: &str, path: &str, body: Option<&str>) -> Result<(u16, String), String> {
+    request_bytes(port, method, path, "application/json", body.unwrap_or("").as_bytes(), Duration::from_secs(4))
+}
+
+/// [`request`] with a binary body and its own read timeout (`/draft` waits on a model).
+pub fn request_bytes(port: u16, method: &str, path: &str, content_type: &str, payload: &[u8], wait: Duration) -> Result<(u16, String), String> {
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
     let mut s = TcpStream::connect_timeout(&addr, Duration::from_millis(800)).map_err(|e| e.to_string())?;
-    let t = Some(Duration::from_secs(4));
-    let _ = s.set_read_timeout(t);
-    let _ = s.set_write_timeout(t);
-    let payload = body.unwrap_or("");
-    let head = format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n", payload.len());
-    s.write_all(head.as_bytes()).and_then(|_| s.write_all(payload.as_bytes())).map_err(|e| e.to_string())?;
+    let _ = s.set_read_timeout(Some(wait));
+    let _ = s.set_write_timeout(Some(Duration::from_secs(4)));
+    let head = format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n\r\n", payload.len());
+    s.write_all(head.as_bytes()).and_then(|_| s.write_all(payload)).map_err(|e| e.to_string())?;
     let mut raw = Vec::new();
     s.read_to_end(&mut raw).map_err(|e| e.to_string())?;
     parse_response(&raw)
@@ -557,6 +560,33 @@ pub fn post_note(port: u16, body: &str) -> Result<(), String> {
     } else {
         Err(serde_json::from_str::<Value>(&reply).ok().and_then(|v| text(&v, "error")).unwrap_or_else(|| format!("The helper said {code}.")))
     }
+}
+
+/// What `POST /draft` heard: the line and its translation (both empty for a silent window).
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct Draft {
+    pub source: String,
+    pub translation: String,
+}
+
+/// The engine's answer to `/draft`: the line, or the reason as one sentence.
+pub fn parse_draft(code: u16, body: &str) -> Result<Draft, String> {
+    let v: Option<Value> = serde_json::from_str(body).ok();
+    if code == 200 {
+        let v = v.ok_or("The engine's answer was not JSON.")?;
+        return Ok(Draft { source: text(&v, "source").unwrap_or_default(), translation: text(&v, "translation").unwrap_or_default() });
+    }
+    let why = v.as_ref().and_then(|v| text(v, "error")).unwrap_or_else(|| format!("The engine said {code}."));
+    // Engine errors can be long (a missing model prints its whole path chain).
+    Err(why.chars().take(160).collect())
+}
+
+/// `POST /draft`: 16 kHz mono f32 PCM in, a caption out. The engine also keeps
+/// it for `GET /live`, which is what the pill reads.
+pub fn post_draft(port: u16, src: &str, tgt: &str, pcm: &[u8]) -> Result<Draft, String> {
+    // shortcut: 25 s wait; a cold model load can take longer, and then the next window retries.
+    let (code, body) = request_bytes(port, "POST", &crate::capture::draft_path(src, tgt), "application/octet-stream", pcm, Duration::from_secs(25))?;
+    parse_draft(code, &body)
 }
 
 /// Items nobody owns yet (the Talk page asks who).
@@ -662,11 +692,14 @@ pub struct View {
     pub calendar: Option<crate::calendar::Calendar>,
     /// Why the last calendar ask failed; the last good calendar stays on screen.
     pub calendar_err: Option<String>,
+    /// The island itself is capturing the PC's audio (`capture`): its line shows
+    /// in the pill whatever the extension's caption surface says.
+    pub capturing: bool,
 }
 
 impl Default for View {
     fn default() -> Self {
-        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), held: None, calendar: None, calendar_err: None }
+        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), held: None, calendar: None, calendar_err: None, capturing: false }
     }
 }
 
@@ -776,9 +809,10 @@ impl View {
     }
 
     /// What the collapsed pill shows: the engine's fresh line, unless Stop was pressed on the Live page
-    /// or the side panel sends captions to the page overlay only.
+    /// or the side panel sends captions to the page overlay only. Our own capture overrides the
+    /// surface: that pref belongs to the extension's overlay.
     pub fn pill_line(&self, now_ms: u64) -> Option<&Live> {
-        if self.following && self.snap.surface.island() {
+        if self.following && (self.capturing || self.snap.surface.island()) {
             self.live_line(now_ms)
         } else {
             None
@@ -824,6 +858,33 @@ mod tests {
 
     fn notes() -> Vec<Note> {
         parse_notes(NOTES).unwrap()
+    }
+
+    #[test]
+    fn draft_answers_become_a_line_or_one_sentence() {
+        let d = parse_draft(200, r#"{"source":" Hallo Welt ","translation":"Hello world","ms":900}"#).unwrap();
+        assert_eq!((d.source.as_str(), d.translation.as_str()), ("Hallo Welt", "Hello world"));
+        assert_eq!(parse_draft(200, r#"{"source":"","translation":""}"#).unwrap(), Draft::default());
+        assert_eq!(parse_draft(500, r#"{"error":"Error: model missing"}"#), Err("Error: model missing".into()));
+        assert_eq!(parse_draft(503, "<html>"), Err("The engine said 503.".into()));
+        assert!(parse_draft(200, "nope").is_err());
+        assert_eq!(parse_draft(500, &format!(r#"{{"error":"{}"}}"#, "x".repeat(400))).unwrap_err().len(), 160);
+    }
+
+    #[test]
+    fn our_own_capture_puts_the_line_in_the_pill_whatever_the_surface() {
+        let mut v = View::default();
+        let snap = Snapshot { live: Some(Live { seq: 1, source: "Halo".into(), at: Some(1000), ..Default::default() }), surface: Surface::Overlay, ..Default::default() };
+        v.apply(Ok((snap, 5)));
+        assert!(v.pill_line(2000).is_none(), "the extension's overlay-only pref hides it");
+        v.capturing = true;
+        assert!(v.pill_line(2000).is_some());
+        // Unfollow still lets the island go, and an offline helper shows nothing.
+        v.set_following(false);
+        assert!(v.pill_line(2000).is_none());
+        v.set_following(true);
+        v.apply(Err("down".into()));
+        assert!(v.pill_line(2000).is_none());
     }
 
     #[test]

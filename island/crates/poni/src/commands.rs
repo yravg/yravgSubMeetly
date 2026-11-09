@@ -127,6 +127,9 @@ pub enum Command {
     AllowFps,
     Phone(PhoneCmd),
     Pair(PairCmd),
+    /// Get one of Prayer times' online city files ("ed", "near/55_-5"; the
+    /// answer: `AppEvent::Cities`).
+    GetCities(String),
     /// Notifications.
     Notify(NotifyCmd),
     /// `POST /notes` to the helper with this body (a decision on a page).
@@ -134,4 +137,46 @@ pub enum Command {
     /// Ask the helper again now.
     HelperPoll,
     Calendar(CalendarCmd),
+    /// Start (true) or stop (false) captions from what the PC plays.
+    Captions(bool),
+    /// Ask the engine which models it has.
+    ModelsRefresh,
+    /// Download this model.
+    ModelPull(poni_core::models::Kind),
+    /// Switch the engine to this model (`models::OFF` for no translation).
+    ModelSelect(poni_core::models::Kind, String),
+    /// The Downloads page (`pages::downloads`).
+    Download(DownloadCmd),
+    /// A Windows language feature (`poni_core::winlang`): Settings' rows and
+    /// the Music page's hint.
+    WinLang(WinLangCmd),
+}
+
+/// What the Windows language rows ask for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WinLangCmd {
+    /// Add the feature with this id (`poni_core::winlang::ALL`): Windows asks
+    /// for permission first.
+    Install(&'static str),
+    /// Look again at what Windows has.
+    Check,
+    /// Open Windows' own page for adding a language.
+    OpenSettings,
+}
+
+/// What the Downloads page asks for.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DownloadCmd {
+    /// Download `url`'s video or sound.
+    Start { url: String, mode: poni_core::ytdlp::Mode },
+    /// Stop a download; one still waiting its turn leaves the list (Cancel).
+    Stop(u64),
+    /// Take a finished, failed or stopped job off the list.
+    Remove(u64),
+    ClearDone,
+    /// Open the finished file, or show it in its folder.
+    Open(u64),
+    Reveal(u64),
+    /// Put the clipboard's link in the page's link field.
+    PasteLink,
 }

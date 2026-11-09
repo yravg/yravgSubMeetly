@@ -37,6 +37,8 @@ import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
+import { startEngineSync } from './lib/engine-sync.js';
+import { makeT as makeNotesT } from './lib/notes-i18n.js';
 import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js';
 import { makeResizable } from './lib/resizable.js';
 import { mountPerfPanel } from './perf-panel.js';
@@ -1959,7 +1961,12 @@ async function saveSettings() {
 // realtime session
 /** True when sidepanel runs under test/app.html (chrome-mock), not the extension. */
 function isLabHarness() {
-  return typeof window !== 'undefined' && !!window.__chromeMockStore;
+  return typeof window !== 'undefined' && (!!window.__chromeMockStore || isWebHost());
+}
+
+/** True when served by the engine at /app/ (Windows app window): src/web-host.js stands in for chrome.*. */
+function isWebHost() {
+  return typeof window !== 'undefined' && !!window.__ysmWebHost;
 }
 
 let labMediaEl = null;
@@ -2354,7 +2361,8 @@ async function onStart() {
         setStatus(t('loadingModels'));
         clearLivePreview();
         $('live-preview').classList.remove('hidden');
-        await acquireLabDemoStream();
+        // App window: Start asks which tab/window/screen to caption; the lab plays a sample instead.
+        await (isWebHost() ? acquireLabDisplayStream() : acquireLabDemoStream());
         await startWithStream(null, 'media');
       } catch (e) {
         releaseLabCapture();
@@ -3201,7 +3209,12 @@ async function init() {
   setTask(uiPrefs.task);
   await refreshDownloaded();
   renderModelLists();
-  populateMockData();
+  if (!isWebHost()) populateMockData(); // the app window shows only real history and live lines
+  // Engine-hosted app window: mirror the register (Teams paste, notes panel) to the engine.
+  startEngineSync({
+    lang: () => state.settings.uiLang,
+    onError: () => setStatus(makeNotesT(state.settings.uiLang)('engineSyncFail'), 'error'),
+  });
   await renderHistory();
   updateWarning();
   if (state.settings.engine === 'native' || state.mode === 'offline') {

@@ -28,6 +28,7 @@ import { seedSampleData } from './lib/notes-fixture.js';
 import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-export.js';
 import { slidingNumber, autoHeight, highlight } from './lib/motion.js';
 import { mountExtras } from './minutes-extras.js';
+import { startEngineSync, engineOrigin } from './lib/engine-sync.js';
 import { mountDraftOptions } from './minutes-draft.js';
 import { mountDock } from './minutes-dock.js';
 import { mountThreads, renderThreads } from './minutes-threads.js';
@@ -1751,7 +1752,7 @@ function paintStaticStrings() {
   // Halaman utama: di lab itu /app.html di root server; di ekstensi app.html
   // tidak ikut dipaket, jadi jalan pulangnya panel sisi.
   const home = $('#crumb-home');
-  if (home) home.href = location.protocol === 'chrome-extension:' ? 'sidepanel.html' : '/app.html';
+  if (home) home.href = location.protocol === 'chrome-extension:' ? 'sidepanel.html' : engineOrigin() ? 'app.html' : '/app.html';
   $('#q').placeholder = T('search');
 }
 
@@ -1769,6 +1770,8 @@ async function boot() {
   window.addEventListener('resize', () => resyncPills(false));
   await reloadAll(false);
   paint();
+  // Engine-hosted app window: mirror the register to the engine so island pages see it.
+  startEngineSync({ lang: () => state.lang, onError: () => toast(T('engineSyncFail'), true) });
 }
 
 boot();
