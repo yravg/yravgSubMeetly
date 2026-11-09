@@ -2239,7 +2239,8 @@ function updateButtons() {
     state.offlineStaging ||
     (state.mode === 'realtime' ? !state.currentTab : !state.offlineFile);
   $('btn-stop').disabled = !running;
-  $('btn-stop').textContent = state.mode === 'offline' ? t('cancelTask') : t('endTask');
+  $('btn-start').textContent = state.mode === 'offline' ? t('startFile') : t('startCaptions');
+  $('btn-stop').textContent = state.mode === 'offline' ? t('cancelTask') : t('stopCaptions');
 }
 
 function setStatus(text, cls = '') {
@@ -3271,6 +3272,12 @@ function populateMockData() {
 // ---------------------------------------------------------------------------
 async function init() {
   await loadSettings();
+  if (isWebHost()) {
+    // In the engine-hosted window the picker is the only capture path today: say so.
+    $('btn-pick').dataset.i18n = 'pickManuallyHosted';
+    // Inside the app shell iframe the shell sidebar is the navigation; alone, keep the panel's own.
+    if (window.self !== window.top) document.documentElement.dataset.embedded = '';
+  }
   wire();
   applyI18n();
   const uiPrefs = await restoreUiPrefs();

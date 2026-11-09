@@ -488,6 +488,15 @@ main { padding: var(--space-3); display: flex; flex-direction: column; gap: var(
   font-size: var(--text-xs); color: var(--muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Embedded in the app shell: the shell sidebar is the navigation, so the panel's own
+   header and bottom bar go (a second set of tabs overlapped Start captions on Files). */
+html[data-embedded] .topbar,
+html[data-embedded] .bottom-nav { display: none; }
+/* Small chip text on the pale accent tint needs the solid green in light mode (accent-soft is 4.23:1 there). */
+.theme-light .target-tag { color: var(--accent-strong); }
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) .target-tag { color: var(--accent-strong); }
+}
 .target-tag {
   font-size: var(--text-xs); color: var(--accent-soft); flex-shrink: 0;
   background: var(--accent-dim);
