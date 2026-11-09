@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use candle_core::Device;
-use hf_hub::{split_id, HFClientSync, HFError};
+use hf_hub::{split_id, HFClient, HFClientSync, HFError};
 
 /// Device the build can use: CUDA/Metal when compiled in and present, else CPU.
 pub fn pick_device(want_gpu: bool) -> Device {
@@ -34,8 +34,19 @@ pub fn gpu_available() -> bool {
     !matches!(pick_device(true), Device::Cpu)
 }
 
+/// The cache is pinned to `models::hub_cache_dir()`, the folder `/models` scans.
+/// hf-hub resolves `$HOME` alone and falls back to `/tmp` (so `C:\tmp` on Windows),
+/// and an app started from Explorer has no `HOME`: downloads would land where
+/// nothing looks and the model would never show as downloaded.
+fn async_client() -> Result<HFClient> {
+    HFClient::builder()
+        .cache_dir(crate::models::hub_cache_dir())
+        .build()
+        .context("hugging face client")
+}
+
 fn client() -> Result<HFClientSync> {
-    HFClientSync::new().context("hugging face client")
+    HFClientSync::from_inner(async_client()?).context("hugging face client")
 }
 
 /// hf-hub waits only 10 s for another downloader of the same blob (a second
@@ -87,6 +98,11 @@ pub fn hub_snapshot(repo_id: &str) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn downloads_go_where_the_models_scan_looks() {
+        assert_eq!(async_client().unwrap().cache_dir(), crate::models::hub_cache_dir());
+    }
 
     #[test]
     fn only_hub_404_counts_as_not_found() {
