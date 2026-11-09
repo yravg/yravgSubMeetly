@@ -486,7 +486,8 @@ async function loadRegister() {
 }
 
 async function pollHelper() {
-  state.health = await nativeHealth(LOCAL_HELPER_ORIGIN);
+  // Windows window: the engine that served this page is the helper (it may not be on 17865).
+  state.health = await nativeHealth(WEB ? location.origin : LOCAL_HELPER_ORIGIN);
   paintHelper();
   paintBell();
   if (parseHash().route === 'today') { lastRoute = null; render(); }

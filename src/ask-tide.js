@@ -145,7 +145,7 @@ export function mountAskTide({ lang = 'en', showCredits = false, getMeetings, on
     state.turns.push(turn);
     state.busy = true; paint();
     const history = state.turns.filter((t) => !t.typing && t.content).slice(0, -1).map((t) => ({ role: t.role, content: t.content }));
-    for await (const ev of chatRequest({ provider, model: provider === 'cloud' ? state.model : null, system: buildGrounding(meetings), history, question: q, fetch: f })) {
+    for await (const ev of chatRequest({ provider, model: provider === 'cloud' ? state.model : null, system: buildGrounding(meetings), history, question: q, fetch: f, origin: globalThis.__ysmWebHost ? location.origin : undefined })) {
       if (ev.delta) { turn.content += ev.delta; paint(); }
       if (ev.error) {
         turn.error = ev.error === 'helper-offline' ? T('errOffline') : ev.error === 'not-connected' ? (provider === 'cloud' ? T('errCloud') : T('errNoAsk')) : ev.error === 'http' ? T('errHttp', ev.status) : T('errModel', ev.error);
