@@ -69,6 +69,7 @@ const state = {
   q: '',
   types: new Set(),
   mine: false,
+  ownerFilter: '',
   dual: false,
   reviewOnly: false,
   seriesAll: false,
@@ -288,6 +289,8 @@ function textWithMark(text, phrase) {
 /* ==========================================================================
    Filtering / sorting (scoped to the active meeting's register)
    ========================================================================== */
+const itemMatches = (it, q) => [it.ref, itemText(it), itemAltText(it), it.owner, it.src?.speaker, it.src?.tr, it.src?.orig, it.topic]
+  .join(' ').toLowerCase().includes(q);
 function filteredItems() {
   const m = activeMeeting();
   if (!m) return [];
@@ -295,14 +298,25 @@ function filteredItems() {
   return m.items.filter((it) => {
     if (state.types.size && !state.types.has(it.type)) return false;
     if (state.mine && state.me && it.owner !== state.me) return false;
+    if (state.ownerFilter && it.owner !== state.ownerFilter) return false;
     if (state.reviewOnly && !(it.review === 'ai' || isLow(it))) return false;
-    if (q) {
-      const hay = [it.ref, itemText(it), itemAltText(it), it.owner, it.src?.speaker, it.src?.tr, it.src?.orig, it.topic]
-        .join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
+    return !q || itemMatches(it, q);
   });
+}
+/** Search reaches every meeting, not only the open one: matches elsewhere are listed under the table with a jump. */
+const XS_MAX = 8;
+function crossSearchHtml() {
+  const q = state.q.trim().toLowerCase();
+  if (!q) return '';
+  const hits = [];
+  for (const m of state.meetings) {
+    if (m.id === state.activeId) continue;
+    for (const it of m.items) if (itemMatches(it, q)) hits.push({ m, it });
+  }
+  if (!hits.length) return '';
+  const rows = hits.slice(0, XS_MAX).map(({ m, it }) => `<button type="button" class="xs-row" data-xs-meeting="${esc(m.id)}" data-xs-ref="${esc(it.ref)}"><b>${esc(it.ref)}</b><span class="xs-text">${esc(itemText(it))}</span><span class="xs-mtg">${esc(m.title)} · ${esc(m.date || '')}</span></button>`).join('');
+  const more = hits.length > XS_MAX ? `<p class="xs-more">+${hits.length - XS_MAX}</p>` : '';
+  return `<section class="xs" aria-label="${esc(T('xsHead', hits.length))}"><h4>${esc(T('xsHead', hits.length))}</h4>${rows}${more}</section>`;
 }
 function sortedItems(rows) {
   const { key, dir } = state.sort;
@@ -924,6 +938,15 @@ function paintSwitcher() {
 
   const counts = new Map();
   for (const m of state.meetings) { const t = m.projectType || 'general'; counts.set(t, (counts.get(t) || 0) + 1); }
+  const of = $('#owner-filter');
+  if (of) {
+    const owners = [...new Set((activeMeeting()?.items || []).map((i) => i.owner).filter(Boolean))].sort();
+    if (state.ownerFilter && !owners.includes(state.ownerFilter)) owners.push(state.ownerFilter);
+    of.innerHTML = `<option value="">${esc(T('ownerAll'))}</option>` + owners.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+    of.value = state.ownerFilter;
+    of.hidden = !owners.length;
+    of.closest('label').hidden = of.hidden;
+  }
   const pf = $('#pt-filter');
   if (pf) {
     pf.innerHTML = `<option value="all">${esc(T('allTypes'))} (${state.meetings.length})</option>` +
@@ -1253,6 +1276,7 @@ function paint() {
     : state.view === 'series' ? viewSeries()
     : THREAD_VIEWS.has(state.view) ? renderThreads(state.view)
     : viewCarry();
+  if (state.view === 'table' || state.view === 'topic') pane.insertAdjacentHTML('beforeend', crossSearchHtml());
 
   $('#q').value = state.q;
   paintFooter(rows);
@@ -1550,6 +1574,15 @@ function wireEvents() {
   $('#q').addEventListener('input', (e) => { state.q = e.target.value; paint(); });
   $('#group-by').addEventListener('change', (e) => { state.group = e.target.value; paint(); });
 
+  $('#owner-filter')?.addEventListener('change', (e) => { state.ownerFilter = e.target.value; paint(); });
+  $('#pane').addEventListener('click', (e) => {
+    const r = e.target.closest('[data-xs-meeting]');
+    if (!r) return;
+    state.activeId = r.dataset.xsMeeting;
+    state.sel = r.dataset.xsRef;
+    state.adding = false;
+    paint();
+  });
   $('#btn-mine').addEventListener('click', (e) => {
     if (!state.me) {
       const name = prompt(T('mine'));
