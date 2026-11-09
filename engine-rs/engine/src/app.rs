@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Map, Value};
 
 use crate::audio::pcm_f32_le;
+use crate::calendar::{Calendar, Fail};
 use crate::engine::{segments_json, Jobs, Ml, ASR_ENGINE, MT_ENGINE};
 use crate::heuristic::heuristic_notes;
 use crate::models::{delete_cached, hub_cache_dir, scan_model_cache};
@@ -21,7 +22,7 @@ use crate::notes::{
     export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
 };
 use crate::protocol::{Request, Response};
-use crate::state::now_utc_iso;
+use crate::state::{now_epoch_secs, now_utc_iso};
 use crate::translate::norm_lang;
 use crate::whisper::Task;
 
@@ -52,6 +53,7 @@ pub struct App {
     jobs: Jobs,
     shutdown: AtomicBool,
     live: Mutex<Value>,
+    calendar: Calendar,
 }
 
 impl App {
@@ -71,6 +73,7 @@ impl App {
             .and_then(|v| v.get("device").and_then(Value::as_str).map(str::to_string))
             .unwrap_or_else(|| "auto".to_string());
         Self {
+            calendar: Calendar::new(state_dir.clone()),
             state_dir,
             notes_path,
             engine_mode_path,
@@ -97,6 +100,11 @@ impl App {
 
     pub fn state_dir(&self) -> &PathBuf {
         &self.state_dir
+    }
+
+    /// Called by the server every minute: re-read calendar links that are due.
+    pub fn calendar_tick(&self) {
+        self.calendar.tick();
     }
 
     /// Replace the `ALLOWED_ORIGINS` list (embedders and policy tests).
@@ -205,7 +213,8 @@ impl App {
                 self.json_response(request, 200, live)
             }
             "/notes" => self.json_response(request, 200, json!({ "notes": self.load_notes() })),
-            "/models" => self.json_response(
+            "/calendar" => self.get_calendar(request),
+            "/models" =>self.json_response(
                 request,
                 200,
                 json!({ "models": self.model_inventory(), "cached": scan_model_cache(&self.hf_cache) }),
@@ -262,6 +271,9 @@ impl App {
             "/notes" => self.post_notes(request),
             "/notes/generate" => self.post_notes_generate(request, false),
             "/notes/summarize" => self.post_notes_generate(request, true),
+            "/calendar/sources" => self.post_calendar_source(request),
+            "/calendar/refresh" => self.post_calendar_refresh(request),
+            "/calendar/notes" => self.post_calendar_note(request),
             "/models/pull" => self.post_models_pull(request),
             "/shutdown" => {
                 self.shutdown.store(true, Ordering::Relaxed);
@@ -662,6 +674,12 @@ impl App {
             );
             return self.json_response(request, status, body);
         }
+        if let Some(rest) = path.strip_prefix("/calendar/sources/") {
+            return match self.calendar.remove(&percent_decode(rest)) {
+                Ok(()) => self.json_response(request, 200, json!({ "ok": true })),
+                Err(fail) => self.calendar_fail(request, fail),
+            };
+        }
         if let Some(rest) = path.strip_prefix("/notes/") {
             let note_id = percent_decode(rest);
             if note_id.is_empty() || note_id.contains('/') {
@@ -850,6 +868,125 @@ impl App {
         notes.truncate(50);
         self.save_notes(&notes);
         self.json_response(request, 200, json!({ "ok": true, "note": note }))
+    }
+
+    fn calendar_fail(&self, request: &Request, fail: Fail) -> Response {
+        let (status, error) = match fail {
+            Fail::Bad(message) => (400, message),
+            Fail::Missing => (404, "calendar not found".to_string()),
+            Fail::Upstream(message) => (502, message),
+        };
+        self.json_response(request, status, json!({ "error": error }))
+    }
+
+    /// `GET /calendar?from=&to=` (ISO dates or times, UTC). Default: yesterday
+    /// to a week ahead; a window is at most 62 days.
+    fn get_calendar(&self, request: &Request) -> Response {
+        let q = query(&request.target);
+        let now = now_epoch_secs() as i64;
+        let bound = |key: &str, fallback: i64| match q.get(key) {
+            Some(text) => crate::ics::parse_iso(text),
+            None => Some(fallback),
+        };
+        let (Some(from), Some(to)) = (bound("from", now - 86_400), bound("to", now + 7 * 86_400))
+        else {
+            return self.json_response(
+                request,
+                400,
+                json!({ "error": "from/to must be ISO dates" }),
+            );
+        };
+        let to = to.min(from + 62 * 86_400);
+        if to <= from {
+            return self.json_response(request, 400, json!({ "error": "to must be after from" }));
+        }
+        self.json_response(request, 200, self.calendar.events(from, to))
+    }
+
+    /// `POST /calendar/sources` with `{url}` (a subscription link) or
+    /// `{ics, name}` (the text of an imported file).
+    fn post_calendar_source(&self, request: &Request) -> Response {
+        let Some(Value::Object(body)) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let text = |key: &str| body.get(key).and_then(Value::as_str).unwrap_or("");
+        let added = if !text("url").is_empty() {
+            self.calendar.add_link(text("url"))
+        } else if !text("ics").is_empty() {
+            self.calendar.add_file(text("ics"), text("name"))
+        } else {
+            Err(Fail::Bad("body needs url or ics".into()))
+        };
+        match added {
+            Ok(source) => self.json_response(request, 200, json!({ "ok": true, "source": source })),
+            Err(fail) => self.calendar_fail(request, fail),
+        }
+    }
+
+    /// `POST /calendar/refresh` with an optional `{id}`: read the links again now.
+    fn post_calendar_refresh(&self, request: &Request) -> Response {
+        let Some(Value::Object(body)) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let id = body
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.is_empty());
+        // A link that fails to read is reported in `sources[].lastError`, not as a failed call.
+        match self.calendar.refresh(id) {
+            Err(Fail::Missing) => self.calendar_fail(request, Fail::Missing),
+            _ => self.json_response(
+                request,
+                200,
+                json!({ "ok": true, "sources": self.calendar.sources() }),
+            ),
+        }
+    }
+
+    /// `POST /calendar/notes` with `{id, tzMinutes?}`: make the meeting note for a
+    /// calendar event. An existing note is returned as it is, never overwritten.
+    fn post_calendar_note(&self, request: &Request) -> Response {
+        let Some(Value::Object(body)) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let Some(event_id) = body
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.is_empty())
+        else {
+            return self.json_response(request, 400, json!({ "error": "body needs id" }));
+        };
+        let tz = body
+            .get("tzMinutes")
+            .and_then(Value::as_i64)
+            .unwrap_or(0)
+            .clamp(-14 * 60, 14 * 60);
+        let Some(doc) = self
+            .calendar
+            .note_for(event_id, tz, now_epoch_secs() as i64)
+        else {
+            return self.json_response(request, 404, json!({ "error": "event not found" }));
+        };
+        let note = match normalize_note_doc(&doc) {
+            Ok(note) => note,
+            Err(error) => return self.json_response(request, 400, json!({ "error": error })),
+        };
+        let mut notes = self.load_notes();
+        if let Some(existing) = notes.iter().find(|n| n.get("id") == note.get("id")) {
+            return self.json_response(
+                request,
+                200,
+                json!({ "ok": true, "created": false, "note": existing }),
+            );
+        }
+        notes.insert(0, note.clone());
+        notes.truncate(50);
+        self.save_notes(&notes);
+        self.json_response(
+            request,
+            200,
+            json!({ "ok": true, "created": true, "note": note }),
+        )
     }
 
     fn post_notes_export(&self, request: &Request) -> Response {

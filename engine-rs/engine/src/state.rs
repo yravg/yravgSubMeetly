@@ -79,7 +79,7 @@ pub fn ymd_hms_from_epoch(secs: u64) -> (i64, u32, u32, u64, u64, u64) {
 
 // Howard Hinnant's civil-from-days, valid for the whole proleptic Gregorian
 // calendar.
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u64;
