@@ -47,7 +47,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
 enum Go {
     Captions(bool),
     Follow,
-    Download,
+    Download(Kind),
 }
 
 /// Nothing to show yet: say what to do, or what the capture is doing.
@@ -62,11 +62,16 @@ fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
         if st.models.due(st.now) {
             st.cmd(Command::ModelsRefresh);
         }
-        let d = st.models.describe(Kind::Asr);
+        let kind = if st.capture.needs_translation_model() { Kind::Translate } else { Kind::Asr };
+        let d = st.models.describe(kind);
         let busy = st.models.pulling.is_some();
-        let line = if busy || st.models.failed.is_some() { d.text } else { "Captions need a speech model on this PC, and it is not downloaded yet. It downloads once and stays.".to_string() };
-        let label = (!busy).then_some(if st.models.failed.is_some() { "Retry" } else { "Download speech model" });
-        ("Speech model needed", line, st.models.failed.is_some(), label, Go::Download)
+        let (title, what, button) = match kind {
+            Kind::Asr => ("Speech model needed", "Captions need a speech model on this PC, and it is not downloaded yet.", "Download speech model"),
+            Kind::Translate => ("Translation model needed", "Captions in this language need a translation model on this PC, and it is not downloaded yet. Choosing English instead needs none.", "Download translation model"),
+        };
+        let line = if busy || st.models.failed.is_some() { d.text } else { format!("{what} It downloads once and stays.") };
+        let label = (!busy).then_some(if st.models.failed.is_some() { "Retry" } else { button });
+        (title, line, st.models.failed.is_some(), label, Go::Download(kind))
     } else if let Some(why) = problem {
         let label = if running { "Stop captions" } else { "Try again" };
         ("Captions need attention", why, true, Some(label), Go::Captions(!running))
@@ -79,7 +84,7 @@ fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
         match go {
             Go::Captions(on) => st.cmd(Command::Captions(on)),
             Go::Follow => st.helper.set_following(true),
-            Go::Download => st.cmd(Command::ModelPull(Kind::Asr)),
+            Go::Download(k) => st.cmd(Command::ModelPull(k)),
         }
     }
 }

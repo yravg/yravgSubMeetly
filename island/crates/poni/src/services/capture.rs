@@ -149,20 +149,20 @@ impl Health {
 // The poster: one request in flight, newest window wins.
 
 fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mutex<Option<Vec<f32>>>>, health: Arc<Health>) {
-    // A speech model that is not on disk would be downloaded by the first /draft, silently and for
-    // minutes; the island says so and waits for the download Settings offers instead.
-    let (mut present, mut checked) = (false, None::<Instant>);
+    // A model that is not on disk would be downloaded by the first /draft, silently and for minutes
+    // (the speech model always; the translation one for a target other than English); the island
+    // says so and waits for the download Settings offers instead.
+    let (mut speech, mut translation) = (Gate::default(), Gate::default());
+    let needs_translation = poni_core::capture::needs_translation_model(src, tgt);
     while wake.recv().is_ok() {
         let Some(window) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
-        if !present {
-            if checked.is_none_or(|t| t.elapsed() > Duration::from_secs(2)) {
-                checked = Some(Instant::now());
-                present = speech_on_disk(port) != Some(false);
-            }
-            if !present {
-                health.engine(Some(poni_core::capture::SPEECH_MISSING.into()));
-                continue;
-            }
+        if !speech.open(|| speech_on_disk(port)) {
+            health.engine(Some(poni_core::capture::SPEECH_MISSING.into()));
+            continue;
+        }
+        if needs_translation && !translation.open(|| translation_on_disk(port)) {
+            health.engine(Some(poni_core::capture::TRANSLATION_MISSING.into()));
+            continue;
         }
         match helper::post_draft(port, src, tgt, &pcm_bytes(&window)) {
             Ok(d) => {
@@ -173,7 +173,7 @@ fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mute
             }
             Err(e) => {
                 crate::pinfo!("capture: /draft failed: {e}");
-                present = false;
+                (speech.ok, translation.ok) = (false, false);
                 // A request that got no answer in its 25 s while /health still answers is a model loading.
                 // (On Windows a read timeout reads "os error 10060", so the test is `engine_unreachable`.)
                 let loading = engine_unreachable(&e).then(|| helper::request(port, "GET", "/health", None).ok()).flatten().filter(|(c, _)| *c == 200).and_then(|(_, b)| poni_core::capture::loading_notice(&b, src != tgt));
@@ -183,13 +183,36 @@ fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mute
     }
 }
 
-/// `None` when the engine does not answer or does not say (the /draft then reports what is wrong).
-fn speech_on_disk(port: u16) -> Option<bool> {
-    let (code, health) = helper::request(port, "GET", "/health", None).ok()?;
-    if code != 200 {
-        return None;
+/// Whether windows may go to the engine for one model: once the model is known to be there, no more
+/// asking until a request fails; while it is not, asked again at most every 2 s.
+#[derive(Default)]
+struct Gate {
+    ok: bool,
+    checked: Option<Instant>,
+}
+
+impl Gate {
+    /// `check`: `Some(false)` = the engine says the model is not on disk; `None` = it does not say.
+    fn open(&mut self, check: impl FnOnce() -> Option<bool>) -> bool {
+        if !self.ok && self.checked.is_none_or(|t| t.elapsed() > Duration::from_secs(2)) {
+            self.checked = Some(Instant::now());
+            self.ok = check() != Some(false);
+        }
+        self.ok
     }
-    poni_core::models::speech_on_disk(&health, || helper::request(port, "GET", "/models", None).ok().filter(|(c, _)| *c == 200).map(|(_, b)| b))
+}
+
+/// A 200 body from the engine, `None` when it does not answer (the /draft then reports what is wrong).
+fn engine_body(port: u16, path: &str) -> Option<String> {
+    helper::request(port, "GET", path, None).ok().filter(|(c, _)| *c == 200).map(|(_, b)| b)
+}
+
+fn speech_on_disk(port: u16) -> Option<bool> {
+    poni_core::models::speech_on_disk(&engine_body(port, "/health")?, || engine_body(port, "/models"))
+}
+
+pub(crate) fn translation_on_disk(port: u16) -> Option<bool> {
+    poni_core::models::translation_on_disk(&engine_body(port, "/health")?, || engine_body(port, "/models"))
 }
 
 /// The error came from the connection (refused, no answer in time), not from the engine's reply.
@@ -357,6 +380,17 @@ fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Arc<Mutex<Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_missing_model_closes_the_gate_and_is_not_asked_about_every_window() {
+        let mut g = Gate::default();
+        assert!(!g.open(|| Some(false)), "the engine says the model is not on disk");
+        assert!(!g.open(|| panic!("asked again within 2 s")));
+        // An engine that does not say is not a missing model: /draft reports what is wrong.
+        let mut g = Gate::default();
+        assert!(g.open(|| None));
+        assert!(g.open(|| panic!("a model known to be there is not asked about again")));
+    }
 
     #[test]
     fn a_dead_engine_and_an_engine_error_read_differently() {

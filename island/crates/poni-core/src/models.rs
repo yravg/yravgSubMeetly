@@ -150,6 +150,17 @@ pub fn speech_on_disk(health: &str, models: impl FnOnce() -> Option<String>) -> 
     row.id.as_ref().map(|_| row.st.downloaded)
 }
 
+/// Is the translation model on disk? `Some(true)` when `/health` says it is loaded or `/models` lists
+/// it as downloaded; `None` when the engine does not say or has no translation model.
+pub fn translation_on_disk(health: &str, models: impl FnOnce() -> Option<String>) -> Option<bool> {
+    let v: Value = serde_json::from_str(health).ok()?;
+    if v.get("loaded").and_then(|l| l.get("translate")).and_then(Value::as_bool) == Some(true) {
+        return Some(true);
+    }
+    let row = parse(&models()?)?.rows.into_iter().find(|r| r.kind == Kind::Translate)?;
+    row.id.as_ref().map(|_| row.st.downloaded)
+}
+
 /// What the island knows about the engine's models.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Models {
@@ -411,6 +422,17 @@ mod tests {
         assert_eq!(speech_on_disk(&loaded(false), || None), None);
         assert_eq!(speech_on_disk(&loaded(false), || Some(r#"{"models":[{"key":"asr","id":null}]}"#.into())), None);
         assert_eq!(speech_on_disk("nope", || None), None);
+    }
+
+    #[test]
+    fn the_translation_model_is_missing_only_when_one_is_chosen_and_not_on_disk() {
+        let health = r#"{"ok":true,"loaded":{"asr":true,"translate":false}}"#;
+        assert_eq!(translation_on_disk(health, || Some(BODY.into())), Some(true), "BODY's translation model is on disk");
+        let missing = BODY.replacen(r#""id":"org/mt-small","loaded":true,"downloaded":true"#, r#""id":"org/mt-small","loaded":false,"downloaded":false"#, 1);
+        assert_eq!(translation_on_disk(health, || Some(missing)), Some(false));
+        assert_eq!(translation_on_disk(r#"{"loaded":{"translate":true}}"#, || panic!("loaded needs no second request")), Some(true));
+        assert_eq!(translation_on_disk(health, || Some(r#"{"models":[{"key":"translate","id":null}]}"#.into())), None, "translation off: nothing to download");
+        assert_eq!(translation_on_disk(health, || None), None);
     }
 
     #[test]

@@ -991,7 +991,10 @@ impl App {
                     shell::open_app(&id);
                     opened = true;
                 }
-                Some(NoticeAction::DownloadModel) => self.pull_model(poni_core::models::Kind::Asr),
+                Some(NoticeAction::DownloadModel) => {
+                    let kind = if self.st.capture.needs_translation_model() { poni_core::models::Kind::Translate } else { poni_core::models::Kind::Asr };
+                    self.pull_model(kind)
+                }
                 None => {}
             }
         }
@@ -1802,6 +1805,9 @@ impl App {
         if self.st.models.failed.is_none() && self.st.models.chosen(kind).as_deref() == Some(id.as_str()) && self.st.models.selected(kind).as_deref() != Some(id.as_str()) {
             self.select_model(kind, id);
         }
+        if kind == poni_core::models::Kind::Translate && self.st.models.failed.is_none() {
+            self.start_lyric_translation();
+        }
         self.refresh_models();
         let title = if self.st.models.failed.is_none() { format!("{} downloaded", kind.label()) } else { format!("{} download failed", kind.label()) };
         let (icon, color) = if self.st.models.failed.is_none() { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
@@ -1849,7 +1855,8 @@ impl App {
                 self.st.helper.capturing = s.running();
                 // Captions cannot start without the speech model: the pill says so and a tap downloads it.
                 if s.needs_model() && !self.st.capture.needs_model() {
-                    self.st.notify(Icon::Download, palette::ORANGE, "Speech model needed", "Tap to download it for captions", 8.0, Some(NoticeAction::DownloadModel));
+                    let title = if s.needs_translation_model() { "Translation model needed" } else { "Speech model needed" };
+                    self.st.notify(Icon::Download, palette::ORANGE, title, "Tap to download it for captions", 8.0, Some(NoticeAction::DownloadModel));
                     self.refresh_models();
                 }
                 self.st.capture = s;

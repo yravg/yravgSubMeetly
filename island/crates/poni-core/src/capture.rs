@@ -177,6 +177,16 @@ pub fn draft_path(src: &str, tgt: &str) -> String {
 /// download of several hundred MB that nobody asked for, so no audio is sent until it is there.
 pub const SPEECH_MISSING: &str = "The speech model is not downloaded yet. Download it and captions start by themselves.";
 
+/// The same for the translation model: the engine downloads it at the first request for a target
+/// other than English, so those wait for the download Settings offers. English never needs it (the
+/// engine falls back to Whisper's own translation).
+pub const TRANSLATION_MISSING: &str = "Translating into this language needs the translation model, which is not downloaded yet. Download it, or choose English, and captions go on.";
+
+/// Does captioning `src` into `tgt` run through the translation model?
+pub fn needs_translation_model(src: &str, tgt: &str) -> bool {
+    tgt != "en" && src != tgt
+}
+
 /// Where the island's own capture stands, for the Live page, the tray and the pill.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum CaptureState {
@@ -197,9 +207,13 @@ impl CaptureState {
         matches!(self, CaptureState::On | CaptureState::Warn(_))
     }
 
-    /// Captions wait for the speech model to be downloaded ([`SPEECH_MISSING`]).
+    /// Captions wait for a model to be downloaded ([`SPEECH_MISSING`], [`TRANSLATION_MISSING`]).
     pub fn needs_model(&self) -> bool {
-        matches!(self, CaptureState::Warn(m) if m == SPEECH_MISSING)
+        matches!(self, CaptureState::Warn(m) if m == SPEECH_MISSING || m == TRANSLATION_MISSING)
+    }
+
+    pub fn needs_translation_model(&self) -> bool {
+        matches!(self, CaptureState::Warn(m) if m == TRANSLATION_MISSING)
     }
 
     /// The sentence to show, if there is a problem.
@@ -220,6 +234,15 @@ mod tests {
         assert!(CaptureState::Warn(SPEECH_MISSING.into()).needs_model());
         assert!(!CaptureState::Warn("Loading the speech model.".into()).needs_model());
         assert!(!CaptureState::On.needs_model());
+        let tr = CaptureState::Warn(TRANSLATION_MISSING.into());
+        assert!(tr.needs_model() && tr.needs_translation_model() && !CaptureState::Warn(SPEECH_MISSING.into()).needs_translation_model());
+    }
+
+    #[test]
+    fn only_a_target_other_than_english_needs_the_translation_model() {
+        assert!(needs_translation_model("auto", "id") && needs_translation_model("de", "id"));
+        assert!(!needs_translation_model("de", "en") && !needs_translation_model("auto", "en"), "English falls back to Whisper's own translation");
+        assert!(!needs_translation_model("id", "id"), "nothing to translate");
     }
 
     #[test]
