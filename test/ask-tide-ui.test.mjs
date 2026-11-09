@@ -58,7 +58,7 @@ before(async () => {
     return req.respond({ status: 404, headers: { 'access-control-allow-origin': '*' }, body: '' });
   });
   await page.goto(`${ORIGIN}/dist/app.html`, { waitUntil: 'networkidle0' });
-  await page.evaluate((env) => { localStorage.clear(); localStorage.setItem('minutesRegister', JSON.stringify(env)); localStorage.setItem('ysmShellWelcomed', 'true'); localStorage.setItem('ysmAskProvider', '"register"'); }, ENV);
+  await page.evaluate((env) => { localStorage.clear(); localStorage.setItem('minutesRegister', JSON.stringify(env)); localStorage.setItem('ysmShellWelcomed', 'true'); localStorage.setItem('ysmShowPlans', 'true'); localStorage.setItem('ysmAskProvider', '"register"'); }, ENV);
   await page.reload({ waitUntil: 'networkidle0' });
   await page.waitForSelector('.askbar');
 });

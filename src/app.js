@@ -165,7 +165,7 @@ const ALIAS = { glossary: 'notes' };
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
 
-const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', developer: !HOSTED };
+const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* privat */ } },
@@ -360,7 +360,7 @@ function panelPage(route) {
 function parseHash() {
   const [r0, q] = location.hash.replace(/^#/, '').split('?');
   const r = ALIAS[r0] || r0;
-  const route = [...MEETING_ROUTES, ...FEATURE_ROUTES, 'helper', 'plans', ...(state.developer ? ['dev'] : [])].includes(r) ? r : 'today';
+  const route = [...MEETING_ROUTES, ...FEATURE_ROUTES, 'helper', ...(state.showPlans ? ['plans'] : []), ...(state.developer ? ['dev'] : [])].includes(r) ? r : 'today';
   return { route, params: new URLSearchParams(q || '') };
 }
 
@@ -422,6 +422,7 @@ function wire() {
   $('#ask-field').innerHTML = `${ic('sparkle', 18)}<span class="hide-rail">${esc(T('askTide'))}</span><kbd class="hide-rail">/</kbd>`;
   $('#ask-field').setAttribute('aria-label', T('askTide'));
   $('#plans-link').textContent = T('plans');
+  $('#plans-link').style.display = state.showPlans ? '' : 'none';
   $('#btn-start').setAttribute('aria-label', `${T('startCaptions')} (Shift+S)`);
   $('#btn-start').title = `${T('startCaptions')} (⇧S)`;
 
@@ -511,9 +512,11 @@ async function boot() {
   state.series = store.get('ysmShellSeries', '');
   state.hideNumbers = store.get('ysmShellHideNumbers', false);
   state.welcomed = store.get('ysmShellWelcomed', false);
+  // Plans have no server behind them yet: the page, the sidebar link and the Ask Tide credits chip stay in the code, off until this flag is set.
+  state.showPlans = store.get('ysmShowPlans', false) === true;
   state.register = store.get('ysmShellRegister', 'modern') === 'classic' ? 'classic' : 'modern';
   if (HOSTED) state.developer = !!(await globalThis.chrome?.storage?.local.get('ysmDeveloper'))?.ysmDeveloper;
-  ask = mountAskTide({ lang: LANG, getMeetings: async () => state.meetings || listMeetings(), onSaved: () => loadRegister() });
+  ask = mountAskTide({ lang: LANG, showCredits: state.showPlans, getMeetings: async () => state.meetings || listMeetings(), onSaved: () => loadRegister() });
   wire();
   paintHelper();
   render();

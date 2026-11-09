@@ -244,3 +244,11 @@ test('A01: tanggal hero dan kartu Today sama pada malam hari di UTC+8 (bukan UTC
 });
 
 test('tanpa galat halaman', () => assert.deepEqual(pageErrors, []));
+
+test('Plans: off by default (no sidebar link, no credits chip, #plans falls back to Today); the flag brings them back', async () => {
+  assert.equal(await page.$eval('#plans-link', (a) => getComputedStyle(a).display), 'none');
+  await page.evaluate(() => { location.hash = '#plans'; });
+  await wait(300);
+  assert.equal(await page.$eval('#page', (p) => p.dataset.route), 'today');
+  assert.equal(await page.$('.ask-ov .credits'), null, 'no credits chip while the flag is off');
+});

@@ -55,7 +55,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* privat */ } },
 };
 
-export function mountAskTide({ lang = 'en', getMeetings, onSaved = () => {}, chrome = globalThis.chrome, fetch: f = globalThis.fetch } = {}) {
+export function mountAskTide({ lang = 'en', showCredits = false, getMeetings, onSaved = () => {}, chrome = globalThis.chrome, fetch: f = globalThis.fetch } = {}) {
   const T = (k, ...a) => { const v = STR[lang]?.[k] ?? STR.en[k]; return typeof v === 'function' ? v(...a) : v; };
   const ov = document.createElement('div');
   ov.className = 'ask-ov';
@@ -63,7 +63,7 @@ export function mountAskTide({ lang = 'en', getMeetings, onSaved = () => {}, chr
   ov.innerHTML = `<div class="ask" role="dialog" aria-modal="true" aria-labelledby="ask-title">
     <header class="ask-h"><img src="tide/01-tide-mark-green.svg" alt="" width="26" height="26" /><h2 id="ask-title">${esc(T('title'))}</h2>
       <span class="grow"></span>
-      <a class="chip sm credits" href="#plans" data-ask="plans" title="${esc(T('topUp'))}">${esc(T('credits'))} · ${esc(T('noServer'))}</a>
+      ${showCredits ? `<a class="chip sm credits" href="#plans" data-ask="plans" title="${esc(T('topUp'))}">${esc(T('credits'))} · ${esc(T('noServer'))}</a>` : ''}
       <button type="button" class="btn sm" data-ask="new">${esc(T('newChat'))}</button>
       <button type="button" class="icon-b" data-ask="close" aria-label="${esc(T('close'))}">✕</button></header>
     <div class="ask-body" aria-live="polite"></div>
