@@ -446,13 +446,39 @@ impl App {
                 json!({ "source": "", "translation": "", "ms": ms(), "asr_ms": asr_ms }),
             ));
         }
-        if !self.ml.translate_available() {
-            self.record_live(&source, &source, ms(), pcm.len());
-            return Ok(self.json_response(
-                request,
-                200,
-                json!({ "source": source, "translation": source, "ms": ms(), "asr_ms": asr_ms }),
-            ));
+        let model_ready = self
+            .ml
+            .translate_id()
+            .is_some_and(|id| cache_state(&self.hf_cache, &id, Kind::Translate).downloaded);
+        match draft_translation(self.ml.translate_available(), model_ready, src, tgt) {
+            DraftMt::Model => {}
+            DraftMt::WhisperEnglish => {
+                // No translation model yet: Whisper's own translate task gives English.
+                let mt_start = std::time::Instant::now();
+                let translation = self.ml.text(&pcm, language, Task::Translate)?;
+                let translate_ms = mt_start.elapsed().as_millis() as u64;
+                self.record_live(&source, &translation, ms(), pcm.len());
+                return Ok(self.json_response(
+                    request,
+                    200,
+                    json!({
+                        "source": source,
+                        "translation": translation,
+                        "ms": ms(),
+                        "asr_ms": asr_ms,
+                        "translate_ms": translate_ms,
+                        "translate_via": "whisper",
+                    }),
+                ));
+            }
+            DraftMt::SourceOnly => {
+                self.record_live(&source, &source, ms(), pcm.len());
+                return Ok(self.json_response(
+                    request,
+                    200,
+                    json!({ "source": source, "translation": source, "ms": ms(), "asr_ms": asr_ms }),
+                ));
+            }
         }
         let mt_start = std::time::Instant::now();
         let translation = self
@@ -1231,6 +1257,32 @@ impl App {
     }
 }
 
+/// How `/draft` turns the source text into the target language.
+#[derive(Debug, PartialEq, Eq)]
+enum DraftMt {
+    /// The translation model (it may still have to load).
+    Model,
+    /// No usable translation model, target English: Whisper's translate task.
+    WhisperEnglish,
+    /// No usable translation model, other target: the source text stands in.
+    SourceOnly,
+}
+
+/// A chosen model that is not downloaded is "not usable" only for English: it would
+/// otherwise block the request on a multi-minute download, while Whisper can answer now.
+/// shortcut: other targets keep the download-on-first-use path, until a non-English
+/// fallback exists.
+fn draft_translation(chosen: bool, downloaded: bool, src: &str, tgt: &str) -> DraftMt {
+    let english = tgt == "en";
+    if chosen && (downloaded || !english) {
+        DraftMt::Model
+    } else if english && src != "en" {
+        DraftMt::WhisperEnglish
+    } else {
+        DraftMt::SourceOnly
+    }
+}
+
 fn draft_source_ok(source: &str, samples: usize) -> bool {
     let s = source.trim();
     if s.is_empty() {
@@ -1406,6 +1458,19 @@ mod tests {
         ] {
             assert!(!is_loopback_host(host), "{host}");
         }
+    }
+
+    #[test]
+    fn draft_falls_back_to_whisper_only_for_english_without_a_ready_model() {
+        use DraftMt::*;
+        assert_eq!(draft_translation(true, true, "de", "en"), Model);
+        assert_eq!(draft_translation(true, false, "de", "en"), WhisperEnglish);
+        assert_eq!(draft_translation(true, false, "auto", "en"), WhisperEnglish);
+        assert_eq!(draft_translation(false, false, "de", "en"), WhisperEnglish);
+        // English speech needs no translation; other targets cannot use Whisper.
+        assert_eq!(draft_translation(false, false, "en", "en"), SourceOnly);
+        assert_eq!(draft_translation(false, false, "de", "id"), SourceOnly);
+        assert_eq!(draft_translation(true, false, "de", "id"), Model);
     }
 
     #[test]
