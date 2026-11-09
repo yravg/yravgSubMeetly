@@ -23,6 +23,7 @@ pub mod look;
 pub mod lrc;
 pub mod lrclib;
 pub mod lyric_tr;
+pub mod meeting_doc;
 pub mod mediaremote;
 pub mod models;
 pub mod notifications;

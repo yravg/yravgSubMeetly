@@ -76,7 +76,7 @@ fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
         let label = if running { "Stop captions" } else { "Try again" };
         ("Captions need attention", why, true, Some(label), Go::Captions(!running))
     } else if running {
-        ("Listening to this PC", "Play a video or join a meeting. Its captions show up here and in the island.".to_string(), false, Some("Stop captions"), Go::Captions(false))
+        ("Listening to this PC", "Play a video or join a meeting. Its captions show up here and in the island, and are saved as a meeting when you stop.".to_string(), false, Some("Stop captions"), Go::Captions(false))
     } else {
         ("Nothing to follow", "Start captions to caption whatever this PC plays, or record in the extension or the Mac app.".to_string(), false, Some("Start captions"), Go::Captions(true))
     };
@@ -166,7 +166,7 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     if !locked {
         let (note, tone) = match st.capture.problem() {
             Some(why) => (why, palette::ORANGE),
-            None if st.capture.running() => ("Captioning what this PC plays. Hold and Unfollow change this view.", palette::TEXT_FAINT),
+            None if st.capture.running() => ("Captions are saved as a meeting when you stop.", palette::TEXT_FAINT),
             None => ("Hold and Unfollow change this view. Start captions listens to what this PC plays.", palette::TEXT_FAINT),
         };
         ui.c.text(note, Rect::new(area.x, area.bottom() - 14.0, (area.w - 70.0).max(0.0), 14.0), &TextStyle::caption().color(tone));

@@ -152,6 +152,8 @@ pub enum AppEvent {
     Engine(poni_core::engine_link::EngineInfo),
     /// System-audio captions: a state change, or words heard (`services::capture`).
     Capture(crate::services::capture::CaptureEvent),
+    /// A captioned session saved as a meeting (its id), or why not, with its lines back.
+    MeetingSaved(Result<String, (String, Vec<poni_core::helper::Line>)>),
     /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.
     LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
     /// What the engine says its models are (or why it could not say), during a download too.

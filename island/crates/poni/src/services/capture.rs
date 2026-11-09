@@ -39,6 +39,62 @@ const RETRY: Duration = Duration::from_millis(1500);
 const DEVICE_CHECK: Duration = Duration::from_secs(2);
 const STOP_TIMEOUT: Duration = Duration::from_millis(800);
 
+/// What a captioning session heard, kept for the meeting saved when it stops. It outlives a
+/// restart (a language change) and is emptied by [`Log::take`]; times count from the first start.
+#[derive(Default)]
+pub struct Log {
+    start: Option<Instant>,
+    lines: Vec<helper::Line>,
+}
+
+pub type SessionLog = Arc<Mutex<Log>>;
+
+impl Log {
+    /// A capture starts: a session with no lines yet begins its clock now.
+    pub fn begin(&mut self) {
+        if self.lines.is_empty() {
+            self.start = Some(Instant::now());
+        }
+    }
+
+    fn push(&mut self, source: String, translation: String) {
+        let end = self.start.get_or_insert_with(Instant::now).elapsed().as_secs_f64();
+        self.lines.push(helper::Line { t0: (end - poni_core::capture::WINDOW_S as f64).max(0.0), t1: end, source, translation });
+    }
+
+    pub fn take(&mut self) -> Vec<helper::Line> {
+        std::mem::take(&mut self.lines)
+    }
+
+    /// Lines whose save failed go back in front of what came since.
+    pub fn restore(&mut self, mut lines: Vec<helper::Line>) {
+        lines.append(&mut self.lines);
+        self.lines = lines;
+    }
+}
+
+/// Everything a Stop needs to save the session as a meeting.
+pub struct Meeting {
+    pub id: String,
+    pub title: String,
+    pub date: String,
+    pub start: String,
+    pub locale: String,
+    pub lines: Vec<helper::Line>,
+}
+
+/// Save a session as a meeting: the engine drafts the summary, decisions and actions (best effort,
+/// the transcript is kept without them), then keeps the document. `Err` returns the lines.
+pub fn save_meeting(port: u16, m: Meeting) -> Result<String, (String, Vec<helper::Line>)> {
+    use poni_core::meeting_doc::{generate_body, generated_note, meeting_doc};
+    let draft = helper::request(port, "POST", "/notes/generate", Some(&generate_body(&m.title, &m.lines))).ok().filter(|(c, _)| *c == 200).and_then(|(_, b)| generated_note(&b));
+    let Some(doc) = meeting_doc(&m.id, &m.title, &m.date, &m.start, &m.locale, &m.lines, draft.as_ref()) else { return Err(("Nothing was heard.".into(), Vec::new())) };
+    match helper::post_note(port, &doc.to_string()) {
+        Ok(()) => Ok(m.id),
+        Err(e) => Err((e, m.lines)),
+    }
+}
+
 pub enum CaptureEvent {
     /// The state changed (only sent on a change).
     State(CaptureState),
@@ -55,7 +111,7 @@ pub struct CaptureService {
 
 impl CaptureService {
     /// Start capturing; `src`/`tgt` are the engine's language codes (`auto` detects).
-    pub fn start(sink: EventSink, port: u16, src: String, tgt: String) -> std::io::Result<Self> {
+    pub fn start(sink: EventSink, port: u16, src: String, tgt: String, log: SessionLog) -> std::io::Result<Self> {
         let health = Arc::new(Health { sink: sink.clone(), st: Mutex::new(HealthState { sent: Some(CaptureState::On), ..Default::default() }) });
         let slot: Arc<Mutex<Option<Vec<f32>>>> = Arc::default();
         let (wake_tx, wake_rx) = channel::<()>();
@@ -63,7 +119,7 @@ impl CaptureService {
         let (done_tx, done) = channel::<()>();
 
         let (h, s) = (health.clone(), slot.clone());
-        std::thread::Builder::new().name("poni-capture-post".into()).spawn(move || post_loop(port, &src, &tgt, wake_rx, s, h))?;
+        std::thread::Builder::new().name("poni-capture-post".into()).spawn(move || post_loop(port, &src, &tgt, wake_rx, s, h, log))?;
         let h = health.clone();
         let thread = std::thread::Builder::new().name("poni-capture".into()).spawn(move || {
             capture_loop(rx, h, slot, wake_tx);
@@ -148,7 +204,7 @@ impl Health {
 // ---------------------------------------------------------------------------
 // The poster: one request in flight, newest window wins.
 
-fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mutex<Option<Vec<f32>>>>, health: Arc<Health>) {
+fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mutex<Option<Vec<f32>>>>, health: Arc<Health>, log: SessionLog) {
     // A model that is not on disk would be downloaded by the first /draft, silently and for minutes
     // (the speech model always; the translation one for a target other than English); the island
     // says so and waits for the download Settings offers instead.
@@ -168,6 +224,7 @@ fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mute
             Ok(d) => {
                 health.engine(None);
                 if !d.source.is_empty() {
+                    log.lock().unwrap_or_else(|e| e.into_inner()).push(d.source, d.translation);
                     health.heard();
                 }
             }
@@ -382,6 +439,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_session_log_keeps_lines_in_order_and_gives_failed_ones_back_in_front() {
+        let mut log = Log::default();
+        log.begin();
+        log.push("line one".into(), "linie eins".into());
+        log.push("line two".into(), String::new());
+        assert!(log.lines[1].t1 >= log.lines[0].t1 && log.lines[0].t0 >= 0.0 && log.lines[0].t0 <= log.lines[0].t1);
+        let taken = log.take();
+        assert_eq!((taken.len(), log.lines.len()), (2, 0));
+        // A restart while lines wait does not reset the clock; a save that failed returns its lines first.
+        log.push("line three".into(), String::new());
+        log.restore(taken);
+        let sources: Vec<_> = log.lines.iter().map(|l| l.source.as_str()).collect();
+        assert_eq!(sources, ["line one", "line two", "line three"]);
+    }
+
+    #[test]
     fn a_missing_model_closes_the_gate_and_is_not_asked_about_every_window() {
         let mut g = Gate::default();
         assert!(!g.open(|| Some(false)), "the engine says the model is not on disk");
@@ -414,7 +487,7 @@ mod tests {
         let port: u16 = std::env::var("PONI_TEST_ENGINE_PORT").expect("PONI_TEST_ENGINE_PORT").parse().unwrap();
         let (tx, rx) = channel();
         let sink = EventSink::new(tx, crate::events::SendHwnd::new(windows::Win32::Foundation::HWND::default()));
-        let svc = CaptureService::start(sink, port, "auto".into(), "en".into()).unwrap();
+        let svc = CaptureService::start(sink, port, "auto".into(), "en".into(), Default::default()).unwrap();
         let t0 = std::time::Instant::now();
         let (mut heard, mut states) = (0, Vec::new());
         while t0.elapsed() < Duration::from_secs(40) {

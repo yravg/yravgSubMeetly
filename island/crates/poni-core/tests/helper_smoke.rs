@@ -84,5 +84,22 @@ fn island_reads_and_writes_the_real_helper() {
     let again = helper::fetch(port).unwrap();
     let d1 = again.notes[0].items.iter().find(|i| i.rf == "D-1").unwrap();
     assert_eq!(d1.review, helper::Review::Accepted);
+
+    // A captioned session saved as a meeting: generate the draft, post the document, read it back newest first.
+    use poni_core::meeting_doc::{generate_body, generated_note, meeting_doc};
+    let lines = [
+        helper::Line { t0: 0.0, t1: 4.0, source: "Decision: ship on Friday.".into(), translation: "line one".into() },
+        helper::Line { t0: 4.0, t1: 8.0, source: "Action: Alya sends the plan.".into(), translation: String::new() },
+    ];
+    let (code, reply) = helper::request(port, "POST", "/notes/generate", Some(&generate_body("Meeting", &lines))).expect("generate");
+    assert_eq!(code, 200, "{reply}");
+    let draft = generated_note(&reply).expect("a draft note");
+    let doc = meeting_doc("MOM-WIN-1", "Meeting 2026-11-10 09:00", "2026-11-10", "2026-11-10T09:00", "auto", &lines, Some(&draft)).expect("doc");
+    helper::post_note(port, &doc.to_string()).expect("post meeting");
+    let saved = helper::fetch(port).unwrap();
+    let m = helper::current(&saved.notes).expect("newest");
+    assert_eq!((m.id.as_str(), m.title.as_str(), m.transcript.len()), ("MOM-WIN-1", "Meeting 2026-11-10 09:00", 2));
+    assert_eq!(m.transcript[0].translation, "line one", "the engine kept the translation");
+    assert!(!m.items.is_empty(), "the draft's decisions and actions came with it");
     let _ = std::fs::remove_dir_all(&dir);
 }

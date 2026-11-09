@@ -743,6 +743,9 @@ impl App {
         if let Some(t) = self.tray.take() {
             t.remove();
         }
+        if self.st.capture.running() {
+            self.end_session(true);
+        }
         if let Some(s) = self.services.take() {
             s.stop(self.helper);
         }
@@ -1774,9 +1777,66 @@ impl App {
         } else {
             svc.capture_stop();
             self.st.capture = poni_core::capture::CaptureState::Off;
+            self.end_session(false);
         }
         self.st.helper.capturing = self.st.capture.running();
         self.request_frame();
+    }
+
+    /// What names a meeting that no calendar event does. shortcut: no calendar hook yet; when the
+    /// Calendar page lands, return the running event's title here.
+    fn running_event_title(&self) -> Option<String> {
+        None
+    }
+
+    /// Captions stopped: what they heard becomes a meeting in the engine. `wait`: on quit, answer
+    /// before the engine goes; otherwise it is saved off the UI thread and reported by an event.
+    fn end_session(&mut self, wait: bool) {
+        let Some(svc) = self.services.as_ref() else { return };
+        let lines = svc.take_session();
+        if lines.is_empty() {
+            return;
+        }
+        let t = clock::local_now();
+        let m = services::capture::Meeting {
+            id: format!("MOM-WIN-{}", self.st.unix),
+            title: self.running_event_title().unwrap_or_else(|| poni_core::meeting_doc::default_title(&t)),
+            date: t.day_key(),
+            start: poni_core::meeting_doc::start_stamp(&t),
+            locale: self.st.settings.source_lang.clone(),
+            lines,
+        };
+        let port = poni_core::helper::configured_port();
+        if wait {
+            match services::capture::save_meeting(port, m) {
+                Ok(id) => pinfo!("meeting {id} saved at quit"),
+                Err((e, _)) => pwarn!("meeting not saved at quit: {e}"),
+            }
+        } else {
+            let sink = self.sink.clone();
+            std::thread::spawn(move || sink.send(AppEvent::MeetingSaved(services::capture::save_meeting(port, m))));
+        }
+    }
+
+    fn on_meeting_saved(&mut self, r: std::result::Result<String, (String, Vec<poni_core::helper::Line>)>) {
+        match r {
+            Ok(id) => {
+                pinfo!("meeting {id} saved");
+                if let Some(s) = self.services.as_ref() {
+                    s.helper_poll();
+                }
+                self.set_page(PageKind::Meeting);
+                self.st.notify(Icon::Lyrics, palette::GREEN, "Meeting saved", "Tap to open it", 8.0, Some(NoticeAction::OpenPage(PageKind::Meeting)));
+            }
+            Err((e, lines)) => {
+                pwarn!("meeting not saved: {e}");
+                // The lines wait for the next Stop rather than being lost.
+                if let Some(s) = self.services.as_ref() {
+                    s.restore_session(lines);
+                }
+                self.st.notify(Icon::Lyrics, palette::ORANGE, "Meeting not saved", "The engine did not take it. It is kept for the next Stop.", 8.0, None);
+            }
+        }
     }
 
     /// Ask the engine which models it has (Settings shows them, every 10 s while open).
@@ -1861,6 +1921,7 @@ impl App {
             CaptureEvent::State(s) => {
                 if let (poni_core::capture::CaptureState::Failed(_), Some(svc)) = (&s, self.services.as_mut()) {
                     svc.capture_stop();
+                    self.end_session(false);
                 }
                 self.st.helper.capturing = s.running();
                 // Captions cannot start without the speech model: the pill says so and a tap downloads it.
@@ -2368,6 +2429,7 @@ impl App {
             }
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::Capture(e) => self.on_capture(e),
+            AppEvent::MeetingSaved(r) => self.on_meeting_saved(r),
             AppEvent::Models(r) => self.st.models.apply(r, now),
             AppEvent::ModelPulled { kind, id, result } => self.on_model_pulled(kind, id, result),
             AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),

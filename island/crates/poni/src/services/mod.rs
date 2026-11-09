@@ -59,6 +59,8 @@ pub struct Services {
     addons: Option<addons::AddonService>,
     helper: Option<helper::HelperService>,
     capture: Option<capture::CaptureService>,
+    /// What captions heard since the last Stop, for the meeting saved then.
+    session: capture::SessionLog,
     engine: Option<engine::EngineService>,
     /// Started at the first download ([`Services::download`]).
     downloader: std::cell::OnceCell<Option<downloader::DownloaderService>>,
@@ -113,6 +115,7 @@ impl Services {
             addons,
             helper,
             capture: None,
+            session: Default::default(),
             engine,
             downloader: std::cell::OnceCell::new(),
             sink: sink.clone(),
@@ -182,12 +185,23 @@ impl Services {
     /// Start capturing the PC's audio for captions, or say why not. Restarts a running one.
     pub fn capture_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str) -> Result<(), String> {
         self.capture = None; // the old one stops first: one device reader at a time
-        self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into()).map_err(|e| format!("Captions could not start ({e})."))?);
+        self.session.lock().unwrap_or_else(|e| e.into_inner()).begin();
+        self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into(), self.session.clone()).map_err(|e| format!("Captions could not start ({e})."))?);
         Ok(())
     }
 
     pub fn capture_stop(&mut self) {
         self.capture = None;
+    }
+
+    /// The lines captions heard since the last time: the session ends here (shortcut: a window the
+    /// engine is still answering when Stop is pressed is not in it).
+    pub fn take_session(&self) -> Vec<poni_core::helper::Line> {
+        self.session.lock().unwrap_or_else(|e| e.into_inner()).take()
+    }
+
+    pub fn restore_session(&self, lines: Vec<poni_core::helper::Line>) {
+        self.session.lock().unwrap_or_else(|e| e.into_inner()).restore(lines);
     }
 
     pub fn helper_poll(&self) {
