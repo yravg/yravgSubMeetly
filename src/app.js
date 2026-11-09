@@ -158,9 +158,9 @@ const $ = (s) => document.querySelector(s);
 
 /* ---------- routes ---------- */
 const MEETING_ROUTES = ['today', 'live', 'minutes', 'notes', 'history', 'files'];
-const FEATURE_ROUTES = ['addins', 'island', 'perf', 'all', 'settings'];
+const FEATURE_ROUTES = ['addins', 'island', 'perf', 'settings'];
 // Old links keep working. #glossary used to open meeting notes, where the Glossary add-in panel lives once trusted.
-const ALIAS = { glossary: 'notes' };
+const ALIAS = { glossary: 'notes', all: 'addins' }; // All features became a section of Add-ins
 // Halaman yang masih memasang panel samping: view (+ tab Pengaturan).
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
@@ -303,15 +303,15 @@ function minutesPage(params) {
     <iframe class="frame reg" title="${esc(T('minutes'))}" src="${esc(registerSrc(state.register, meeting, true))}"></iframe>`;
 }
 
-/* ---------- All features (A06) ---------- */
-function allPage() {
+/* ---------- Add-ins + all features (A06) ---------- */
+function addinsPage() {
   const tile = (icn, name, desc, right) => `<div class="cd tile2"><span class="tl">${ic(icn, 20)}</span><b>${esc(name)}</b><p>${esc(desc)}</p><div class="ft">${right}</div></div>`;
   const open = (href) => `<span class="grow"></span><a class="btn sm" href="${href}">${esc(T('open'))}</a>`;
-  const addinOpen = `<span class="mut small">${esc(T('installed'))}</span>${open('#all?pane=addins')}`;
+  const addinOpen = `<span class="mut small">${esc(T('installed'))}</span>${open('#addins?pane=addins')}`;
   const builtIn = (href) => `<span class="mut small">${esc(T('builtIn'))}</span>${open(href)}`;
   // One switch only: the top bar owns it; the tile shows its state and opens the settings.
   const island = `<span class="chip sm" data-island-state>${esc(T($('#island-switch').checked ? 'islandOn' : 'islandOff'))}</span>${open('#island')}`;
-  return `<div class="tiles">
+  return `<section class="addins-sec"><h2>${esc(T('all'))}</h2></section><div class="tiles">
     ${tile('mail', T('fRecap'), T('fRecapD'), addinOpen)}
     ${tile('book', T('fGlossary'), T('fGlossaryD'), addinOpen)}
     ${tile('cal', T('fDue'), T('fDueD'), addinOpen)}
@@ -374,15 +374,15 @@ function render() {
   const page = $('#page');
   page.dataset.route = route;
   // Bingkai panel tidak dimuat ulang saat hanya data beranda yang berubah.
-  if (route === lastRoute && !['today', 'minutes', 'all', 'plans'].includes(route)) return;
+  if (route === lastRoute && !['today', 'minutes', 'addins', 'plans'].includes(route)) return;
   if (route === 'minutes' && lastRoute === 'minutes' && page.querySelector('iframe.reg')) {
     const btn = page.querySelector('[data-act="win"]');
     if (btn) btn.innerHTML = state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'));
     return;
   }
   lastRoute = route;
-  page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'all' ? allPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage() : route === 'plans' ? plansPage() : panelPage(route);
-  if (route === 'all' && params.get('pane') === 'addins') $('#addins-pane')?.scrollIntoView({ block: 'start' });
+  page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'addins' ? addinsPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage() : route === 'plans' ? plansPage() : panelPage(route);
+  if (route === 'addins' && params.get('pane') === 'addins') $('#addins-pane')?.scrollIntoView({ block: 'start' });
 }
 
 /* ---------- start captions (one action everywhere: sidebar, Today, ⇧S) ---------- */

@@ -120,7 +120,7 @@ test('⇧S membuka Live captions; setiap rute nav memasang halamannya', async ()
   await page.keyboard.down('Shift'); await page.keyboard.press('S'); await page.keyboard.up('Shift');
   await page.waitForFunction(() => location.hash === '#live');
   const routes = await page.$$eval('#nav-meetings a, #nav-features a', (l) => l.map((a) => a.dataset.route));
-  assert.deepEqual(routes, ['today', 'live', 'minutes', 'notes', 'history', 'files', 'addins', 'island', 'perf', 'all', 'settings', 'dev'], 'lab: Developer tampil');
+  assert.deepEqual(routes, ['today', 'live', 'minutes', 'notes', 'history', 'files', 'addins', 'island', 'perf', 'settings', 'dev'], 'lab: Developer tampil');
   const expect = { live: 'view=captions', history: 'view=history', files: 'view=files', addins: 'stab=addins', notes: 'view=notes', island: 'stab=output', perf: 'view=perf', settings: 'view=settings' };
   for (const [route, frag] of Object.entries(expect)) {
     await page.evaluate((r) => { location.hash = `#${r}`; }, route);
@@ -192,8 +192,9 @@ test('A04: Modern bawaan; Klasik lewat menu Style; pilihan diingat dan tampil le
 });
 
 test('A06: delapan fitur, Island dengan sakelar nyata, add-in terpasang di halaman yang sama', async () => {
-  await page.evaluate(() => { location.hash = '#all'; });
+  await page.evaluate(() => { location.hash = '#all'; }); // alias of #addins
   await page.waitForSelector('.tiles');
+  assert.equal(await page.$eval('#page', (p) => p.dataset.route), 'addins', '#all is an alias of Add-ins');
   assert.equal(await page.$$eval('.tiles .tile2', (l) => l.length), 8);
   assert.equal((await page.$$('.tiles [data-act="island"]')).length, 0, 'satu sakelar Island saja: di bilah atas');
   const before = await page.evaluate(() => chrome.storage.local.get('captionSurface'));
