@@ -27,6 +27,7 @@ import {
 import { parseCsv, toCsv, GLOSSARY_MAX } from './lib/glossary.js';
 import { I18N } from './lib/i18n.js';
 import { PROJECT_TYPES, normalizeProjectType, sessionLinesToTranscript } from './lib/notes-schema.js';
+import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minutes-window.js';
 
 /* ---- Tipe proyek: preferensi terakhir dipakai untuk rapat berikutnya ---- */
 const PT_PREF_KEY = 'notesProjectType';
@@ -246,7 +247,7 @@ function meetingBarHtml({ meetings, active, T, creating }) {
 }
 
 export function renderNotesPanel(root, state, handlers = {}) {
-  const { meetings, active, lang, T, capture, notice, summaryDraft, addingDecision, addingAction, projectType = 'general', addinsHtml = '' } = state;
+  const { meetings, active, lang, T, capture, notice, summaryDraft, addingDecision, addingAction, projectType = 'general', addinsHtml = '', minutesWinOpen = false } = state;
   const stats = active ? meetingStats(active) : null;
   const latest = latestItems(active, lang);
   const decisions = latestByType(active, lang, 'decision');
@@ -348,6 +349,11 @@ export function renderNotesPanel(root, state, handlers = {}) {
           ${escapeHtml(T('openRegister'))}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 16 16 8"/><path d="M9.5 8H16v6.5"/></svg>
         </button>
+        <button type="button" class="btn ghost notes-open-btn" id="btn-open-minutes-window" data-open="${minutesWinOpen}">
+          ${minutesWinOpen
+            ? `<span class="status-dot on" aria-hidden="true"></span>${escapeHtml(T('minutesWindowOpen'))}`
+            : `${escapeHtml(T('openMinutesWindow'))}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 16 16 8"/><path d="M9.5 8H16v6.5"/></svg>`}
+        </button>
         ${active ? `<div class="notes-export-row">
           <button type="button" class="mini-btn" id="btn-notes-txt">TXT</button>
           <button type="button" class="mini-btn" id="btn-notes-md">Markdown</button>
@@ -423,6 +429,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
   }
 
   root.querySelector('#btn-open-register')?.addEventListener('click', () => handlers.onOpenRegister?.());
+  root.querySelector('#btn-open-minutes-window')?.addEventListener('click', () => handlers.onOpenMinutesWindow?.());
   root.querySelector('#btn-end-draft')?.addEventListener('click', () => handlers.onEndAndDraft?.());
   root.querySelector('#btn-flag-moment')?.addEventListener('click', () => handlers.onFlagMoment?.());
   root.querySelectorAll('[data-addin]').forEach((btn) => {
@@ -491,12 +498,18 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
   let addinRt = await loadRuntime();
   let glossaryAll = await loadGlossary().catch(() => ({}));
   let addinResult = null; // result card under the chips: recap / ics / error, for one meeting
+  // TIDE-023: label "Minutes window is open · Focus" while the popup exists.
+  let minutesWinOpen = false;
+  const refreshMinutesWin = () => isMinutesWindowOpen(globalThis.chrome).then((v) => {
+    if (v !== minutesWinOpen) { minutesWinOpen = v; redraw(); }
+  }).catch(() => {});
   let glossaryNote = null; // {kind, text} under the glossary editor
   const tAi = (key, ...args) => { const v = I18N[lang]?.[key] ?? I18N.en[key] ?? key; return typeof v === 'function' ? v(...args) : v; };
   if (root.__addinsListener) chrome.storage.onChanged?.removeListener(root.__addinsListener);
   root.__addinsListener = (ch) => {
     if ('ysmAddinTrust' in ch || 'ysmAddinRemoved' in ch) loadRuntime().then((rt) => { addinRt = rt; redraw(); });
     if (GLOSSARY_KEY in ch) { glossaryAll = ch[GLOSSARY_KEY].newValue || {}; redraw(); }
+    if (WIN_ID_KEY in ch) refreshMinutesWin();
   };
   chrome.storage.onChanged?.addListener(root.__addinsListener);
 
@@ -670,10 +683,15 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
           glossary: { entries: glossaryEntries(activeMeeting?.seriesId), note: glossaryNote },
         }),
         creatingMeeting,
+        minutesWinOpen,
         headMount: document.getElementById('notes-meeting-bar'),
       },
       {
         onOpenRegister: openRegister,
+        onOpenMinutesWindow: async () => {
+          await openMinutesWindow(globalThis.chrome, registerUrl());
+          refreshMinutesWin();
+        },
         onFlagMoment: flagNow,
         onAddin: async (addinId, actionId) => {
           const meeting = meetings.find((m) => m.id === activeId) || null;
@@ -990,6 +1008,7 @@ export async function mountNotesPanel(root, { getCapture, getSessionLines, onEnd
   };
 
   redraw();
+  refreshMinutesWin();
 
   if (getCapture) {
     // Satu detak per detik: selagi merekam ia hanya menulis ulang jam (murah),

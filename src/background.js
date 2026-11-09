@@ -13,6 +13,7 @@ import { normalizeInterpreter, isConsecutive } from './lib/interpreter.js';
 import { nativeHostAction, nativeHostConnection, nativeHostSupported, NATIVE_HOST_NAME } from './lib/native-host.js';
 import { nativeHealth } from './lib/native.js';
 import { NATIVE_MESSAGING_HOST, LOCAL_HELPER_ORIGIN } from './lib/native-protocol.js';
+import { trackMinutesWindow } from './lib/minutes-window.js';
 
 let session = {
   active: false,
@@ -32,6 +33,8 @@ let session = {
 // Chrome opens the side panel on toolbar click via setPanelBehavior; Edge
 // (and older Chromium) may ignore it, so also open explicitly on action click.
 chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true }).catch(() => {});
+// TIDE-023: remember the Minutes popup's size/position and forget it when closed.
+trackMinutesWindow(chrome);
 chrome.action.onClicked.addListener((tab) => {
   try {
     chrome.sidePanel?.open?.({ windowId: tab.windowId });

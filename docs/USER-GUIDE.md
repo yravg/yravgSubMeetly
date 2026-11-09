@@ -142,6 +142,13 @@ item beserta pemiliknya, pertanyaan terbuka, risiko, dan metrik.
   rapat yang sudah terlanjur direkam Teams.
 - **Open minutes register** membuka tabel lengkap di tab tersendiri, dengan
   jejak asal tiap butir dan dokumen MoM yang siap diterbitkan.
+- **Open Minutes window ↗** membuka register yang sama di jendela tersendiri
+  (popup), cocok untuk diletakkan di samping rapat. Ukuran dan posisinya diingat;
+  selama jendela itu terbuka tombolnya berbunyi **Minutes window is open · Focus**
+  dan klik berikutnya hanya memunculkannya kembali, tidak membuka jendela kedua.
+- Ringkasan di atas register berupa satu pita: jumlah butir, batang per tipe,
+  angka-angka utama dan **Review N**. Tekan chevron di ujung kanan untuk melihat
+  legenda lengkap dengan persentase per tipe.
 - **Project type** di kartu rekam menandai rapat (progres mingguan, K3, tinjauan
   desain, stand-up, sprint, penjualan, keuangan, hukum, pelatihan, riset,
   kesehatan, pendidikan, umum). Pilih **sebelum** menekan Start; register
