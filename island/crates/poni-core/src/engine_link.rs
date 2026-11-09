@@ -77,8 +77,8 @@ pub fn offline_message(info: &EngineInfo, why: &str, port: u16) -> (&'static str
 pub fn status_line(answering: Option<&Health>, port: u16, last: Action) -> String {
     match answering {
         Some(h) if h.rust => format!("Engine: running (Rust) on {port}"),
-        Some(h) if h.engine.is_empty() => format!("Engine: running (other helper) on {port}"),
-        Some(h) => format!("Engine: running (other helper, {}) on {port}", h.engine),
+        Some(h) if h.engine.is_empty() => format!("Engine: running (other engine) on {port}"),
+        Some(h) => format!("Engine: running (other engine, {}) on {port}", h.engine),
         None => match last {
             Action::Wait | Action::Spawn => "Engine: starting…".into(),
             Action::Missing => "Engine: not installed".into(),
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn the_status_line_names_the_engine_that_answers() {
         assert_eq!(status_line(Some(&health(true, "candle")), 17865, Action::Use), "Engine: running (Rust) on 17865");
-        assert_eq!(status_line(Some(&health(false, "faster-whisper")), 17865, Action::Use), "Engine: running (other helper, faster-whisper) on 17865");
+        assert_eq!(status_line(Some(&health(false, "faster-whisper")), 17865, Action::Use), "Engine: running (other engine, faster-whisper) on 17865");
         assert_eq!(status_line(None, 17865, Action::Use), "Engine: not running");
         assert_eq!(status_line(None, 17865, Action::Wait), "Engine: starting…");
         assert_eq!(status_line(None, 17865, Action::Missing), "Engine: not installed");

@@ -541,10 +541,10 @@ pub fn parse_response(raw: &[u8]) -> Result<(u16, String), String> {
 /// Ask `/health` and `/notes`. An answer that is not JSON of the expected
 /// shape counts as "not the helper".
 pub fn fetch(port: u16) -> Result<Snapshot, String> {
-    let (code, body) = request(port, "GET", "/health", None).map_err(|e| format!("The helper is not running ({e})."))?;
-    let health = if code == 200 { parse_health(&body) } else { None }.ok_or_else(|| format!("Port {port} answered, but not as the helper."))?;
+    let (code, body) = request(port, "GET", "/health", None).map_err(|e| format!("The engine is not running ({e})."))?;
+    let health = if code == 200 { parse_health(&body) } else { None }.ok_or_else(|| format!("Port {port} answered, but not as the engine."))?;
     let (code, body) = request(port, "GET", "/notes", None)?;
-    let notes = if code == 200 { parse_notes(&body) } else { None }.ok_or("The helper's notes could not be read.")?;
+    let notes = if code == 200 { parse_notes(&body) } else { None }.ok_or("The engine's notes could not be read.")?;
     // An older helper has no /live (404): the island falls back to the note's transcript.
     let live = request(port, "GET", "/live", None).ok().filter(|(code, _)| *code == 200).and_then(|(_, body)| parse_live(&body));
     // Missing on an older helper (404) = the overlay only.
@@ -558,7 +558,7 @@ pub fn post_note(port: u16, body: &str) -> Result<(), String> {
     if code == 200 {
         Ok(())
     } else {
-        Err(serde_json::from_str::<Value>(&reply).ok().and_then(|v| text(&v, "error")).unwrap_or_else(|| format!("The helper said {code}.")))
+        Err(serde_json::from_str::<Value>(&reply).ok().and_then(|v| text(&v, "error")).unwrap_or_else(|| format!("The engine said {code}.")))
     }
 }
 

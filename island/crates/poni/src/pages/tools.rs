@@ -95,7 +95,7 @@ pub fn draw_talk(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let hint = match state {
         PageState::Locked => "Issued meeting \u{b7} read-only".to_string(),
         PageState::Needs => format!("{} items have no owner yet", helper::unowned(note)),
-        _ => "Items per owner. The helper sends no speaker time yet.".to_string(),
+        _ => "Items per owner. The engine sends no speaker time yet.".to_string(),
     };
     let tone = if state == PageState::Needs { palette::ORANGE } else { palette::TEXT_DIM };
     ui.c.text(&hint, Rect::new(area.x, area.y, area.w, 18.0), &TextStyle::footnote().color(tone));
@@ -121,7 +121,7 @@ pub fn draw_engine(ui: &mut Ui, st: &mut AppState, area: Rect) {
     match state {
         PageState::Error => return offline(ui, st, area, "engine.retry"),
         PageState::Empty => {
-            hkit::message(ui, area, accent, Icon::Cpu, "Looking for the helper", "Asking the helper on its port.", false, None);
+            hkit::message(ui, area, accent, Icon::Cpu, "Looking for the engine", "Asking the engine on its port.", false, None);
             return;
         }
         _ => {}

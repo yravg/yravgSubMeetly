@@ -262,7 +262,7 @@ pub const TALK_TIME: Addon = Addon {
 pub const ENGINE_MONITOR: Addon = Addon {
     id: "engine",
     title: "Engine monitor",
-    blurb: "The helper's engine, model and device, and how fast it answers.",
+    blurb: "The engine's model and device, and how fast it answers.",
     mac_blurb: None,
     tag: "",
     files: &[],
