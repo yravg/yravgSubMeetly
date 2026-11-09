@@ -3207,7 +3207,7 @@ async function init() {
   setTask(uiPrefs.task);
   await refreshDownloaded();
   renderModelLists();
-  populateMockData();
+  if (!isWebHost()) populateMockData(); // the app window shows only real history and live lines
   await renderHistory();
   updateWarning();
   if (state.settings.engine === 'native' || state.mode === 'offline') {
