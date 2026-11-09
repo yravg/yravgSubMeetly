@@ -36,7 +36,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
-use windows::core::{w, Result};
+use windows::core::{w, Result, HSTRING};
 use windows::Foundation::Numerics::Matrix3x2;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Ole::{OleInitialize, OleUninitialize};
@@ -120,9 +120,9 @@ pub fn main_entry() -> i32 {
     unsafe {
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
-    // Single instance (the self-test may run next to a normal instance).
-    let mutex_name = w!("Local\\yravgSubMeetly.Island");
-    let _mutex = unsafe { CreateMutexW(None, true, mutex_name) };
+    // Single instance. A run with its own PONI_HOME (dev, self-test) is its own instance, next to the installed one.
+    let mutex_name = HSTRING::from(if std::env::var_os("PONI_HOME").is_some() { "Local\\yravgSubMeetly.Island.dev" } else { "Local\\yravgSubMeetly.Island" });
+    let _mutex = unsafe { CreateMutexW(None, true, &mutex_name) };
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         pinfo!("another instance is running; exiting");
         // A Start-menu "Minutes register" launch while the island runs: the running one has the engine.
@@ -3670,6 +3670,7 @@ impl App {
                 }
                 Command::HelperPoll => {
                     if let Some(s) = self.services.as_ref() {
+                        s.engine_start(); // Try again also starts the engine
                         s.helper_poll();
                     }
                 }

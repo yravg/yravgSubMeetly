@@ -53,10 +53,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let state = helper::meeting_state(&st.helper.link, &st.helper.snap.notes);
     match state {
         PageState::Error => {
-            let line = hkit::offline_line(&st.helper.link);
-            if hkit::message(ui, area, accent, Icon::Unlink, "Helper offline", &line, true, Some(("Try again", wid("meeting.retry")))) {
-                st.cmd(Command::HelperPoll);
-            }
+            hkit::offline(ui, st, area, wid("meeting.retry"));
             return;
         }
         PageState::Empty => {

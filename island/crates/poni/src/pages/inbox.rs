@@ -28,10 +28,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let state = helper::inbox_state(&st.helper.link, notes);
     match state {
         PageState::Error => {
-            let line = hkit::offline_line(&st.helper.link);
-            if hkit::message(ui, area, accent, Icon::Unlink, "Helper offline", &line, true, Some(("Try again", wid("inbox.retry")))) {
-                st.cmd(Command::HelperPoll);
-            }
+            hkit::offline(ui, st, area, wid("inbox.retry"));
             return;
         }
         PageState::Empty => {

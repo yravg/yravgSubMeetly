@@ -133,6 +133,7 @@ impl EngineService {
                     running: health.is_some(),
                     ours: health.is_some() && child.is_some(),
                     ext_seen,
+                    action: shown,
                 };
                 if last_info.as_ref() != Some(&info) {
                     last_info = Some(info.clone());

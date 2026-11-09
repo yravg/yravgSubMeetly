@@ -52,11 +52,24 @@ pub struct EngineInfo {
     pub ours: bool,
     /// The Chrome extension has reached the engine at least once.
     pub ext_seen: bool,
+    /// What the supervisor last did or found (`decide`, Spawn shown as Wait).
+    pub action: Action,
 }
 
 impl Default for EngineInfo {
     fn default() -> Self {
-        Self { line: "Engine: checking…".into(), running: false, ours: false, ext_seen: false }
+        Self { line: "Engine: checking…".into(), running: false, ours: false, ext_seen: false, action: Action::Wait }
+    }
+}
+
+/// What a meeting page says in place of its content while nothing is reading
+/// the engine: `(title, line, is_a_problem)`. `why`: the link's own reason.
+pub fn offline_message(info: &EngineInfo, why: &str, port: u16) -> (&'static str, String, bool) {
+    match info.action {
+        _ if info.running => ("Connecting to the engine…", format!("The engine answers on {port}; this page fills in on the next read. ({why})"), false),
+        Action::Missing => ("Engine not found", "submeetly-engine.exe is not next to the island. Reinstall yravgSubMeetly, or set SUBMEETLY_ENGINE_EXE to the engine's full path, then press Try again.".into(), true),
+        Action::Failed => ("Engine would not start", format!("The island started it {MAX_SPAWNS} times and it never answered on {port}. Check that nothing else uses that port, then press Try again."), true),
+        _ => ("Starting the engine…", "The island is launching it. This page fills in when it answers.".into(), false),
     }
 }
 
@@ -100,6 +113,25 @@ mod tests {
     #[test]
     fn no_exe_is_said_not_hidden() {
         assert_eq!(decide(false, false, 0, None), Action::Missing);
+    }
+
+    fn info(action: Action, running: bool) -> EngineInfo {
+        EngineInfo { action, running, ..Default::default() }
+    }
+
+    #[test]
+    fn offline_pages_say_what_the_supervisor_is_doing() {
+        let (t, l, bad) = offline_message(&info(Action::Wait, false), "timed out", 17865);
+        assert_eq!((t, bad), ("Starting the engine…", false));
+        assert!(!l.contains("run.sh") && !l.contains("run.bat"));
+        let (t, l, bad) = offline_message(&info(Action::Missing, false), "x", 17865);
+        assert_eq!((t, bad), ("Engine not found", true));
+        assert!(l.contains("SUBMEETLY_ENGINE_EXE") && l.contains("Reinstall"));
+        let (t, l, bad) = offline_message(&info(Action::Failed, false), "x", 18000);
+        assert_eq!((t, bad), ("Engine would not start", true));
+        assert!(l.contains("18000"));
+        let (t, _, bad) = offline_message(&info(Action::Use, true), "late", 17865);
+        assert_eq!((t, bad), ("Connecting to the engine…", false));
     }
 
     #[test]

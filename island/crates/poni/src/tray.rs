@@ -319,7 +319,7 @@ mod tests {
     }
 
     fn engine(running: bool, ours: bool, ext_seen: bool) -> EngineInfo {
-        EngineInfo { line: if running { "Engine: running (Rust) on 17865".into() } else { "Engine: not running".into() }, running, ours, ext_seen }
+        EngineInfo { line: if running { "Engine: running (Rust) on 17865".into() } else { "Engine: not running".into() }, running, ours, ext_seen, ..Default::default() }
     }
 
     #[test]

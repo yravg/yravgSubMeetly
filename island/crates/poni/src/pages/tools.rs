@@ -11,7 +11,6 @@
 //! has no Locked (nothing there to protect).
 
 use super::hkit;
-use crate::commands::Command;
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
 use crate::state::AppState;
@@ -32,10 +31,7 @@ pub fn timer_wake(st: &AppState) -> Option<f64> {
 }
 
 fn offline(ui: &mut Ui, st: &mut AppState, area: Rect, id: &str) {
-    let line = hkit::offline_line(&st.helper.link);
-    if hkit::message(ui, area, st.accent, Icon::Unlink, "Helper offline", &line, true, Some(("Try again", wid(id)))) {
-        st.cmd(Command::HelperPoll);
-    }
+    hkit::offline(ui, st, area, wid(id));
 }
 
 pub fn draw_timer(ui: &mut Ui, st: &mut AppState, area: Rect) {
