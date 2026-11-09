@@ -1,6 +1,7 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Captions in the app window use the local engine by default** (the in-page background read empty settings and fell back to the browser engine, which stalled on model download); the browser engine stays a choice. Test `test/web-host-captions.test.mjs` plays a sample through screen sharing and expects a real caption line.
 - **Island: live captions of what the PC plays.** "Start live captions" (Live page, tray) captures the default output with WASAPI loopback, sends 4 s windows (silence skipped) to the engine `/draft`, and the pill shows the line and its translation in the lyric pill's two-row look; a synced song that is playing keeps its lyrics. "Loading the speech/translation model…" replaces "not answering" while a model loads.
 - **Island: translated lyrics.** Synced lyrics get a second pill row with the translation (engine `/translate`, once per song, cached); none when the song is already in the target language.
 - **Island Settings "Captions and languages" and Models:** spoken language (Auto + 12), target language, captions on/off remembered across restarts, lyric translation switch; model rows with downloaded state, Download and progress; the pill and Live page say when the speech model is missing.
