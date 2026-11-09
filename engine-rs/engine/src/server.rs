@@ -194,13 +194,7 @@ fn write_response(writer: &mut TcpStream, response: &Response) -> io::Result<()>
 
 fn write_page(writer: &mut TcpStream, page: &crate::web::WebResponse) -> io::Result<()> {
     let head = format!(
-        "HTTP/1.1 {} {}
-Content-Type: {}
-Content-Length: {}
-Cache-Control: no-cache
-X-Content-Type-Options: nosniff
-
-",
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-cache\r\nX-Content-Type-Options: nosniff\r\n\r\n",
         page.status,
         reason_phrase(page.status),
         page.content_type,
@@ -252,5 +246,19 @@ mod tests {
         stream.read_to_string(&mut response).expect("read");
         assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
         assert!(response.contains("\"ok\":true"), "{response}");
+    }
+
+    #[test]
+    fn a_page_reply_has_crlf_line_ends_whatever_the_checkout() {
+        let page = crate::web::WebResponse { status: 200, content_type: "text/html", body: b"x".to_vec() };
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let address = listener.local_addr().expect("addr");
+        let t = thread::spawn(move || write_page(&mut listener.accept().expect("accept").0, &page));
+        let mut stream = TcpStream::connect(address).expect("connect");
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).expect("read");
+        t.join().expect("thread").expect("write");
+        assert!(raw.starts_with("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"), "{raw:?}");
+        assert!(raw.ends_with("\r\n\r\nx"), "{raw:?}");
     }
 }
