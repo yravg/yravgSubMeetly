@@ -171,7 +171,8 @@ const store = {
 
 /* ---------- formatters ---------- */
 const fmtDate = (d) => new Intl.DateTimeFormat(LANG === 'id' ? 'id-ID' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(d);
-const fmtShort = (iso) => new Intl.DateTimeFormat(LANG === 'id' ? 'id-ID' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(`${iso}T00:00:00`));
+// Date (local) or 'YYYY-MM-DD'; never toISOString() — that is UTC and shows yesterday late in the evening east of Greenwich.
+const fmtShort = (v) => new Intl.DateTimeFormat(LANG === 'id' ? 'id-ID' : 'en-GB', { day: 'numeric', month: 'short' }).format(typeof v === 'string' ? new Date(`${v}T00:00:00`) : v);
 const hm = (min) => T('hm', Math.floor(min / 60), min % 60);
 const num = (v) => `<span class="num" data-num>${esc(v)}</span>`;
 
@@ -278,7 +279,7 @@ function todayPage() {
 
   const ydayCard = t.yesterdayOpen ? `<section class="cd rail1"><span class="eyebrow">${esc(fmtShort(t.yesterdayOpen.date))} · ${esc(t.yesterdayOpen.title)}</span><h3>${esc(T('ydayTitle'))}</h3><p>${esc(T('ydayBody'))}</p><a class="pill-b full" href="#minutes?meeting=${encodeURIComponent(t.yesterdayOpen.id)}">${esc(T('issueMinutes'))}</a></section>` : '';
   const rows = t.meetingsToday.map((m) => `<a class="mrow" href="#minutes?meeting=${encodeURIComponent(m.id)}"><span class="t">${esc(m.start || '—')}</span><span><b>${esc(m.title)}</b><small>${esc(hm(m.minutes))}</small></span><span class="chip sm ${m.status === 'issued' ? 'ok' : 'warn'}">${esc(T(m.status))}</span></a>`).join('');
-  const todayCard = `<section class="cd"><span class="eyebrow">${esc(T('today'))} · ${esc(fmtShort(new Date().toISOString().slice(0, 10)))}</span><h3>${t.meetingsToday.length ? esc(T('todayCard', t.meetingsToday.length, hm(t.minutesToday))) : esc(T('todayNone'))}</h3>${rows}${t.meetingsToday.some((m) => m.status === 'draft') ? `<small class="mut">${esc(T('checkIssue'))}</small>` : ''}</section>`;
+  const todayCard = `<section class="cd"><span class="eyebrow">${esc(T('today'))} · ${esc(fmtShort(now))}</span><h3>${t.meetingsToday.length ? esc(T('todayCard', t.meetingsToday.length, hm(t.minutesToday))) : esc(T('todayNone'))}</h3>${rows}${t.meetingsToday.some((m) => m.status === 'draft') ? `<small class="mut">${esc(T('checkIssue'))}</small>` : ''}</section>`;
   const h = state.health;
   const helperCard = h ? `<section class="cd"><div class="row"><h3>${esc(T('helper'))}</h3><span class="grow"></span><span class="chip sm ok"><span class="dot ok"></span>${esc(T('helperLive'))}</span></div>
       <div class="kv"><span>${esc(T('engine'))}</span><b>${esc(h.engine_label || h.engine || T('nativeHelper'))}</b></div><div class="kv"><span>${esc(T('device'))}</span><b>${esc(String(h.device || 'cpu').toUpperCase())}</b></div><div class="kv"><span>${esc(T('model'))}</span><b>${esc(h.model || '—')}</b></div></section>`

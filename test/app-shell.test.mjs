@@ -204,4 +204,22 @@ test('390 px: sidebar jadi lembar lewat tombol menu; tanpa gulir mendatar', asyn
   await page.setViewport({ width: 1440, height: 1000 });
 });
 
+test('A01: tanggal hero dan kartu Today sama pada malam hari di UTC+8 (bukan UTC)', async () => {
+  // 2026-11-09 17:30 UTC = 10 Nov 01:30 di Asia/Shanghai; toISOString() masih menyebut 9 Nov.
+  const p = await browser.newPage();
+  await p.emulateTimezone('Asia/Shanghai');
+  await p.evaluateOnNewDocument(() => {
+    const T0 = Date.UTC(2026, 10, 9, 17, 30); const D = Date;
+    globalThis.Date = class extends D { constructor(...a) { super(...(a.length ? a : [T0])); } static now() { return T0; } };
+  });
+  await p.goto(`${ORIGIN}/dist/app.html`, { waitUntil: 'networkidle0' });
+  await p.evaluate(() => localStorage.setItem('ysmShellWelcomed', 'true'));
+  await p.reload({ waitUntil: 'networkidle0' });
+  await p.waitForSelector('.dateline');
+  const r = await p.evaluate(() => ({ line: document.querySelector('.dateline').textContent, eyebrow: document.querySelector('.cd .eyebrow')?.textContent }));
+  await p.close();
+  assert.match(r.line, /Tuesday 10 November/);
+  assert.match(r.eyebrow, /10 Nov/);
+});
+
 test('tanpa galat halaman', () => assert.deepEqual(pageErrors, []));
