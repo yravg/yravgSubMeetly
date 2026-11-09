@@ -60,12 +60,14 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         }
         PageState::Empty => {
             // A note from Calendar's Notes button exists but holds no items yet: say so, with its name.
-            let started = st.helper.note().map(|n| n.title.clone());
+            let started = st.helper.note().map(|n| (n.title.clone(), n.transcript.len()));
             let (title, line) = match &started {
-                Some(t) => (t.as_str(), "Notes started from Calendar. Start captions during the meeting; when you stop, the draft decisions and actions land here."),
-                None => ("No decisions yet", "A meeting lands here when you stop captions. Pick a meeting in Calendar to start its notes. Items that wait on you get buttons."),
+                // Saved when captions stopped: its lines are kept, the draft just found nothing to decide.
+                Some((t, n)) if *n > 0 => (t.as_str(), format!("Saved from captions: {n} lines. No decisions or actions found in them.")),
+                Some((t, _)) => (t.as_str(), "Notes started from Calendar. Start captions during the meeting; when you stop, the draft decisions and actions land here.".to_string()),
+                None => ("No decisions yet", "A meeting lands here when you stop captions. Pick a meeting in Calendar to start its notes. Items that wait on you get buttons.".to_string()),
             };
-            if hkit::message(ui, area, accent, Icon::Clipboard, title, line, false, Some(("Open Calendar", wid("meeting.calendar")))) {
+            if hkit::message(ui, area, accent, Icon::Clipboard, title, &line, false, Some(("Open Calendar", wid("meeting.calendar")))) {
                 st.cmd(Command::SetPage(PageKind::Calendar));
             }
             return;
