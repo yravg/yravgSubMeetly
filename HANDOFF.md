@@ -478,3 +478,11 @@ Sisa tahap: **4** dokumentasi lewat generator (`docs/`), lalu rebuild bundel.
   (`http://127.0.0.1:8799/app.html`). Verifikasi UI lewat sana.
 - Sync: `sync --if-changed --plan` (metadata saja). **Jangan** jalankan final `sync` sampai
   seluruh task plan selesai.
+
+## Island 1.2.1 dan merge burbot (2026-11-09)
+
+- `bedc871` menggabungkan cabang VPS `burbot` (Tide build 1-6). T8 (reskin Tide panel samping) **masih belum di-commit di VPS** (`/home/dev/orca/workspaces/yraveragesub/burbot`); worker di sana terblokir: preview `submeetly-dev-web` mati (butuh restart root) dan memori VPS penuh oleh sesi Sonnet lama.
+- `a1f69e0` Island 1.2.1: "Open Minutes register" membuka `minutes.html` lewat `chrome --app=` (lalu Edge, lalu browser bawaan) — jendela sendiri, register localStorage Chrome tetap sama.
+- Installer: `island/dist/yravgSubMeetly-Setup-1.2.1.exe` (27,5 MB, sha256 6bc51a90…0557). Di Git Bash, `ISCC /D…` rusak oleh konversi path — jalankan ISCC dari PowerShell. Biner rilis di `E:\cargo-target\sm-desktop\release`.
+- `npm test` di laptop: 521 / 513 lulus / 0 gagal / 8 dilewati, dengan lingkungan: `python3` shim di PATH, `PYTHONUTF8=1` (lab-server.py mencetak `→` dan crash di cp1252 saat stdout pipa), `PUPPETEER_EXECUTABLE_PATH` ke Chrome 154 di cache puppeteer (folder 152 tanpa chrome.exe), engine debug yang segar (`engine-rs/target/debug` basi dan terkunci proses).
+- `main` sudah di-push ke GitHub. GitHub melaporkan repo pindah ke https://github.com/yravg/yravgSubMeetly.
