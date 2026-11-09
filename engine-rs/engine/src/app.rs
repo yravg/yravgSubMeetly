@@ -1516,7 +1516,7 @@ impl App {
                 json!({ "error": "body needs theme and/or reskin" }),
             );
         };
-        if !["theme", "reskin", "captionSurface"]
+        if !["theme", "reskin", "captionSurface", "srcLang", "tgtLang"]
             .iter()
             .any(|k| patch.contains_key(*k))
         {
@@ -1821,6 +1821,11 @@ impl App {
                     prefs.insert("captionSurface".to_string(), Value::String(s.clone()));
                 }
             }
+            for (key, auto) in [("srcLang", true), ("tgtLang", false)] {
+                if let Some(code) = saved.get(key).and_then(|v| ui_lang(v, auto)) {
+                    prefs.insert(key.to_string(), Value::String(code));
+                }
+            }
         }
         (Value::Object(prefs), true)
     }
@@ -1845,6 +1850,11 @@ impl App {
                 prefs.insert("captionSurface".to_string(), Value::String(s.clone()));
             }
         }
+        for (key, auto) in [("srcLang", true), ("tgtLang", false)] {
+            if let Some(code) = patch.get(key).and_then(|v| ui_lang(v, auto)) {
+                prefs.insert(key.to_string(), Value::String(code));
+            }
+        }
         let prefs = Value::Object(prefs);
         write_json(
             &self.ui_prefs_path,
@@ -1852,6 +1862,18 @@ impl App {
         );
         prefs
     }
+}
+
+/// A language code for the shared UI prefs: letters, digits, `-`, `_`, 1..=12 chars;
+/// "auto" only for the spoken language. Anything else is ignored, not stored.
+fn ui_lang(value: &Value, allow_auto: bool) -> Option<String> {
+    let code = value.as_str()?.trim();
+    let valid = !code.is_empty()
+        && code.chars().count() <= 12
+        && code
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    (valid && (allow_auto || code != "auto")).then(|| code.to_string())
 }
 
 /// How `/draft` turns the source text into the target language.
@@ -2067,6 +2089,19 @@ mod tests {
         ] {
             assert!(!is_loopback_host(host), "{host}");
         }
+    }
+
+    #[test]
+    fn ui_lang_accepts_codes_and_rejects_the_rest() {
+        let code = |v: Value, auto| ui_lang(&v, auto);
+        assert_eq!(code(json!(" zh-CN "), false).as_deref(), Some("zh-CN"));
+        assert_eq!(code(json!("auto"), true).as_deref(), Some("auto"));
+        assert_eq!(code(json!("auto"), false), None);
+        assert_eq!(code(json!(""), true), None);
+        assert_eq!(code(json!("a b"), true), None);
+        assert_eq!(code(json!("../../etc"), true), None);
+        assert_eq!(code(json!("x".repeat(13)), true), None);
+        assert_eq!(code(json!(7), true), None);
     }
 
     #[test]
