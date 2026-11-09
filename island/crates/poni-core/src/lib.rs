@@ -21,6 +21,7 @@ pub mod helper;
 pub mod look;
 pub mod lrc;
 pub mod lrclib;
+pub mod lyric_tr;
 pub mod mediaremote;
 pub mod notifications;
 pub mod nowplaying;

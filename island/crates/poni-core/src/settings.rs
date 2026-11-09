@@ -133,6 +133,14 @@ pub struct Settings {
     pub lyrics_pronunciation: bool,
     /// Shift synced lyrics: positive shows each line earlier (ms).
     pub lyrics_offset_ms: i32,
+    /// Translate synced lyrics into `target_lang` under the sung line.
+    pub lyrics_translate: bool,
+    /// Language the PC's speech is in for live captions: `auto` or an engine code (`capture::LANGS`).
+    pub source_lang: String,
+    /// Language captions and lyrics are translated into.
+    pub target_lang: String,
+    /// Live captions from what the PC plays were on when the island last ran.
+    pub captions_on: bool,
     pub hud_volume: bool,
     pub hud_power: bool,
     pub hud_bluetooth: bool,
@@ -189,6 +197,10 @@ impl Default for Settings {
             lyrics: true,
             lyrics_pronunciation: true,
             lyrics_offset_ms: 0,
+            lyrics_translate: true,
+            source_lang: "auto".into(),
+            target_lang: "en".into(),
+            captions_on: false,
             hud_volume: true,
             hud_power: true,
             hud_bluetooth: true,

@@ -11,6 +11,41 @@ pub const WINDOW_S: usize = 4;
 /// RMS under this (about -50 dBFS) is a pause or a muted player: not worth a request.
 pub const SILENCE_RMS: f32 = 0.003;
 
+/// Languages the pickers offer, as (engine code, name). Spoken language also offers `auto`.
+pub const LANGS: [(&str, &str); 12] = [
+    ("en", "English"),
+    ("id", "Indonesian"),
+    ("zh", "Chinese"),
+    ("ja", "Japanese"),
+    ("ko", "Korean"),
+    ("es", "Spanish"),
+    ("fr", "French"),
+    ("de", "German"),
+    ("pt", "Portuguese"),
+    ("ru", "Russian"),
+    ("ar", "Arabic"),
+    ("hi", "Hindi"),
+];
+
+/// The name of a language code (`auto` = "Auto-detect"; unknown codes show as is).
+pub fn lang_name(code: &str) -> String {
+    if code == "auto" {
+        return "Auto-detect".into();
+    }
+    LANGS.iter().find(|(c, _)| *c == code).map_or_else(|| code.to_string(), |(_, n)| n.to_string())
+}
+
+/// The next code in `LANGS` after `code` (wraps); `with_auto` puts `auto` first in the cycle.
+pub fn next_lang(code: &str, with_auto: bool) -> &'static str {
+    let mut all: Vec<&'static str> = Vec::new();
+    if with_auto {
+        all.push("auto");
+    }
+    all.extend(LANGS.iter().map(|(c, _)| *c));
+    let i = all.iter().position(|c| *c == code).map_or(0, |i| i + 1);
+    all[i % all.len()]
+}
+
 /// Average the channels of interleaved frames into one.
 pub fn downmix(interleaved: &[f32], channels: usize) -> Vec<f32> {
     let ch = channels.max(1);
@@ -235,5 +270,17 @@ mod tests {
         assert!(w.running() && w.problem() == Some("engine offline"));
         let f = CaptureState::Failed("no output device".into());
         assert!(!f.running() && f.problem() == Some("no output device"));
+    }
+
+    #[test]
+    fn languages_cycle_and_have_names() {
+        assert_eq!(next_lang("auto", true), "en");
+        assert_eq!(next_lang("en", true), "id");
+        assert_eq!(next_lang("hi", true), "auto");
+        assert_eq!(next_lang("hi", false), "en");
+        assert_eq!(next_lang("xx", false), "en");
+        assert_eq!(lang_name("ja"), "Japanese");
+        assert_eq!(lang_name("auto"), "Auto-detect");
+        assert_eq!(lang_name("xx"), "xx");
     }
 }
