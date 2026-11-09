@@ -47,6 +47,24 @@ pub fn step_lang(code: &str, step: i32, with_auto: bool) -> &'static str {
     all[(at + step).rem_euclid(all.len() as i32) as usize]
 }
 
+/// What to tell when `/draft` timed out and `/health` (`health_body`) still answers: the engine
+/// is loading a model, not gone. `translating`: the captions are asked to be translated.
+/// `None` when nothing says it is loading (the caller keeps its "not answering" sentence).
+pub fn loading_notice(health_body: &str, translating: bool) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(health_body).ok()?;
+    if v.get("ok").and_then(|o| o.as_bool()) != Some(true) {
+        return None;
+    }
+    let loaded = |k: &str| v.get("loaded").and_then(|l| l.get(k)).and_then(|b| b.as_bool());
+    if loaded("asr") == Some(false) {
+        return Some("Loading the speech model. The first captions can take a minute.".into());
+    }
+    if translating && v.get("translate").and_then(|t| t.as_bool()) == Some(true) && loaded("translate") == Some(false) {
+        return Some("Loading the translation model. Captions follow as soon as it is ready.".into());
+    }
+    None
+}
+
 /// Average the channels of interleaved frames into one.
 pub fn downmix(interleaved: &[f32], channels: usize) -> Vec<f32> {
     let ch = channels.max(1);
@@ -271,6 +289,19 @@ mod tests {
         assert!(w.running() && w.problem() == Some("engine offline"));
         let f = CaptureState::Failed("no output device".into());
         assert!(!f.running() && f.problem() == Some("no output device"));
+    }
+
+    #[test]
+    fn a_slow_engine_says_which_model_it_is_loading() {
+        let health = |asr: bool, tr: bool, mt: bool| format!(r#"{{"ok":true,"translate":{mt},"loaded":{{"asr":{asr},"translate":{tr}}}}}"#);
+        assert_eq!(loading_notice(&health(false, false, true), true).as_deref(), Some("Loading the speech model. The first captions can take a minute."));
+        assert_eq!(loading_notice(&health(true, false, true), true).as_deref(), Some("Loading the translation model. Captions follow as soon as it is ready."));
+        // No translation wanted, or none installed: only the speech model matters.
+        assert_eq!(loading_notice(&health(true, false, true), false), None);
+        assert_eq!(loading_notice(&health(true, false, false), true), None);
+        // Everything loaded but still slow, or an answer that is not the engine's: no claim.
+        assert_eq!(loading_notice(&health(true, true, true), true), None);
+        assert_eq!(loading_notice("not json", true), None);
     }
 
     #[test]

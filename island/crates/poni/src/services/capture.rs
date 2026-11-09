@@ -160,15 +160,23 @@ fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mute
             }
             Err(e) => {
                 crate::pinfo!("capture: /draft failed: {e}");
-                health.engine(Some(engine_problem(&e)));
+                // A request that got no answer in its 25 s while /health still answers is a model loading.
+                // (On Windows a read timeout reads "os error 10060", so the test is `engine_unreachable`.)
+                let loading = engine_unreachable(&e).then(|| helper::request(port, "GET", "/health", None).ok()).flatten().filter(|(c, _)| *c == 200).and_then(|(_, b)| poni_core::capture::loading_notice(&b, src != tgt));
+                health.engine(Some(loading.unwrap_or_else(|| engine_problem(&e))));
             }
         }
     }
 }
 
+/// The error came from the connection (refused, no answer in time), not from the engine's reply.
+fn engine_unreachable(e: &str) -> bool {
+    e.contains("os error") || e.contains("timed out") || e.contains("no response")
+}
+
 /// A connection error is "not running"; anything else is the engine's own sentence.
 fn engine_problem(e: &str) -> String {
-    if e.contains("os error") || e.contains("timed out") || e.contains("no response") {
+    if engine_unreachable(e) {
         "The engine is not answering. Captions resume when it is back.".into()
     } else {
         format!("The engine could not caption this audio: {e}")
