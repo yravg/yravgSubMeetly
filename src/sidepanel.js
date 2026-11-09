@@ -37,6 +37,8 @@ import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
+import { startEngineSync } from './lib/engine-sync.js';
+import { makeT as makeNotesT } from './lib/notes-i18n.js';
 import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js';
 import { makeResizable } from './lib/resizable.js';
 import { mountPerfPanel } from './perf-panel.js';
@@ -3208,6 +3210,11 @@ async function init() {
   await refreshDownloaded();
   renderModelLists();
   if (!isWebHost()) populateMockData(); // the app window shows only real history and live lines
+  // Engine-hosted app window: mirror the register (Teams paste, notes panel) to the engine.
+  startEngineSync({
+    lang: () => state.settings.uiLang,
+    onError: () => setStatus(makeNotesT(state.settings.uiLang)('engineSyncFail'), 'error'),
+  });
   await renderHistory();
   updateWarning();
   if (state.settings.engine === 'native' || state.mode === 'offline') {
