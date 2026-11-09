@@ -17,6 +17,7 @@ html[data-reskin="tide"]:not([data-theme="coretax"]) {
   --border: #24372F; --grid: rgba(232, 242, 236, 0.06); --row-hover: rgba(232, 242, 236, 0.04); --row-sel: rgba(74, 222, 128, 0.12);
   --text: #E8F2EC; --text2: #C9D8CF; --muted: #A3B5AB; --muted2: #8FA299;
   --accent: #22C55E; --accent-hover: #4ADE80; --accent-soft: #4ADE80; --accent-dim: rgba(34, 197, 94, 0.16);
+  --accent-fill: #22C55E; --on-accent-fill: #0B1310; /* white on this green is 2.3:1; ink is 8:1 */
   --warn-text: #F5C16C; --danger: #FF8A80; --up: #4ADE80;
   color-scheme: dark;
 }
@@ -27,6 +28,7 @@ html[data-reskin="tide"][data-theme="coretax"] {
   --border: #DCE8E1; --grid: rgba(10, 15, 12, 0.06); --row-hover: rgba(14, 122, 71, 0.05); --row-sel: rgba(182, 243, 92, 0.28);
   --text: #0A0F0C; --text2: #33443A; --muted: #4B5A52; --muted2: #5B6B62;
   --accent: #0A0F0C; --accent-hover: #1E2A23; --accent-soft: #0E7A47; --accent-dim: rgba(34, 197, 94, 0.16);
+  --accent-fill: #0A0F0C; --on-accent-fill: #fff;
   --gold: #B6F35C; --gold-dim: rgba(182, 243, 92, 0.45);
   --warn-text: #8A5A00; --warn-ink: #8A5A00; --ok-ink: #0E7A47; --warn-line: rgba(138, 90, 0, 0.45);
   --danger: #B42318; --up: #0E7A47; --down-bar: #B42318; --stack-bg: rgba(10, 15, 12, 0.08);
