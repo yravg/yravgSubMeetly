@@ -341,6 +341,33 @@ mod tests {
         assert!(!unsafe { describe(&fmt(3, 64)) }.2);
     }
 
+    /// Real hardware, real engine: play speech on this PC, point `PONI_TEST_ENGINE_PORT`
+    /// at a running engine, run with `--ignored --nocapture`. Prints what `/live` holds after 40 s.
+    #[test]
+    #[ignore = "needs a running engine and speech playing on this PC"]
+    fn what_this_pc_plays_reaches_the_engine_as_a_caption() {
+        let port: u16 = std::env::var("PONI_TEST_ENGINE_PORT").expect("PONI_TEST_ENGINE_PORT").parse().unwrap();
+        let (tx, rx) = channel();
+        let sink = EventSink::new(tx, crate::events::SendHwnd::new(windows::Win32::Foundation::HWND::default()));
+        let svc = CaptureService::start(sink, port, "auto".into(), "en".into()).unwrap();
+        let t0 = std::time::Instant::now();
+        let (mut heard, mut states) = (0, Vec::new());
+        while t0.elapsed() < Duration::from_secs(40) {
+            match rx.recv_timeout(Duration::from_millis(500)) {
+                Ok(crate::events::AppEvent::Capture(CaptureEvent::Heard)) => {
+                    heard += 1;
+                    eprintln!("{:>4.1}s heard", t0.elapsed().as_secs_f32());
+                }
+                Ok(crate::events::AppEvent::Capture(CaptureEvent::State(s))) => states.push(format!("{s:?}")),
+                _ => {}
+            }
+        }
+        drop(svc);
+        let live = helper::request(port, "GET", "/live", None);
+        eprintln!("heard {heard} times; states {states:?}; /live {live:?}");
+        assert!(heard > 0, "the engine never returned a caption");
+    }
+
     /// The real default output device, if there is one: opens a loopback session and reads nothing but silence.
     #[test]
     fn a_loopback_session_opens_on_this_pcs_default_output() {
