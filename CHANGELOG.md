@@ -1,6 +1,7 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Island 1.2.2** (installer `yravgSubMeetly-Setup-1.2.2.exe`) carries everything above since 1.2.1.
 - **Engine: per-model storage folder.** `POST /engine/models/location` moves a model to any folder or drive (copy, verify size and SHA-256, switch, then delete the old copy; free-space and writability checks first); an unplugged drive shows as unavailable instead of re-downloading to C:. Island Settings > Models has the folder row with the Windows folder picker, move progress and drive-unavailable state.
 - **Engine: downloads only on request.** Only `POST /models/pull` and a model move download; a missing model answers 409 `model-not-downloaded`. `/draft` never waits for translation and reports `translateState`; English targets use Whisper's own translation until the translation model is ready. Models left in the old `C:	mp` cache are copied into the real cache at start. `/ui-prefs` keeps `srcLang`/`tgtLang`, shared by the island and the app window.
 - **Island: captions are saved as a meeting when they stop** (and at quit), with the engine's draft summary, decisions and actions; plain Windows wording ("Engine", reinstall hint, spinner while starting); fresh installs open on the meeting tabs.
