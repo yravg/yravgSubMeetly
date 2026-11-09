@@ -8,7 +8,7 @@ use candle_transformers::models::qwen2::{Config, ModelForCausalLM};
 use serde_json::Value;
 use tokenizers::Tokenizer;
 
-pub const DEFAULT_TRANSLATE_MODEL: &str = "Qwen/Qwen2.5-3B-Instruct";
+pub const DEFAULT_TRANSLATE_MODEL: &str = "Qwen/Qwen2.5-0.5B-Instruct";
 
 const LANG_NAMES: [(&str, &str); 20] = [
     ("en", "English"),

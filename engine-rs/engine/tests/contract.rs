@@ -204,7 +204,7 @@ fn ml_routes_answer_without_loading_a_model() {
     // The active ASR model's cache entry is never deletable.
     let active = app.handle(&request(
         "DELETE",
-        "/models/cache/openai--whisper-large-v3-turbo?confirm=1",
+        "/models/cache/openai--whisper-base?confirm=1",
         None,
         "127.0.0.1:17865",
         true,
@@ -223,7 +223,7 @@ fn ml_routes_answer_without_loading_a_model() {
     let health = app.handle(&request("GET", "/health", None, "127.0.0.1:17865", true));
     let body = health.body.expect("health body");
     assert_eq!(body["loaded"], json!({ "asr": false, "translate": false }));
-    assert_eq!(body["model"], json!("openai/whisper-large-v3-turbo"));
+    assert_eq!(body["model"], json!("openai/whisper-base"));
     let _ = fs::remove_dir_all(&state);
 }
 

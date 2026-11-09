@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 
 use crate::audio::{self, MonoStream, Windows, SAMPLE_RATE};
 use crate::translate::{Translator, DEFAULT_TRANSLATE_MODEL};
+use crate::whisper::DEFAULT_ASR_MODEL;
 use crate::whisper::{repo_for, Segment, Task, WhisperAsr};
 
 pub const ASR_ENGINE: &str = "candle-whisper";
@@ -50,7 +51,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 impl Ml {
     /// `device_pref` is the saved auto/cpu/cuda choice; env `DEVICE` wins, like the oracle.
     pub fn from_env(device_pref: &str) -> Self {
-        let model = env::var("WHISPER_MODEL").unwrap_or_else(|_| "large-v3-turbo".to_string());
+        let model = env::var("WHISPER_MODEL").unwrap_or_else(|_| DEFAULT_ASR_MODEL.to_string());
         let translate_model = (env::var("TRANSLATE").unwrap_or_default() != "off").then(|| {
             env::var("TRANSLATE_MODEL").unwrap_or_else(|_| DEFAULT_TRANSLATE_MODEL.to_string())
         });

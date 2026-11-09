@@ -58,6 +58,9 @@ pub struct WhisperAsr {
     suppress: Vec<u32>,
 }
 
+/// Small enough to download in minutes and run live on CPU; bigger models are chosen at runtime.
+pub const DEFAULT_ASR_MODEL: &str = "base";
+
 /// `WHISPER_MODEL` short names map to the openai safetensors repos.
 pub fn repo_for(model: &str) -> String {
     if model.contains('/') {
