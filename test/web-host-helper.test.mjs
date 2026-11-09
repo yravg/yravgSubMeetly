@@ -63,3 +63,21 @@ test('Helper page: install steps hide behind Troubleshooting; Restart brings the
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test('naming: the app window says Engine, never Helper, on its own pages', { timeout: 90_000 }, async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 520, height: 900 });
+  await page.evaluateOnNewDocument((engine) => localStorage.setItem('settings', JSON.stringify({ nativeUrl: engine, uiLang: 'en' })), origin);
+  const go = () => page.goto(`${origin}/app/sidepanel.html?view=helper`, { waitUntil: 'networkidle0' });
+  await go().catch((e) => { if (!/ERR_ABORTED/.test(e.message)) throw e; return go(); });
+  await page.waitForSelector('#btn-helper-restart');
+  await page.click('#helper-troubleshoot > summary'); // the install guide is part of the page too
+  // textContent: hidden pieces count, so a closed disclosure cannot hide the old word
+  const text = await page.evaluate(() => ['#view-helper', '#bottom-nav', '.set-card[data-pane="engine"]', '#settings-modal .settings-tabs'].map((s) => document.querySelector(s)?.textContent || '').join('\n'));
+  const labels = await page.evaluate(() => [...document.querySelectorAll('[aria-label],[title]')].map((e) => (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('title') || '')).join('\n'));
+  const hits = (text + '\n' + labels).match(/.{0,30}helper.{0,30}/gi) || [];
+  // the engine's own address and the CLI file names keep their real spelling
+  assert.deepEqual(hits.filter((h) => !/com\.yraveragesubmin\.helper|helper-/i.test(h)), []);
+  assert.match(await page.$eval('#view-helper h2', (e) => e.textContent), /Engine/);
+  await page.close();
+});

@@ -37,6 +37,7 @@ import {
 } from './lib/export-options.js';
 import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
+import { watchEngineWording } from './lib/engine-wording.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
 import { startEngineSync, engineOrigin } from './lib/engine-sync.js';
@@ -3338,7 +3339,10 @@ async function init() {
   await loadSettings();
   if (isWebHost()) {
     document.documentElement.dataset.hosted = '';
+    watchEngineWording(document.body); // the Windows app says Engine where the extension says Helper / Native Helper
     arrangeHostedSettings();
+    const note = document.querySelector('[data-i18n="nativeNote"]');
+    if (note) note.dataset.i18n = 'nativeNoteHosted';
     // Status, model and Restart stay on top; the install guide and diagnostics go behind Troubleshooting.
     const guideMount = $('helper-guide-mount');
     if (guideMount) {

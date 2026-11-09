@@ -371,6 +371,7 @@ const en = {
   hsRestarting: 'Restarting…',
   hsTroubleshooting: 'Troubleshooting',
   advanced: 'Advanced',
+  nativeNoteHosted: 'Whisper runs in the Engine on this PC (CPU; CUDA if built with it). Choose models on the Models tab; each one downloads once, to the engine cache.',
   hsConnected: 'Helper connected',
   hsDisconnected: 'Helper disconnected',
   hsMode: 'Mode',
@@ -1090,6 +1091,7 @@ export const I18N = {
     hsRestarting: 'Memulai ulang…',
     hsTroubleshooting: 'Pemecahan masalah',
     advanced: 'Lanjutan',
+    nativeNoteHosted: 'Whisper berjalan di Engine pada PC ini (CPU; CUDA bila dibangun dengannya). Pilih model di tab Models; tiap model diunduh sekali ke cache engine.',
     hsConnected: 'Helper terhubung',
     hsDisconnected: 'Helper terputus',
     hsMode: 'Mode',
@@ -1130,3 +1132,4 @@ export const I18N = {
 
 /** Minutes Register strings live in notes-i18n.js — re-exported so callers have one import. */
 export { NOTES_I18N, notesStrings, makeT } from './notes-i18n.js';
+
