@@ -35,6 +35,35 @@ Setelah selesai, bobot model tersimpan lokal dan tidak diunduh ulang.
 
 ---
 
+## Halaman aplikasi (Today)
+
+`app.html` adalah halaman penuh dengan sidebar di kiri: **Meetings** (Today, Live captions,
+Minutes, History, Files) dan **Features** (Add-ins, Glossary, Island, Performance, Settings).
+Tombol hitam **Start captions** (pintasan ⇧S) membuka Live captions.
+
+- **Today** menghitung semuanya dari register di perangkat ini: menit yang terekam hari ini,
+  rapat hari ini, butir minggu ini dibanding minggu lalu per tipe (saring per pemilik), dan
+  butir yang lewat tenggat. Pilih seri rapat di atas sidebar untuk melihat satu seri saja.
+  Ikon mata menyamarkan angka (berguna saat berbagi layar).
+- Kartu **Yesterday's minutes are still open** muncul bila notulen kemarin belum diterbitkan;
+  **Issue minutes** membuka rapat itu di halaman Minutes.
+- Lonceng di samping logo mengumpulkan yang menunggu Anda: notulen belum terbit, butir lewat
+  tenggat, helper mati. Sakelar **Island** di kanan atas menyalakan pil subtitel di bawah notch.
+- Halaman **Minutes** memuat register yang sama dengan `minutes.html`. **Open register:
+  Classic ↗** membuka tampilan yang sudah Anda kenal; **Modern ↗** membuka register yang sama
+  dalam warna Tide. Pilihan terakhir diingat. **Open Minutes window ↗** membuka jendela tersendiri.
+- **All features** merangkum fitur dengan satu kalimat dan tombol Open; add-in dinyalakan di
+  daftar bawahnya setelah Anda meninjau dan mempercayainya.
+- **Developer** (hanya di lab, atau setelah sakelar Developer di Settings) berisi alat lab:
+  halaman uji, mock helper, panduan dan sampel CC0.
+- Register kosong menampilkan Tide tertidur dengan jalan pintas ke Start captions dan Library.
+- **Ask Tide** (bilah tanya di beranda, kolom di sidebar, atau tombol `/`) menjawab tentang rapat
+  Anda. Pilih model di kiri bawah dialog: **Local** (model Qwen lewat Native Helper, bawaan),
+  **Register only** (tanpa model, dari register saja) atau **Cloud** (OpenRouter; diminta izin
+  dulu, dan teks yang dikirim disebut di bawah jawaban). Tide tidak pernah mengubah register sendiri:
+  perubahan muncul sebagai kartu dengan **Confirm**. **Plans** di kaki sidebar menampilkan paket;
+  pembelian belum tersedia.
+
 ## Subtitel langsung dari sebuah tab
 
 1. Buka tab berisi video atau panggilan.
@@ -142,6 +171,13 @@ item beserta pemiliknya, pertanyaan terbuka, risiko, dan metrik.
   rapat yang sudah terlanjur direkam Teams.
 - **Open minutes register** membuka tabel lengkap di tab tersendiri, dengan
   jejak asal tiap butir dan dokumen MoM yang siap diterbitkan.
+- **Open Minutes window ↗** membuka register yang sama di jendela tersendiri
+  (popup), cocok untuk diletakkan di samping rapat. Ukuran dan posisinya diingat;
+  selama jendela itu terbuka tombolnya berbunyi **Minutes window is open · Focus**
+  dan klik berikutnya hanya memunculkannya kembali, tidak membuka jendela kedua.
+- Ringkasan di atas register berupa satu pita: jumlah butir, batang per tipe,
+  angka-angka utama dan **Review N**. Tekan chevron di ujung kanan untuk melihat
+  legenda lengkap dengan persentase per tipe.
 - **Project type** di kartu rekam menandai rapat (progres mingguan, K3, tinjauan
   desain, stand-up, sprint, penjualan, keuangan, hukum, pelatihan, riset,
   kesehatan, pendidikan, umum). Pilih **sebelum** menekan Start; register

@@ -385,6 +385,7 @@
 .notes-latest-row .meta .low { color: var(--danger); }
 .notes-open-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); width: 100%; }
 .notes-open-btn svg { color: rgba(255, 255, 255, 0.85); }
+.notes-open-btn.ghost svg { color: inherit; }
 .notes-hint { text-align: center; font-size: 10.5px; }
 
 /* ---------------------------------------------------------------------------

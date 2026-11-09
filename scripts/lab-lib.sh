@@ -33,7 +33,9 @@ lab_cleanup_stale() {
     [[ -z "$pid" ]] || kill "$pid" 2>/dev/null || true
     rm -f "$LAB_PID_FILE"
   fi
-  pkill -f "scripts/lab-server.py" 2>/dev/null || true
+  # Hanya server lab milik checkout ini (jalur absolut): mesin bersama juga menjalankan
+  # pratinjau systemd dan worktree lain dengan lab-server.py mereka sendiri.
+  pkill -f "$LAB_ROOT/scripts/lab-server.py" 2>/dev/null || true
   lab_kill_port
 }
 
@@ -69,6 +71,8 @@ lab_stop() {
     kill "$(cat "$LAB_PID_FILE")" 2>/dev/null || true
     rm -f "$LAB_PID_FILE"
   fi
-  pkill -f "scripts/lab-server.py" 2>/dev/null || true
+  # Hanya server lab milik checkout ini (jalur absolut): mesin bersama juga menjalankan
+  # pratinjau systemd dan worktree lain dengan lab-server.py mereka sendiri.
+  pkill -f "$LAB_ROOT/scripts/lab-server.py" 2>/dev/null || true
   lab_kill_port
 }

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-reskin="tide">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>yravgSubMeetly</title>
+<link rel="icon" href="tide/01-tide-mark-green.svg" />
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="theme-tide.css" />
+<link rel="stylesheet" href="app.css" />
+</head>
+<body>
+<!-- TIDE-002..005, 008, 014 (papan A01, A04, A09). Kerangka; app.js mengisi halaman. -->
+<div class="app" id="app">
+  <aside class="sb" id="sb" aria-label="Main">
+    <div class="sb-brand">
+      <img src="tide/01-tide-mark-green.svg" alt="" width="30" height="30" />
+      <span class="wm">yravg<i>SubMeetly</i></span>
+      <button type="button" class="icon-b bell" id="btn-bell" aria-haspopup="dialog" aria-expanded="false"></button>
+      <button type="button" class="icon-b sb-close" id="btn-sb-close"></button>
+    </div>
+    <label class="series hide-rail">
+      <span class="av" id="series-av" aria-hidden="true"></span>
+      <select id="series-select"></select>
+    </label>
+    <button type="button" class="askf" id="ask-field"></button>
+    <div class="sec hide-rail" data-t="meetings"></div>
+    <nav class="nav" id="nav-meetings"></nav>
+    <div class="sec hide-rail" data-t="features"></div>
+    <nav class="nav" id="nav-features"></nav>
+    <div class="push"></div>
+    <a class="pill-b full" id="btn-start" href="#live"><span class="ic-slot" data-ic="play"></span><span class="hide-rail" data-t="startCaptions"></span><kbd class="hide-rail">⇧S</kbd></a>
+    <div class="sb-foot">
+      <span class="dot" id="foot-dot"></span>
+      <span class="hide-rail"><b data-t="thisDevice"></b><small id="foot-helper"></small></span>
+      <a class="plk hide-rail" id="plans-link" href="#plans"></a>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+  <main class="mn" id="main">
+    <div class="top">
+      <button type="button" class="icon-b menu" id="btn-menu" aria-controls="sb" aria-expanded="false"></button>
+      <h1 id="page-title"></h1>
+      <span class="grow"></span>
+      <label class="chip sw-chip" id="island-chip"><span class="ic-slot" data-ic="island"></span><span data-t="island"></span><input type="checkbox" role="switch" id="island-switch" /></label>
+      <a class="chip" id="helper-pill" href="#helper"><span class="dot" id="helper-dot"></span><span id="helper-pill-text"></span></a>
+    </div>
+    <div id="page" class="page" tabindex="-1"></div>
+  </main>
+</div>
+<div class="pop" id="bell-pop" role="dialog" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

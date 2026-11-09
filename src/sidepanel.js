@@ -3308,6 +3308,15 @@ async function init() {
     updateButtons();
   }
   await toBG('ensure-offscreen', {});
+  // App shell (src/app.html) mounts this panel per page: ?view=<tab>[&stab=<settings tab>].
+  const q = new URLSearchParams(location.search);
+  if (q.get('view') === 'files') {
+    jumpTo('captions');
+    setMode('offline');
+  } else if (q.get('view')) {
+    jumpTo(q.get('view'));
+    if (q.get('view') === 'settings' && SETTINGS_TABS.includes(q.get('stab'))) setSettingsTab(q.get('stab'));
+  }
 }
 
 init();
