@@ -1,6 +1,6 @@
 //! The Settings window's content: every setting yravgSubMeetly has, in a
 //! sidebar of sections (General, Appearance, Island, Music and lyrics,
-//! Pop-ups, Tabs, Add-ons, Focus, AI, Oyenza, About), called
+//! Pop-ups, Tabs, Add-ons, Focus, Prayer, AI, Oyenza, About), called
 //! Advanced settings. The last row of the island's Settings page (behind
 //! the gear) and the menu's Advanced settings… open it, in a window of its
 //! own: on Windows a borderless one (`settings_host.rs`), on the Mac a real
@@ -29,7 +29,7 @@ use crate::state::AppState;
 use crate::ui::{wid, wid_n, CursorKind, Hit, Input, MouseButton, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use crate::version::VERSION;
 use poni_core::geom::{palette, Color, Point, Rect};
-use poni_core::settings::{IdleStyle, MonitorChoice, Theme, TranslationColor};
+use poni_core::settings::{IdleStyle, MonitorChoice, PrayerSound, Theme, TranslationColor};
 use std::collections::HashMap;
 
 /// The card, in DIPs. Windows' window gives it room for its shadow and is
@@ -123,11 +123,12 @@ pub enum Section {
     Tabs,
     Addons,
     Focus,
+    Prayer,
     About,
 }
 
 impl Section {
-    pub const ALL: [Section; 9] = [
+    pub const ALL: [Section; 10] = [
         Section::General,
         Section::Appearance,
         Section::Island,
@@ -136,6 +137,7 @@ impl Section {
         Section::Tabs,
         Section::Addons,
         Section::Focus,
+        Section::Prayer,
         Section::About,
     ];
 
@@ -149,6 +151,7 @@ impl Section {
             Section::Tabs => "Tabs",
             Section::Addons => "Add-ons",
             Section::Focus => "Focus",
+            Section::Prayer => "Prayer times",
             Section::About => "About",
         }
     }
@@ -164,6 +167,7 @@ impl Section {
             Section::Tabs => "tabs",
             Section::Addons => "addons",
             Section::Focus => "focus",
+            Section::Prayer => "prayer",
             Section::About => "about",
         }
     }
@@ -178,6 +182,7 @@ impl Section {
             Section::Tabs => Icon::App,
             Section::Addons => Icon::Addons,
             Section::Focus => Icon::Timer,
+            Section::Prayer => Icon::Moon,
             Section::About => Icon::Gear,
         }
     }
@@ -193,13 +198,17 @@ impl Section {
             Section::Tabs => palette::GREEN,
             Section::Addons => Color::hex(0x0A84FF),
             Section::Focus => palette::ORANGE,
+            Section::Prayer => Color::hex(0x30B0A0),
             Section::About => Color::hex(0x8E8E93),
         }
     }
 
-    /// Every section shows (a section may go with an add-on again).
-    pub fn shown(self, _st: &AppState) -> bool {
-        true
+    /// Prayer times has a section only while its add-on is on.
+    pub fn shown(self, st: &AppState) -> bool {
+        match self {
+            Section::Prayer => st.prayer_on(),
+            _ => true,
+        }
     }
 }
 
@@ -242,6 +251,10 @@ pub enum Key {
     LongEvery,
     AutoBreaks,
     AutoFocus,
+    PrayerSound,
+    PrayerCountdown,
+    PrayerPause,
+    PrayerFollow,
     SettingsFile,
     DataFolder,
     ReleaseNotes,
@@ -307,6 +320,7 @@ const HOVER: [(u32, &str); 4] = [(220, "0.22 s"), (1500, "1.5 s"), (3000, "3 s")
 const CLOSE: [(u32, &str); 3] = [(0, "At once"), (400, "Short"), (1000, "Long")];
 const DISPLAYS: [(MonitorChoice, &str); 2] = [(MonitorChoice::Primary, "Main display"), (MonitorChoice::Cursor, "Under the pointer")];
 const FULLSCREEN: [(bool, &str); 2] = [(true, "Hide"), (false, "Stay on top")];
+const SOUNDS: [(PrayerSound, &str); 3] = [(PrayerSound::Adzan, "Adzan"), (PrayerSound::Tone, "Tone"), (PrayerSound::Silent, "Silent")];
 const THEMES: [(Theme, &str, &str); 4] = [
     (Theme::Classic, "Classic", "A black island at the top edge"),
     (Theme::Glass, "Glass", "Frosted glass over your screen"),
@@ -477,6 +491,22 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 ),
             ]
         }
+        Section::Prayer => {
+            let p = &s.prayer;
+            let countdown = if p.remind_before_min == 0 { "Off".to_string() } else { minutes(p.remind_before_min) };
+            vec![
+                Block::Group(
+                    Some("When it's time"),
+                    vec![
+                        item(Key::PrayerSound, "Sound", Some("Subuh plays the tone"), Ctl::Choice(names(&SOUNDS), chosen(&SOUNDS, p.sound))),
+                        switch(Key::PrayerPause, "Pause music for the adzan", None, p.pause_music),
+                        item(Key::PrayerCountdown, "Countdown before each prayer", Some("On the closed island"), Ctl::Stepper(countdown)),
+                    ],
+                ),
+                Block::Group(Some("Place"), vec![switch(Key::PrayerFollow, "Follow my location", Some("Windows' location picks the nearest place"), p.follow_location)]),
+                Block::Note("Pick a place by hand on the island's Prayer page."),
+            ]
+        }
         Section::About => vec![
             Block::Version,
             Block::Group(
@@ -597,6 +627,13 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::LongEvery => s.pomodoro.long_every = (s.pomodoro.long_every as i32 + step).clamp(0, 12) as u32,
         Key::AutoBreaks => s.pomodoro.auto_start_breaks = !s.pomodoro.auto_start_breaks,
         Key::AutoFocus => s.pomodoro.auto_start_focus = !s.pomodoro.auto_start_focus,
+        Key::PrayerSound => match act {
+            Act::Pick(i) if i < SOUNDS.len() => s.prayer.sound = SOUNDS[i].0,
+            _ => return,
+        },
+        Key::PrayerCountdown => s.prayer.remind_before_min = step_min(s.prayer.remind_before_min, step, 0, 60),
+        Key::PrayerPause => s.prayer.pause_music = !s.prayer.pause_music,
+        Key::PrayerFollow => s.prayer.follow_location = !s.prayer.follow_location,
         Key::SettingsFile => {
             st.cmd(Command::OpenPath(crate::paths::settings_path().to_string_lossy().into_owned()));
             return;
@@ -770,7 +807,7 @@ impl View {
     /// Draw the window on `c` for `st`, light or dark.
     pub fn draw(&mut self, c: &mut Canvas, st: &mut AppState, now: f64, frame: Frame, light: bool) -> Painted {
         self.dirty = false;
-        // A section that went away (an add-on switched off) is General.
+        // A section that went away (Prayer times switched off) is General.
         if !self.section.shown(st) {
             self.section = Section::General;
             self.scroll = Scroll::default();
@@ -1561,9 +1598,10 @@ mod tests {
         for _ in 0..100 {
             apply(&mut st, Key::Width, Act::Step(-1));
             apply(&mut st, Key::FocusMin, Act::Step(-1));
+            apply(&mut st, Key::PrayerCountdown, Act::Step(-1));
         }
         let s = &st.settings;
-        assert_eq!((s.expanded_width, s.pomodoro.focus_min), (480.0, 1));
+        assert_eq!((s.expanded_width, s.pomodoro.focus_min, s.prayer.remind_before_min), (480.0, 1, 0));
         // Minutes go by five, and by one below five.
         assert_eq!((step_min(25, -1, 1, 180), step_min(5, -1, 1, 180), step_min(3, 1, 1, 180), step_min(5, 1, 1, 180)), (20, 4, 4, 10));
     }
@@ -1622,6 +1660,14 @@ mod tests {
         assert!(!st.notifications_on() && st.cmds.iter().any(|c| matches!(c, Command::SaveSettings)));
         apply(&mut st, Key::Tab(PageKind::Notifications), Act::Toggle);
         assert!(st.notifications_on());
+    }
+
+    #[test]
+    fn prayer_has_a_section_only_while_its_add_on_is_on() {
+        let st = state();
+        assert!(!sections(&st).contains(&Section::Prayer));
+        assert_eq!(sections(&st).first(), Some(&Section::General));
+        assert_eq!(sections(&st).last(), Some(&Section::About));
     }
 
     #[test]

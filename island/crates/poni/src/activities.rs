@@ -17,6 +17,7 @@ use poni_core::frames::fmt_fps;
 use poni_core::geom::{clamp01, palette, Color, Point, Rect};
 use poni_core::pomodoro::Phase;
 use poni_core::settings::IdleStyle;
+use poni_core::svgpath::Seg;
 use poni_core::sysmon::fmt_pct;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,10 +25,14 @@ pub enum Activity {
     Media,
     Timer,
     MediaTimer,
+    /// Prayer times: the minutes before the next prayer.
+    Prayer,
     /// Show over games: frame rate, GPU and CPU while a full-screen app is in front.
     Game,
     /// The engine's newest caption, while it is fresh ([`poni_core::helper::Live`]).
     Caption,
+    /// The Downloader add-on: how far its downloads are.
+    Download,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -72,12 +77,30 @@ const BOLT_INSET: f32 = BOLT * 5.0 / 24.0;
 const BOLT_VISIBLE: f32 = BOLT * 14.0 / 24.0;
 /// Gap between the idle clock and its battery badge.
 const BADGE_GAP: f32 = 6.0;
+/// The countdown before a prayer: the moon, then "Maghrib 10 min" (152,
+/// its words' room), then its OK.
+const PRAYER_W: f32 = 152.0 + PRAYER_OK_ROOM;
+/// The countdown's OK: a small grey pill concentric with the 32 DIP pill's
+/// right end, as a notice's Hide is with the notice's. It puts the
+/// countdown away until the prayer's time (`AppState::prayer_countdown_ok`).
+pub(crate) const PRAYER_OK_ID: &str = "prayer.ok";
+const PRAYER_OK_W: f32 = 40.0;
+const PRAYER_OK_H: f32 = 24.0;
+const PRAYER_OK_INSET: f32 = (32.0 - PRAYER_OK_H) / 2.0;
+/// What the OK takes at the pill's right end, from where the words end.
+pub(crate) const PRAYER_OK_ROOM: f32 = 12.0 + PRAYER_OK_W + PRAYER_OK_INSET;
 /// The readout over games: room for "999 fps", "GPU 100% · 100°" and
 /// "CPU 100%" with dividers (tabular digits keep it still as numbers
 /// change), and without the temperature when the driver reports none.
 const GAME_W: f32 = 276.0;
 const GAME_NO_TEMP_W: f32 = 236.0;
 const GAME_DIVIDER: Color = Color::white(0.18);
+/// Downloads: the ring with the arrow in it, then "37%" (the timer's
+/// width); the long timer's while the count sits beside the ring.
+const DOWNLOAD_W: f32 = 96.0;
+const DOWNLOAD_MANY_W: f32 = 112.0;
+/// The capsule under the download count.
+const COUNT_FILL: Color = Color::white(0.16);
 /// Modes with the same key share content (no cross-fade between them).
 pub fn content_key(m: &Mode) -> u32 {
     match m {
@@ -85,8 +108,10 @@ pub fn content_key(m: &Mode) -> u32 {
         Mode::Activity(Activity::Media) => 2,
         Mode::Activity(Activity::Timer) => 3,
         Mode::Activity(Activity::MediaTimer) => 4,
+        Mode::Activity(Activity::Prayer) => 5,
         Mode::Activity(Activity::Game) => 6,
         Mode::Activity(Activity::Caption) => 7,
+        Mode::Activity(Activity::Download) => 8,
         Mode::Hud(t) => 10 + *t as u32,
         Mode::Notice => 20,
         Mode::Expanded(_) => 30,
@@ -113,7 +138,23 @@ fn media_grace_end(st: &AppState) -> Option<f64> {
     st.media_paused_at.map(|t| t + MEDIA_GRACE)
 }
 
+/// The prayer coming up and the minutes left, while its countdown runs and
+/// its OK wasn't clicked.
+pub fn prayer_countdown(st: &AppState) -> Option<(poni_core::prayer::Prayer, i64)> {
+    if !st.prayer_on() {
+        return None;
+    }
+    let site = st.prayer.site()?;
+    poni_core::prayer::countdown(&site, st.prayer_now(), st.settings.prayer.remind_before_min)
+        .filter(|(m, _)| st.prayer.countdown_ok != Some(m.at))
+        .map(|(m, left)| (m.prayer, left))
+}
+
 pub fn current_activity(st: &AppState) -> Option<Activity> {
+    // The few minutes before a prayer come next: they don't come back.
+    if prayer_countdown(st).is_some() {
+        return Some(Activity::Prayer);
+    }
     // Over a game the readout takes the pill; music and timer wait.
     if st.game.active {
         return Some(Activity::Game);
@@ -129,8 +170,17 @@ pub fn current_activity(st: &AppState) -> Option<Activity> {
         (true, true) => Some(Activity::MediaTimer),
         (true, false) => Some(Activity::Media),
         (false, true) => Some(Activity::Timer),
+        // Downloads under way come last: they run for minutes and their
+        // page has the details, so music and the timer keep the island;
+        // they show while nothing else is live.
+        _ if downloading(st) => Some(Activity::Download),
         _ => None,
     }
+}
+
+/// Downloads wait or run (the Downloader add-on).
+fn downloading(st: &AppState) -> bool {
+    st.downloader_on() && st.downloads.busy()
 }
 
 pub fn collapsed_mode(st: &AppState) -> Mode {
@@ -226,7 +276,9 @@ pub fn geom(m: &Mode, st: &AppState) -> Geom {
         }
         Mode::Activity(Activity::MediaTimer) => Geom::new(132.0, 32.0, 15.0),
         Mode::Activity(Activity::Caption) => crate::pill::live::caption_geom(st, 32.0, 15.0),
+        Mode::Activity(Activity::Prayer) => Geom::new(PRAYER_W, 32.0, 15.0),
         Mode::Activity(Activity::Game) => Geom::new(if game_temp(st).is_some() { GAME_W } else { GAME_NO_TEMP_W }, 32.0, 15.0),
+        Mode::Activity(Activity::Download) => Geom::new(if download_many(st) { DOWNLOAD_MANY_W } else { DOWNLOAD_W }, 32.0, 15.0),
         Mode::Hud(HudTag::Volume) => Geom::new(316.0, 40.0, 19.0),
         Mode::Hud(HudTag::Charging) | Mode::Hud(HudTag::LowBattery) => Geom::new(300.0, 40.0, 19.0),
         Mode::Hud(HudTag::Bluetooth) => Geom::new(336.0, 46.0, 22.0),
@@ -491,7 +543,18 @@ fn draw_activity(ui: &mut Ui, st: &mut AppState, a: Activity, body: Rect) {
             ui.c.text(&text, Rect::new(body.x + 40.0, body.y, 64.0, body.h), &countdown_style(col, paused));
         }
         Activity::Caption => crate::pill::live::draw_caption(ui, st, body),
+        Activity::Prayer => {
+            // No Oyen here, in any theme: the moon, the minutes and OK only.
+            let Some((prayer, left)) = prayer_countdown(st) else { return };
+            let col = st.accent;
+            ui.c.icon(Icon::Moon, Rect::new(body.x + 14.0, cy - 8.0, 16.0, 16.0), col);
+            let text = format!("{} {left} min", prayer.name());
+            let ts = TextStyle::body().weight(Weight::Semibold).tabular().color(col).right();
+            let end = draw_prayer_ok(ui, body);
+            ui.c.text(&text, Rect::new(body.x + 36.0, body.y, end - body.x - 36.0, body.h), &ts);
+        }
         Activity::Game => draw_game(ui, st, body),
+        Activity::Download => draw_download(ui, st, body),
         Activity::MediaTimer => {
             // Art on the left; the ring sits right next to its countdown.
             art_or_icon(ui, st, art, playing);
@@ -507,6 +570,81 @@ fn draw_activity(ui: &mut Ui, st: &mut AppState, a: Activity, body: Rect) {
             ui.c.ring(c, 7.0, 2.2, p.progress(st.now), RING_TRACK, col);
         }
     }
+}
+
+/// The countdown's OK in the right end of its pill `body` (the app acts on
+/// it at mouse-down, as on a notice's inline pill). Returns where the words
+/// end.
+pub(crate) fn draw_prayer_ok(ui: &mut Ui, body: Rect) -> f32 {
+    let r = Rect::new(body.right() - PRAYER_OK_INSET - PRAYER_OK_W, body.center().y - PRAYER_OK_H / 2.0, PRAYER_OK_W, PRAYER_OK_H);
+    ui.pill(wid(PRAYER_OK_ID), r, "OK", None, PillStyle::Utility);
+    body.right() - PRAYER_OK_ROOM
+}
+
+/// What the download pill shows (`Activity::Download`, every theme): how far
+/// the downloads are, of everything running (None until a size is known),
+/// and how many wait or run. A saved file shows as the app's "Saved" notice
+/// (`app_downloads.rs`), not here.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct DownloadView {
+    pub fraction: Option<f32>,
+    pub count: usize,
+}
+
+pub(crate) fn download_view(st: &AppState) -> DownloadView {
+    let pill = st.downloads.pill();
+    DownloadView { fraction: pill.as_ref().and_then(|p| p.fraction), count: pill.map_or(0, |p| p.count) }
+}
+
+/// The count shows beside the download pill's mark: more than one download
+/// waits or runs.
+pub(crate) fn download_many(st: &AppState) -> bool {
+    download_view(st).count > 1
+}
+
+/// "37%": the whole percent the Downloads page's bar shows too
+/// (`downloads::percent`).
+pub(crate) fn download_pct(fraction: f32) -> String {
+    format!("{}%", poni_core::downloads::percent(fraction))
+}
+
+/// The download count on a grey capsule `h` tall, its left end at `x`
+/// (the Pill theme's too, in its own type).
+pub(crate) fn count_chip(ui: &mut Ui, count: usize, x: f32, cy: f32, h: f32, ts: TextStyle) {
+    let text = count.to_string();
+    let w = (ui.c.measure(&text, &ts, 100.0).0.ceil() + h / 2.0).max(h);
+    let r = Rect::new(x, cy - h / 2.0, w, h);
+    ui.c.fill_rrect(r, h / 2.0, COUNT_FILL);
+    ui.c.text(&text, r, &ts.center());
+}
+
+/// Downloads, in the timer's place: the ring filling with the accent round
+/// an arrow down, the count beside it while more than one waits or runs,
+/// and the percentage where the countdown sits. Until a size is known, the
+/// ring's track alone and a dash: no spinner, nothing moves (it repaints as
+/// yt-dlp reports).
+fn draw_download(ui: &mut Ui, st: &AppState, body: Rect) {
+    let c = Point::new(body.x + 12.0 + 9.0, body.center().y);
+    let ts = TextStyle::body().weight(Weight::Semibold).tabular().right();
+    let DownloadView { fraction, count } = download_view(st);
+    ui.c.ring(c, 9.0, 2.4, fraction.unwrap_or(0.0), RING_TRACK, st.accent);
+    arrow_down(ui, c, palette::TEXT);
+    if count > 1 {
+        count_chip(ui, count, c.x + 15.0, c.y, 16.0, TextStyle::caption().weight(Weight::Semibold).tabular());
+    }
+    let (text, col) = match fraction {
+        Some(f) => (download_pct(f), palette::TEXT),
+        None => ("\u{2013}".to_string(), palette::TEXT_DIM),
+    };
+    ui.c.text(&text, Rect::new(body.x + 30.0, body.y, body.w - 30.0 - 14.0, body.h), &ts.color(col));
+}
+
+/// A plain arrow down centred on `c`, 8.5 DIPs tall: `Icon::Download`'s
+/// tray leaves its arrow too small inside the download pill's ring.
+fn arrow_down(ui: &mut Ui, c: Point, color: Color) {
+    let (x, y) = (c.x, c.y);
+    let segs = [Seg::MoveTo(x, y - 4.25), Seg::LineTo(x, y + 4.25), Seg::MoveTo(x - 3.5, y + 0.75), Seg::LineTo(x, y + 4.25), Seg::LineTo(x + 3.5, y + 0.75)];
+    ui.c.path(&segs, None, Some((color, 1.6)));
 }
 
 /// The GPU's temperature for the readout, when its driver reports one.
@@ -657,6 +795,7 @@ fn inline_done(st: &AppState, a: InlineAction) -> bool {
         InlineAction::StartFocus => st.pomodoro.is_active(),
         // Oyenza: the sum is in place once Show took it.
         InlineAction::ShowAmount => st.notice.as_ref().is_some_and(|n| n.reveal.is_none()),
+        InlineAction::StopAdzan => !st.prayer.adzan,
         // Done once clicked: the app puts the check in the notice's icon.
         InlineAction::WhatsNew => st.notice.as_ref().is_some_and(|n| n.icon == Icon::Check),
         // Hide and Open take the notice away at once.
@@ -706,6 +845,7 @@ pub(crate) fn inline_look(st: &AppState, n: &Notice, a: InlineAction) -> (&'stat
         // Orange for focus; a break starts in its own green.
         InlineAction::StartFocus => ("Start", Some(Icon::Play), phase_color(st.pomodoro.phase)),
         InlineAction::ShowAmount => ("Show", Some(Icon::Eye), n.color),
+        InlineAction::StopAdzan => ("Stop", Some(Icon::Stop), n.color),
         InlineAction::WhatsNew => ("What's new", Some(Icon::Open), n.color),
         // Another app's notification: open that app.
         InlineAction::Open => ("Open", Some(Icon::Open), n.color),
@@ -782,7 +922,7 @@ mod tests {
             track_key: key.clone(),
         });
         if let Some(l) = lrc {
-            st.lyrics = LyricsState { track_key: key, status: LyricsStatus::Found, lyrics: Some(parse_lrc(l)), source: "Sample".into(), ruby: Vec::new() };
+            st.lyrics = LyricsState { track_key: key, status: LyricsStatus::Found, lyrics: Some(parse_lrc(l)), source: "Sample".into(), ruby: Vec::new(), wants_ja_readings: false };
         }
         st
     }
@@ -857,6 +997,54 @@ mod tests {
         st.helper.apply(Err("down".into()));
         assert_eq!(collapsed_mode(&st), Mode::Idle);
     }
+    /// Prayer times on in Kota Jakarta with a song singing its line, the
+    /// prayer clock `secs` before today's Ashar; and today's times there.
+    fn before_ashar(secs: i64) -> (AppState, poni_core::prayer::DayTimes) {
+        use poni_core::addons::{Status, PRAYER_TIMES};
+        let mut st = playing(Some("[00:10.00]Paper lanterns on the line\n[00:14.00]Count the windows\n"));
+        st.addons.insert(PRAYER_TIMES.id, Status::Ready);
+        let list = poni_core::prayer::PlaceList::parse(
+            r#"{"places":[{"id":"jakarta","label":"Kota Jakarta","kind":"kota","prov":"DKI Jakarta","lat":-6.1833,"lng":106.8333,"tz":"Asia/Jakarta"}]}"#,
+        )
+        .expect("the place");
+        st.prayer.place = list.find("jakarta").cloned();
+        st.prayer.places = Some(std::sync::Arc::new(list));
+        let site = st.prayer.site().expect("its site");
+        let times = poni_core::prayer::day_times(&site, site.local_day(st.unix)).expect("today's times");
+        st.prayer.clock_shift = times.ashar - secs - st.unix;
+        (st, times)
+    }
+
+    #[test]
+    fn ok_on_the_prayer_countdown_gives_the_island_back_until_that_prayer() {
+        use poni_core::prayer::Prayer;
+        let (mut st, times) = before_ashar(8 * 60);
+        // The countdown comes before the song...
+        assert_eq!(prayer_countdown(&st), Some((Prayer::Ashar, 8)));
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Prayer));
+        // ...until OK: the song and its line again, until Ashar.
+        assert_eq!(st.prayer_countdown_ok().map(|m| (m.prayer, m.at)), Some((Prayer::Ashar, times.ashar)));
+        assert_eq!(prayer_countdown(&st), None);
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Media));
+        st.prayer.clock_shift += 7 * 60;
+        assert_eq!(prayer_countdown(&st), None, "a minute before Ashar");
+        // Maghrib counts down as ever.
+        st.prayer.clock_shift = times.maghrib - 5 * 60 - st.unix;
+        assert_eq!(prayer_countdown(&st), Some((Prayer::Maghrib, 5)));
+        assert_eq!(collapsed_mode(&st), Mode::Activity(Activity::Prayer));
+    }
+
+    #[test]
+    fn ok_with_no_countdown_running_puts_nothing_away() {
+        let (mut st, _) = before_ashar(30 * 60);
+        assert_eq!(prayer_countdown(&st), None);
+        assert_eq!(st.prayer_countdown_ok(), None);
+        assert_eq!(st.prayer.countdown_ok, None);
+        // Ashar's countdown still comes in its time.
+        st.prayer.clock_shift += 25 * 60;
+        assert_eq!(prayer_countdown(&st).map(|(p, _)| p), Some(poni_core::prayer::Prayer::Ashar));
+    }
+
     #[test]
     fn a_notice_that_stays_waits_under_a_volume_change_and_a_games_readout() {
         let mut st = AppState::new(Settings::default(), Store::default());
@@ -906,5 +1094,93 @@ mod tests {
         song.hud = None;
         assert!(!is_live(&Mode::Aside, &song));
         assert!(is_live(&media, &song));
+    }
+
+    /// A download of `url` added to the list (queued).
+    fn add(st: &mut AppState, url: &str) -> u64 {
+        st.downloads.add(url.into(), poni_core::ytdlp::Mode::Video, 0)
+    }
+
+    /// The Downloader on, with `n` downloads starting (no size known yet).
+    fn with_downloads(mut st: AppState, n: usize) -> AppState {
+        st.downloader_offered = true;
+        st.addons.insert(poni_core::addons::DOWNLOADER.id, poni_core::addons::Status::Ready);
+        for i in 0..n {
+            let id = add(&mut st, &format!("https://video.blender.org/w/{i}"));
+            st.downloads.starting(id);
+        }
+        st
+    }
+
+    #[test]
+    fn downloads_show_while_nothing_else_is_live() {
+        let mut st = with_downloads(AppState::new(Settings::default(), Store::default()), 1);
+        assert_eq!(current_activity(&st), Some(Activity::Download));
+        // Music and the timer keep the island while downloads run.
+        let song = with_downloads(playing(None), 1);
+        assert_eq!(current_activity(&song), Some(Activity::Media));
+        st.pomodoro.start(st.now);
+        assert_eq!(current_activity(&st), Some(Activity::Timer));
+        // So does a game's readout.
+        st.game.active = true;
+        assert_eq!(current_activity(&st), Some(Activity::Game));
+        // Where the Downloader isn't offered (the Mac, for now): never.
+        let mut mac = with_downloads(AppState::new(Settings::default(), Store::default()), 1);
+        mac.downloader_offered = false;
+        assert_eq!(current_activity(&mac), None);
+    }
+
+    #[test]
+    fn the_download_pill_never_moves_and_goes_once_its_file_is_saved() {
+        use poni_core::settings::Theme;
+        let m = Mode::Activity(Activity::Download);
+        let mut st = with_downloads(AppState::new(Settings::default(), Store::default()), 1);
+        for theme in [Theme::Classic, Theme::Glass, Theme::Paper, Theme::Pill] {
+            st.settings.theme = theme;
+            assert!(!is_live(&m, &st), "{theme:?}");
+            assert_eq!(next_wake(&m, &st), None, "{theme:?}: it repaints as yt-dlp reports");
+            let g = geom(&m, &st);
+            assert_eq!((g.w, g.h), (DOWNLOAD_W, 32.0), "{theme:?}");
+        }
+        // Saved: the app's notice says so (`App::saved`), the pill has nothing left to show.
+        let id = st.downloads.list[0].id;
+        st.downloads.apply(id, poni_core::ytdlp::Line::Done { path: "Sprite Fright.mp4".into() });
+        assert_eq!(current_activity(&st), None);
+    }
+
+    #[test]
+    fn the_pill_shows_how_far_and_widens_for_the_count() {
+        use poni_core::settings::Theme;
+        use poni_core::ytdlp::Line;
+        let m = Mode::Activity(Activity::Download);
+        let mut st = with_downloads(AppState::new(Settings::default(), Store::default()), 0);
+        let id = add(&mut st, "https://video.blender.org/w/sprite-fright");
+        st.downloads.starting(id);
+        assert_eq!(download_view(&st), DownloadView { fraction: None, count: 1 }, "no size yet");
+        st.downloads.apply(id, Line::Progress { done: 12_400_000, total: Some(45_100_000), speed: Some(2.1e6), eta_s: Some(14) });
+        let DownloadView { fraction: Some(f), count: 1 } = download_view(&st) else { panic!("{:?}", download_view(&st)) };
+        assert_eq!(download_pct(f), "27%");
+        for theme in [Theme::Classic, Theme::Pill] {
+            st.settings.theme = theme;
+            assert_eq!(geom(&m, &st).w, DOWNLOAD_W, "{theme:?}");
+        }
+        // A second one, queued: the count shows beside the mark.
+        add(&mut st, "https://archive.org/details/BigBuckBunny_124");
+        assert!(download_many(&st));
+        for theme in [Theme::Classic, Theme::Glass, Theme::Paper, Theme::Pill] {
+            st.settings.theme = theme;
+            assert_eq!(geom(&m, &st).w, DOWNLOAD_MANY_W, "{theme:?}");
+        }
+        // Joining the picture and the sound: all its bytes are in.
+        st.downloads.apply(id, Line::Stage(poni_core::ytdlp::Stage::Merging));
+        let DownloadView { fraction: Some(f), count: 2 } = download_view(&st) else { panic!("{:?}", download_view(&st)) };
+        assert_eq!(download_pct(f), "100%");
+    }
+
+    #[test]
+    fn download_percents_round_to_the_nearest_as_the_page_s_bars_do() {
+        for (f, s) in [(0.0, "0%"), (0.29, "29%"), (0.369, "37%"), (0.996, "99%"), (1.0, "100%"), (1.5, "100%")] {
+            assert_eq!(download_pct(f), s);
+        }
     }
 }

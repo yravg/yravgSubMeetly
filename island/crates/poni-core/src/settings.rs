@@ -154,6 +154,8 @@ pub struct Settings {
     /// Add-ons switched on, by id (`poni_core::addons`). Ids this version
     /// doesn't know are kept, so a newer Poni's choices survive a save.
     pub addons: BTreeMap<String, bool>,
+    /// The Prayer times add-on's choices.
+    pub prayer: PrayerSettings,
     /// Show over games: while a full-screen app is in front, the island
     /// shows its frame rate, the GPU's load and temperature and the CPU's
     /// load. Turning it on also keeps the island on top of full-screen apps.
@@ -168,6 +170,43 @@ pub struct Settings {
     /// Notifications' choices: which apps the island shows, and
     /// whether who it's from and the message show at once.
     pub notifications: crate::notifications::NotificationSettings,
+}
+
+/// What plays when a prayer's time comes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PrayerSound {
+    /// The adzan recording (Subuh plays the tone: the recording isn't Subuh's adzan).
+    Adzan,
+    /// A short system tone.
+    #[default]
+    Tone,
+    Silent,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PrayerSettings {
+    /// The place the times are for: its id in the add-on's place list, or
+    /// "w:lat,lng" for a city abroad. None until one is found or picked.
+    pub place: Option<String>,
+    /// That city abroad as its own few lines (`prayer::World::excerpt`): its
+    /// name, country, point and clock, so its times need nothing online.
+    pub world_place: Option<String>,
+    /// Let Windows' location pick the nearest place, and pick again when the
+    /// PC moves. Picking a place by hand turns this off.
+    pub follow_location: bool,
+    pub sound: PrayerSound,
+    /// Minutes before each prayer the island counts down (0 = no countdown).
+    pub remind_before_min: u32,
+    /// Pause music that is playing when the adzan starts (it stays paused).
+    pub pause_music: bool,
+}
+
+impl Default for PrayerSettings {
+    fn default() -> Self {
+        Self { place: None, world_place: None, follow_location: true, sound: PrayerSound::Tone, remind_before_min: 10, pause_music: true }
+    }
 }
 
 impl Default for Settings {
@@ -199,6 +238,7 @@ impl Default for Settings {
             pomodoro: PomodoroConfig::default(),
             system_history: true,
             addons: BTreeMap::new(),
+            prayer: PrayerSettings::default(),
             game_stats: false,
             game_peek: false,
             notifications: crate::notifications::NotificationSettings::default(),
@@ -302,6 +342,7 @@ impl Settings {
         p.short_break_min = p.short_break_min.clamp(1, 60);
         p.long_break_min = p.long_break_min.clamp(1, 120);
         p.long_every = p.long_every.min(12);
+        self.prayer.remind_before_min = self.prayer.remind_before_min.min(60);
         self
     }
 }
@@ -321,12 +362,12 @@ mod tests {
     #[test]
     fn addons_are_off_until_switched_on_and_unknown_ones_survive() {
         let mut s = Settings::default();
-        assert!(!s.addon_on("system"));
-        s.set_addon("system", true);
-        assert!(s.addon_on("system"));
+        assert!(!s.addon_on("sholat"));
+        s.set_addon("sholat", true);
+        assert!(s.addon_on("sholat"));
         // A newer Poni's add-on stays in the file when this one saves it.
-        let s: Settings = serde_json::from_str(r#"{"addons":{"system":true,"future":true}}"#).unwrap();
-        assert!(s.addon_on("system"));
+        let s: Settings = serde_json::from_str(r#"{"addons":{"sholat":true,"future":true}}"#).unwrap();
+        assert!(s.addon_on("sholat"));
         let back: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert!(back.addon_on("future"));
         // Files from before add-ons have none on.
@@ -337,15 +378,25 @@ mod tests {
     #[test]
     fn an_addon_switched_off_by_hand_is_no_longer_unset() {
         let mut s = Settings::default();
-        assert!(s.addon_unset("script"));
-        s.set_addon("script", true);
-        assert!(!s.addon_unset("script"));
-        s.set_addon("script", false);
-        assert!(!s.addon_unset("script"), "off by hand: the person's word, kept");
-        assert!(!s.addon_on("script"));
+        assert!(s.addon_unset("ja"));
+        s.set_addon("ja", true);
+        assert!(!s.addon_unset("ja"));
+        s.set_addon("ja", false);
+        assert!(!s.addon_unset("ja"), "off by hand: the person's word, kept");
+        assert!(!s.addon_on("ja"));
         // It survives a save and a load.
         let back: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
-        assert!(!back.addon_unset("script"));
+        assert!(!back.addon_unset("ja"));
+    }
+
+    #[test]
+    fn prayer_defaults_follow_location_with_a_tone_ten_minutes_before() {
+        let p = Settings::default().prayer;
+        assert_eq!((p.place, p.follow_location, p.sound, p.remind_before_min, p.pause_music), (None, true, PrayerSound::Tone, 10, true));
+        let s: Settings = serde_json::from_str(r#"{"prayer":{"place":"jakarta","sound":"adzan","remind_before_min":600}}"#).unwrap();
+        let s = s.sanitized();
+        assert_eq!((s.prayer.place.as_deref(), s.prayer.sound, s.prayer.remind_before_min), (Some("jakarta"), PrayerSound::Adzan, 60));
+        assert!(s.prayer.follow_location);
     }
 
     #[test]
@@ -515,9 +566,9 @@ mod tests {
     fn notifications_switched_off_as_an_add_on_stays_off() {
         // Until 0.2.24 Notifications was an add-on, off by default. One switched
         // off by hand stays off, as a hidden tab.
-        let s = serde_json::from_str::<Settings>(r#"{"settings_version":4,"addons":{"notifications":false,"system":true}}"#).unwrap().sanitized();
+        let s = serde_json::from_str::<Settings>(r#"{"settings_version":4,"addons":{"notifications":false,"sholat":true}}"#).unwrap().sanitized();
         assert_eq!(s.hidden_tabs, ["notifications"]);
-        assert!(s.addon_on("system"));
+        assert!(s.addon_on("sholat"));
         // Switched on, or never touched: on, like everyone's now.
         for file in [r#"{"settings_version":4,"addons":{"notifications":true}}"#, r#"{"settings_version":4}"#] {
             let s = serde_json::from_str::<Settings>(file).unwrap().sanitized();

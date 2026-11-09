@@ -72,7 +72,9 @@ pub enum AppleMusicStatus {
 #[derive(Clone, Debug)]
 pub enum LyricsResult {
     /// `ruby`: each line's pieces with their readings (empty = none needed).
-    Found { lyrics: Lyrics, source: String, ruby: Vec<Vec<Ruby>> },
+    /// `wants_ja_readings`: kanji went unread for want of the Japanese
+    /// readings add-on (`services::romanize::Pronounced`).
+    Found { lyrics: Lyrics, source: String, ruby: Vec<Vec<Ruby>>, wants_ja_readings: bool },
     /// The song is marked instrumental (no words to show).
     Instrumental,
     NotFound,
@@ -125,9 +127,19 @@ pub enum AppEvent {
     Addon { id: &'static str, status: poni_core::addons::Status },
     /// What the update file said (`services::update`).
     Update(crate::services::update::UpdateEvent),
+    /// Where Windows says the PC is (`services::location`), for prayer times.
+    Located(crate::services::location::Located),
+    /// One of prayer times' online city files (`services::cities`).
+    Cities { file: String, got: Result<poni_core::prayer::World, String> },
+    /// One of yt-dlp's lines for download `id` (`services::downloader`).
+    Download { id: u64, line: poni_core::ytdlp::Line },
+    /// yt-dlp for download `id` ended (`ok`: it exited with 0).
+    DownloadEnded { id: u64, ok: bool },
     /// Notifications: what Windows allows, and new notifications
     /// (`services::notifications`).
     Notify(crate::services::notifications::NotifyEvent),
+    /// The adzan finished playing, or couldn't play on.
+    AdzanEnded,
     /// Start with Windows is on (true) or off, read for the Settings page.
     Autostart(bool),
     /// The helper's answer: notes and health with the round trip in ms, or why not.

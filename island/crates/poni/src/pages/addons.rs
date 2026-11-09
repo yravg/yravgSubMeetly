@@ -1,15 +1,26 @@
 //! Add-ons page, the "+" at the end of the tab row: features only the people
-//! who switch them on get (`poni_core::addons`). Script reader and System are
-//! already in the app and only show their pages (System's readings also run
-//! only while it is on).
+//! who switch them on get (`poni_core::addons`). Most download then; Script
+//! reader, System, Health, Stocks, IELTS and Meeting notes are already in
+//! the app and only show their pages (System's readings, Health's steps and
+//! Stocks' prices also run only while they are on; IELTS only while a
+//! session runs, Meeting notes only while it records).
 //!
 //! One row per add-on: its icon, its name, what it does (or where its
 //! download stands, with a bar while it comes in), its size while it is off,
 //! ("Built in" for one with nothing to download), and a switch. The whole
-//! row toggles, as in Settings (`Command::SaveSettings`; the app passes the
-//! change to `services::addons`). One whose files this build can't get yet
-//! stays off and says so (`Status::Unpinned`).
-//! Both apps list every add-on ([`OFFERED`]).
+//! row toggles, as in Settings: on downloads the add-on and starts it, off
+//! stops it and deletes its files
+//! (`Command::SaveSettings`; the app passes the change to `services::addons`).
+//! One whose files this build can't get yet stays off and says so
+//! (`Status::Unpinned`).
+//! Both apps list every add-on ([`OFFERED`]) but Screen recorder, which shows
+//! once yravgSubMeetly Recorder is installed ([`rows`]). From seven rows each
+//! is one line: the name, then the line after it.
+//!
+//! A Studio Pro add-on's row says Pro where its size was, for everyone, so
+//! people know what Pro brings before they buy it. Without Pro its switch
+//! gives way to a +, and a click opens what it does ([`locked`], [`draw_about`]).
+//! The Downloader's tools come only with Pro ([`needs_pro`]).
 
 use crate::commands::Command;
 use crate::gfx::TextStyle;
@@ -41,7 +52,8 @@ const TWO_LINES: f32 = 33.0;
 const BADGE_ONE_LINE: f32 = 24.0;
 /// Between the name and the line after it, on a one-line row.
 const LINE_GAP: f32 = 10.0;
-/// The add-ons this app has, in the page's order.
+/// The add-ons this app has, in the page's order: all of them, on Windows
+/// and on the Mac (whose Prayer times use macOS's location and sounds).
 pub const OFFERED: &[&Addon] = &addons::ALL;
 /// The lines name the Mac ("on this Mac") and leave out Windows' reasons.
 const MAC: bool = cfg!(target_os = "macos");
@@ -51,9 +63,10 @@ pub fn height(st: &AppState) -> f32 {
     ROWS_Y + n as f32 * row_h(n)
 }
 
-/// The page's rows: every add-on offered.
-fn rows(_st: &AppState) -> Vec<&'static Addon> {
-    OFFERED.to_vec()
+/// The page's rows: every add-on offered, Downloader only where it's offered
+/// (`AppState::downloader_offered`).
+fn rows(st: &AppState) -> Vec<&'static Addon> {
+    OFFERED.iter().copied().filter(|a| a.id != addons::DOWNLOADER.id || st.downloader_offered).collect()
 }
 
 fn row_h(n: usize) -> f32 {
@@ -68,11 +81,15 @@ fn status(st: &AppState, a: &Addon) -> Status {
 /// Each add-on's icon on its badge.
 fn icon(a: &Addon) -> Icon {
     match a.id {
+        "sholat" => Icon::Moon,
+        "ja" => Icon::Lyrics,
         "script" => Icon::Script,
         "system" => Icon::Gauge,
         "timer" => Icon::Clock,
         "talk" => Icon::Volume,
         "engine" => Icon::Cpu,
+        "notifications" => Icon::Bell,
+        "downloader" => Icon::Download,
         _ => Icon::Addons,
     }
 }
@@ -173,8 +190,15 @@ mod tests {
 
     #[test]
     fn every_row_offered_fits_the_page() {
-        let st = AppState::new(Settings::default(), Store::default());
+        let mut st = AppState::new(Settings::default(), Store::default());
+        // The Downloader is offered only where it can run (not the Store build).
+        assert_eq!(rows(&st).len(), addons::ALL.len() - 1);
+        assert!(!rows(&st).iter().any(|a| a.id == addons::DOWNLOADER.id));
+        st.downloader_offered = true;
         assert_eq!(rows(&st).len(), addons::ALL.len());
         assert!(height(&st) <= MAX_H, "the window never grows for this page");
+        let h = row_h(rows(&st).len());
+        assert!(h < TWO_LINES, "that many rows are a line each");
+        assert!(BADGE_ONE_LINE.min(h - 2.0) + 2.0 <= h, "{h} DIPs: the badges keep apart");
     }
 }
