@@ -1,7 +1,7 @@
 //! Starts the real Rust engine (`submeetly-engine`) on a free loopback port
 //! with a fixture state dir and checks that the island's client reads it and
-//! that a decision round-trips. Skipped (with a message) when no engine binary
-//! is found: build it, or set `SUBMEETLY_ENGINE_BIN` to pick one.
+//! that a decision round-trips. Skipped (with a message) when no engine binary is found, or when the
+//! only ones are older than the engine source: build it, or set `SUBMEETLY_ENGINE_BIN` to pick one.
 
 use poni_core::helper::{self, Decision};
 use std::net::TcpListener;
@@ -24,27 +24,61 @@ impl Drop for Guard {
     }
 }
 
-/// `SUBMEETLY_ENGINE_BIN`, else the engine-rs build output (release first).
-fn engine_binary() -> Option<std::path::PathBuf> {
+/// The engine to test: `SUBMEETLY_ENGINE_BIN` (named on purpose, used as it is), else the newest-built
+/// engine-rs output (release first) that is not older than the engine source. `Err` says why there is none:
+/// a stale exe would fail on things the source already does, which reads as a bug in this code.
+fn engine_binary() -> Result<std::path::PathBuf, String> {
+    const BUILD: &str = "cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml";
     if let Ok(p) = std::env::var("SUBMEETLY_ENGINE_BIN") {
         let p = std::path::PathBuf::from(p);
-        return p.is_file().then_some(p);
+        return if p.is_file() { Ok(p) } else { Err(format!("SUBMEETLY_ENGINE_BIN={} is not a file", p.display())) };
     }
     let exe = if cfg!(windows) { "submeetly-engine.exe" } else { "submeetly-engine" };
-    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../engine-rs/target");
-    let targets = [std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from), Some(repo)];
-    targets
-        .into_iter()
-        .flatten()
-        .flat_map(|t| [t.join("release").join(exe), t.join("debug").join(exe)])
-        .find(|p| p.is_file())
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../engine-rs");
+    let targets = [std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from), Some(root.join("target"))];
+    let found: Vec<_> = targets.into_iter().flatten().flat_map(|t| [t.join("release").join(exe), t.join("debug").join(exe)]).filter(|p| p.is_file()).collect();
+    if found.is_empty() {
+        return Err(format!("submeetly-engine not built ({BUILD})"));
+    }
+    let (newest, newest_at) = newest_source(&root).ok_or_else(|| "cannot read the engine source".to_string())?;
+    let built = |p: &std::path::Path| p.metadata().and_then(|m| m.modified()).ok();
+    match found.iter().find(|p| built(p).is_some_and(|b| b >= newest_at)) {
+        Some(p) => Ok(p.clone()),
+        None => Err(format!("{} is older than {} (rebuild: {BUILD}, or set SUBMEETLY_ENGINE_BIN)", found[0].display(), newest.display())),
+    }
+}
+
+/// The most recently changed engine source file (Rust, Cargo manifests and lock) under `dir`, `target` left out.
+fn newest_source(dir: &std::path::Path) -> Option<(std::path::PathBuf, std::time::SystemTime)> {
+    let mut best: Option<(std::path::PathBuf, std::time::SystemTime)> = None;
+    for e in std::fs::read_dir(dir).ok()?.flatten() {
+        let p = e.path();
+        let name = e.file_name();
+        let found = if p.is_dir() {
+            if name == "target" || name == "golden" {
+                continue;
+            }
+            newest_source(&p)
+        } else if p.extension().is_some_and(|x| x == "rs") || name == "Cargo.toml" || name == "Cargo.lock" {
+            e.metadata().and_then(|m| m.modified()).ok().map(|t| (p, t))
+        } else {
+            None
+        };
+        if let Some(f) = found.filter(|f| best.as_ref().is_none_or(|b| f.1 > b.1)) {
+            best = Some(f);
+        }
+    }
+    best
 }
 
 #[test]
 fn island_reads_and_writes_the_real_helper() {
-    let Some(engine) = engine_binary() else {
-        eprintln!("skip: submeetly-engine not built (cargo build --release -p submeetly-engine --manifest-path engine-rs/Cargo.toml)");
-        return;
+    let engine = match engine_binary() {
+        Ok(e) => e,
+        Err(why) => {
+            eprintln!("skip: {why}");
+            return;
+        }
     };
     let port = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
     let dir = std::env::temp_dir().join(format!("island-smoke-{port}"));
