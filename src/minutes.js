@@ -816,24 +816,39 @@ function paintHeader() {
    butir (total), tindak lanjut, lewat tenggat, pertanyaan (baris peringkat),
    belum ditinjau, keputusan/varians (peringkat atau blok), cakupan agenda.
    -------------------------------------------------------------------------- */
+/* TIDE-024 (A04d): satu pita ≤ 72 px. Legenda sebaris membawa jumlah; chevron
+   membuka legenda penuh (.sum-rank) dengan jumlah dan persentase. */
 let sum = null;
+let sumOpen = false;
 
 function buildSummary(host) {
-  host.innerHTML = `<div class="sum">
+  host.innerHTML = `<div class="sum-box"><div class="sum">
     <div class="sum-total"><span class="n"><span class="mo-num"></span></span><span class="l"></span></div>
-    <div class="sum-mid"><div class="sum-stack" role="img"></div><ul class="sum-rank"></ul></div>
-    <div class="sum-side"><dl class="sum-stats"></dl><button type="button" class="btn sm sum-review" id="btn-sum-review"></button></div>
-  </div>`;
+    <div class="sum-mid"><div class="sum-stack" role="img"></div><ul class="sum-legend"></ul></div>
+    <dl class="sum-stats"></dl>
+    <div class="sum-act"><button type="button" class="btn sm sum-review" id="btn-sum-review"></button>
+    <button type="button" class="icon-btn sum-xp" id="btn-sum-expand" aria-controls="sum-rank" aria-expanded="false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+  </div><ul class="sum-rank" id="sum-rank" hidden></ul></div>`;
   sum = {
     host,
     total: slidingNumber(host.querySelector('.mo-num'), { decimals: 0, groupSeparator: '', decimalSeparator: '.' }),
     label: host.querySelector('.sum-total .l'),
     stack: host.querySelector('.sum-stack'),
+    legend: host.querySelector('.sum-legend'),
     rank: host.querySelector('.sum-rank'),
     stats: host.querySelector('.sum-stats'),
     review: host.querySelector('.sum-review'),
+    xp: host.querySelector('.sum-xp'),
   };
   sum.review.addEventListener('click', () => $('#btn-review-only').click());
+  sum.xp.addEventListener('click', () => { sumOpen = !sumOpen; paintSummaryOpen(); });
+}
+
+function paintSummaryOpen() {
+  sum.xp.setAttribute('aria-expanded', String(sumOpen));
+  sum.xp.title = T(sumOpen ? 'sumLess' : 'sumMore');
+  sum.xp.setAttribute('aria-label', sum.xp.title);
+  sum.rank.hidden = !sumOpen || !sum.rank.childElementCount;
 }
 
 function paintSummary(stats) {
@@ -846,7 +861,12 @@ function paintSummary(stats) {
   const share = (n) => (stats.total ? Math.round((n / stats.total) * 100) : 0);
   sum.stack.setAttribute('aria-label', counts.map(([t, n]) => `${T(t)} ${n}`).join(', '));
   sum.stack.innerHTML = counts.map(([t, n]) => `<i style="flex:${n};background:${TYPE_COLOR[t]}" title="${esc(T(t))} ${n}"></i>`).join('');
+  sum.legend.innerHTML = counts.length
+    ? counts.map(([t, n]) => `<li><span class="sw" style="background:${TYPE_COLOR[t]}"></span>${esc(T(t))} <b class="mono">${n}</b></li>`).join('')
+    : `<li class="none">${esc(T('sumNone'))}</li>`;
   sum.rank.innerHTML = counts.map(([t, n]) => `<li><span class="sw" style="background:${TYPE_COLOR[t]}"></span><span class="nm">${esc(T(t))}${t === 'question' && stats.questionsOpen !== n ? ` <em>${esc(T('openN', stats.questionsOpen))}</em>` : ''}</span><span class="v mono">${n}</span><span class="sh mono">${share(n)}%</span></li>`).join('');
+  sum.xp.hidden = !counts.length;
+  paintSummaryOpen();
   const rows = [
     [T('sActions'), `${stats.actionsOpen}<span class="of">/${stats.actionsTotal}</span>`, ''],
     [T('sOverdue'), String(stats.overdue), stats.overdue ? 'is-alert' : ''],
