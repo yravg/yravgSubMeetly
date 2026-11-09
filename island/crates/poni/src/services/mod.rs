@@ -129,6 +129,13 @@ impl Services {
         }
     }
 
+    /// A calendar request to the engine; the answer comes back as `AppEvent::Calendar`.
+    pub fn calendar(&self, req: poni_core::calendar::Req) {
+        if let Some(h) = &self.helper {
+            h.calendar(req);
+        }
+    }
+
     /// Step aside on (the band along the top edge of the island's monitor,
     /// screen pixels) or off: the full-screen watcher reports what reaches it.
     pub fn watch_top(&self, band: Option<RECT>) {

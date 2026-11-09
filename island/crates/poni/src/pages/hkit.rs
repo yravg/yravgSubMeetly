@@ -4,7 +4,8 @@
 
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
-use crate::ui::{PillStyle, Ui, PILL_SMALL};
+use crate::pages::PageKind;
+use crate::ui::{wid_n, PillStyle, Ui, PILL_SMALL};
 use poni_core::geom::{palette, Color, Point, Rect};
 use crate::commands::Command;
 use crate::state::AppState;
@@ -73,7 +74,47 @@ pub fn kind_chip(ui: &mut Ui, x: f32, cy: f32, k: Kind) -> f32 {
     w
 }
 
-/// The colour of the translated line: the person's pick on a light island
+/// Height of the row [`guide`] draws, with its gap to the content.
+pub const GUIDE_H: f32 = 26.0;
+const NAV_GAP: f32 = 14.0;
+
+/// The meeting pages in the order a meeting goes: the plan, the room, the notes, what is left.
+const STEPS: [(PageKind, &str); 5] = [(PageKind::Calendar, "Calendar"), (PageKind::Live, "Live"), (PageKind::Meeting, "Meeting"), (PageKind::Inbox, "Inbox"), (PageKind::Timer, "Agenda")];
+
+/// What this page is for (one line, left) and the way to the other meeting
+/// pages (right, the open one marked). The nav is dropped when it would
+/// leave the purpose too little room. Returns the area under the row.
+pub fn guide(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKind, purpose: &str) -> Rect {
+    let row = Rect::new(area.x, area.y, area.w, GUIDE_H - 6.0);
+    let tabs = super::tabs(st);
+    let steps: Vec<(PageKind, &str)> = STEPS.into_iter().filter(|(p, _)| tabs.contains(p)).collect();
+    let on = TextStyle::caption().weight(Weight::Semibold).color(st.accent);
+    let off = TextStyle::caption().weight(Weight::Regular).color(palette::TEXT_DIM);
+    let widths: Vec<f32> = steps.iter().map(|(p, l)| ui.c.measure(l, if *p == page { &on } else { &off }, 200.0).0.ceil()).collect();
+    let nav_w = widths.iter().sum::<f32>() + NAV_GAP * steps.len().saturating_sub(1) as f32;
+    let show_nav = steps.len() > 1 && row.w - nav_w - 12.0 >= 260.0;
+    let purpose_w = if show_nav { row.w - nav_w - 12.0 } else { row.w };
+    ui.c.text(purpose, Rect::new(row.x, row.y, purpose_w, row.h), &off);
+    if show_nav {
+        let mut x = row.right() - nav_w;
+        for (i, ((p, label), w)) in steps.iter().zip(&widths).enumerate() {
+            let r = Rect::new(x, row.y, *w, row.h);
+            if *p == page {
+                ui.c.text(label, r, &on);
+            } else {
+                let resp = ui.button(wid_n("guide.nav", i as u64), r.inset(-4.0, 0.0));
+                ui.c.text(label, r, &off.clone().color(if resp.hovered { palette::TEXT } else { palette::TEXT_DIM }));
+                if resp.clicked {
+                    st.cmd(Command::SetPage(*p));
+                }
+            }
+            x += w + NAV_GAP;
+        }
+    }
+    Rect::new(area.x, area.y + GUIDE_H, area.w, (area.h - GUIDE_H).max(0.0))
+}
+
+/// The colour of the translated line:the person's pick on a light island
 /// (the swatches are made for white), cyan on the dark ones.
 pub fn translation_color(ui: &Ui, pick: poni_core::settings::TranslationColor) -> Color {
     if ui.c.look().light {

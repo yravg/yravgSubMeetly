@@ -3,7 +3,7 @@
 
 use crate::activities::{self, Mode};
 use crate::clock;
-use crate::commands::{Command, MediaCmd, NotifyCmd, PairCmd, PhoneCmd};
+use crate::commands::{CalendarCmd, Command, MediaCmd, NotifyCmd, PairCmd, PhoneCmd};
 use crate::events::{AppEvent, AppleMusicStatus, EventSink, SendHwnd, WM_APP_APPBAR, WM_APP_EVENT, WM_APP_FRAME, WM_APP_TRAY};
 use crate::gfx::{px_rect, px_union, scale_about, union_rect, Canvas, Gfx, HitMask};
 use crate::icons::Icon;
@@ -44,6 +44,9 @@ use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::HiDpi::{SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+
+/// The engine takes a calendar file up to this size (its own limit is 5 MB).
+const ICS_MAX_BYTES: u64 = 5 * 1024 * 1024;
 
 /// Not exported by windows-rs 0.58's WindowsAndMessaging module.
 const WM_MOUSELEAVE: u32 = 0x02A3;
@@ -2068,6 +2071,13 @@ impl App {
                 self.st.drag_hover = false;
                 self.request_frame();
             }
+            AppEvent::ShelfAdd(paths) if self.expanded && self.st.page == PageKind::Calendar && paths.iter().any(|p| poni_core::calendar::is_ics_path(p)) => {
+                // An .ics file dropped on the Calendar page is imported, not shelved.
+                self.import_ics(&paths);
+                self.drag_hover = false;
+                self.st.drag_hover = false;
+                self.request_frame();
+            }
             AppEvent::ShelfAdd(paths) => {
                 let n = self.st.store.shelf.add_paths(&paths, self.st.unix);
                 for p in &paths {
@@ -2085,7 +2095,7 @@ impl App {
                 self.st.drag_hover = on;
                 if on {
                     // The Script page takes a text file; everything else goes to the Shelf.
-                    if !(self.expanded && self.st.page == PageKind::Script) {
+                    if !(self.expanded && matches!(self.st.page, PageKind::Script | PageKind::Calendar)) {
                         self.st.page = PageKind::Shelf;
                     }
                     self.expand();
@@ -2145,6 +2155,16 @@ impl App {
             AppEvent::Helper(r) => self.st.helper.apply(r),
             AppEvent::Engine(info) => self.st.engine = info,
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
+            AppEvent::Calendar(r) => {
+                self.st.helper.apply_calendar(r);
+                self.calendar_heads_up();
+            }
+            AppEvent::CalendarNotes(Ok(_)) => {
+                // The note is first in the list now: the Meeting page reads it.
+                self.set_page(PageKind::Meeting);
+                self.request_frame();
+            }
+            AppEvent::CalendarNotes(Err(e)) => self.st.helper_notice = Some((e, now + 6.0, true)),
             AppEvent::Addon { id, status } => {
                 // A late report from before a switch-off doesn't bring it back.
                 if self.st.settings.addon_on(id) || status == AddonStatus::Off {
@@ -3537,6 +3557,54 @@ impl App {
         pinfo!("notice: inline action {a:?} done");
     }
 
+    /// A Calendar page request: the engine does the work; the answer comes back as an event.
+    fn calendar_cmd(&mut self, c: CalendarCmd) {
+        use poni_core::calendar::{self as cal, Req};
+        let req = match c {
+            CalendarCmd::PasteLink => match services::clipboard::read_text(self.hwnd).as_deref().and_then(cal::looks_like_link) {
+                Some(u) => Req::Link(u.to_string()),
+                None => {
+                    self.st.helper_notice = Some(("Copy your calendar link first, then press Paste link.".into(), self.st.now + 5.0, true));
+                    return;
+                }
+            },
+            CalendarCmd::Remove(id) => Req::Remove(id),
+            CalendarCmd::Refresh => Req::Refresh,
+            CalendarCmd::Notes(event) => Req::Notes { event, tz_minutes: cal::utc_offset(&self.st.local, self.st.unix) / 60 },
+        };
+        if let Some(s) = &self.services {
+            s.calendar(req);
+        }
+    }
+
+    /// The pill says "Standup in 5 min" once, when the calendar answer shows a
+    /// meeting about to start (`poni_core::calendar::soon`).
+    fn calendar_heads_up(&mut self) {
+        let Some(s) = self.st.helper.calendar.as_ref().and_then(|c| poni_core::calendar::soon(c, self.st.unix)) else { return };
+        if self.st.calendar_pinged.as_deref() == Some(s.event.id.as_str()) {
+            return;
+        }
+        let (id, title) = (s.event.id.clone(), poni_core::calendar::soon_text(&s));
+        self.st.calendar_pinged = Some(id);
+        let accent = self.st.accent;
+        self.st.notify(Icon::Calendar, accent, title, "Open Calendar", 8.0, Some(NoticeAction::OpenPage(PageKind::Calendar)));
+    }
+
+    /// Import the first dropped `.ics` file (at most [`ICS_MAX_BYTES`]).
+    fn import_ics(&mut self, paths: &[String]) {
+        use poni_core::calendar::{self as cal, Req};
+        let Some(path) = paths.iter().find(|p| cal::is_ics_path(p)) else { return };
+        let read = std::fs::metadata(path).ok().filter(|m| m.len() <= ICS_MAX_BYTES).and_then(|_| std::fs::read(path).ok());
+        let Some(ics) = read.and_then(|b| String::from_utf8(b).ok()) else {
+            self.st.helper_notice = Some(("That file is not a calendar this size can read (.ics, up to 5 MB).".into(), self.st.now + 6.0, true));
+            return;
+        };
+        let name = std::path::Path::new(path).file_name().map_or_else(|| "calendar.ics".into(), |n| n.to_string_lossy().into_owned());
+        if let Some(s) = &self.services {
+            s.calendar(Req::File { ics, name });
+        }
+    }
+
     /// Open the island on page `p` (the menu's entries for our own pages).
     fn open_page(&mut self, p: PageKind) {
         self.set_page(p);
@@ -3674,6 +3742,7 @@ impl App {
                         s.helper_poll();
                     }
                 }
+                Command::Calendar(c) => self.calendar_cmd(c),
             }
         }
         self.sync_phone_offer();

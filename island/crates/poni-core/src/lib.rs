@@ -9,6 +9,7 @@
 
 pub mod addons;
 pub mod applemusic;
+pub mod calendar;
 pub mod datetime;
 pub mod engine_link;
 pub mod frames;

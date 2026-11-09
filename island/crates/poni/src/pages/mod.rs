@@ -10,6 +10,7 @@
 //! files, saving, …).
 
 pub mod addons;
+pub mod calendar;
 pub mod card;
 pub mod focus;
 pub mod hkit;
@@ -57,6 +58,8 @@ pub enum PageKind {
     Meeting,
     /// Open items across meetings (I04).
     Inbox,
+    /// Meetings read from an Outlook or Gmail calendar (ICS link or file).
+    Calendar,
     /// Agenda timer add-in (I06).
     Timer,
     /// Talk time add-in (I06).
@@ -84,10 +87,11 @@ pub enum PageKind {
 impl PageKind {
     /// The tab row's order: the island's own pages, Oyenza, then the
     /// add-ons' pages and the "+".
-    pub const ALL: [PageKind; 15] = [
+    pub const ALL: [PageKind; 16] = [
         PageKind::Live,
         PageKind::Meeting,
         PageKind::Inbox,
+        PageKind::Calendar,
         PageKind::Timer,
         PageKind::Talk,
         PageKind::Engine,
@@ -107,6 +111,7 @@ impl PageKind {
             PageKind::Live => "live",
             PageKind::Meeting => "meeting",
             PageKind::Inbox => "inbox",
+            PageKind::Calendar => "calendar",
             PageKind::Timer => "timer",
             PageKind::Talk => "talk",
             PageKind::Engine => "engine",
@@ -132,6 +137,7 @@ impl PageKind {
             PageKind::Live => "Live",
             PageKind::Meeting => "Meeting",
             PageKind::Inbox => "Inbox",
+            PageKind::Calendar => "Calendar",
             PageKind::Timer => "Agenda timer",
             PageKind::Talk => "Talk time",
             PageKind::Engine => "Engine",
@@ -152,6 +158,7 @@ impl PageKind {
             PageKind::Live => Icon::Lyrics,
             PageKind::Meeting => Icon::Clipboard,
             PageKind::Inbox => Icon::CheckCircle,
+            PageKind::Calendar => Icon::Calendar,
             PageKind::Timer => Icon::Clock,
             PageKind::Talk => Icon::Volume,
             PageKind::Engine => Icon::Cpu,
@@ -254,7 +261,9 @@ pub fn content_height(p: PageKind, st: &AppState) -> f32 {
         PageKind::Live => live::height(st),
         PageKind::Meeting => meeting::height(st),
         PageKind::Inbox => inbox::height(st),
-        PageKind::Timer | PageKind::Talk | PageKind::Engine => tools::height(st),
+        PageKind::Calendar => calendar::height(st),
+        PageKind::Timer => tools::timer_height(st),
+        PageKind::Talk | PageKind::Engine => tools::height(st),
         PageKind::Media => media::height(st),
         PageKind::Focus => focus::height(st),
         PageKind::Shelf => shelf::height(st),
@@ -379,6 +388,7 @@ pub(crate) fn draw_page(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKi
         PageKind::Live => live::draw(ui, st, area),
         PageKind::Meeting => meeting::draw(ui, st, area),
         PageKind::Inbox => inbox::draw(ui, st, area),
+        PageKind::Calendar => calendar::draw(ui, st, area),
         PageKind::Timer => tools::draw_timer(ui, st, area),
         PageKind::Talk => tools::draw_talk(ui, st, area),
         PageKind::Engine => tools::draw_engine(ui, st, area),
@@ -685,12 +695,12 @@ mod tests {
     fn the_row_is_the_island_s_own_pages_then_the_add_ons_then_the_plus() {
         use PageKind::*;
         let mut st = state();
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Media, Shelf, Tasks, Focus, Addons]);
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Shelf, Tasks, Focus, Addons]);
         // Switched-on add-ons show after Focus, before the "+".
         for id in ["system", "script"] {
             st.addons.insert(id, poni_core::addons::Status::Ready);
         }
-        assert_eq!(&tabs(&st)[10..], [System, Script, Addons]);
+        assert_eq!(&tabs(&st)[11..], [System, Script, Addons]);
         // Clipboard left the app: an island last open there opens on the first tab.
         assert_eq!(PageKind::from_key("clipboard"), PageKind::ALL[0]);
     }
@@ -701,18 +711,18 @@ mod tests {
         let mut st = state();
         st.settings.hidden_tabs = vec!["shelf".into(), "tasks".into()];
         st.page = Focus;
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Media, Focus, Addons]);
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Focus, Addons]);
         // Opened from elsewhere (a dropped file opens the Shelf): its tab
         // shows while it's open, and stepping on leaves it behind.
         st.page = Shelf;
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Media, Shelf, Focus, Addons]);
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Shelf, Focus, Addons]);
         st.page = step_tab(Shelf, &st, true);
         assert_eq!(st.page, Focus);
         assert!(!tabs(&st).contains(&Shelf));
         // Every hideable tab hidden: the Live page is still there.
         st.settings.hidden_tabs = PageKind::HIDEABLE.iter().map(|p| p.key().to_string()).collect();
         st.page = Live;
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Timer, Talk, Engine, Addons]);
+        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Addons]);
         assert_eq!(first_tab(&st), Live);
     }
 

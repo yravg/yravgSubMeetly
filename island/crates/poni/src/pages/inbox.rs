@@ -8,21 +8,23 @@ use super::hkit;
 use crate::commands::Command;
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
+use crate::pages::PageKind;
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Rect};
 use poni_core::helper::{self, Decision, PageState};
 
 const HEAD_H: f32 = 26.0;
-const ROW_H: f32 = 40.0;
+const ROW_H: f32 = 36.0;
 pub const MAX_ROWS: usize = 5;
 const FOOT_H: f32 = 16.0;
 
 pub fn height(_st: &AppState) -> f32 {
-    HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H
+    HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H + hkit::GUIDE_H
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
+    let area = hkit::guide(ui, st, area, PageKind::Inbox, "Open actions and questions from all your meetings.");
     let accent = st.accent;
     let notes = &st.helper.snap.notes;
     let state = helper::inbox_state(&st.helper.link, notes);
@@ -65,7 +67,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         let chip = hkit::kind_chip(ui, row.x, cy - 8.0, r.item.kind);
         let tx = row.x + chip + 8.0;
         let w = (right - tx - 6.0).max(0.0);
-        ui.c.text(&r.item.text, Rect::new(tx, cy - 17.0, w, 20.0), &TextStyle::body());
+        ui.c.text(&r.item.text, Rect::new(tx, cy - 16.0, w, 20.0), &TextStyle::body());
         let mut from = r.note.title.clone();
         if let Some(o) = &r.item.owner {
             from = format!("{from} \u{b7} {o}");
@@ -73,7 +75,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         if let Some(d) = &r.item.due {
             from = format!("{from} \u{b7} due {d}");
         }
-        ui.c.text(&from, Rect::new(tx, cy + 3.0, w, 16.0), &TextStyle::caption().weight(Weight::Regular).color(palette::TEXT_DIM));
+        ui.c.text(&from, Rect::new(tx, cy + 2.0, w, 16.0), &TextStyle::caption().weight(Weight::Regular).color(palette::TEXT_DIM));
     }
     let foot = match (rows.len() > MAX_ROWS, locked) {
         (true, 0) => Some(format!("+{} more in the register", rows.len() - MAX_ROWS)),

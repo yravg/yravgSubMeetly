@@ -658,15 +658,30 @@ pub struct View {
     pub prev_line: String,
     /// Live is paused on the engine's line: what the page shows meanwhile.
     pub held: Option<Captions>,
+    /// The engine's calendar, asked less often than the notes. None until it answers once.
+    pub calendar: Option<crate::calendar::Calendar>,
+    /// Why the last calendar ask failed; the last good calendar stays on screen.
+    pub calendar_err: Option<String>,
 }
 
 impl Default for View {
     fn default() -> Self {
-        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), held: None }
+        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), held: None, calendar: None, calendar_err: None }
     }
 }
 
 impl View {
+    /// Take the calendar answer. A failure keeps the last calendar (stale, not blank).
+    pub fn apply_calendar(&mut self, r: Result<crate::calendar::Calendar, String>) {
+        match r {
+            Ok(c) => {
+                self.calendar = Some(c);
+                self.calendar_err = None;
+            }
+            Err(e) => self.calendar_err = Some(e),
+        }
+    }
+
     /// Take the service's answer: a snapshot and how long it took, or why not.
     /// An offline helper keeps the last notes on screen (stale, not blank).
     pub fn apply(&mut self, r: Result<(Snapshot, u32), String>) {
@@ -1102,5 +1117,18 @@ mod tests {
     #[test]
     fn clock_formats() {
         assert_eq!((clock(0.0).as_str(), clock(65.4).as_str(), clock(3725.0).as_str(), clock(-3.0).as_str()), ("0:00", "1:05", "1:02:05", "0:00"));
+    }
+
+    #[test]
+    fn a_failed_calendar_ask_keeps_the_last_calendar() {
+        let mut v = View::default();
+        assert!(v.calendar.is_none());
+        v.apply_calendar(Ok(crate::calendar::Calendar::default()));
+        assert!(v.calendar.is_some() && v.calendar_err.is_none());
+        v.apply_calendar(Err("down".into()));
+        assert!(v.calendar.is_some(), "stale, not blank");
+        assert_eq!(v.calendar_err.as_deref(), Some("down"));
+        v.apply_calendar(Ok(crate::calendar::Calendar::default()));
+        assert!(v.calendar_err.is_none());
     }
 }

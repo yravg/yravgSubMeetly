@@ -27,10 +27,11 @@ const HEAD_H: f32 = 34.0;
 const HEIGHT: f32 = 168.0;
 
 pub fn height(_st: &AppState) -> f32 {
-    HEIGHT
+    HEIGHT + hkit::GUIDE_H
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
+    let area = hkit::guide(ui, st, area, PageKind::Live, "Live captions of the meeting now, line by line.");
     let accent = st.accent;
     let state = st.helper.live_state();
     match state {
@@ -39,13 +40,17 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         }
         PageState::Empty => {
             let (title, line) = if st.helper.following {
-                ("Nothing to follow", "Start a recording in the extension or the Mac app. The newest line shows up here.")
+                ("Nothing to follow", "Start captions in Chrome (or the Mac app). The newest line shows up here.")
             } else {
                 ("Unfollowed", "The island left the meeting alone. Follow shows the newest line again.")
             };
-            let button = if st.helper.following { None } else { Some(("Follow", wid("live.start"))) };
-            if hkit::message(ui, area, accent, Icon::Lyrics, title, line, false, button) {
-                st.helper.set_following(true);
+            let button = if st.helper.following { ("Start captions", wid("live.captions")) } else { ("Follow", wid("live.start")) };
+            if hkit::message(ui, area, accent, Icon::Lyrics, title, line, false, Some(button)) {
+                if st.helper.following {
+                    st.cmd(Command::Menu(if st.engine.ext_seen { crate::tray::MenuCmd::OpenCaptionsPanel } else { crate::tray::MenuCmd::SetupExtension }));
+                } else {
+                    st.helper.set_following(true);
+                }
             }
         }
         _ => lines(ui, st, area, state),

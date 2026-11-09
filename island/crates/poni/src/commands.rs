@@ -46,6 +46,19 @@ pub enum PairCmd {
     Remove(String),
 }
 
+/// Requests for the Calendar page (`poni_core::calendar`, run by `services::helper`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CalendarCmd {
+    /// Add the calendar link on the clipboard.
+    PasteLink,
+    /// Stop reading this source (its id).
+    Remove(String),
+    /// Read every link again now.
+    Refresh,
+    /// Make (or find) the note of this event (its id) and open the Meeting page on it.
+    Notes(String),
+}
+
 /// Requests for Notifications (`services::notifications`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NotifyCmd {
@@ -120,4 +133,5 @@ pub enum Command {
     HelperPost(String),
     /// Ask the helper again now.
     HelperPoll,
+    Calendar(CalendarCmd),
 }
