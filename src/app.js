@@ -261,7 +261,7 @@ function todayPage() {
     ${welcome || t.empty ? '' : `<div class="askbar">${pose === 'shell' ? `<span class="peek">${tide('shell', 'peek-art')}</span>` : ''}${ic('sparkle', 20)}<input type="text" data-act="askbar" placeholder="${esc(T('askBar'))}" aria-label="${esc(T('askBar'))}" /><button type="button" class="send" data-act="askgo" aria-label="${esc(T('send'))}">${ic('send', 20)}</button></div>
     <div class="chips">${T('chips').map((c, i) => `<button type="button" class="chip" data-act="chip" data-i="${i}">${ic(['chat', 'flag', 'list', 'globe'][i], 18)}${esc(c)}</button>`).join('')}</div>`}
     ${welcome ? stateCard({ pose: 'wave', title: T('welcomeTitle'), body: T('welcomeBody'), actions: `<button type="button" class="pill-b" data-act="welcomed">${esc(T('gotIt'))}</button>`, cls: 'in-hero' }) : ''}
-    ${!welcome && t.empty ? stateCard({ pose: 'sleep', title: T('emptyTitle'), body: T('emptyBody'), actions: `<a class="pill-b" href="#live">${ic('play', 16)}${esc(T('startCaptions'))}</a><a class="btn" href="#minutes">${esc(T('openMinutes'))}</a>`, cls: 'in-hero' }) : ''}
+    ${!welcome && t.empty ? stateCard({ pose: 'sleep', title: T('emptyTitle'), body: T('emptyBody'), actions: `<a class="pill-b" href="#live" data-start>${ic('play', 16)}${esc(T('startCaptions'))}</a><a class="btn" href="#minutes">${esc(T('openMinutes'))}</a>`, cls: 'in-hero' }) : ''}
   </section>`;
 
   const total = t.week.items;
@@ -380,6 +380,19 @@ function render() {
   if (route === 'all' && params.get('pane') === 'addins') $('#addins-pane')?.scrollIntoView({ block: 'start' });
 }
 
+/* ---------- start captions (one action everywhere: sidebar, Today, ⇧S) ---------- */
+// Opens Live, then presses the panel's own Start button (same origin, so its document is reachable).
+// shortcut: a freshly loaded panel has no user activation, so tab/screen sharing may ask for a second press; keep Live mounted to remove that.
+async function startCaptions() {
+  if (parseHash().route !== 'live') location.hash = '#live';
+  for (let i = 0; i < 60; i++) {
+    const doc = document.querySelector('#page[data-route="live"] iframe.panel')?.contentDocument;
+    const btn = doc?.getElementById('btn-start');
+    if (btn && !btn.disabled && doc.readyState === 'complete') { btn.click(); return; }
+    await new Promise((r) => setTimeout(r, 150));
+  }
+}
+
 /* ---------- events ---------- */
 function setSheet(open) {
   $('#app').classList.toggle('sheet-open', open);
@@ -411,7 +424,7 @@ function wire() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { toggleBell(false); setSheet(false); }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
-    if (!typing && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); location.hash = '#live'; }
+    if (!typing && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); startCaptions(); }
     if (!typing && e.key === '/' && !e.metaKey && !e.ctrlKey && $('.ask-ov')?.hidden !== false) { e.preventDefault(); ask.open(); }
   });
   $('#page').addEventListener('click', async (e) => {
@@ -433,6 +446,7 @@ function wire() {
     if (e.target.matches('[data-act="askbar"]') && e.key === 'Enter') { e.preventDefault(); ask.open(e.target.value.trim() || undefined); }
   });
   $('#ask-field').addEventListener('click', () => ask.open());
+  document.addEventListener('click', (e) => { const a = e.target.closest('#btn-start, [data-start]'); if (a) { e.preventDefault(); startCaptions(); } });
   $('#island-switch').addEventListener('change', (e) => {
     globalThis.chrome?.storage?.local.set({ captionSurface: e.target.checked ? 'both' : 'overlay' });
   });

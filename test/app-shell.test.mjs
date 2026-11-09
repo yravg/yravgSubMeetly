@@ -45,6 +45,7 @@ before(async () => {
   assert.ok(existsSync('dist/app.html'), 'dist/ belum dibangun — jalankan `npm run build`');
   server = spawn('python3', ['scripts/lab-server.py'], { cwd: new URL('..', import.meta.url), env: { ...process.env, LAB_PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe'] });
   await waitForServer(`${ORIGIN}/dist/app.html`);
+  await wait(1500); // Windows: the first browser request right after the probe is aborted without this
   browser = await puppeteer.launch({ headless: true, args: ['--window-size=1440,1000'] });
   page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 1000 });
@@ -133,6 +134,17 @@ test('⇧S membuka Live captions; setiap rute nav memasang halamannya', async ()
   assert.match(await page.$eval('#page', (p) => p.textContent), /Needs the extension/);
 });
 
+test('Start captions di sidebar benar-benar memulai (bukan hanya membuka Live)', async () => {
+  await page.evaluate(() => { location.hash = '#today'; });
+  await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'today');
+  await page.click('#btn-start');
+  await page.waitForFunction(() => {
+    const d = document.querySelector('#page[data-route="live"] iframe.panel')?.contentDocument;
+    return d && d.getElementById('btn-start')?.disabled === true && d.getElementById('btn-stop')?.disabled === false;
+  }, { timeout: 15000 });
+  await page.evaluate(() => { location.hash = '#today'; });
+});
+
 test('A04: Minutes memasang register, tautan Klasik dan jendela Minutes', async () => {
   await page.evaluate(() => { location.hash = '#minutes?meeting=Y1'; });
   await page.waitForSelector('#page iframe.reg');
@@ -216,7 +228,7 @@ test('A01: tanggal hero dan kartu Today sama pada malam hari di UTC+8 (bukan UTC
   await p.evaluate(() => localStorage.setItem('ysmShellWelcomed', 'true'));
   await p.reload({ waitUntil: 'networkidle0' });
   await p.waitForSelector('.dateline');
-  const r = await p.evaluate(() => ({ line: document.querySelector('.dateline').textContent, eyebrow: document.querySelector('.cd .eyebrow')?.textContent }));
+  const r = await p.evaluate(() => ({ line: document.querySelector('.dateline').textContent, eyebrow: [...document.querySelectorAll('.cd .eyebrow')].map((e) => e.textContent).find((t) => /^Today/.test(t)) }));
   await p.close();
   assert.match(r.line, /Tuesday 10 November/);
   assert.match(r.eyebrow, /10 Nov/);
