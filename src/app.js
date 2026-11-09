@@ -58,7 +58,7 @@ const STR = {
     fRecap: 'Recap email', fRecapD: 'Builds a plain-text recap and opens it as a mail draft. Nothing is sent for you.',
     fGlossary: 'Glossary', fGlossaryD: 'Per-series terms fixed in captions and in the minutes draft.',
     fDue: 'Due dates to calendar', fDueD: 'Saves open actions with a due date as one .ics file.',
-    fIsland: 'Island', fIslandD: 'Caption pill under the notch, beside or instead of the page overlay.',
+    islandOn: 'On', islandOff: 'Off', fIsland: 'Island', fIslandD: 'Caption pill under the notch, beside or instead of the page overlay.',
     fPerf: 'Performance', fPerfD: 'Speed of each stage: p50, p95 and real-time factor.',
     fLibrary: 'Library', fLibraryD: 'Sample transcripts in weekly series to try the register.',
     fTraining: 'Training', fTrainingD: 'Guided tours and quizzes with XP and levels.',
@@ -105,7 +105,7 @@ const STR = {
     fRecap: 'Email rekap', fRecapD: 'Menyusun rekap teks biasa dan membukanya sebagai draf email. Tidak ada yang dikirim otomatis.',
     fGlossary: 'Glosarium', fGlossaryD: 'Istilah per seri yang diperbaiki di teks dan draf notulen.',
     fDue: 'Tenggat ke kalender', fDueD: 'Menyimpan tindak lanjut bertenggat sebagai satu berkas .ics.',
-    fIsland: 'Island', fIslandD: 'Pil teks di bawah notch, di samping atau menggantikan overlay halaman.',
+    islandOn: 'Nyala', islandOff: 'Mati', fIsland: 'Island', fIslandD: 'Pil teks di bawah notch, di samping atau menggantikan overlay halaman.',
     fPerf: 'Kinerja', fPerfD: 'Kecepatan tiap tahap: p50, p95 dan faktor waktu nyata.',
     fLibrary: 'Library', fLibraryD: 'Transkrip contoh dalam seri mingguan untuk mencoba register.',
     fTraining: 'Training', fTrainingD: 'Tur terpandu dan kuis dengan XP dan level.',
@@ -309,7 +309,8 @@ function allPage() {
   const open = (href) => `<span class="grow"></span><a class="btn sm" href="${href}">${esc(T('open'))}</a>`;
   const addinOpen = `<span class="mut small">${esc(T('installed'))}</span>${open('#all?pane=addins')}`;
   const builtIn = (href) => `<span class="mut small">${esc(T('builtIn'))}</span>${open(href)}`;
-  const island = `<label class="sw-chip bare"><input type="checkbox" role="switch" data-act="island"${$('#island-switch').checked ? ' checked' : ''} aria-label="${esc(T('fIsland'))}" /></label>${open('#island')}`;
+  // One switch only: the top bar owns it; the tile shows its state and opens the settings.
+  const island = `<span class="chip sm" data-island-state>${esc(T($('#island-switch').checked ? 'islandOn' : 'islandOff'))}</span>${open('#island')}`;
   return `<div class="tiles">
     ${tile('mail', T('fRecap'), T('fRecapD'), addinOpen)}
     ${tile('book', T('fGlossary'), T('fGlossaryD'), addinOpen)}
@@ -450,7 +451,6 @@ function wire() {
   document.addEventListener('click', (e) => { for (const d of document.querySelectorAll('.reg-menu[open]')) if (!d.contains(e.target)) d.open = false; });
   $('#page').addEventListener('change', (e) => {
     if (e.target.matches('[data-act="owner"]')) { state.owner = e.target.value; lastRoute = null; render(); }
-    else if (e.target.matches('[data-act="island"]')) { $('#island-switch').checked = e.target.checked; $('#island-switch').dispatchEvent(new Event('change')); }
     else if (e.target.matches('[data-act="dev"]')) { state.developer = e.target.checked; globalThis.chrome?.storage?.local.set({ ysmDeveloper: state.developer }); paintNav(parseHash().route); }
   });
   $('#page').addEventListener('keydown', (e) => {
@@ -459,7 +459,9 @@ function wire() {
   $('#ask-field').addEventListener('click', () => ask.open());
   document.addEventListener('click', (e) => { const a = e.target.closest('#btn-start, [data-start]'); if (a) { e.preventDefault(); startCaptions(); } });
   $('#island-switch').addEventListener('change', (e) => {
-    globalThis.chrome?.storage?.local.set({ captionSurface: e.target.checked ? 'both' : 'overlay' });
+    // The Windows window has no page overlay, so on means the island alone; in the extension it means beside the overlay.
+    globalThis.chrome?.storage?.local.set({ captionSurface: e.target.checked ? (WEB ? 'island' : 'both') : 'overlay' });
+    paintIslandState();
   });
 }
 
@@ -489,9 +491,15 @@ async function pollHelper() {
   if (parseHash().route === 'today') { lastRoute = null; render(); }
 }
 
+function paintIslandState() {
+  for (const el of document.querySelectorAll('[data-island-state]')) el.textContent = T($('#island-switch').checked ? 'islandOn' : 'islandOff');
+}
 async function syncIsland() {
-  const { captionSurface = 'overlay' } = (await globalThis.chrome?.storage?.local.get('captionSurface')) || {};
+  let { captionSurface } = (await globalThis.chrome?.storage?.local.get('captionSurface')) || {};
+  // Windows window: no page overlay exists, so an unset surface starts on the island (the panel reads the same key).
+  if (captionSurface == null && WEB) { captionSurface = 'island'; globalThis.chrome?.storage?.local.set({ captionSurface }); }
   $('#island-switch').checked = captionSurface === 'island' || captionSurface === 'both';
+  paintIslandState();
 }
 
 let ask = null;

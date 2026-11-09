@@ -195,13 +195,14 @@ test('A06: delapan fitur, Island dengan sakelar nyata, add-in terpasang di halam
   await page.evaluate(() => { location.hash = '#all'; });
   await page.waitForSelector('.tiles');
   assert.equal(await page.$$eval('.tiles .tile2', (l) => l.length), 8);
-  const sw = await page.$('.tiles [data-act="island"]');
+  assert.equal((await page.$$('.tiles [data-act="island"]')).length, 0, 'satu sakelar Island saja: di bilah atas');
   const before = await page.evaluate(() => chrome.storage.local.get('captionSurface'));
-  await sw.click(); await wait(300);
+  await page.click('#island-chip'); await wait(300);
   const afterOn = await page.evaluate(() => chrome.storage.local.get('captionSurface'));
   assert.notEqual(afterOn.captionSurface, before.captionSurface || 'overlay');
   assert.equal(await page.$eval('#island-switch', (i) => i.checked), afterOn.captionSurface === 'both');
-  await sw.click(); await wait(300);
+  assert.equal(await page.$eval('[data-island-state]', (e) => e.textContent), 'On', 'kartu menunjukkan status sakelar');
+  await page.click('#island-chip'); await wait(300);
   assert.ok((await page.$eval('#addins-pane iframe', (f) => f.getAttribute('src'))).includes('stab=addins'));
 });
 

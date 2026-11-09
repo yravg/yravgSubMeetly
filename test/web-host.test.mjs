@@ -179,3 +179,11 @@ test('wording: no Mac-only text on a non-Mac device, and the empty state points 
   assert.doesNotMatch(r.hint, /side panel/);
   await page.close();
 });
+
+test('app.html in the Windows window: captions start on the island (no page overlay exists)', async () => {
+  const { page, errors } = await open('/app/app.html');
+  await page.waitForFunction(() => document.getElementById('island-switch')?.checked === true, { timeout: 5000 });
+  assert.equal((await page.evaluate(() => chrome.storage.local.get('captionSurface'))).captionSurface, 'island');
+  assert.deepEqual(errors, []);
+  await page.close();
+});
