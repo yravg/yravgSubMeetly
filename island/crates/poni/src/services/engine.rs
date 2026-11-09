@@ -49,7 +49,7 @@ fn spawn(exe: &std::path::Path, port: u16) -> std::io::Result<Child> {
     cmd.spawn()
 }
 
-/// Open `path` of the engine's own pages in the default browser once the engine
+/// Open `path` of the engine's own pages (Minutes as an app window) once the engine
 /// answers /health (up to 15 s; after that the browser shows the honest error).
 pub fn open_when_ready(path: &str) {
     let path = path.to_string();
@@ -65,7 +65,13 @@ pub fn open_now(path: &str) {
         }
         std::thread::sleep(Duration::from_millis(300));
     }
-    crate::shell::open(&format!("http://127.0.0.1:{port}{path}"));
+    let url = format!("http://127.0.0.1:{port}{path}");
+    // Minutes is the app's own window; the setup page stays in the browser, next to chrome://extensions.
+    if path == "/app/minutes.html" {
+        crate::shell::open_app_window(&url);
+    } else {
+        crate::shell::open(&url);
+    }
 }
 
 /// `--open <name>` on the command line: the engine page it names.

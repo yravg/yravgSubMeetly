@@ -75,6 +75,40 @@ pub fn open_in_chrome(url: &str) {
     });
 }
 
+/// Open one of the engine's own pages (`http://127.0.0.1:<port>/app/…`) as an
+/// app window of its own: no tabs, no address bar, its own taskbar entry.
+/// Chrome first, so the page keeps the localStorage (the Minutes register) it
+/// had in the user's Chrome tab; then Edge; then the default browser.
+pub fn open_app_window(url: &str) {
+    if !app_window_url_ok(url) {
+        crate::pwarn!("open_app_window refused: {}", for_log(url));
+        return;
+    }
+    let url = url.to_string();
+    run("open-app-window", move || {
+        let arg = HSTRING::from(format!("--app={url}"));
+        for exe in [w!("chrome"), w!("msedge")] {
+            let r = unsafe { ShellExecuteW(None, w!("open"), exe, &arg, None, SW_SHOWNORMAL) };
+            if (r.0 as isize) > 32 {
+                return;
+            }
+        }
+        crate::pwarn!("open_app_window: neither Chrome nor Edge opened; using the default browser");
+        let u = HSTRING::from(url.as_str());
+        let r = unsafe { ShellExecuteW(None, w!("open"), &u, None, None, SW_SHOWNORMAL) };
+        if (r.0 as isize) <= 32 {
+            crate::pwarn!("open failed ({}): {}", r.0 as isize, for_log(&url));
+        }
+    });
+}
+
+/// Only the engine's own pages on loopback, nothing that could end the argument.
+pub(crate) fn app_window_url_ok(url: &str) -> bool {
+    url.len() < 200
+        && url.bytes().all(|b| b.is_ascii_graphic())
+        && url.strip_prefix("http://127.0.0.1:").and_then(|rest| rest.split_once('/')).is_some_and(|(port, path)| port.parse::<u16>().is_ok() && path.starts_with("app/"))
+}
+
 /// Open Settings > Apps > Startup (asynchronously). The Store build sends
 /// people there when they turned Poni's startup task off in Windows, the only
 /// place it can be turned back on.
@@ -347,6 +381,22 @@ fn for_log(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn app_window_opens_only_engine_pages_on_loopback() {
+        assert!(app_window_url_ok("http://127.0.0.1:17865/app/minutes.html"));
+        for url in [
+            "http://localhost:17865/app/minutes.html",
+            "https://127.0.0.1:17865/app/minutes.html",
+            "http://127.0.0.1:17865/notes",
+            "http://127.0.0.1:x/app/minutes.html",
+            "http://127.0.0.1:17865/app/a b",
+            "http://127.0.0.1:17865/app/\" --x",
+            "http://127.0.0.1.evil.com:80/app/",
+        ] {
+            assert!(!app_window_url_ok(url), "{url}");
+        }
+    }
 
     #[test]
     fn app_ids_from_windows_open_and_nothing_else_does() {

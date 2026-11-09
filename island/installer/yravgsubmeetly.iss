@@ -5,8 +5,8 @@
 ;
 ; Build with tools\build-installer.ps1 (builds poni.exe and submeetly-engine.exe, then
 ; runs ISCC with the right paths and version), or by hand:
-;   iscc /DAppVersion=1.2.0 /DExeSource=...\poni.exe /DEngineSource=...\submeetly-engine.exe installer\yravgsubmeetly.iss
-;   -> dist\yravgSubMeetly-Setup-1.2.0.exe   (the name tools/make_update_feed.py looks for)
+;   iscc /DAppVersion=1.2.1 /DExeSource=...\poni.exe /DEngineSource=...\submeetly-engine.exe installer\yravgsubmeetly.iss
+;   -> dist\yravgSubMeetly-Setup-1.2.1.exe   (the name tools/make_update_feed.py looks for)
 ;
 ; Per-user install: no admin rights, no UAC prompt. The app goes to
 ; %LOCALAPPDATA%\Programs\yravgSubMeetly. The person's own data stays when uninstalling:
@@ -19,7 +19,7 @@
 ; version when done (/reopen).
 
 #ifndef AppVersion
-  #define AppVersion "1.2.0"
+  #define AppVersion "1.2.1"
 #endif
 #ifndef ExeSource
   #define ExeSource "..\target\release\poni.exe"
@@ -95,7 +95,7 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; Comment: "Live transcription and minutes at the edge of your screen"
-Name: "{autoprograms}\{#AppName} Minutes register"; Filename: "{app}\{#AppExe}"; Parameters: "--open minutes"; Comment: "Meeting minutes in your browser"
+Name: "{autoprograms}\{#AppName} Minutes register"; Filename: "{app}\{#AppExe}"; Parameters: "--open minutes"; Comment: "Meeting minutes in a window of their own"
 Name: "{autoprograms}\Set up the {#AppName} Chrome extension"; Filename: "{app}\{#AppExe}"; Parameters: "--open setup-extension"; Comment: "Load the extension in Chrome, step by step"
 Name: "{autoprograms}\{#AppName} engine"; Filename: "{app}\{#EngineExe}"; Comment: "The local transcription helper the Chrome extension talks to"
 
