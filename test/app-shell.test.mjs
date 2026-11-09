@@ -46,7 +46,8 @@ before(async () => {
   server = spawn('python3', ['scripts/lab-server.py'], { cwd: new URL('..', import.meta.url), env: { ...process.env, LAB_PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe'] });
   await waitForServer(`${ORIGIN}/dist/app.html`);
   await wait(1500); // Windows: the first browser request right after the probe is aborted without this
-  browser = await puppeteer.launch({ headless: true, args: ['--window-size=1440,1000'] });
+  // Autoplay allowed: the lab panel's demo audio otherwise races play() against pause() and Start fails at random.
+  browser = await puppeteer.launch({ headless: true, args: ['--window-size=1440,1000', '--autoplay-policy=no-user-gesture-required'] });
   page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 1000 });
   page.on('pageerror', (e) => pageErrors.push(String(e.message || e)));

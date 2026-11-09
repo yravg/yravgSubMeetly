@@ -2576,7 +2576,22 @@ function onPickManually() {
   });
 }
 
+// One start at a time: a second click (double-click, the app shell's retry) would open a second
+// share picker or restart the lab sample under the first one.
+let starting = false;
 async function onStart() {
+  if (starting) return;
+  starting = true;
+  $('btn-start').disabled = true;
+  try {
+    await startOnce();
+  } finally {
+    starting = false;
+    updateButtons();
+  }
+}
+
+async function startOnce() {
   if (state.mode === 'realtime') {
     persistLastConfig();
     if (isLabHarness()) {

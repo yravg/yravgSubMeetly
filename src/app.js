@@ -401,10 +401,12 @@ async function startCaptions() {
     const doc = document.querySelector('#page[data-route="live"] iframe.panel')?.contentDocument;
     const btn = doc?.getElementById('btn-start');
     if (btn && !btn.disabled && doc.readyState === 'complete') {
+      const before = doc.getElementById('status-text')?.textContent || '';
       btn.click();
       await new Promise((r) => setTimeout(r, 700));
       // The panel may not have attached its handler yet; a click that changed nothing is repeated.
-      if (btn.disabled || doc.getElementById('status-text')?.textContent) return;
+      // A changed status line (an error, a share prompt) means the click landed: never click again then.
+      if (btn.disabled || (doc.getElementById('status-text')?.textContent || '') !== before) return;
       continue;
     }
     await new Promise((r) => setTimeout(r, 150));
