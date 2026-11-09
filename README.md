@@ -187,3 +187,7 @@ side panel (UI) ──► service worker ── tabCapture streamId ──► of
 
 All processing is on-device. Model weights' copyrights belong to their original
 authors and institutions.
+
+## Credits
+
+Where the ideas and the forked code come from (Oyenza Studio, Meetily, Threadbear and others): [CREDITS.md](CREDITS.md).

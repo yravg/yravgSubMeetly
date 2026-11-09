@@ -7,8 +7,8 @@
 #
 # The private half of the first key is the UPDATE_FEED_KEY secret in the release
 # environment (and a copy at ~/.yravg/update-feed-key.pem on the maintainer's machine).
-# OWNER, BEFORE THE FIRST PUBLIC RELEASE: make a second key with
-# `python tools/make_update_feed.py --keygen <path>`, keep its private half OFFLINE, and add its
-# line below. Copies already installed trust only the keys that were in the build they came from,
-# so a spare added later cannot rescue them.
+# The second key is the offline spare (made 2026-11-08): its private half lives only on offline
+# storage, never on a CI runner. Use it only if the first key is lost or leaked; copies already
+# installed trust only the keys that were in the build they came from.
 ad662e29df0544ce 041947fe8942c3411f3fb26063bb02a233126c56e8269a8802b01e75ab385b205852bb3abb868b6fb571d7f876546434b5569a8f0574e9dbb8edad17e42c24b2f0
+5693fbeec7bd596f 045cb4abe81bc4a76d9c95ed2a81599a3335d6ffdedff829f48dd6083402e39022c041464385f90f926daf1037d6a825dabbcaba9fb39656da36bc35ce0ecf6393

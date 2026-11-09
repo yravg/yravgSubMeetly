@@ -10,7 +10,7 @@ yravgSubMeetly installs with one Setup and learns about new versions from one si
 | Build the Setup | `tools/build-installer.ps1` -> `dist/yravgSubMeetly-Setup-<version>.exe` (git-ignored) |
 | Make and sign the update file | `tools/make_update_feed.py` |
 | Public keys the app trusts | `crates/poni-core/data/update-keys.txt` |
-| Release repository (one constant) | `poni_core::update::REPO` = `yraveragework/yraveragesub` |
+| Release repository (one constant) | `poni_core::update::REPO` = `yravg/yravgSubMeetly` |
 | Release workflow (draft) | `.github/workflows/release.yml` |
 
 ## The installer
@@ -27,26 +27,26 @@ Per user, no admin, no UAC. It installs into `%LOCALAPPDATA%\Programs\yravgSubMe
 
 ## The update file
 
-`latest.json` is an asset of every release, so `https://github.com/yraveragework/yraveragesub/releases/latest/download/latest.json` always answers with the newest.
+`latest.json` is an asset of every release, so `https://github.com/yravg/yravgSubMeetly/releases/latest/download/latest.json` always answers with the newest.
 
 ```json
-{ "about": "...", "payload": "{\"schema\":1,\"version\":\"0.2.27\",...}", "signature": "base64 of r and s, 64 bytes", "key": "ad662e29df0544ce" }
+{ "about": "...", "payload": "{\"schema\":1,\"version\":\"1.2.1\",...}", "signature": "base64 of r and s, 64 bytes", "key": "ad662e29df0544ce" }
 ```
 
 `payload` is JSON kept as a string so its exact bytes are the ones signed: `version`, `date`, `headline`, `notes` (release page) and `windows` with `url`, `size`, `sha256` of `yravgSubMeetly-Setup-<version>.exe`. The signature is ECDSA P-256 over the SHA-256 of the payload's UTF-8 bytes. `key` is the first 16 hex digits of the SHA-256 of the public point.
 
-The app refuses the file when the signature fails, when `key` is not in `update-keys.txt`, or when any URL is outside `github.com/yraveragework/yraveragesub/releases/download/v<version>/` (or the release page `tag/v<version>`). It then downloads the Setup, keeps it only if size and SHA-256 match, and shows the pop-up.
+The app refuses the file when the signature fails, when `key` is not in `update-keys.txt`, or when any URL is outside `github.com/yravg/yravgSubMeetly/releases/download/v<version>/` (or the release page `tag/v<version>`). It then downloads the Setup, keeps it only if size and SHA-256 match, and shows the pop-up.
 
 ## What the person sees
 
 About two minutes after start, then hourly, the app reads the file. A later version shows on the island as **Update available x** over the release headline, with **Hide**. A click opens the Update sheet: what is new, **Install now**, **Install on next start**, **Not now**, and the release-notes link. Install now runs the downloaded Setup silently and the new version opens.
 
-## Owner steps (nothing here was done for you)
+## Owner steps
 
-1. **Make the repository public.** The app downloads without a token, so `yraveragework/yraveragesub` must be public. Until then a check says it could not read the file; nothing breaks.
-2. **Keys.** The signing key was made with `python tools/make_update_feed.py --keygen`; its private half is `%USERPROFILE%\.yravg\update-feed-key.pem`, outside the repo. Do this:
-   - Copy that PEM text into the repository secret `UPDATE_FEED_KEY`, in an environment called `release` limited to `v*` tags. Never print it or commit it.
-   - **Make a second, spare key now, before the first public release:** `python tools/make_update_feed.py --keygen <path-on-an-offline-disk>.pem`, add its printed line to `update-keys.txt`, keep the private half offline. Copies already out trust only the keys in their build; with one key lost and no spare, they can never be told of an update again.
+State 2026-11-08: the `release` environment exists (deployment limited to `v*` tags) and holds `UPDATE_FEED_KEY`; the spare key is made and listed in `update-keys.txt`. Still open: steps 1 and 3.
+
+1. **Make the repository public.** The app downloads without a token, so `yravg/yravgSubMeetly` must be public. Until then a check says it could not read the file; nothing breaks. `gh repo edit yravg/yravgSubMeetly --visibility public --accept-visibility-change-consequences`
+2. **Keys (done).** Signing key: private half at `%USERPROFILE%\.yravg\update-feed-key.pem` and in the `UPDATE_FEED_KEY` secret. Spare key `5693fbeec7bd596f`: private half written to `%USERPROFILE%\.yravg\update-feed-key-spare-OFFLINE.pem`; move it to offline storage (a USB stick kept apart) and delete it from the PC. Never print or commit either.
 3. **Release.** Bump `version` in `island/Cargo.toml`, commit, then `git tag v<version>` and `git push origin v<version>`. `release.yml` checks the tag matches `Cargo.toml`, runs `cargo test -p poni-core`, builds the Setup, publishes the release, signs `latest.json` and attaches it. It is a draft: read it once before the first tag.
 4. **Offline signing** (no secret in CI): `python tools/make_update_feed.py --check` prints the payload; save it, then `python tools/make_update_feed.py latest.json --payload payload.json` signs it with the key file, and you upload `latest.json` by hand.
 5. **Taking a release back:** mark the previous release as latest; the file follows GitHub's latest.
