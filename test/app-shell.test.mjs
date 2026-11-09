@@ -120,14 +120,19 @@ test('⇧S membuka Live captions; setiap rute nav memasang halamannya', async ()
   await page.keyboard.down('Shift'); await page.keyboard.press('S'); await page.keyboard.up('Shift');
   await page.waitForFunction(() => location.hash === '#live');
   const routes = await page.$$eval('#nav-meetings a, #nav-features a', (l) => l.map((a) => a.dataset.route));
-  assert.deepEqual(routes, ['today', 'live', 'minutes', 'history', 'files', 'addins', 'glossary', 'island', 'perf', 'all', 'settings', 'dev'], 'lab: Developer tampil');
-  const expect = { live: 'view=captions', history: 'view=history', files: 'view=files', addins: 'stab=addins', glossary: 'view=notes', island: 'stab=output', perf: 'view=perf', settings: 'view=settings' };
+  assert.deepEqual(routes, ['today', 'live', 'minutes', 'notes', 'history', 'files', 'addins', 'island', 'perf', 'all', 'settings', 'dev'], 'lab: Developer tampil');
+  const expect = { live: 'view=captions', history: 'view=history', files: 'view=files', addins: 'stab=addins', notes: 'view=notes', island: 'stab=output', perf: 'view=perf', settings: 'view=settings' };
   for (const [route, frag] of Object.entries(expect)) {
     await page.evaluate((r) => { location.hash = `#${r}`; }, route);
     await page.waitForFunction((r) => document.querySelector('#page').dataset.route === r, {}, route);
     const src = await page.$eval('#page iframe.panel', (f) => f.getAttribute('src'));
     assert.ok(src.includes(frag), `${route} → ${src}`);
   }
+  // Tautan lama #glossary membuka catatan rapat (tempat panel Glosarium hidup), berlabel Notes; History berlabel Transcripts.
+  await page.evaluate(() => { location.hash = '#glossary'; });
+  await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'notes');
+  assert.equal(await page.$eval('#page-title', (h) => h.textContent), 'Notes');
+  assert.equal(await page.$eval('#nav-meetings [data-route="history"]', (a) => a.textContent.trim()), 'Transcripts');
   // Lab: Live menyebut keadaan terkunci "Needs the extension".
   await page.evaluate(() => { location.hash = '#live'; });
   await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'live');

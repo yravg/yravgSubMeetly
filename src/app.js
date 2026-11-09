@@ -1,7 +1,7 @@
 /**
  * App shell yravgSubMeetly (TIDE-002..005, 008, 014 — papan A01, A04, A09).
  *
- * Halaman (hash): today · live · minutes · history · files · addins · glossary ·
+ * Halaman (hash): today · live · minutes · notes · history · files · addins ·
  * island · perf · settings · helper. Today dan Minutes digambar di sini; halaman
  * lain memasang tampilan panel samping yang sudah ada (sidepanel.html?view=…),
  * jadi setiap kendali lama tetap ada sampai halaman barunya dibangun (T6).
@@ -26,8 +26,8 @@ const HOSTED = IS_EXT || WEB;
 /* ---------- strings ---------- */
 const STR = {
   en: {
-    meetings: 'Meetings', features: 'Features', today: 'Today', live: 'Live captions', minutes: 'Minutes', history: 'History', files: 'Files',
-    addins: 'Add-ins', glossary: 'Glossary', island: 'Island', perf: 'Performance', settings: 'Settings', helper: 'Helper',
+    meetings: 'Meetings', features: 'Features', today: 'Today', live: 'Live captions', minutes: 'Minutes', history: 'Transcripts', notes: 'Notes', files: 'Files',
+    addins: 'Add-ins', island: 'Island', perf: 'Performance', settings: 'Settings', helper: 'Helper',
     startCaptions: 'Start captions', thisDevice: 'This device', allSeries: 'All series', series: 'Meeting series',
     notices: 'Notices', noNotices: 'Nothing needs you right now.', openMenu: 'Open menu', closeMenu: 'Close menu',
     morning: 'Good morning.', afternoon: 'Good afternoon.', evening: 'Good evening.',
@@ -73,8 +73,8 @@ const STR = {
     noServerTitle: 'No server yet', noServerBody: 'Plans and credits need the account server, which is not built yet. Local and Register-only answers are free and work now.',
   },
   id: {
-    meetings: 'Rapat', features: 'Fitur', today: 'Hari ini', live: 'Teks langsung', minutes: 'Notulen', history: 'Riwayat', files: 'Berkas',
-    addins: 'Add-in', glossary: 'Glosarium', island: 'Island', perf: 'Kinerja', settings: 'Pengaturan', helper: 'Helper',
+    meetings: 'Rapat', features: 'Fitur', today: 'Hari ini', live: 'Teks langsung', minutes: 'Notulen', history: 'Transkrip', notes: 'Catatan', files: 'Berkas',
+    addins: 'Add-in', island: 'Island', perf: 'Kinerja', settings: 'Pengaturan', helper: 'Helper',
     startCaptions: 'Mulai teks', thisDevice: 'Perangkat ini', allSeries: 'Semua seri', series: 'Seri rapat',
     notices: 'Pemberitahuan', noNotices: 'Tidak ada yang menunggu Anda.', openMenu: 'Buka menu', closeMenu: 'Tutup menu',
     morning: 'Selamat pagi.', afternoon: 'Selamat siang.', evening: 'Selamat malam.',
@@ -132,7 +132,7 @@ const P = {
   history: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   files: '<path d="M3.5 7.5a2 2 0 0 1 2-2H10l2 2.5h6.5a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
   addins: '<path d="M10 4.5a2 2 0 1 1 4 0V7h3.5v3.5H20a2 2 0 1 1 0 4h-2.5V18H14v-2.5a2 2 0 1 0-4 0V18H6.5v-3.5H4a2 2 0 1 1 0-4h2.5V7H10z"/>',
-  glossary: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
+  notes: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
   island: '<rect x="3" y="8.5" width="18" height="7" rx="3.5"/><circle cx="8" cy="12" r="1.2"/>',
   perf: '<path d="M4 19V5M4 19h16M8 15v-3M12 15V8M16 15v-5"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/>',
@@ -157,10 +157,12 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const $ = (s) => document.querySelector(s);
 
 /* ---------- routes ---------- */
-const MEETING_ROUTES = ['today', 'live', 'minutes', 'history', 'files'];
-const FEATURE_ROUTES = ['addins', 'glossary', 'island', 'perf', 'all', 'settings'];
+const MEETING_ROUTES = ['today', 'live', 'minutes', 'notes', 'history', 'files'];
+const FEATURE_ROUTES = ['addins', 'island', 'perf', 'all', 'settings'];
+// Old links keep working. #glossary used to open meeting notes, where the Glossary add-in panel lives once trusted.
+const ALIAS = { glossary: 'notes' };
 // Halaman yang masih memasang panel samping: view (+ tab Pengaturan).
-const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], glossary: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
+const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
 
 const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'classic', developer: !HOSTED };
@@ -313,7 +315,7 @@ function allPage() {
     ${tile('cal', T('fDue'), T('fDueD'), addinOpen)}
     ${tile('island', T('fIsland'), T('fIslandD'), island)}
     ${tile('perf', T('fPerf'), T('fPerfD'), builtIn('#perf'))}
-    ${tile('glossary', T('fLibrary'), T('fLibraryD'), builtIn('#minutes'))}
+    ${tile('book', T('fLibrary'), T('fLibraryD'), builtIn('#minutes'))}
     ${tile('sparkle', T('fTraining'), T('fTrainingD'), builtIn('#minutes'))}
     ${tile('export', T('fExport'), T('fExportD'), builtIn('#history'))}
   </div>
@@ -354,7 +356,8 @@ function panelPage(route) {
 
 /* ---------- router ---------- */
 function parseHash() {
-  const [r, q] = location.hash.replace(/^#/, '').split('?');
+  const [r0, q] = location.hash.replace(/^#/, '').split('?');
+  const r = ALIAS[r0] || r0;
   const route = [...MEETING_ROUTES, ...FEATURE_ROUTES, 'helper', 'plans', ...(state.developer ? ['dev'] : [])].includes(r) ? r : 'today';
   return { route, params: new URLSearchParams(q || '') };
 }
@@ -388,7 +391,13 @@ async function startCaptions() {
   for (let i = 0; i < 60; i++) {
     const doc = document.querySelector('#page[data-route="live"] iframe.panel')?.contentDocument;
     const btn = doc?.getElementById('btn-start');
-    if (btn && !btn.disabled && doc.readyState === 'complete') { btn.click(); return; }
+    if (btn && !btn.disabled && doc.readyState === 'complete') {
+      btn.click();
+      await new Promise((r) => setTimeout(r, 700));
+      // The panel may not have attached its handler yet; a click that changed nothing is repeated.
+      if (btn.disabled || doc.getElementById('status-text')?.textContent) return;
+      continue;
+    }
     await new Promise((r) => setTimeout(r, 150));
   }
 }

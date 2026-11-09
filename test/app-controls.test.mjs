@@ -17,6 +17,12 @@ const PORT = 8911;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const CONTROLS = JSON.parse(readFileSync(new URL('../docs/design/tide-shell-canvas/shots/controls.json', import.meta.url), 'utf8')).controls;
 const norm = (k) => k.replace(/\d+/g, '#').replace(/\s+/g, ' ').trim();
+// Controls that were deliberately renamed (never removed): old label -> current label.
+const RENAMED = {
+  'button|Start Task': 'button|Start captions',
+  'button|End Task': 'button|Stop captions',
+};
+const has = (found, k) => found.has(k) || found.has(RENAMED[k]);
 let server; let browser; let page;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -62,6 +68,7 @@ before(async () => {
   assert.ok(existsSync('dist/app.html'), 'dist/ belum dibangun — jalankan `npm run build`');
   server = spawn('python3', ['scripts/lab-server.py'], { cwd: new URL('..', import.meta.url), env: { ...process.env, LAB_PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe'] });
   await waitForServer(`${ORIGIN}/dist/app.html`);
+  await wait(1500); // Windows: the first browser request right after the probe is aborted without this
   browser = await puppeteer.launch({ headless: true });
   page = await browser.newPage();
   // controls.json ditangkap di Windows; panduan helper dan ekspor memberi label per OS (detectOs membaca UA).
@@ -85,7 +92,7 @@ before(async () => {
   add(await dump(page.mainFrame()));
 
   // Panel samping per halaman (sama dengan bottom-nav lama).
-  for (const [h, sel] of [['#live', 'iframe.panel'], ['#glossary', 'iframe.panel'], ['#history', 'iframe.panel'], ['#helper', 'iframe.panel']]) {
+  for (const [h, sel] of [['#live', 'iframe.panel'], ['#notes', 'iframe.panel'], ['#history', 'iframe.panel'], ['#helper', 'iframe.panel']]) {
     await route(h); add(await dump(await frameOf(sel)));
   }
   await route('#settings');
@@ -120,7 +127,7 @@ after(async () => { await browser?.close(); server?.kill('SIGTERM'); });
 
 for (const [surface, list] of Object.entries(CONTROLS)) {
   test(`kendali ${surface} (${list.length}) masih ada di kerangka`, () => {
-    const missing = list.filter((k) => !found.has(norm(k)));
+    const missing = list.filter((k) => !has(found, norm(k)));
     assert.deepEqual(missing, [], `${surface}: ${missing.length} kendali tidak ditemukan`);
   });
 }
@@ -128,6 +135,6 @@ for (const [surface, list] of Object.entries(CONTROLS)) {
 test('jumlah kendali yang dicatat tidak berkurang', () => {
   const all = new Set(Object.values(CONTROLS).flat().map(norm));
   assert.ok(all.size >= 180, `controls.json hanya ${all.size} label unik`);
-  const missing = [...all].filter((k) => !found.has(k));
+  const missing = [...all].filter((k) => !has(found, k));
   assert.equal(missing.length, 0, `hilang: ${missing.join(' ; ')}`);
 });
