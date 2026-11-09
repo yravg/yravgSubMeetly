@@ -54,7 +54,7 @@ export function installWebHost(win = window) {
   });
   // chrome.storage accepts a callback too (sidepanel.js uses both styles).
   const cb = (promise, fn) => (typeof fn === 'function' ? void promise.then(fn) : promise);
-  const keysOf = (keys) => (Array.isArray(keys) ? keys : typeof keys === 'string' ? [keys] : Object.keys(keys || {}));
+  const keysOf = (keys) => (keys == null ? Object.keys(win.localStorage) : Array.isArray(keys) ? keys : typeof keys === 'string' ? [keys] : Object.keys(keys));
   const storage = {
     local: {
       get: (keys, fn) => cb((async () => {
@@ -94,7 +94,16 @@ export function installWebHost(win = window) {
   const toPanel = (type, data) => deliver({ target: 'panel', type, data });
   const toOffscreen = (type, data) => deliver({ target: 'offscreen', type, data });
 
-  const getSettings = async () => (await storage.local.get('settings')).settings || {};
+  // The engine is this page's origin, so captions use it unless the user saved another choice.
+  // Panel and background both read this, so they cannot disagree about the engine.
+  // shortcut: the panel saves its whole settings object, so a saved engine:'browser' cannot be told from a choice; upgrade by saving only changed keys.
+  const withDefaults = (s) => ({
+    engine: 'native',
+    ...s,
+    // the panel's built-in 17865 default is not a choice; this origin is the engine that served the page
+    nativeUrl: !s?.nativeUrl || s.nativeUrl === 'http://127.0.0.1:17865' ? win.location.origin : s.nativeUrl,
+  });
+  const getSettings = async () => withDefaults((await storage.local.get('settings')).settings);
 
   // ---- background: one in-page session ------------------------------------
   const idle = () => ({
@@ -306,7 +315,7 @@ export function installWebHost(win = window) {
       onUpdated: { addListener() {} },
     },
   };
-  win.__ysmWebHost = { session: () => session };
+  win.__ysmWebHost = { session: () => session, withDefaults };
 }
 
 if (typeof window !== 'undefined' && isEngineHosted()) installWebHost();

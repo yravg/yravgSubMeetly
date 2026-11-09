@@ -37,7 +37,7 @@ import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
-import { startEngineSync } from './lib/engine-sync.js';
+import { startEngineSync, engineOrigin } from './lib/engine-sync.js';
 import { makeT as makeNotesT } from './lib/notes-i18n.js';
 import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js';
 import { makeResizable } from './lib/resizable.js';
@@ -1532,6 +1532,8 @@ async function pullUiPrefs() {
 async function loadSettings() {
   const { settings } = await chrome.storage.local.get('settings');
   if (settings) Object.assign(state.settings, settings);
+  // Engine-hosted window: defaults to the engine it was served from; a saved choice still wins.
+  if (isWebHost()) state.settings = { ...state.settings, ...window.__ysmWebHost.withDefaults(settings) };
   await loadCaptionSurface();
   if (!UI_LANGS.some(([c]) => c === state.settings.uiLang)) {
     state.settings.uiLang = 'en';
