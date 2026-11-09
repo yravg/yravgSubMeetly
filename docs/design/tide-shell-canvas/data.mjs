@@ -2,6 +2,8 @@
 import { st } from './kit.mjs';
 import * as B from './boards.mjs';
 import * as M from './minutes-boards.mjs';
+import * as AP from './ask-plans-boards.mjs';
+import * as MW from './minutes-window-boards.mjs';
 
 export const PRD = 'docs/roadmap/tide-shell.md';
 const R = {
@@ -49,6 +51,15 @@ export const BOARDS = [
     stories: [st('TIDE-007', 'PRD', 'new', 'Dialog with bubble, steps, answer, list/bars/action/export cards, write guard, local answers')],
     where: ['<b>New:</b> src/ask-tide.js, src/ask-tide.css', '<b>Reads:</b> register (src/lib/notes-schema.js), helper /notes/generate', '<b>Write guard:</b> a test asserts nothing changes before Confirm'],
     refs: { note: 'No frame of the reference chat exists locally. From its capture spec: a 640 px dialog, black pill user bubble (16 px / 500), grey 13 px step row with an eye icon, answer text 16 px with the figure bold, rounded light-grey list card (title and range left, bold total right), action card with Cancel (light) and Confirm (black), export card with a green "Done" and a right-aligned "Open". The composer is a 24 px radius grey pill with a round send button.', shots: [] } },
+  { id: 'A03b', tier: 'APP SHELL', title: 'Ask Tide: model and credits', ext: 'new', lives: 'Ask Tide dialog: composer model pill, header credits chip',
+    afterOnly: true, states: [['local', 'Local'], ['reg', 'Register only'], ['consent', 'Cloud consent'], ['cloud', 'Cloud answer'], ['out', 'Out of credits']],
+    wins: { local: { html: AP.askModel('local'), h: 960 }, reg: { html: AP.askModel('reg'), h: 960 }, consent: { html: AP.askModel('consent'), h: 960 }, cloud: { html: AP.askModel('cloud'), h: 960 }, out: { html: AP.askModel('out'), h: 960 } },
+    notes: [[1160, 20, '<b>Click the model pill.</b> The picker lists Local (default), Register only and three cloud models. The first pick of a cloud model opens the consent card; Cancel keeps Local.', false], [1160, 190, '<b>Turn on cloud.</b> Black button. Until then OpenRouter is off and nothing leaves the computer. Audio never leaves in any mode.', false], [1160, 360, '<b>Every answer names its source:</b> "Local model · Qwen", "From your register" or "Cloud model · Claude Sonnet 5 · 2 credits".', false], [1160, 520, '<b>At 0 credits</b> Send is disabled and the card offers Top up or Use Local. Under 10 credits a banner warns first. Local and register answers cost 0.', false], [1160, 700, '<b>Writes stay confirm-gated</b> in every mode: the model proposes, the action card waits for Confirm. Answers stream from the helper (SSE: delta, done, error).', false]],
+    must: ['Model pill in the composer: Local · Qwen 2.5 by default', 'Picker: Local, Register only, Cloud · OpenRouter with three models and a cost hint', 'Consent card before the first cloud answer, with Cancel and Turn on cloud', 'Source line under each answer, with credits for cloud answers', 'Credits chip in the dialog header with Top up', 'Low-balance banner under 10; Out of credits card with Top up and Use Local; Send disabled at 0'],
+    motion: [['Picker', 'opens 140 ms ease-out'], ['Reply', 'streams in 50 ms chunks'], ['Reduce Motion', 'no streaming; the reply appears whole']],
+    stories: [st('TIDE-018', 'PRD', 'new', 'Ask Tide model engine: Local Qwen default, Register only, OpenRouter cloud; stream via helper /ask; writes only through the action card'), st('TIDE-019', 'PRD', 'new', 'Cloud consent: off until turned on, answers labelled with model name; key stays in the helper'), st('TIDE-020', 'PRD', 'new', 'Credits: 1 credit = Rp100, starter 50 credits for 14 days, balance chip, low-balance banner, Out of credits state')],
+    where: ['<b>New:</b> src/ask-tide.js model picker, helper /ask route (SSE)', '<b>Key:</b> %USERPROFILE%/.yravg/openrouter.key, read by the helper only; never in the extension or git', "<b>Pattern:</b> Solvarium chat (owner's own app)"],
+    refs: { note: "Pattern from Solvarium chat (owner's own app), no frame. Credit numbers and model names are sample data from the PRD.", shots: [] } },
   { id: 'A04', tier: 'APP SHELL', title: 'Minutes in the shell', ext: 'Minutes register (dist/minutes.html)', lives: 'Shell › Meetings › Minutes',
     before: { img: 'shots/b-minutes-sample.png', cap: 'Real capture of minutes.html with the sample series loaded' },
     states: [['reg', 'Register'], ['layout', 'Layout menu']],
@@ -79,6 +90,26 @@ export const BOARDS = [
     stories: [st('TIDE-017', 'PRD', 'partial', 'Register summary in one band of 72 px or less, with an expand control', 'Exists: the summary block and all its figures. Missing: the compact band, the inline legend and the Expanded state.')],
     where: ['<b>Page:</b> src/minutes.js summary render, src/minutes.css', '<b>Shared by:</b> A04 (shell Minutes) and A04a (detail page)', '<b>Data:</b> register counts from src/lib/notes-schema.js'],
     refs: refs('The one-bar breakdown idea comes from the reference; our band adds the legend and five stats. Words and art are not copied.', 'brk') },
+  { id: 'A04c', tier: 'APP SHELL', title: 'Open the Minutes window', ext: 'Minutes page in the shell and the side panel (button); page src/minutes.html (unchanged)', lives: 'Shell › Minutes toolbar; side panel Minutes tab',
+    before: { img: 'shots/b-minutes-sample.png', cap: 'Real capture of minutes.html: today it opens as a plain page or tab, with no button that opens it as its own window' },
+    states: [['closed', 'Window closed'], ['open', 'Window open']],
+    wins: { closed: { html: MW.openWindow('closed'), h: 590 }, open: { html: MW.openWindow('open'), h: 990 } },
+    notes: [[1160, 20, '<b>Click Open Minutes window.</b> It opens minutes.html in its own window (chrome.windows.create, type popup). Size and position are remembered. A second click focuses the open window instead of opening another.', false], [1160, 190, '<b>While it is open</b> the button reads "Minutes window is open · Focus" with a green dot. Closing the window brings the original label back.', false], [1160, 360, '<b>One register.</b> The shell Minutes page and this window read the same register; an edit in one shows in the other.', false], [1160, 520, '<b>Unchanged.</b> The window is the existing page, same layout, same keys. Nothing is removed from it. The same button sits on the side panel Minutes tab.', false]],
+    must: ['Button "Open Minutes window ↗" in the Minutes toolbar of the shell and on the side panel Minutes tab', 'Opened state: "Minutes window is open · Focus"', 'Separate window titled "yravgSubMeetly — Minutes" holding minutes.html unchanged', 'Size and position remembered; second click focuses'],
+    motion: [['Button label', 'swaps in 120 ms'], ['Window', 'opens by the browser, no app animation'], ['Reduce Motion', 'none needed']],
+    stories: [st('TIDE-023', 'PRD', 'new', 'Open Minutes window: the shell Minutes page and the side panel open the existing minutes.html in its own window, size remembered, second click focuses')],
+    where: ['<b>New:</b> button in src/app.html Minutes page and src/sidepanel.js; chrome.windows.create popup', '<b>Opens:</b> src/minutes.html (chrome-extension://…/minutes.html in the extension, http://127.0.0.1:8799/src/minutes.html in the lab); page unchanged', '<b>Remembers:</b> window bounds in chrome.storage.local'],
+    refs: { note: 'No reference: our own page. The owner wants minutes.html kept as it is for the people who already use it.', shots: [] } },
+  { id: 'A04d', tier: 'APP SHELL', title: 'Minutes page, same layout, Tide colours', ext: 'Minutes register page src/minutes.html (layout unchanged)', lives: 'Settings › Theme › Tide light / Tide dark; Dark stays the default for existing users',
+    before: { img: 'shots/b-minutes-owner.png', cap: 'Owner capture of minutes.html today (dark theme, series W36 sample library)' },
+    states: [['dark', 'Tide dark'], ['light', 'Tide light'], ['theme', 'Theme picker'], ['contrast', 'Contrast']],
+    wins: { dark: { html: MW.sameLayout('dark'), h: 780 }, light: { html: MW.sameLayout('light'), h: 780 }, theme: { html: MW.sameLayout('theme'), h: 780 }, contrast: { html: MW.contrastCard(), h: 720 } },
+    notes: [[1160, 20, '<b>Only colours change.</b> Every position, size, label and shortcut stays where users know it: top bar, header, provenance strip, the 13 ITEMS block, navigator, table columns, transcript pane, footer.', false], [1160, 190, '<b>Theme picker.</b> Settings (gear) › Theme lists Dark (current), Coretax, Tide light, Tide dark. Dark stays the default for existing users.', false], [1160, 360, '<b>Issue MoM</b> is the one ink pill: black in Tide light, light ink in Tide dark. It is no longer green-filled.', false], [1160, 520, '<b>Type colours</b> come from the Tide palette as a 3 px bar before the word. The word itself is ink. Source status words are plain caps, no pills.', false]],
+    must: ['Top bar with wordmark, breadcrumb, On-device, Draft options, Library, Training, date switcher, Add item, Export, Issue MoM, settings', 'Header, meta line, provenance strip with the Mac note', 'The 13 ITEMS block with legend, percentages and the five stats, Review 1 low-confidence item', 'Navigator, table columns Ref to Source, transcript pane, footer with shortcuts', 'Theme picker with four entries', 'Contrast table for the Tide dark text pairs'],
+    motion: [['Theme switch', 'colours cross-fade 160 ms'], ['Reduce Motion', 'swap at once']],
+    stories: [st('TIDE-024', 'PRD', 'new', 'Tide theme for minutes.html (light and dark) with the layout unchanged; Dark remains the default')],
+    where: ['<b>Page:</b> src/minutes.html, src/minutes.css (new theme block), Settings › Theme', '<b>Tokens:</b> src/theme-tide.css; no markup or position changes', '<b>Default:</b> existing users keep Dark; Tide is opt-in'],
+    refs: { note: 'No reference: our own page, redrawn from the owner capture at the same layout. Sizes are measured from the capture at 1280 px wide.', shots: [] } },
   { id: 'A05', tier: 'APP SHELL', title: 'History and Files', ext: 'Side panel History tab and offline task', lives: 'Shell › Meetings › History, Files',
     before: { img: 'shots/b-history.png', cap: 'Real capture: History tab with search and per-row Open / TXT / SRT / VTT' },
     states: [['history', 'History'], ['drop', 'Files: drop'], ['running', 'Files: running'], ['done', 'Files: done']],
@@ -126,4 +157,13 @@ export const BOARDS = [
     stories: [st('TIDE-014', 'PRD', 'new', 'Empty, thinking, welcome, done with Tide; error without mascot; locked'), st('TIDE-015', 'PRD', 'new', 'Responsive 1440 / 1024 / 390 and dark')],
     where: ['<b>Shared:</b> src/tide-states.js, src/theme-tide.css', '<b>Mascot art:</b> yravgBuds Tide poses (shell, wave, sleep, compass, celebrate)'],
     refs: refs('The reference puts the mascot only on the hero and empty states. Same rule here.', 'hero') },
+  { id: 'A10', tier: 'APP SHELL', title: 'Plans', ext: 'new', lives: 'Sidebar footer › Plans, Settings › Plans',
+    afterOnly: true, states: [['plans', 'Default'], ['out', 'Signed out'], ['noserver', 'No server yet']],
+    wins: { plans: { html: AP.plans('plans'), h: 1000 }, out: { html: AP.plans('out'), h: 1000 }, noserver: { html: AP.plans('noserver'), h: 1000 } },
+    notes: [[1160, 20, '<b>Free is the live plan.</b> Start free signs in and grants 50 credits for 14 days. Pro and Agent show Coming soon until billing exists.', false], [1160, 190, '<b>Top up</b> buys credits once: Rp25.000 = 250, Rp50.000 = 525, Rp100.000 = 1.100, Rp250.000 = 2.750. 1 credit = Rp100.', false], [1160, 360, '<b>Owner decision needed:</b> 400 credits a month on Pro and 1,000 on Agent are proposals, not agreed numbers. Prices $4.99 and $9.99 are from the PRD.', false], [1160, 520, '<b>Signed out:</b> Start free becomes Sign in and top-up buttons are disabled. <b>No server:</b> plans say Coming soon and credits are hidden; Local and Register only still work.', false]],
+    must: ['Three plan cards: Free $0.00, Pro $4.99, Agent $9.99, one full-width button each', 'Included lists with check marks, Beta marked on Agent follow-ups', 'Top up credits row with four packs and the 1 credit = Rp100 line', 'Signed out and No server yet states', 'Entry: sidebar footer Plans link'],
+    motion: [['Cards', 'no motion; hover lifts the shadow 120 ms'], ['Reduce Motion', 'none needed']],
+    stories: [st('TIDE-021', 'PRD', 'new', 'Monthly plans page: Free, Pro, Agent with Coming soon buttons and a top-up row'), st('TIDE-022', 'PRD', 'new', 'Account and wallet server (reuse of the solvarium-chat backend); without it only Local and Register only work')],
+    where: ['<b>New:</b> src/plans.js, src/plans.css; entry in the sidebar footer and Settings › Plans', '<b>Server:</b> shared with solvarium-chat, still an open question in the PRD'],
+    refs: { note: 'The pricing layout of the reference (three cards, large price with a small per-month label, one wide button, Included lists) is followed in structure only. Plan names, copy, prices and art are our own. No frame is kept.', shots: [] } },
 ];

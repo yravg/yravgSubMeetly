@@ -18,7 +18,7 @@ export const sidebar = (active, { dev = false, syncDot = '' } = {}) => `<aside c
 <nav class="nav">${navA('addins', 'Add-ins', active === 'addins')}${navA('book', 'Glossary', active === 'glossary')}${navA('island', 'Island', active === 'island')}${navA('perf', 'Performance', active === 'perf')}${navA('grid', 'All features', active === 'all', 8)}${navA('gear', 'Settings', active === 'settings')}${dev ? `<a class="dv ${active === 'dev' ? 'on' : ''}">${ic('dev', 20)}<span>Developer</span><span class="n">lab</span></a>` : ''}</nav>
 <div class="push"></div>
 <div class="pillb full"><span class="hide1" style="display:contents">${ic('play', 18)}Start captions<kbd>⇧S</kbd></span></div>
-<div class="sbf"><span class="av sm">EM</span><span class="hide1"><b>Enrico</b><small>${dot()}${syncDot || 'Helper · CUDA · synced 08:52'}</small></span></div>
+<div class="sbf"><span class="av sm">EM</span><span class="hide1"><b>Enrico</b><small>${dot()}${syncDot || 'Helper · CUDA · synced 08:52'}</small></span><a class="plk hide1 ${active === 'plans' ? 'on' : ''}">Plans</a></div>
 </aside>`;
 
 export const topbar = (title, extra = '') => `<div class="top"><h1>${title}</h1>${SAMPLE}<span class="grow"></span>${extra}<span class="chip">${ic('island', 18)}Island<span class="sw on"></span></span><span class="chip ok">${dot()}Helper · CUDA</span></div>`;

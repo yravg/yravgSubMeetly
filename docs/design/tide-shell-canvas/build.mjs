@@ -15,6 +15,8 @@ import { BOARD_CSS, TIDE_CSS, NEW, esc, st, bt, paneCss, ixScript, ixDc } from '
 import * as B from './boards.mjs';
 import { BOARDS, PRD } from './data.mjs';
 import { MIN_CSS } from './minutes-boards.mjs';
+import { PLAN_CSS } from './ask-plans-boards.mjs';
+import { WIN_CSS } from './minutes-window-boards.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const S = 1140 / 1440;
@@ -85,7 +87,7 @@ const cover = `<section class="cover" id="cover"><div class="ey"><span class="ti
 <h1>Tide app shell</h1>
 <p>One app window in the Oyenza layout: sidebar, greeting hero, ask bar, key number, right rail, one black pill. Painted with yravg brand tokens, with Tide as the mascot. Every control of today's app.html lands on a board; lab tools move to a Developer area. All numbers on the boards are sample data.</p>
 <div class="tiles"><div class="tile"><b>${total}</b>boards</div><div class="tile"><b>${B.contrastRows.length}</b>contrast rows measured</div><div class="tile"><b>${cnt('new')}</b>NEW rows</div><div class="tile"><b>${cnt('partial')}</b>PARTIAL rows</div></div>
-<div class="tcards"><div class="tcard"><h3>FOUNDATION</h3>K01 tokens: colour, type, radius, motion, light and dark.</div><div class="tcard"><h3>APP SHELL</h3>A01 to A09: shell and Today, pages, Ask Tide, Developer, states.</div><div class="tcard"><h3>BEFORE | AFTER</h3>Before is a real capture of today's UI. After is drawn here on the brand tokens.</div><div class="tcard"><h3>REFERENCE</h3>Oyenza frames are layout reference only; no name, art or copy is used.</div></div>
+<div class="tcards"><div class="tcard"><h3>FOUNDATION</h3>K01 tokens: colour, type, radius, motion, light and dark.</div><div class="tcard"><h3>APP SHELL</h3>A01 to A10: shell and Today, pages, Ask Tide, model and credits, Developer, states, Plans.</div><div class="tcard"><h3>BEFORE | AFTER</h3>Before is a real capture of today's UI. After is drawn here on the brand tokens.</div><div class="tcard"><h3>REFERENCE</h3>Oyenza frames are layout reference only; no name, art or copy is used.</div></div>
 <div class="legend"><span class="lg lgn">NEW: does not exist yet</span><span class="lg lgp">PARTIAL: exists, needs change</span><span>Navy notes: what happens on click, hover or when something is missing</span></div></section>`;
 
 const statusRows = BOARDS.map((b) => `<tr><td><a href="#${b.id}">${b.id}</a></td><td>${esc(b.title)}</td><td>${b.stories.map((s) => `<span class="spill ${s.stat}">${s.id} ${s.stat === 'new' ? 'NEW' : 'PARTIAL'}</span>`).join(' ')}</td><td>${(kept[b.id] || new Set()).size}</td></tr>`).join('');
@@ -103,7 +105,7 @@ const boards = BOARDS.map((b) => {
 }).join('\n');
 
 const body = `<div class="page"><nav class="toc"><div class="tt">CANVAS</div><a href="#cover">Cover</a><a href="#status">Status</a><a href="#index">Story index</a><div class="tt">BOARDS</div>${idx}</nav><main class="cv">${cover}${status}${index}${boards}</main></div>`;
-const css = BOARD_CSS + '\n' + TIDE_CSS + '\n' + MIN_CSS + '\n' + paneCss(body);
+const css = BOARD_CSS + '\n' + TIDE_CSS + '\n' + MIN_CSS + '\n' + PLAN_CSS + '\n' + WIN_CSS + '\n' + paneCss(body);
 const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1640"><title>Tide app shell canvas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Geist:wght@400;500;600&family=Geist+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <style>${css}</style></head><body>${body}${ixScript}</body></html>`;
