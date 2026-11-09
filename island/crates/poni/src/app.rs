@@ -122,7 +122,7 @@ pub fn main_entry() -> i32 {
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
     // Single instance. A run with its own PONI_HOME (dev, self-test) is its own instance, next to the installed one.
-    let mutex_name = HSTRING::from(if std::env::var_os("PONI_HOME").is_some() { "Local\\yravgSubMeetly.Island.dev" } else { "Local\\yravgSubMeetly.Island" });
+    let mutex_name = HSTRING::from(instance_mutex_name(std::env::var_os("PONI_HOME").as_deref()));
     let _mutex = unsafe { CreateMutexW(None, true, &mutex_name) };
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         pinfo!("another instance is running; exiting");
@@ -286,6 +286,16 @@ unsafe extern "system" fn helper_wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             LRESULT(0)
         }
         None => DefWindowProcW(hwnd, msg, wp, lp),
+    }
+}
+
+/// The single-instance mutex's name. The installed app's is fixed; a run with its own
+/// `PONI_HOME` (dev, self-test) gets one per home, so dev islands run side by side.
+fn instance_mutex_name(home: Option<&std::ffi::OsStr>) -> String {
+    match home {
+        None => "Local\\yravgSubMeetly.Island".into(),
+        // FNV-1a: a short stable tag, not a security hash.
+        Some(h) => format!("Local\\yravgSubMeetly.Island.dev.{:08x}", h.to_string_lossy().to_lowercase().bytes().fold(0x811c9dc5u32, |a, b| (a ^ b as u32).wrapping_mul(0x0100_0193))),
     }
 }
 
@@ -4680,6 +4690,17 @@ mod downloads;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_installed_apps_mutex_name_is_fixed_and_each_dev_home_has_its_own() {
+        use std::ffi::OsStr;
+        assert_eq!(super::instance_mutex_name(None), "Local\\yravgSubMeetly.Island");
+        let a = super::instance_mutex_name(Some(OsStr::new("E:\\a\\home")));
+        let b = super::instance_mutex_name(Some(OsStr::new("E:\\b\\home")));
+        assert!(a.starts_with("Local\\yravgSubMeetly.Island.dev."));
+        assert_ne!(a, b);
+        assert_eq!(a, super::instance_mutex_name(Some(OsStr::new("E:\\A\\HOME"))), "Windows paths ignore case");
+    }
+
     use super::*;
     use crate::island::HIT_MARGIN;
 
