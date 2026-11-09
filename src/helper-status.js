@@ -81,6 +81,7 @@ export function renderHelperStatusCard(root, opts) {
           ${escapeHtml(tt(online ? 'hsConnected' : 'hsDisconnected'))}
         </span>
         <span class="notes-meta">${escapeHtml(guide.label)} · ${escapeHtml(guide.engine)}</span>
+        ${typeof opts.onRestart === 'function' ? `<button type="button" class="mini-btn" id="btn-helper-restart" ${opts.restarting ? 'disabled' : ''}>${escapeHtml(tt(opts.restarting ? 'hsRestarting' : 'hsRestart'))}</button>` : ''}
       </div>
 
       <div class="helper-indicators" id="helper-mode-indicators">
@@ -105,7 +106,7 @@ export function renderHelperStatusCard(root, opts) {
         <strong>${escapeHtml(tt('hsDisconnected'))}</strong> — ${escapeHtml(tt('hsDisconnectedBody', guide.label))}
       </div>
 
-      <div class="notes-block">
+      <div class="notes-block helper-steps-block">
         <h3>${escapeHtml(tt('hsGuideTitle', guide.label))}</h3>
         <ol class="helper-steps">
           ${guide.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}
@@ -217,6 +218,7 @@ export function renderHelperStatusCard(root, opts) {
     else renderHelperStatusCard(root, { ...opts, exportOptions: d });
   });
 
+  root.querySelector('#btn-helper-restart')?.addEventListener('click', () => opts.onRestart());
   root.querySelector('#btn-helper-lf-cancel')?.addEventListener('click', () => {
     btnDisabled(root.querySelector('#btn-helper-lf-cancel'));
     if (typeof opts.onCancelLargeFile === 'function') {

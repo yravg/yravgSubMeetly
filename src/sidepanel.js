@@ -1706,6 +1706,7 @@ function setNativeUi({ running, busy, detail }) {
   $('btn-native-start').disabled = busy || running;
   $('btn-native-stop').disabled = busy || !running;
   $('btn-native-restart').disabled = busy;
+  redrawHelperStatus?.(); // the Helper page's Restart button follows busy
 }
 
 async function checkNative({ allowAutoStart = false } = {}) {
@@ -1999,7 +2000,17 @@ async function nativeControl(action) {
     detail: action === 'start' ? t('nativeStarting') : action === 'stop' ? t('nativeStopping') : t('nativeRestarting'),
   });
   try {
-    if (nativeHostSupported()) {
+    if (isWebHost()) {
+      // No Native Messaging here: the island supervises the engine and starts it again when /health stops answering.
+      if (action !== 'start') {
+        await nativeShutdown(url);
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      if (action === 'restart') {
+        const end = Date.now() + 45_000;
+        while (Date.now() < end && !(await nativeHealth(url, 1000))) await new Promise((r) => setTimeout(r, 1000));
+      }
+    } else if (nativeHostSupported()) {
       let res;
       try {
         res = await nativeHostAction(action, { timeoutMs: 130_000 });
@@ -3273,6 +3284,18 @@ function populateMockData() {
 async function init() {
   await loadSettings();
   if (isWebHost()) {
+    document.documentElement.dataset.hosted = '';
+    // Status, model and Restart stay on top; the install guide and diagnostics go behind Troubleshooting.
+    const guideMount = $('helper-guide-mount');
+    if (guideMount) {
+      const d = document.createElement('details');
+      d.className = 'hs-troubleshoot';
+      d.id = 'helper-troubleshoot';
+      const sum = document.createElement('summary');
+      sum.textContent = t('hsTroubleshooting');
+      guideMount.replaceWith(d);
+      d.append(sum, guideMount);
+    }
     // In the engine-hosted window the picker is the only capture path today: say so.
     $('btn-pick').dataset.i18n = 'pickManuallyHosted';
     // Inside the app shell iframe the shell sidebar is the navigation; alone, keep the panel's own.
@@ -3352,6 +3375,8 @@ async function init() {
       exportOptions: exportOptions(),
       exportSource: currentExportSource(),
       exportFolder: exportDirLabel(),
+      restarting: nativeBusy,
+      onRestart: isWebHost() ? () => nativeControl('restart') : undefined,
       onExportOptionChange: updateExportOptions,
       onExport: (kind) => {
         const source = currentExportSource();
