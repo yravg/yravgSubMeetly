@@ -1359,7 +1359,8 @@ fn draw_row(ui: &mut Ui, it: &Item, at: (usize, usize), row: Rect, view: Rect, a
     let ctl_w = match &it.ctl {
         Ctl::Switch(_) => SWITCH_W,
         Ctl::Choice(names, _) => picker_width(ui, names),
-        Ctl::Stepper(_) => 2.0 * STEP_BTN + STEP_VALUE_W,
+        // A long value ("Qwen2.5 0.5B") gets its own width plus a gap to each button, not the fixed slot.
+        Ctl::Stepper(v) => 2.0 * STEP_BTN + STEP_VALUE_W.max(ui.c.measure(v, &TextStyle::body().weight(Weight::Semibold).tabular(), 300.0).0.ceil() + 16.0),
         Ctl::Button(label) => ui.pill_width(label, true, true),
         Ctl::None => 0.0,
     };
