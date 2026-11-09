@@ -16,12 +16,13 @@ import { addItem, startNextMeeting } from './notes-actions.js';
 
 export const SAMPLE_SERIES_ID = 'CPOC7-WEEKLY';
 
+// example.com addresses: demo data for the Recap email add-in. QA/QC and CVL are groups with no mailbox, so the recap names them as "no email".
 const ATTENDEES = [
-  { name: 'Nasmee Samang', org: 'GZS' },
-  { name: 'Lai Kong Teng', org: 'COMPANY' },
-  { name: 'Riza', org: 'GZS' },
-  { name: 'Jagdeep', org: 'MWS' },
-  { name: 'Huimin', org: 'GZS' },
+  { name: 'Nasmee Samang', org: 'GZS', email: 'nasmee.samang@example.com' },
+  { name: 'Lai Kong Teng', org: 'COMPANY', email: 'lai.kongteng@example.com' },
+  { name: 'Riza', org: 'GZS', email: 'riza@example.com' },
+  { name: 'Jagdeep', org: 'MWS', email: 'jagdeep@example.com' },
+  { name: 'Huimin', org: 'GZS', email: 'huimin@example.com' },
   { name: 'QA/QC', org: 'GZS' },
   { name: 'CVL', org: 'SUBCON' },
 ];
@@ -191,6 +192,13 @@ function buildW36(w35) {
   return m;
 }
 
+/** Demo terms for the Glossary add-in (ysmGlossary[SAMPLE_SERIES_ID]): what a recogniser tends to hear for this series' vocabulary. */
+export const SAMPLE_GLOSSARY = [
+  { term: 'HLV', heard: ['h l v', 'hlv crane'], translation: '' },
+  { term: 'GMDR', heard: ['g m d r', 'gee mdr'], translation: '' },
+  { term: 'sea fastening', heard: ['sea fasting', 'see fastening'], translation: 'pengikatan di laut' },
+];
+
 /** Bangun [W35, W36] murni di memori — tanpa efek samping penyimpanan. */
 export function buildSampleSeries() {
   const w35 = buildW35();
@@ -204,5 +212,11 @@ export async function seedSampleData() {
   const [w35, w36] = buildSampleSeries();
   await saveMeeting(w35);
   await saveMeeting(w36);
+  try {
+    const got = (await chrome.storage.local.get('ysmGlossary')).ysmGlossary || {};
+    if (!got[SAMPLE_SERIES_ID]) await chrome.storage.local.set({ ysmGlossary: { ...got, [SAMPLE_SERIES_ID]: SAMPLE_GLOSSARY } });
+  } catch {
+    /* no extension storage here (plain node): the demo meetings still load without a glossary */
+  }
   return [w35, w36];
 }

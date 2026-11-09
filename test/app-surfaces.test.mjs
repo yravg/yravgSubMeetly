@@ -585,6 +585,43 @@ test('modal Pengaturan berisi tepat satu kartu, dan kartunya terpusat di layar',
   await page.evaluate(() => document.getElementById('btn-close-settings').click());
 });
 
+test('Captions show on: tiga pilihan tersimpan di captionSurface; petunjuk mesin hanya saat Island/Both dengan mesin Browser', async () => {
+  await page.evaluate(() => document.getElementById('btn-settings').click());
+  await page.evaluate(() => document.querySelector('#settings-tabs [data-stab="output"]').click());
+  const state = () =>
+    page.evaluate(async () => ({
+      stored: (await chrome.storage.local.get('captionSurface')).captionSurface,
+      active: document.querySelector('#surface-toggle button.active')?.dataset.surface,
+      hintHidden: document.getElementById('surface-engine-hint').classList.contains('hidden'),
+      engine: document.getElementById('engine-toggle').value,
+    }));
+  const pick = async (v) => {
+    await page.evaluate((x) => document.querySelector(`#surface-toggle [data-surface="${x}"]`).click(), v);
+    await page.waitForFunction((x) => document.querySelector('#surface-toggle button.active')?.dataset.surface === x, {}, v);
+  };
+  const before = await state();
+  assert.equal(before.active, 'overlay', 'bawaan: overlay halaman');
+  assert.equal(before.hintHidden, true);
+  await pick('island');
+  let st = await state();
+  assert.deepEqual([st.stored, st.hintHidden, st.engine], ['island', false, 'browser'], 'Island + mesin Browser → petunjuk muncul');
+  await pick('both');
+  assert.equal((await state()).stored, 'both');
+  await page.evaluate(() => document.getElementById('btn-surface-native').click());
+  await page.waitForFunction(() => document.getElementById('engine-toggle').value === 'native');
+  await page.waitForFunction(() => document.getElementById('surface-engine-hint').classList.contains('hidden'));
+  await pick('overlay');
+  assert.equal((await state()).stored, 'overlay');
+  // kembalikan mesin Browser supaya tes lain tidak terpengaruh
+  await page.evaluate(() => {
+    const sel = document.getElementById('engine-toggle');
+    sel.value = 'browser';
+    sel.dispatchEvent(new Event('change'));
+  });
+  await page.evaluate(() => document.querySelector('#settings-tabs [data-stab="general"]').click());
+  await page.evaluate(() => document.getElementById('btn-close-settings').click());
+});
+
 test('tombol lebar tetap bekerja setelah panel notulen me-render ulang', async () => {
   // Urutan inilah yang dulu membekukan max-width: render ulang notulen lalu
   // ganti preset lebar.

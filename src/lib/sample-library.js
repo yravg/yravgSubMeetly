@@ -582,7 +582,7 @@ export function buildTranscript(id) {
     end: addMinutes(start, Math.max(30, Math.ceil(built.durationSec / 60) + 5)),
     tz: 'Asia/Jakarta',
     chair: cast.chair.name,
-    attendees: cast.attendees.map((a) => ({ name: a.name, org: a.org, speakerLabel: a.name })),
+    attendees: cast.attendees.map((a) => ({ name: a.name, org: a.org, speakerLabel: a.name, email: demoEmail(a.name) })),
     agenda: built.agenda,
     locale,
     bilingual,
@@ -595,7 +595,19 @@ export function buildTranscript(id) {
 
 /* ------------------------------------------------------------------ import */
 
+// Demo data for the Recap email / Due dates to calendar add-ins: example.com addresses, and a due date a
+// few days after the meeting on each open action (the generator only writes "by Friday" into the text).
+const demoEmail = (name) => `${name.normalize('NFD').replace(/[^A-Za-z ]/g, '').trim().toLowerCase().replace(/\s+/g, '.')}@example.com`;
+function withDemoDue(m) {
+  let k = 0;
+  return { ...m, items: m.items.map((it) => (it.type === 'action' && it.status !== 'closed' && !it.due ? { ...it, due: addDays(m.date, 3 + 2 * (k++ % 4)) } : it)) };
+}
+
 function meetingFromTranscript(tr, prev) {
+  return withDemoDue(buildMeeting(tr, prev));
+}
+
+function buildMeeting(tr, prev) {
   const meta = { title: tr.title, date: tr.date, locale: tr.locale, seriesId: tr.seriesId, source: 'sample-library' };
   const gen = generateNotesFromTranscript(tr.lines, meta);
   const generatedAt = `${tr.date}T${tr.end}:00.000Z`;

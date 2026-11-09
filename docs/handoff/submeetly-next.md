@@ -167,3 +167,28 @@ Claude cannot run as root with `--dangerously-skip-permissions`, so the VPS work
   by the permission classifier. (3) First start of each worker may wait on the trust or bypass-permissions prompt.
 - Next: after login, attach each tmux session, accept prompts; when all three REPORT.md files exist, the lead
   verifies each branch and merges.
+
+## Back on the laptop (2026-11-09 morning, lead)
+
+VPS SSH timed out twice (`hostinger-vps-dev`, banner exchange), so work runs locally again. Owner runs
+`/yravgvps:yravgvps-mode` to set up VPS sync (the lead cannot invoke that skill).
+
+Meeting test setup (owner testing in a live meeting this morning): `npm ci` + `npm run build` on main 4a1959a ok;
+Python helper started by the lead on 17865 (system Python 3.11, faster-whisper 1.2.1, large-v3-turbo, CUDA float16,
+TRANSLATE=off); lab server on 8799. `npm run e2e` (CfT 154): reaches "Listening — Whisper Tiny · WASM", then
+`Runtime.callFunctionOn timed out` — the same CDP stall as REL-03, now also in browser mode. `test/speech.wav` was
+missing on main (gitignored `*.wav`); copied from sm-s5.
+
+Agent team (Sonnet subagents, local worktrees under `C:\Users\Enrico D. Marlon\orca\workspaces\yraverageSubMeetly`,
+checkpoints `.checkpoints/<name>.md` in each):
+
+| Agent | Worktree / branch | Task |
+|---|---|---|
+| addins2 | sm-addins2 | ADD-001 gate: merge main, npm test, slop, review |
+| s5 | sm-s5 | ENG-004 gate: merge main, cargo, npm test, e2e on a non-default port |
+| desktop | sm-desktop | tray/menu, engine supervisor, fixed extension ID, Setup build (no install) |
+| overlay | sm-overlay (new) | owner: in-page caption overlay revamp, Apple look on our tokens; honours `captionSurface` |
+| surface | sm-surface (new) | owner: captions in the island pill; setting `captionSurface` overlay/island/both |
+
+Contract between overlay and surface: `chrome.storage.local.captionSurface` = 'overlay' | 'island' | 'both',
+default 'overlay'. Island captions come from helper `GET /live`, so they need Engine = Native Helper.

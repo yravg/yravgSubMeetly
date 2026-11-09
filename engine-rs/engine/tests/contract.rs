@@ -347,3 +347,33 @@ fn engine_device_choice_is_validated_and_persisted() {
     assert_eq!(cuda.status, 200);
     let _ = fs::remove_dir_all(&state);
 }
+
+#[test]
+fn caption_surface_is_stored_only_when_valid_and_survives_other_prefs() {
+    let (app, state) = app_with_state();
+    let post = |body: &str| {
+        let mut r = request("POST", "/ui-prefs", None, "127.0.0.1:17865", true);
+        r.body = body.as_bytes().to_vec();
+        app.handle(&r)
+    };
+    let get = || {
+        let r = app.handle(&request("GET", "/ui-prefs", None, "127.0.0.1:17865", true));
+        r.body.clone().expect("json body")
+    };
+    // Unset: the key is absent, so GET keeps its old shape.
+    assert_eq!(
+        get()["prefs"],
+        json!({ "theme": "auto", "reskin": "yraverage" })
+    );
+    assert_eq!(post(r#"{"captionSurface":"island"}"#).status, 200);
+    assert_eq!(get()["prefs"]["captionSurface"], "island");
+    // A bad value is ignored; another pref does not clear it.
+    assert_eq!(post(r#"{"captionSurface":"nope"}"#).status, 200);
+    assert_eq!(post(r#"{"theme":"dark"}"#).status, 200);
+    assert_eq!(
+        get()["prefs"],
+        json!({ "theme": "dark", "reskin": "yraverage", "captionSurface": "island" })
+    );
+    assert_eq!(post("{}").status, 400);
+    let _ = fs::remove_dir_all(state);
+}

@@ -50,7 +50,8 @@ import {
 } from './lib/qa-samples.js';
 import { tile as colourTile } from './lib/colour-icons.js';
 import { renderFeatureMap } from './lib/feature-map.js';
-import { mountAddinsPane } from './addins-ui.js';
+import { mountAddinsPane, glossaryCaption } from './addins-ui.js';
+import { markedHtml } from './lib/glossary.js';
 import { springProgress, slidingNumber, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -1334,6 +1335,37 @@ function applyTabRows() {
   });
 }
 
+// Where live captions show: 'overlay' (page), 'island' (pill on the desktop) or 'both'.
+// Key `captionSurface` in chrome.storage.local is read by content.js; the helper keeps a
+// copy (ui-prefs) because the island reads captions from the helper, which has none with
+// the in-browser engine.
+const CAPTION_SURFACES = ['overlay', 'island', 'both'];
+let captionSurface = 'overlay';
+
+function applyCaptionSurface() {
+  document.querySelectorAll('#surface-toggle button').forEach((b) => {
+    const on = b.dataset.surface === captionSurface;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  $('surface-engine-hint')?.classList.toggle(
+    'hidden',
+    captionSurface === 'overlay' || state.settings.engine === 'native',
+  );
+}
+
+async function setCaptionSurface(value) {
+  captionSurface = CAPTION_SURFACES.includes(value) ? value : 'overlay';
+  await chrome.storage.local.set({ captionSurface });
+  applyCaptionSurface();
+  pushUiPrefs();
+}
+
+async function loadCaptionSurface() {
+  const { captionSurface: v } = await chrome.storage.local.get('captionSurface');
+  captionSurface = CAPTION_SURFACES.includes(v) ? v : 'overlay';
+}
+
 async function setTabRows(rows) {
   state.settings.tabRows = rows === 'two' ? 'two' : 'one';
   await saveSettings();
@@ -1343,6 +1375,14 @@ async function setTabRows(rows) {
 function applyTranslationColour() {
   const c = TCOLOURS.includes(state.settings.translationColour) ? state.settings.translationColour : 'indigo';
   document.documentElement.dataset.tcolor = c;
+  document.querySelectorAll('#surface-toggle button').forEach((b) =>
+    b.addEventListener('click', () => setCaptionSurface(b.dataset.surface)),
+  );
+  $('btn-surface-native')?.addEventListener('click', () => {
+    const sel = $('engine-toggle');
+    sel.value = 'native';
+    sel.dispatchEvent(new Event('change'));
+  });
   document.querySelectorAll('#tcolor-toggle button').forEach((b) => {
     const on = b.dataset.tcolor === c;
     b.classList.toggle('active', on);
@@ -1456,6 +1496,7 @@ function pushUiPrefs() {
   nativeSetUiPrefs(state.settings.nativeUrl || DEFAULT_NATIVE_URL, {
     theme: state.settings.theme,
     reskin: state.settings.reskin,
+    captionSurface,
   }).catch(() => {});
 }
 
@@ -1489,6 +1530,7 @@ async function pullUiPrefs() {
 async function loadSettings() {
   const { settings } = await chrome.storage.local.get('settings');
   if (settings) Object.assign(state.settings, settings);
+  await loadCaptionSurface();
   if (!UI_LANGS.some(([c]) => c === state.settings.uiLang)) {
     state.settings.uiLang = 'en';
   }
@@ -1511,6 +1553,7 @@ async function loadSettings() {
   applyReskin();
   if (!['one', 'two'].includes(state.settings.tabRows)) state.settings.tabRows = 'one';
   applyTabRows();
+  applyCaptionSurface();
   if (!TCOLOURS.includes(state.settings.translationColour)) state.settings.translationColour = 'indigo';
   applyTranslationColour();
   renderEngineLine();
@@ -1668,6 +1711,7 @@ async function checkNative({ allowAutoStart = false } = {}) {
     if (started) nativeInfo = await nativeHealth(state.settings.nativeUrl || DEFAULT_NATIVE_URL);
   }
   if (nativeInfo) {
+    pushUiPrefs(); // the island reads captionSurface from the helper
     const stale =
       nativeInfo.translate &&
       nativeInfo.features &&
@@ -2442,7 +2486,7 @@ async function pickFile(file) {
 
 // ---------------------------------------------------------------------------
 // subtitle stream + offline results
-function appendLiveLine(host, text, tag = '') {
+function appendLiveLine(host, text, tag = '', marks = []) {
   if (!text) return;
   const div = document.createElement('div');
   div.className = 'line';
@@ -2452,7 +2496,9 @@ function appendLiveLine(host, text, tag = '') {
     badge.textContent = tag;
     div.appendChild(badge);
   }
-  div.appendChild(document.createTextNode(text));
+  // Glossary add-in: wrap each fixed term in <mark> (markedHtml escapes the text).
+  if (marks.length) div.insertAdjacentHTML('beforeend', markedHtml(text, marks));
+  else div.appendChild(document.createTextNode(text));
   host.appendChild(div);
   while (host.children.length > 30) host.firstChild.remove();
   host.scrollTop = host.scrollHeight;
@@ -2488,14 +2534,18 @@ function pushLive({ source, translation, rawSource, rawTranslation, t0, t1, inte
   // Two-way lines say which way this utterance went; one-way stays untagged.
   const srcTag = dir?.src ? dir.src.toUpperCase() : '';
   const dirTag = dir?.src && dir?.tgt ? `${dir.src.toUpperCase()} \u2192 ${dir.tgt.toUpperCase()}` : '';
-  if (source) appendLiveLine($('live-src-lines'), source, srcTag);
-  if (translation) appendLiveLine($('live-tgt-lines'), translation, dirTag);
+  // Glossary add-in (caption.final hook): fix terms in the shown line and in the stored line the exports read.
+  const fix = (src, tgt) => glossaryCaption({ src, tgt }) || { src, tgt, marks: { src: [], tgt: [] } };
+  const shown = fix(source || '', translation || '');
+  if (source) appendLiveLine($('live-src-lines'), shown.src, srcTag, shown.marks.src);
+  if (translation) appendLiveLine($('live-tgt-lines'), shown.tgt, dirTag, shown.marks.tgt);
   if ((source || translation) && (t0 != null || t1 != null)) {
+    const kept = fix(rawSource ?? source ?? '', rawTranslation ?? translation ?? '');
     state.realtimeLines.push({
       t0: t0 ?? 0,
       t1: t1 ?? (t0 ?? 0) + 3,
-      src: rawSource ?? source ?? '',
-      tgt: rawTranslation ?? translation ?? '',
+      src: kept.src,
+      tgt: kept.tgt,
     });
     redrawHelperStatus?.();
   }
