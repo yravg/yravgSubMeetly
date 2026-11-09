@@ -2481,6 +2481,10 @@ impl App {
             AppEvent::Helper(r) => {
                 let langs = r.as_ref().ok().map(|(s, _)| s.langs.clone());
                 self.st.helper.apply(r);
+                // A model move goes on with Settings closed: this poll keeps asking how far it is.
+                if !self.st.models.moving().is_empty() && self.st.models.due(now) {
+                    self.refresh_models();
+                }
                 if let Some(l) = langs {
                     self.on_engine_langs(&l);
                 }
@@ -2506,7 +2510,19 @@ impl App {
             AppEvent::CalendarNotes(Err(e)) => self.st.helper_notice = Some((e, now + 6.0, true)),
             AppEvent::Capture(e) => self.on_capture(e),
             AppEvent::MeetingSaved(r) => self.on_meeting_saved(r),
-            AppEvent::Models(r) => self.st.models.apply(r, now),
+            AppEvent::Models(r) => {
+                let was = self.st.models.moving();
+                self.st.models.apply(r, now);
+                // With Settings open the row says how the move went; with it closed a notice does.
+                if !self.settings_window_open() {
+                    for (kind, end) in self.st.models.move_ends(&was) {
+                        match end {
+                            Ok(sub) => self.st.notify(Icon::Download, palette::GREEN, format!("{} moved", kind.label()), sub, 6.0, None),
+                            Err(e) => self.st.notify(Icon::Download, palette::ORANGE, format!("{} not moved", kind.label()), e, 8.0, None),
+                        }
+                    }
+                }
+            }
             AppEvent::ModelPulled { kind, id, result } => self.on_model_pulled(kind, id, result),
             AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
             AppEvent::ModelPlaced { kind, result } => self.on_model_placed(kind, result),

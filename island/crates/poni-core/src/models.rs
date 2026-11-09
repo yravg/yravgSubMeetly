@@ -231,6 +231,28 @@ impl Models {
     pub fn row(&self, k: Kind) -> Option<&Row> {
         self.rows.iter().find(|r| r.kind == k)
     }
+    /// The models whose move to another folder is under way.
+    pub fn moving(&self) -> Vec<Kind> {
+        self.rows.iter().filter(|r| r.st.moving).map(|r| r.kind).collect()
+    }
+
+    /// Of `was` (the [`Models::moving`] taken before an inventory came in), the moves that have ended
+    /// since, with one sentence each: where the model is now, or why the move failed.
+    pub fn move_ends(&self, was: &[Kind]) -> Vec<(Kind, Result<String, String>)> {
+        was.iter()
+            .filter_map(|&k| {
+                let st = &self.row(k).filter(|r| !r.st.moving)?.st;
+                Some((k, match (&st.move_error, &st.dir) {
+                    (Some(e), _) => Err(e.clone()),
+                    (None, dir) => {
+                        let place = dir.as_ref().map_or("The model was moved".to_string(), |d| format!("Now in {d}"));
+                        Ok(st.move_warning.as_ref().map_or(place.clone(), |w| format!("{place}. {w}")))
+                    }
+                }))
+            })
+            .collect()
+    }
+
 
     pub fn apply(&mut self, r: Result<Inventory, String>, now: f64) {
         self.busy = false;
@@ -568,6 +590,23 @@ mod tests {
         let p = m.place(Kind::Asr).unwrap();
         assert_eq!(p.text, "The move failed: disk full. The model is still in C:\\hub.");
         assert!(p.change);
+    }
+
+    #[test]
+    fn a_move_that_ends_is_reported_once_with_where_the_model_is_or_why_not() {
+        let go = r#""downloaded":true,"dir":"D:/m","dirIsDefault":false,"dirAvailable":true,"moving":true,"movePct":90"#;
+        let was = placed(go).moving();
+        assert_eq!(was, [Kind::Asr]);
+        // Still going: nothing to say.
+        assert!(placed(go).move_ends(&was).is_empty());
+        let done = placed(r#""downloaded":true,"dir":"D:/m","dirIsDefault":false,"dirAvailable":true,"moving":false"#);
+        assert_eq!(done.move_ends(&was), [(Kind::Asr, Ok("Now in D:/m".to_string()))]);
+        let warned = placed(r#""downloaded":true,"dir":"D:/m","dirIsDefault":false,"dirAvailable":true,"moving":false,"moveWarning":"the old copy stays""#);
+        assert_eq!(warned.move_ends(&was), [(Kind::Asr, Ok("Now in D:/m. the old copy stays".to_string()))]);
+        let failed = placed(r#""downloaded":true,"dir":"C:/hub","dirIsDefault":true,"dirAvailable":true,"moving":false,"moveError":"disk full""#);
+        assert_eq!(failed.move_ends(&was), [(Kind::Asr, Err("disk full".to_string()))]);
+        // A model that was not moving before has no end to report (a failure from long ago stays quiet).
+        assert!(failed.move_ends(&[]).is_empty());
     }
 
     #[test]
