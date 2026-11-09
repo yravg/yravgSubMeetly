@@ -11,6 +11,8 @@
 
 pub mod addons;
 pub mod card;
+pub mod downloads;
+pub mod downloads_offer;
 pub mod focus;
 pub mod hkit;
 pub mod inbox;
@@ -19,6 +21,7 @@ pub mod media;
 pub mod meeting;
 pub mod menu;
 pub mod notifications;
+pub mod prayer;
 pub mod script;
 pub mod settings;
 pub mod shelf;
@@ -71,6 +74,10 @@ pub enum PageKind {
     System,
     /// The teleprompter: a script read under the webcam.
     Script,
+    /// Prayer times, while that add-on is on ([`tabs`]).
+    Prayer,
+    /// Links to save as video or sound, while the Downloader add-on is on ([`tabs`]).
+    Downloads,
     /// Which apps' notifications show on the island, while Notifications is
     /// on ([`tabs`]; Windows' Store copy only).
     Notifications,
@@ -84,7 +91,7 @@ pub enum PageKind {
 impl PageKind {
     /// The tab row's order: the island's own pages, Oyenza, then the
     /// add-ons' pages and the "+".
-    pub const ALL: [PageKind; 15] = [
+    pub const ALL: [PageKind; 17] = [
         PageKind::Live,
         PageKind::Meeting,
         PageKind::Inbox,
@@ -97,6 +104,8 @@ impl PageKind {
         PageKind::Focus,
         PageKind::System,
         PageKind::Script,
+        PageKind::Prayer,
+        PageKind::Downloads,
         PageKind::Notifications,
         PageKind::Addons,
         PageKind::Settings,
@@ -116,6 +125,8 @@ impl PageKind {
             PageKind::Tasks => "tasks",
             PageKind::System => "system",
             PageKind::Script => "script",
+            PageKind::Prayer => "prayer",
+            PageKind::Downloads => "downloads",
             PageKind::Notifications => "notifications",
             PageKind::Addons => "addons",
             PageKind::Settings => "settings",
@@ -141,6 +152,8 @@ impl PageKind {
             PageKind::Tasks => "Tasks",
             PageKind::System => "System",
             PageKind::Script => "Script",
+            PageKind::Prayer => "Prayer",
+            PageKind::Downloads => "Downloads",
             PageKind::Notifications => "Notifications",
             PageKind::Addons => "Add-ons",
             PageKind::Settings => "Settings",
@@ -161,6 +174,8 @@ impl PageKind {
             PageKind::Tasks => Icon::ListChecks,
             PageKind::System => Icon::Gauge,
             PageKind::Script => Icon::Script,
+            PageKind::Prayer => Icon::Moon,
+            PageKind::Downloads => Icon::Download,
             PageKind::Notifications => Icon::Bell,
             PageKind::Addons => Icon::Addons,
             PageKind::Settings => Icon::Gear,
@@ -195,7 +210,7 @@ impl PageKind {
 
 /// The tabs in the header: every page but Settings, AI only with Studio Pro,
 /// and Health, IELTS, Notes,
-/// System and Script only while their add-ons are on.
+/// System, Script, Record, Prayer and Stocks only while their add-ons are on.
 /// Music, Today, Shelf, Tasks and Focus unless Settings took them off the
 /// row; one of those still shows while its page is open (a file dropped on
 /// the island opens the Shelf). Notifications wherever the copy can read
@@ -233,7 +248,9 @@ fn row(st: &AppState, open: Option<PageKind>) -> Vec<PageKind> {
             PageKind::Talk => st.addon(poni_core::addons::TALK_TIME.id) == poni_core::addons::Status::Ready,
             PageKind::Engine => st.addon(poni_core::addons::ENGINE_MONITOR.id) == poni_core::addons::Status::Ready,
             PageKind::System => st.system_on(),
+            PageKind::Prayer => st.prayer_on(),
             PageKind::Script => st.script_on(),
+            PageKind::Downloads => st.downloader_on(),
             PageKind::Notifications => st.notifications_on(),
             p if p.hideable() => !st.tab_hidden(p) || open == Some(p),
             p => p.tabbed(),
@@ -261,6 +278,8 @@ pub fn content_height(p: PageKind, st: &AppState) -> f32 {
         PageKind::Tasks => tasks::height(st),
         PageKind::System => system::height(st),
         PageKind::Script => script::height(st),
+        PageKind::Prayer => prayer::height(st),
+        PageKind::Downloads => downloads::height(st),
         PageKind::Notifications => notifications::height(st),
         PageKind::Addons => addons::height(st),
         PageKind::Settings => settings::height(st),
@@ -278,6 +297,8 @@ pub fn next_wake(page: PageKind, st: &AppState) -> Option<f64> {
         PageKind::Settings => settings::next_wake(st),
         PageKind::Script => script::next_wake(st),
         PageKind::Timer => tools::timer_wake(st),
+        PageKind::Prayer => prayer::next_wake(st),
+        PageKind::Downloads => downloads::next_wake(st),
         _ => None,
     }
 }
@@ -388,6 +409,8 @@ pub(crate) fn draw_page(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKi
         PageKind::Tasks => tasks::draw(ui, st, area),
         PageKind::System => system::draw(ui, st, area),
         PageKind::Script => script::draw(ui, st, area),
+        PageKind::Prayer => prayer::draw(ui, st, area),
+        PageKind::Downloads => downloads::draw(ui, st, area),
         PageKind::Notifications => notifications::draw(ui, st, area),
         PageKind::Addons => addons::draw(ui, st, area),
         PageKind::Settings => settings::draw(ui, st, area),
@@ -760,6 +783,38 @@ mod tests {
         st.page = PageKind::Notifications;
         assert!(!st.notifications_on() && !tabs(&st).contains(&PageKind::Notifications));
         assert_eq!(first_tab(&st), PageKind::Live);
+    }
+
+    #[test]
+    fn downloads_has_a_tab_only_while_offered_switched_on_and_ready() {
+        let (page, addon) = (PageKind::Downloads, poni_core::addons::DOWNLOADER);
+        let mut st = state();
+        st.settings.set_addon(addon.id, true);
+        st.addons.insert(addon.id, poni_core::addons::Status::Ready);
+        assert!(!tabs(&st).contains(&page), "a copy that can't offer the Downloader");
+        st.downloader_offered = true;
+        assert!(tabs(&st).contains(&page));
+        st.addons.insert(addon.id, poni_core::addons::Status::Downloading { done: 1, total: 2 });
+        assert!(!tabs(&st).contains(&page), "its tools aren't in place yet");
+        // An island last open on its page opens on the first tab while it's off.
+        let store = Store { last_page: page.key().into(), ..Store::default() };
+        let settings = Settings { remember_page: true, ..Settings::default() };
+        assert_eq!(AppState::new(settings, store).page, PageKind::ALL[0]);
+    }
+
+    #[test]
+    fn prayer_has_a_tab_only_while_its_add_on_is_on_and_ready() {
+        let mut st = state();
+        assert!(!tabs(&st).contains(&PageKind::Prayer));
+        st.addons.insert("sholat", poni_core::addons::Status::Ready);
+        assert!(!tabs(&st).contains(&PageKind::Prayer), "no places read yet");
+        let list = poni_core::prayer::PlaceList::parse(r#"{"places":[]}"#).unwrap();
+        st.prayer.places = Some(std::sync::Arc::new(list));
+        let row = tabs(&st);
+        assert_eq!(&row[row.len() - 2..], &[PageKind::Prayer, PageKind::Addons]);
+        assert!(content_height(PageKind::Prayer, &st) <= content_height(PageKind::Tasks, &st));
+        st.addons.insert("sholat", poni_core::addons::Status::Downloading { done: 1, total: 2 });
+        assert!(!tabs(&st).contains(&PageKind::Prayer));
     }
 
     #[test]

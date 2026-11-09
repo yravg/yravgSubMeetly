@@ -11,7 +11,11 @@
 //! `javascript:`, `shell:`, relative names that would be searched on `PATH`)
 //! is logged and refused. Fixed exceptions: Settings > Apps > Startup
 //! ([`open_startup_settings`]) and Settings > Privacy > Notifications
-//! ([`open_notification_settings`]), constant URIs; yravgSubMeetly Recorder's
+//! ([`open_notification_settings`]) and Settings > Time & language > Language
+//! & region ([`open_language_settings`]), constant URIs; adding a Windows
+//! language feature ([`run_elevated_install`]), the one elevated run: Windows'
+//! own PowerShell with a fixed command line per feature, UAC asking first;
+//! yravgSubMeetly Recorder's
 //! own action links ([`open_recorder_link`]): its fixed scheme and one
 //! percent-encoded value, as `poni_core::recorder` builds them; and an app
 //! by its AppUserModelID in the Apps folder ([`open_app`]), the characters
@@ -23,7 +27,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use windows::core::{w, HSTRING};
 use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
 use windows::Win32::UI::Shell::ShellExecuteW;
-use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+use windows::Win32::UI::WindowsAndMessaging::{SW_HIDE, SW_SHOWNORMAL};
 
 /// Shell calls allowed to be in progress at once. Calls stuck on an
 /// unreachable share hold a slot each; past this, new ones are refused
@@ -131,6 +135,66 @@ pub fn open_notification_settings() {
             crate::pwarn!("open failed ({}): ms-settings:privacy-notifications", r.0 as isize);
         }
     });
+}
+
+/// Open Settings > Time & language > Language & region (asynchronously),
+/// where Windows adds a language and its typing feature by hand: the way
+/// round when the island's own install can't run
+/// (`poni_core::winlang::SETTINGS_URI`).
+pub fn open_language_settings() {
+    run("open", || {
+        let r = unsafe { ShellExecuteW(None, w!("open"), w!("ms-settings:regionlanguage"), None, None, SW_SHOWNORMAL) };
+        if (r.0 as isize) <= 32 {
+            crate::pwarn!("open failed ({}): ms-settings:regionlanguage", r.0 as isize);
+        }
+    });
+}
+
+/// Run Windows PowerShell elevated (Windows asks first: UAC) with `params`,
+/// and wait for it to end. Blocks, so only a service thread calls it. Used
+/// for one thing: adding a Windows language feature, `params` being
+/// `poni_core::winlang::install_params` for a feature of its own list;
+/// anything else is refused. PowerShell is the copy in Windows' own folder.
+pub fn run_elevated_install(params: &str) -> poni_core::winlang::Ran {
+    use poni_core::winlang::Ran;
+    use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
+    use windows::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject, INFINITE};
+    use windows::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
+    if !poni_core::winlang::ALL.iter().any(|f| poni_core::winlang::install_params(f) == params) {
+        crate::pwarn!("elevated run refused (not a language install)");
+        return Ran::NotStarted;
+    }
+    let root = std::env::var_os("SystemRoot").map(std::path::PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(|| r"C:\Windows".into());
+    let exe = HSTRING::from(root.join(r"System32\WindowsPowerShell\v1.0\powershell.exe").as_os_str());
+    let params = HSTRING::from(params);
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOCLOSEPROCESS,
+        lpVerb: w!("runas"),
+        lpFile: windows::core::PCWSTR(exe.as_ptr()),
+        lpParameters: windows::core::PCWSTR(params.as_ptr()),
+        nShow: SW_HIDE.0,
+        ..Default::default()
+    };
+    if let Err(e) = unsafe { ShellExecuteExW(&mut info) } {
+        // ERROR_CANCELLED: the person closed or declined the UAC prompt.
+        let cancelled = (e.code().0 as u32 & 0xFFFF) == 1223;
+        crate::pwarn!("elevated install didn't start: {e}");
+        return if cancelled { Ran::Cancelled } else { Ran::NotStarted };
+    }
+    if info.hProcess.is_invalid() {
+        return Ran::NotStarted;
+    }
+    let ran = unsafe {
+        let waited = WaitForSingleObject(info.hProcess, INFINITE);
+        let mut code = 1u32;
+        if waited != WAIT_OBJECT_0 || GetExitCodeProcess(info.hProcess, &mut code).is_err() {
+            code = 1;
+        }
+        let _ = CloseHandle(info.hProcess);
+        code
+    };
+    Ran::Exit(ran)
 }
 
 /// Open the app with this AppUserModelID the way Start does, through the
@@ -381,6 +445,15 @@ fn for_log(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_elevated_run_refuses_anything_but_a_language_install() {
+        use poni_core::winlang::Ran;
+        // Refused before any process starts (nothing is launched or elevated here).
+        for params in ["", "-Command calc.exe", "-NoProfile -Command \"Add-WindowsCapability -Online -Name 'Language.Basic~~~ja-JP~0.0.1.0'; calc\""] {
+            assert_eq!(run_elevated_install(params), Ran::NotStarted, "{params}");
+        }
+    }
 
     #[test]
     fn app_window_opens_only_engine_pages_on_loopback() {

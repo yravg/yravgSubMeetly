@@ -1,0 +1,143 @@
+Downloader add-on for Oyenza Studio: what it holds and where it comes from
+
+yt-dlp.exe
+  yt-dlp, which reads a link and downloads its video or sound. Downloaded
+  from yt-dlp's own release on GitHub, unchanged. Each version of Oyenza
+  Studio names the release it takes and that file's size and SHA-256
+  (poni_core::addons::DOWNLOADER), and refuses any other file; a newer
+  yt-dlp comes with a newer Oyenza Studio.
+
+qjs.exe
+  QuickJS-ng, a small JavaScript engine. yt-dlp runs it to answer YouTube's
+  JavaScript challenges. Downloaded from QuickJS-ng's own release on GitHub
+  (qjs-windows-x86_64.exe), unchanged, and saved as qjs.exe; pinned the
+  same way as yt-dlp.exe.
+
+ffmpeg.exe
+  FFmpeg 9.0.2, which yt-dlp runs to join a video's picture and sound into
+  one file. It is gyan.dev's official Windows build ("essentials", static,
+  GPL v3), downloaded unchanged from gyan.dev's release on GitHub
+  (GyanD/codexffmpeg, tag 9.0.2) as a zip, of which only bin/ffmpeg.exe is
+  kept. The zip and the unpacked file are each pinned by size and SHA-256
+  (poni_core::addons::DOWNLOADER), as above. It is not part of the installer.
+
+NOTICE.txt
+  This file.
+
+They are separate programs: Oyenza Studio runs yt-dlp, and yt-dlp runs the
+other two. Each keeps its own license, below.
+
+------------------------------------------------------------------------------
+yt-dlp
+
+Used for: yt-dlp.exe.
+
+Source: https://github.com/yt-dlp/yt-dlp
+
+yt-dlp's own code is under the Unlicense, below. yt-dlp.exe is its
+PyInstaller build, which also bundles Python and the libraries yt-dlp uses,
+each under its own license (among them MIT, BSD, Apache-2.0, MPL-2.0 and,
+for mutagen, GPL-2.0-or-later). As yt-dlp's README says, "the
+PyInstaller-bundled executables include GPLv3+ licensed code, and as such
+the combined work is licensed under GPLv3+." yt-dlp's
+THIRD_PARTY_LICENSES.txt lists every bundled part with its license text and
+says how to get its source. yt-dlp.exe carries that file inside it, and it
+is also at
+https://github.com/yt-dlp/yt-dlp/blob/master/THIRD_PARTY_LICENSES.txt
+(and in each release's source).
+
+Its license (LICENSE), unchanged:
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
+
+------------------------------------------------------------------------------
+QuickJS-ng
+
+Used for: qjs.exe. It is QuickJS-ng's own Windows build, which also has
+mimalloc (MIT) and the mingw-w64 runtime linked in.
+
+Source: https://github.com/quickjs-ng/quickjs
+Its license (LICENSE), unchanged:
+
+The MIT License (MIT)
+ 
+Copyright (c) 2017-2026 Fabrice Bellard
+Copyright (c) 2017-2024 Charlie Gordon
+Copyright (c) 2023-2026 Ben Noordhuis
+Copyright (c) 2023-2026 Saúl Ibarra Corretgé
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+------------------------------------------------------------------------------
+FFmpeg 9.0.2
+
+Used for: ffmpeg.exe.
+
+This add-on runs a build of FFmpeg (https://ffmpeg.org) that gyan.dev
+publishes (https://www.gyan.dev/ffmpeg/builds/), the "essentials" 64-bit
+static build of 9.0.2. That build is configured with --enable-gpl and
+--enable-version3, so it is licensed under the GNU General Public License,
+version 3 (its README.txt says "License: GPL v3"), and it carries its own
+copy of that licence (LICENSE in the zip). Its source is FFmpeg's, at the
+commit its README.txt names: https://github.com/FFmpeg/FFmpeg/commit/946fcce07b
+
+Oyenza Studio does not distribute this file: each PC downloads it itself,
+from gyan.dev's release, when the Downloader is switched on. Oyenza Studio
+starts ffmpeg.exe as a separate program and links none of it, so its own
+licence doesn't change, and anyone can put another build in its place.
+
+FFmpeg is Copyright (c) 2000-2026 the FFmpeg developers. FFmpeg's notice, as
+in its source files:
+
+FFmpeg is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+FFmpeg is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with FFmpeg; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA

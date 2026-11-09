@@ -284,7 +284,7 @@ impl Worker {
                 // Readings for Japanese / Korean / Chinese lines, worked out
                 // here so the UI thread never waits on the analyzer.
                 let read = super::romanize::pronounce(&lyrics);
-                self.deliver(&job, LyricsResult::Found { lyrics, source, ruby: read.ruby })
+                self.deliver(&job, LyricsResult::Found { lyrics, source, ruby: read.ruby, wants_ja_readings: read.wants_ja_readings })
             }
             Ok(result) => self.deliver(&job, result),
             Err(Halt::Abandoned) => {}
@@ -615,7 +615,7 @@ fn to_result(record: Option<&LrclibRecord>, job: &Job, source: &str) -> LyricsRe
         return LyricsResult::Instrumental;
     }
     match record.and_then(|r| lyrics_for(r, job.query.duration_s)) {
-        Some(lyrics) => LyricsResult::Found { lyrics, source: source.into(), ruby: Vec::new() },
+        Some(lyrics) => LyricsResult::Found { lyrics, source: source.into(), ruby: Vec::new(), wants_ja_readings: false },
         None => LyricsResult::NotFound,
     }
 }
