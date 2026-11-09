@@ -1,6 +1,7 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Subtitel tampil di (Settings, tab Output):** pilihan Page overlay / Island / Both (`captionSurface`, bawaan overlay). Nilainya disalin ke helper (`/ui-prefs`, Python dan Rust) dan pil island hanya menampilkan baris langsung saat Island atau Both; island membaca baris dari helper, jadi dengan mesin Browser panel menampilkan petunjuk dengan tombol "Use Native Helper"
 - **Repo publik `yravg/yravgSubMeetly`:** `CREDITS.md` mencatat asal ide dan kode (Oyenza Studio, Meetily, Threadbear, Local AI Subtitle, Coretax, candle, faster-whisper, model, Inno Setup); berkas pembaruan island kini menunjuk repo baru
 - **Pemeriksaan lead:** kartu Native Helper kini ikut bahasa UI (dulu selalu bahasa Indonesia, termasuk langkah per OS), tombol Re-check tidak lagi terlipat dua baris; toolbar Minutes membungkus di lebar ponsel (390 px) sehingga Add item, Export, Issue MoM dan Settings tetap terjangkau; ketiga screenshot toko ditangkap ulang (03 tidak lagi timeout dan memotret tab Helper); terjemahan Qwen2.5 di engine Rust lulus uji properti untuk pertama kali (model 0.5B masih salah arti di beberapa kalimat)
 - **Side panel:** tab Add-ins ikut bahasa UI (en/id/zh); titik warna terjemahan terbaca di mode gelap (5,88-8,58:1, teks 5,39-9,17:1); screenshot toko 01-02 memakai wordmark yravgSubMeetly tanpa kerangka lab; empat tes yang gagal hanya di Windows kini mengikuti bawaan OS (CRLF/BOM, bit eksekusi dari git, USERPROFILE), `npm test` 0 gagal di Windows
