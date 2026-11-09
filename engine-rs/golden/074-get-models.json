@@ -29,6 +29,7 @@
     }
   },
   "mask": [
-    "models"
+    "models",
+    "catalog"
   ]
 }

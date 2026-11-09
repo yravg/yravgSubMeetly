@@ -5,13 +5,14 @@ use std::collections::HashMap;
 use std::env;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use anyhow::{anyhow, Result};
 use candle_core::Device;
 use serde_json::{json, Value};
 
 use crate::audio::{self, MonoStream, Windows, SAMPLE_RATE};
+use crate::models::{catalog_spec, Kind};
 use crate::translate::{Translator, DEFAULT_TRANSLATE_MODEL};
 use crate::whisper::DEFAULT_ASR_MODEL;
 use crate::whisper::{repo_for, Segment, Task, WhisperAsr};
@@ -27,16 +28,71 @@ fn env_f64(key: &str, fallback: f64) -> f64 {
 }
 
 pub struct Ml {
-    pub asr_model: String,
-    pub translate_model: Option<String>,
+    asr_model: RwLock<String>,
+    translate_model: RwLock<Option<String>>,
+    /// Env vars win over the saved choice, so `POST /engine/models` cannot move these.
+    asr_from_env: bool,
+    translate_from_env: bool,
     pub device: Device,
-    asr: Mutex<Option<WhisperAsr>>,
-    mt: Mutex<Option<Translator>>,
-    asr_loaded: AtomicBool,
-    mt_loaded: AtomicBool,
+    /// The loaded model and the id it was loaded for; a changed choice reloads on next use.
+    asr: Mutex<Option<(String, WhisperAsr)>>,
+    mt: Mutex<Option<(String, Translator)>>,
+    asr_loaded_id: RwLock<Option<String>>,
+    mt_loaded_id: RwLock<Option<String>>,
+    asr_loading: AtomicBool,
+    mt_loading: AtomicBool,
     pub stream_chunk_sec: f64,
     pub stream_overlap_sec: f64,
     pub stream_min_bytes: u64,
+}
+
+/// The saved `engine-models.json` choice: an id, or `"off"` for translation.
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+pub struct SavedModels {
+    pub asr: Option<String>,
+    pub translate: Option<String>,
+}
+
+/// Which model each kind starts with: env, then the saved choice, then the default.
+#[derive(Debug, PartialEq, Eq)]
+struct Picked {
+    asr: String,
+    asr_from_env: bool,
+    translate: Option<String>,
+    translate_from_env: bool,
+}
+
+fn pick_models(env: &dyn Fn(&str) -> Option<String>, saved: &SavedModels) -> Picked {
+    // A saved id the catalog no longer lists (hand-edited file) is ignored.
+    let saved_id = |value: &Option<String>, kind: Kind| {
+        value
+            .clone()
+            .filter(|id| catalog_spec(id).is_some_and(|spec| spec.kind == kind))
+    };
+    let (asr, asr_from_env) = match env("WHISPER_MODEL") {
+        Some(model) => (repo_for(&model), true),
+        None => (
+            saved_id(&saved.asr, Kind::Asr).unwrap_or_else(|| repo_for(DEFAULT_ASR_MODEL)),
+            false,
+        ),
+    };
+    let (translate, translate_from_env) = if env("TRANSLATE").as_deref() == Some("off") {
+        (None, true)
+    } else if let Some(model) = env("TRANSLATE_MODEL") {
+        (Some(model), true)
+    } else if saved.translate.as_deref() == Some("off") {
+        (None, false)
+    } else {
+        let id = saved_id(&saved.translate, Kind::Translate)
+            .unwrap_or_else(|| DEFAULT_TRANSLATE_MODEL.to_string());
+        (Some(id), false)
+    };
+    Picked {
+        asr,
+        asr_from_env,
+        translate,
+        translate_from_env,
+    }
 }
 
 /// Env `DEVICE` wins over the saved preference; only `cpu` turns the GPU off.
@@ -48,23 +104,33 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }
 
+fn read<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    lock.read().unwrap_or_else(|poison| poison.into_inner())
+}
+
+fn write<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    lock.write().unwrap_or_else(|poison| poison.into_inner())
+}
+
 impl Ml {
     /// `device_pref` is the saved auto/cpu/cuda choice; env `DEVICE` wins, like the oracle.
-    pub fn from_env(device_pref: &str) -> Self {
-        let model = env::var("WHISPER_MODEL").unwrap_or_else(|_| DEFAULT_ASR_MODEL.to_string());
-        let translate_model = (env::var("TRANSLATE").unwrap_or_default() != "off").then(|| {
-            env::var("TRANSLATE_MODEL").unwrap_or_else(|_| DEFAULT_TRANSLATE_MODEL.to_string())
-        });
+    /// `saved` is the models chosen through `POST /engine/models`.
+    pub fn from_env(device_pref: &str, saved: &SavedModels) -> Self {
+        let picked = pick_models(&|key| env::var(key).ok(), saved);
         let device =
             crate::ml::pick_device(wants_gpu(env::var("DEVICE").ok().as_deref(), device_pref));
         Self {
-            asr_model: repo_for(&model),
-            translate_model,
+            asr_model: RwLock::new(picked.asr),
+            translate_model: RwLock::new(picked.translate),
+            asr_from_env: picked.asr_from_env,
+            translate_from_env: picked.translate_from_env,
             device,
             asr: Mutex::new(None),
             mt: Mutex::new(None),
-            asr_loaded: AtomicBool::new(false),
-            mt_loaded: AtomicBool::new(false),
+            asr_loaded_id: RwLock::new(None),
+            mt_loaded_id: RwLock::new(None),
+            asr_loading: AtomicBool::new(false),
+            mt_loading: AtomicBool::new(false),
             stream_chunk_sec: env_f64("STREAM_CHUNK_SEC", 300.0),
             stream_overlap_sec: env_f64("STREAM_OVERLAP_SEC", 2.0),
             stream_min_bytes: env_f64("STREAM_MIN_BYTES", 512.0 * 1024.0 * 1024.0) as u64,
@@ -75,40 +141,95 @@ impl Ml {
         crate::ml::device_name(&self.device)
     }
 
+    pub fn asr_id(&self) -> String {
+        read(&self.asr_model).clone()
+    }
+
+    pub fn translate_id(&self) -> Option<String> {
+        read(&self.translate_model).clone()
+    }
+
+    pub fn asr_from_env(&self) -> bool {
+        self.asr_from_env
+    }
+
+    pub fn translate_from_env(&self) -> bool {
+        self.translate_from_env
+    }
+
+    /// Switch the speech model; the old one is dropped on next use. False when env pins it.
+    pub fn set_asr(&self, id: &str) -> bool {
+        if self.asr_from_env {
+            return false;
+        }
+        *write(&self.asr_model) = id.to_string();
+        true
+    }
+
+    /// Switch the translation model (`None` = off). False when env pins it.
+    pub fn set_translate(&self, id: Option<&str>) -> bool {
+        if self.translate_from_env {
+            return false;
+        }
+        *write(&self.translate_model) = id.map(str::to_string);
+        true
+    }
+
     pub fn asr_loaded(&self) -> bool {
-        self.asr_loaded.load(Ordering::Relaxed)
+        *read(&self.asr_loaded_id) == Some(self.asr_id())
     }
 
     pub fn translate_loaded(&self) -> bool {
-        self.mt_loaded.load(Ordering::Relaxed)
+        let loaded = read(&self.mt_loaded_id);
+        loaded.is_some() && *loaded == self.translate_id()
+    }
+
+    /// True while the model is being fetched and read into memory.
+    pub fn asr_loading(&self) -> bool {
+        self.asr_loading.load(Ordering::Relaxed)
+    }
+
+    pub fn translate_loading(&self) -> bool {
+        self.mt_loading.load(Ordering::Relaxed)
     }
 
     pub fn translate_available(&self) -> bool {
-        self.translate_model.is_some()
+        read(&self.translate_model).is_some()
     }
 
     pub fn with_asr<R>(&self, f: impl FnOnce(&mut WhisperAsr) -> Result<R>) -> Result<R> {
+        let want = self.asr_id();
         let mut guard = lock(&self.asr);
-        if guard.is_none() {
-            eprintln!("[asr] loading {} …", self.asr_model);
-            *guard = Some(WhisperAsr::load(&self.asr_model, self.device.clone())?);
-            self.asr_loaded.store(true, Ordering::Relaxed);
+        if guard.as_ref().map(|(id, _)| id) != Some(&want) {
+            // Free the old weights first: two Whisper models at once is gigabytes.
+            *guard = None;
+            *write(&self.asr_loaded_id) = None;
+            eprintln!("[asr] loading {want} ...");
+            self.asr_loading.store(true, Ordering::Relaxed);
+            let loaded = WhisperAsr::load(&want, self.device.clone());
+            self.asr_loading.store(false, Ordering::Relaxed);
+            *guard = Some((want.clone(), loaded?));
+            *write(&self.asr_loaded_id) = Some(want);
         }
-        f(guard.as_mut().expect("loaded above"))
+        f(&mut guard.as_mut().expect("loaded above").1)
     }
 
     pub fn with_translator<R>(&self, f: impl FnOnce(&mut Translator) -> Result<R>) -> Result<R> {
-        let repo = self
-            .translate_model
-            .as_deref()
+        let want = self
+            .translate_id()
             .ok_or_else(|| anyhow!("translation is off"))?;
         let mut guard = lock(&self.mt);
-        if guard.is_none() {
-            eprintln!("[translate] loading {repo} …");
-            *guard = Some(Translator::load(repo, self.device.clone())?);
-            self.mt_loaded.store(true, Ordering::Relaxed);
+        if guard.as_ref().map(|(id, _)| id) != Some(&want) {
+            *guard = None;
+            *write(&self.mt_loaded_id) = None;
+            eprintln!("[translate] loading {want} ...");
+            self.mt_loading.store(true, Ordering::Relaxed);
+            let loaded = Translator::load(&want, self.device.clone());
+            self.mt_loading.store(false, Ordering::Relaxed);
+            *guard = Some((want.clone(), loaded?));
+            *write(&self.mt_loaded_id) = Some(want);
         }
-        f(guard.as_mut().expect("loaded above"))
+        f(&mut guard.as_mut().expect("loaded above").1)
     }
 
     pub fn segments(
@@ -419,5 +540,84 @@ mod merge_tests {
             Some(12.0),
         );
         assert_eq!(pairs(&out), [(0.2, 5.0), (5.0, 10.0)]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn env<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |key| {
+            pairs
+                .iter()
+                .find(|(k, _)| *k == key)
+                .map(|(_, v)| v.to_string())
+        }
+    }
+
+    fn saved(asr: Option<&str>, translate: Option<&str>) -> SavedModels {
+        SavedModels {
+            asr: asr.map(str::to_string),
+            translate: translate.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn defaults_are_the_small_models() {
+        let picked = pick_models(&env(&[]), &SavedModels::default());
+        assert_eq!(picked.asr, "openai/whisper-base");
+        assert_eq!(
+            picked.translate.as_deref(),
+            Some("Qwen/Qwen2.5-0.5B-Instruct")
+        );
+        assert!(!picked.asr_from_env && !picked.translate_from_env);
+    }
+
+    #[test]
+    fn saved_choice_beats_the_default_and_env_beats_the_saved_choice() {
+        let mine = saved(
+            Some("openai/whisper-small"),
+            Some("Qwen/Qwen2.5-3B-Instruct"),
+        );
+        let picked = pick_models(&env(&[]), &mine);
+        assert_eq!(picked.asr, "openai/whisper-small");
+        assert_eq!(
+            picked.translate.as_deref(),
+            Some("Qwen/Qwen2.5-3B-Instruct")
+        );
+
+        let picked = pick_models(
+            &env(&[("WHISPER_MODEL", "tiny"), ("TRANSLATE", "off")]),
+            &mine,
+        );
+        assert_eq!(picked.asr, "openai/whisper-tiny");
+        assert!(picked.asr_from_env);
+        assert_eq!(picked.translate, None);
+        assert!(picked.translate_from_env);
+
+        let picked = pick_models(&env(&[("TRANSLATE_MODEL", "acme/mt")]), &mine);
+        assert_eq!(picked.translate.as_deref(), Some("acme/mt"));
+    }
+
+    #[test]
+    fn saved_off_turns_translation_off_and_a_stale_id_is_ignored() {
+        let picked = pick_models(&env(&[]), &saved(None, Some("off")));
+        assert_eq!(picked.translate, None);
+        assert!(!picked.translate_from_env);
+
+        // An id the catalog does not list, or one of the wrong kind, falls back to the default.
+        let picked = pick_models(
+            &env(&[]),
+            &saved(
+                Some("Qwen/Qwen2.5-3B-Instruct"),
+                Some("openai/whisper-small"),
+            ),
+        );
+        assert_eq!(picked.asr, "openai/whisper-base");
+        assert_eq!(
+            picked.translate.as_deref(),
+            Some("Qwen/Qwen2.5-0.5B-Instruct")
+        );
     }
 }

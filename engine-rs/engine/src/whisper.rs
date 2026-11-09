@@ -3,10 +3,13 @@
 //! Feature path follows faster-whisper (the Python oracle), see `transcribe`.
 
 use crate::whisper_model::Whisper;
+use std::path::{Path, PathBuf};
+
 use anyhow::{anyhow, Context, Result};
 use candle_core::{Device, IndexOp, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::whisper::{self as w, Config};
+use hf_hub::progress::Progress;
 use realfft::RealFftPlanner;
 use tokenizers::Tokenizer;
 
@@ -60,6 +63,41 @@ pub struct WhisperAsr {
 
 /// Small enough to download in minutes and run live on CPU; bigger models are chosen at runtime.
 pub const DEFAULT_ASR_MODEL: &str = "base";
+
+/// The three cached files `WhisperAsr::load` reads.
+pub struct WhisperFiles {
+    pub config: PathBuf,
+    pub tokenizer: PathBuf,
+    pub weights: PathBuf,
+}
+
+/// Download (or find cached) the files of a Whisper repo; `finished` sees each one.
+pub fn fetch_files(
+    repo_id: &str,
+    progress: Option<&Progress>,
+    finished: &mut dyn FnMut(&Path),
+) -> Result<WhisperFiles> {
+    let mut fetch = |name: &str| -> Result<PathBuf> {
+        let file = |revision| crate::ml::hub_file_with(repo_id, revision, name, progress.cloned());
+        // whisper-base and friends only have safetensors on this PR ref. Only a
+        // 404 means "try the PR"; any other failure is the real error, not
+        // something the PR ref's own 404 should overwrite.
+        let path = file(None).or_else(|first| {
+            if crate::ml::is_not_found(&first) {
+                file(Some("refs/pr/22")).map_err(|_| first)
+            } else {
+                Err(first)
+            }
+        })?;
+        finished(&path);
+        Ok(path)
+    };
+    Ok(WhisperFiles {
+        config: fetch("config.json")?,
+        tokenizer: fetch("tokenizer.json")?,
+        weights: fetch("model.safetensors")?,
+    })
+}
 
 /// `WHISPER_MODEL` short names map to the openai safetensors repos.
 pub fn repo_for(model: &str) -> String {
@@ -189,23 +227,11 @@ fn argmax(values: &[f32]) -> usize {
 impl WhisperAsr {
     pub fn load(model: &str, device: Device) -> Result<Self> {
         let repo_id = repo_for(model);
-        let fetch = |name: &str| {
-            crate::ml::hub_file(&repo_id, None, name).or_else(|first| {
-                // whisper-base and friends only have safetensors on this PR ref. Only a
-                // 404 means "try the PR"; any other failure is the real error, not
-                // something the PR ref's own 404 should overwrite.
-                if crate::ml::is_not_found(&first) {
-                    crate::ml::hub_file(&repo_id, Some("refs/pr/22"), name).map_err(|_| first)
-                } else {
-                    Err(first)
-                }
-            })
-        };
-        let config: Config = serde_json::from_slice(&std::fs::read(fetch("config.json")?)?)
-            .context("whisper config")?;
-        let tokenizer =
-            Tokenizer::from_file(fetch("tokenizer.json")?).map_err(|e| anyhow!("{e}"))?;
-        let weights = fetch("model.safetensors")?;
+        let files = fetch_files(&repo_id, None, &mut |_| {})?;
+        let config: Config =
+            serde_json::from_slice(&std::fs::read(files.config)?).context("whisper config")?;
+        let tokenizer = Tokenizer::from_file(files.tokenizer).map_err(|e| anyhow!("{e}"))?;
+        let weights = files.weights;
         // SAFETY: the hub cache file is not modified while mapped.
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights], w::DTYPE, &device)? };
         let model = Whisper::load(&vb, config.clone())?;

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use candle_core::Device;
+use hf_hub::progress::Progress;
 use hf_hub::{split_id, HFClient, HFClientSync, HFError};
 
 /// Device the build can use: CUDA/Metal when compiled in and present, else CPU.
@@ -67,14 +68,24 @@ fn wait_for_lock<T>(mut attempt: impl FnMut() -> Result<T, HFError>) -> Result<T
 
 /// One file of `repo_id` at `revision` (None = main), via the hub cache.
 pub fn hub_file(repo_id: &str, revision: Option<&str>, filename: &str) -> Result<PathBuf> {
+    hub_file_with(repo_id, revision, filename, None)
+}
+
+/// [`hub_file`] reporting byte progress to `progress` (must not block).
+pub fn hub_file_with(
+    repo_id: &str,
+    revision: Option<&str>,
+    filename: &str,
+    progress: Option<Progress>,
+) -> Result<PathBuf> {
     let (owner, name) = split_id(repo_id);
     let repo = client()?.model(owner, name);
     wait_for_lock(|| {
-        let builder = repo.download_file().filename(filename);
-        match revision {
-            Some(revision) => builder.revision(revision).send(),
-            None => builder.send(),
-        }
+        repo.download_file()
+            .filename(filename)
+            .maybe_revision(revision)
+            .maybe_progress(progress.clone())
+            .send()
     })
     .with_context(|| format!("download {repo_id}/{filename}"))
 }
@@ -88,20 +99,16 @@ pub fn is_not_found(err: &anyhow::Error) -> bool {
     )
 }
 
-/// Whole snapshot of `repo_id` into the hub cache (for `/models/pull`).
-pub fn hub_snapshot(repo_id: &str) -> Result<PathBuf> {
-    let (owner, name) = split_id(repo_id);
-    let repo = client()?.model(owner, name);
-    wait_for_lock(|| repo.snapshot_download().send()).with_context(|| format!("download {repo_id}"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn downloads_go_where_the_models_scan_looks() {
-        assert_eq!(async_client().unwrap().cache_dir(), crate::models::hub_cache_dir());
+        assert_eq!(
+            async_client().unwrap().cache_dir(),
+            crate::models::hub_cache_dir()
+        );
     }
 
     #[test]

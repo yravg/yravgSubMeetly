@@ -14,9 +14,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Map, Value};
 
 use crate::audio::pcm_f32_le;
-use crate::engine::{segments_json, Jobs, Ml, ASR_ENGINE, MT_ENGINE};
+use crate::engine::{segments_json, Jobs, Ml, SavedModels, ASR_ENGINE, MT_ENGINE};
 use crate::heuristic::heuristic_notes;
-use crate::models::{delete_cached, hub_cache_dir, scan_model_cache};
+use crate::models::{
+    cache_state, catalog_spec, delete_cached, hub_cache_dir, scan_model_cache, Kind, PullProgress,
+    CATALOG,
+};
 use crate::notes::{
     export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
 };
@@ -40,8 +43,21 @@ fn live_idle() -> Value {
     json!({ "seq": 0, "source": "", "translation": "", "ms": null, "audio_s": null, "rtf": null, "at": null })
 }
 
+/// A model download started by `POST /models/pull`. A finished one is dropped (the
+/// cache says it is downloaded); a failed one stays until the next try, with its reason.
+struct Pull {
+    progress: Arc<PullProgress>,
+    /// Catalog size, until the hub reports the real one.
+    approx_bytes: u64,
+    error: Option<String>,
+}
+
+type Pulls = Arc<Mutex<HashMap<String, Pull>>>;
+
 pub struct App {
     state_dir: PathBuf,
+    models_path: PathBuf,
+    pulls: Pulls,
     notes_path: PathBuf,
     engine_mode_path: PathBuf,
     device_pref_path: PathBuf,
@@ -60,6 +76,7 @@ impl App {
         let engine_mode_path = env_path("ENGINE_MODE_PATH", state_dir.join("engine-mode.json"));
         let device_pref_path = env_path("DEVICE_PREF_PATH", state_dir.join("device.json"));
         let ui_prefs_path = env_path("UI_PREFS_PATH", state_dir.join("ui-prefs.json"));
+        let models_path = env_path("ENGINE_MODELS_PATH", state_dir.join("engine-models.json"));
         let allowed_origins = env::var("ALLOWED_ORIGINS")
             .unwrap_or_default()
             .split(',')
@@ -70,15 +87,24 @@ impl App {
         let device_pref = read_json(&device_pref_path)
             .and_then(|v| v.get("device").and_then(Value::as_str).map(str::to_string))
             .unwrap_or_else(|| "auto".to_string());
+        let saved = read_json(&models_path).map_or_else(SavedModels::default, |value| {
+            let text = |key| value.get(key).and_then(Value::as_str).map(str::to_string);
+            SavedModels {
+                asr: text("asr"),
+                translate: text("translate"),
+            }
+        });
         Self {
             state_dir,
+            models_path,
+            pulls: Pulls::default(),
             notes_path,
             engine_mode_path,
             device_pref_path,
             ui_prefs_path,
             allowed_origins,
             hf_cache: hub_cache_dir(),
-            ml: Arc::new(Ml::from_env(&device_pref)),
+            ml: Arc::new(Ml::from_env(&device_pref, &saved)),
             jobs: Jobs::default(),
             shutdown: AtomicBool::new(false),
             live: Mutex::new(live_idle()),
@@ -205,11 +231,7 @@ impl App {
                 self.json_response(request, 200, live)
             }
             "/notes" => self.json_response(request, 200, json!({ "notes": self.load_notes() })),
-            "/models" => self.json_response(
-                request,
-                200,
-                json!({ "models": self.model_inventory(), "cached": scan_model_cache(&self.hf_cache) }),
-            ),
+            "/models" => self.json_response(request, 200, self.models_body()),
             "/engine/mode" => {
                 self.json_response(request, 200, json!({ "mode": self.load_engine_mode() }))
             }
@@ -257,6 +279,7 @@ impl App {
         match path {
             "/engine/device" => self.post_engine_device(request),
             "/engine/mode" => self.post_engine_mode(request),
+            "/engine/models" => self.post_engine_models(request),
             "/ui-prefs" => self.post_ui_prefs(request),
             "/notes/export" => self.post_notes_export(request),
             "/notes" => self.post_notes(request),
@@ -586,37 +609,127 @@ impl App {
         )
     }
 
+    /// Cache and download state of one model, the same fields on every row.
+    fn model_status(&self, id: &str, kind: Kind) -> Map<String, Value> {
+        let cache = cache_state(&self.hf_cache, id, kind);
+        let pulls = self.pulls.lock().unwrap_or_else(|e| e.into_inner());
+        let pull = pulls.get(id);
+        let running = pull.is_some_and(|p| p.error.is_none());
+        let (done, total) = pull.filter(|_| running).map_or((0, 0), |p| {
+            // The hub reports a file's size when it starts, so before the last file
+            // the total is an estimate; never let it sit below what is already done.
+            let done = p.progress.bytes_done();
+            (done, p.approx_bytes.max(done))
+        });
+        let Value::Object(status) = json!({
+            "downloaded": cache.downloaded,
+            "bytes": cache.bytes,
+            "partialBytes": cache.partial_bytes,
+            "pulling": running,
+            "bytesDone": done,
+            "bytesTotal": total,
+            // Held at 99 until the last file lands: the total is an estimate.
+            "pct": if running && total > 0 { json!((done * 99 / total).min(99)) } else { Value::Null },
+            "pullError": pull.and_then(|p| p.error.clone()),
+        }) else {
+            unreachable!("object literal")
+        };
+        status
+    }
+
     fn model_inventory(&self) -> Vec<Value> {
         let device = self.ml.device_name();
         let mt = self.ml.translate_available();
-        vec![
-            json!({
-                "key": "asr",
-                "kind": "asr",
-                "id": self.ml.asr_model,
-                "engine": ASR_ENGINE,
-                "device": device,
-                "available": true,
-                "loaded": self.ml.asr_loaded(),
-            }),
-            json!({
-                "key": "translate",
-                "kind": "translate",
-                "id": self.ml.translate_model,
-                "engine": if mt { Value::from(MT_ENGINE) } else { Value::Null },
-                "device": device,
-                "available": mt,
-                "loaded": self.ml.translate_loaded(),
-            }),
-        ]
+        let asr = self.ml.asr_id();
+        let translate = self.ml.translate_id();
+        let mut asr_row = json!({
+            "key": "asr",
+            "kind": "asr",
+            "id": asr,
+            "engine": ASR_ENGINE,
+            "device": device,
+            "available": true,
+            "loaded": self.ml.asr_loaded(),
+            "loading": self.ml.asr_loading(),
+            "fromEnv": self.ml.asr_from_env(),
+        });
+        let mut translate_row = json!({
+            "key": "translate",
+            "kind": "translate",
+            "id": translate,
+            "engine": if mt { Value::from(MT_ENGINE) } else { Value::Null },
+            "device": device,
+            "available": mt,
+            "loaded": self.ml.translate_loaded(),
+            "loading": self.ml.translate_loading(),
+            "fromEnv": self.ml.translate_from_env(),
+        });
+        asr_row
+            .as_object_mut()
+            .expect("object")
+            .extend(self.model_status(&asr, Kind::Asr));
+        let translate_status = match &translate {
+            Some(id) => self.model_status(id, Kind::Translate),
+            None => Map::new(),
+        };
+        translate_row
+            .as_object_mut()
+            .expect("object")
+            .extend(translate_status);
+        vec![asr_row, translate_row]
     }
 
+    fn catalog_rows(&self) -> Vec<Value> {
+        let (asr, translate) = (self.ml.asr_id(), self.ml.translate_id());
+        CATALOG
+            .iter()
+            .map(|spec| {
+                let mut row = json!({
+                    "kind": spec.kind.as_str(),
+                    "id": spec.id,
+                    "label": spec.label,
+                    "approxBytes": spec.approx_bytes,
+                    "selected": match spec.kind {
+                        Kind::Asr => asr == spec.id,
+                        Kind::Translate => translate.as_deref() == Some(spec.id),
+                    },
+                });
+                row.as_object_mut()
+                    .expect("object")
+                    .extend(self.model_status(spec.id, spec.kind));
+                row
+            })
+            .collect()
+    }
+
+    fn models_body(&self) -> Value {
+        json!({
+            "models": self.model_inventory(),
+            "catalog": self.catalog_rows(),
+            "cached": scan_model_cache(&self.hf_cache),
+        })
+    }
+
+    /// Ids the engine runs now: the ones `/models/cache` must not delete.
     fn inventory_ids(&self) -> Vec<String> {
-        let mut ids = vec![self.ml.asr_model.clone()];
-        ids.extend(self.ml.translate_model.clone());
+        let mut ids = vec![self.ml.asr_id()];
+        ids.extend(self.ml.translate_id());
         ids
     }
 
+    /// The kind of a model the engine can download: a catalog entry or an active one.
+    fn model_kind(&self, id: &str) -> Option<Kind> {
+        catalog_spec(id).map(|spec| spec.kind).or_else(|| {
+            if self.ml.asr_id() == id {
+                Some(Kind::Asr)
+            } else {
+                (self.ml.translate_id().as_deref() == Some(id)).then_some(Kind::Translate)
+            }
+        })
+    }
+
+    /// Starts the download in the background and answers 202 at once; progress is
+    /// on the model's row in `GET /models`.
     fn post_models_pull(&self, request: &Request) -> Response {
         let Some(payload) = parse_body(&request.body) else {
             return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
@@ -625,25 +738,114 @@ impl App {
             Some(id) if py_truthy(id) => py_str(id).trim().to_string(),
             _ => String::new(),
         };
-        if want.is_empty() || !self.inventory_ids().contains(&want) {
+        let Some(kind) = self.model_kind(&want) else {
             return self.json_response(
                 request,
                 400,
                 json!({ "error": "id must be one of the /models inventory ids" }),
             );
+        };
+        let status = |started: bool| {
+            let mut body = json!({ "ok": true, "id": want, "started": started });
+            body.as_object_mut()
+                .expect("object")
+                .extend(self.model_status(&want, kind));
+            body
+        };
+        if cache_state(&self.hf_cache, &want, kind).downloaded {
+            return self.json_response(request, 200, status(false));
         }
-        match crate::models::pull(&want) {
-            Ok((path, bytes)) => self.json_response(
-                request,
-                200,
-                json!({ "ok": true, "id": want, "path": path.to_string_lossy(), "bytes": bytes }),
-            ),
-            Err(error) => self.json_response(
-                request,
-                502,
-                json!({ "error": format!("download failed: {error:#}") }),
-            ),
+        {
+            let mut pulls = self.pulls.lock().unwrap_or_else(|e| e.into_inner());
+            if pulls.get(&want).is_some_and(|p| p.error.is_none()) {
+                drop(pulls);
+                return self.json_response(request, 202, status(false));
+            }
+            pulls.insert(
+                want.clone(),
+                Pull {
+                    progress: Arc::default(),
+                    approx_bytes: catalog_spec(&want).map_or(0, |spec| spec.approx_bytes),
+                    error: None,
+                },
+            );
         }
+        let progress =
+            Arc::clone(&self.pulls.lock().unwrap_or_else(|e| e.into_inner())[&want].progress);
+        let (pulls, id) = (Arc::clone(&self.pulls), want.clone());
+        std::thread::Builder::new()
+            .name(format!("pull-{id}"))
+            .spawn(move || {
+                let result = crate::models::pull(&id, kind, &progress);
+                let mut pulls = pulls.lock().unwrap_or_else(|e| e.into_inner());
+                match result {
+                    Ok(()) => {
+                        pulls.remove(&id);
+                    }
+                    Err(error) => {
+                        eprintln!("[pull] {id}: {error:#}");
+                        if let Some(pull) = pulls.get_mut(&id) {
+                            pull.error = Some(format!("download failed: {error:#}"));
+                        }
+                    }
+                }
+            })
+            .expect("spawn pull thread");
+        self.json_response(request, 202, status(true))
+    }
+
+    /// Choose the speech and/or translation model. Saved like `/engine/mode`, applied
+    /// at once: the old model is dropped on the next request, and a model that is not
+    /// downloaded yet is fetched then (so the first request after the switch is slow).
+    fn post_engine_models(&self, request: &Request) -> Response {
+        let Some(payload) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let wanted = |key: &str| payload.get(key).and_then(Value::as_str).map(str::trim);
+        let (asr, translate) = (wanted("asr"), wanted("translate"));
+        if asr.is_none() && translate.is_none() {
+            return self.json_response(
+                request,
+                400,
+                json!({ "error": "body needs asr and/or translate (a catalog id; translate may be \"off\")" }),
+            );
+        }
+        let asr = asr.map(crate::whisper::repo_for);
+        let known = |id: &str, kind: Kind| catalog_spec(id).is_some_and(|spec| spec.kind == kind);
+        let bad = asr.as_deref().is_some_and(|id| !known(id, Kind::Asr))
+            || translate.is_some_and(|id| id != "off" && !known(id, Kind::Translate));
+        if bad {
+            let allowed: Vec<&str> = CATALOG.iter().map(|spec| spec.id).collect();
+            return self.json_response(
+                request,
+                400,
+                json!({ "error": "id must be one of the /models catalog ids", "allowed": allowed }),
+            );
+        }
+        let mut saved = read_json(&self.models_path).unwrap_or_else(|| json!({}));
+        let mut applied = Map::new();
+        if let Some(id) = &asr {
+            saved["asr"] = json!(id);
+            applied.insert("asr".into(), json!(self.ml.set_asr(id)));
+        }
+        if let Some(id) = translate {
+            saved["translate"] = json!(id);
+            let on = (id != "off").then_some(id);
+            applied.insert("translate".into(), json!(self.ml.set_translate(on)));
+        }
+        write_json(&self.models_path, saved);
+        self.json_response(
+            request,
+            200,
+            json!({
+                "ok": true,
+                "asr": self.ml.asr_id(),
+                "translate": self.ml.translate_id(),
+                // false: an env var (WHISPER_MODEL, TRANSLATE, TRANSLATE_MODEL) pins that
+                // kind; the choice is saved but does not apply until the env var goes.
+                "applied": applied,
+            }),
+        )
     }
 
     fn delete(&self, request: &Request) -> Response {
@@ -689,12 +891,12 @@ impl App {
             "ok": true,
             "engine": ASR_ENGINE,
             "engine_label": ASR_ENGINE,
-            "model": self.ml.asr_model,
+            "model": self.ml.asr_id(),
             // Media is decoded in-process (symphonia), not by ffmpeg.
             "ffmpeg": false,
             "media_decoder": "symphonia",
             "translate": mt,
-            "translate_model": self.ml.translate_model,
+            "translate_model": self.ml.translate_id(),
             "draft_model": Value::Null,
             "device": self.ml.device_name(),
             "compute": "float32",

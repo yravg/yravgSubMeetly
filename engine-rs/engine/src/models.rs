@@ -5,6 +5,10 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
+use hf_hub::progress::{DownloadEvent, Progress, ProgressEvent, ProgressHandler};
 
 use serde_json::{json, Value};
 
@@ -140,9 +144,266 @@ pub fn delete_cached(cache: &Path, slug: &str, active: &[String], confirm: bool)
     )
 }
 
-/// Download a whole repo snapshot into the hub cache; returns (path, bytes).
-pub fn pull(repo_id: &str) -> anyhow::Result<(PathBuf, u64)> {
-    let path = crate::ml::hub_snapshot(repo_id)?;
-    let (bytes, _) = walk_size(&path, true);
-    Ok((path, bytes))
+/// What a model does; decides which files a download needs.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Kind {
+    Asr,
+    Translate,
+}
+
+impl Kind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Kind::Asr => "asr",
+            Kind::Translate => "translate",
+        }
+    }
+}
+
+pub struct Spec {
+    pub kind: Kind,
+    pub id: &'static str,
+    pub label: &'static str,
+    /// Download size of the files the engine loads, rounded (what the UI shows before a pull).
+    pub approx_bytes: u64,
+}
+
+/// Models the engine can run and `POST /engine/models` accepts. Whisper and Qwen are
+/// multilingual: one download serves every language, so there is no per-language model.
+pub const CATALOG: [Spec; 7] = [
+    spec(
+        Kind::Asr,
+        "openai/whisper-base",
+        "Whisper base",
+        290_000_000,
+    ),
+    spec(
+        Kind::Asr,
+        "openai/whisper-small",
+        "Whisper small",
+        967_000_000,
+    ),
+    spec(
+        Kind::Asr,
+        "openai/whisper-medium",
+        "Whisper medium",
+        3_060_000_000,
+    ),
+    spec(
+        Kind::Asr,
+        "openai/whisper-large-v3-turbo",
+        "Whisper large-v3 turbo",
+        1_620_000_000,
+    ),
+    spec(
+        Kind::Translate,
+        "Qwen/Qwen2.5-0.5B-Instruct",
+        "Qwen2.5 0.5B",
+        988_000_000,
+    ),
+    spec(
+        Kind::Translate,
+        "Qwen/Qwen2.5-1.5B-Instruct",
+        "Qwen2.5 1.5B",
+        3_090_000_000,
+    ),
+    spec(
+        Kind::Translate,
+        "Qwen/Qwen2.5-3B-Instruct",
+        "Qwen2.5 3B",
+        6_170_000_000,
+    ),
+];
+
+const fn spec(kind: Kind, id: &'static str, label: &'static str, approx_bytes: u64) -> Spec {
+    Spec {
+        kind,
+        id,
+        label,
+        approx_bytes,
+    }
+}
+
+pub fn catalog_spec(id: &str) -> Option<&'static Spec> {
+    CATALOG.iter().find(|spec| spec.id == id)
+}
+
+/// What the hub cache holds for one model.
+#[derive(Debug, PartialEq, Eq)]
+pub struct CacheState {
+    /// Every file the loader needs is in a snapshot.
+    pub downloaded: bool,
+    /// Finished blobs, `.incomplete` excluded.
+    pub bytes: u64,
+    /// `.incomplete` blobs of a download that has not finished.
+    pub partial_bytes: u64,
+}
+
+/// A snapshot file that exists (a dangling link does not count).
+fn snapshot_file(snapshots: &[PathBuf], name: &str) -> Option<PathBuf> {
+    snapshots
+        .iter()
+        .map(|dir| dir.join(name))
+        .find(|path| fs::metadata(path).is_ok_and(|meta| meta.is_file()))
+}
+
+fn shard_names(index: &Path) -> Option<Vec<String>> {
+    let index: Value = serde_json::from_slice(&fs::read(index).ok()?).ok()?;
+    let mut names: Vec<String> = index["weight_map"]
+        .as_object()?
+        .values()
+        .filter_map(|name| name.as_str().map(str::to_string))
+        .collect();
+    names.sort();
+    names.dedup();
+    Some(names)
+}
+
+pub fn cache_state(cache: &Path, repo_id: &str, kind: Kind) -> CacheState {
+    let root = cache.join(format!("models--{}", repo_id.replace('/', "--")));
+    let (mut bytes, mut partial_bytes) = (0, 0);
+    for entry in fs::read_dir(root.join("blobs"))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let Ok(meta) = fs::metadata(entry.path()) else {
+            continue;
+        };
+        if name.ends_with(".incomplete") {
+            partial_bytes += meta.len();
+        } else if meta.is_file() && counted(&name) {
+            bytes += meta.len();
+        }
+    }
+    let snapshots: Vec<PathBuf> = fs::read_dir(root.join("snapshots"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .collect();
+    let have = |name: &str| snapshot_file(&snapshots, name).is_some();
+    let weights = match kind {
+        Kind::Asr => have("model.safetensors"),
+        // Sharded repos (Qwen 1.5B and up) name their shards in the index.
+        Kind::Translate => match snapshot_file(&snapshots, "model.safetensors.index.json") {
+            Some(index) => shard_names(&index).is_some_and(|names| names.iter().all(|n| have(n))),
+            None => have("model.safetensors"),
+        },
+    };
+    CacheState {
+        downloaded: weights && have("config.json") && have("tokenizer.json"),
+        bytes,
+        partial_bytes,
+    }
+}
+
+/// Byte progress of one running download. Fed by hf-hub's progress events, which
+/// arrive on its runtime thread, so every field is atomic and nothing blocks.
+#[derive(Default)]
+pub struct PullProgress {
+    /// Sizes of the files finished so far.
+    finished: AtomicU64,
+    /// Bytes of the file in flight, and its size once the hub reported it.
+    current: AtomicU64,
+    current_total: AtomicU64,
+}
+
+impl PullProgress {
+    pub fn bytes_done(&self) -> u64 {
+        self.finished.load(Ordering::Relaxed) + self.current.load(Ordering::Relaxed)
+    }
+
+    pub fn file_finished(&self, path: &Path) {
+        let size = fs::metadata(path).map_or(0, |meta| meta.len());
+        self.finished.fetch_add(size, Ordering::Relaxed);
+        self.current.store(0, Ordering::Relaxed);
+        self.current_total.store(0, Ordering::Relaxed);
+    }
+
+    /// Size of the file in flight; 0 between files.
+    pub fn current_total(&self) -> u64 {
+        self.current_total.load(Ordering::Relaxed)
+    }
+}
+
+impl ProgressHandler for PullProgress {
+    fn on_progress(&self, event: &ProgressEvent) {
+        let ProgressEvent::Download(event) = event else {
+            return;
+        };
+        let reached = match event {
+            DownloadEvent::Start { total_bytes, .. } => {
+                self.current_total.store(*total_bytes, Ordering::Relaxed);
+                return;
+            }
+            DownloadEvent::AggregateProgress {
+                bytes_completed, ..
+            } => *bytes_completed,
+            // One file at a time, so the largest figure reported is this file's.
+            DownloadEvent::Progress { files } => {
+                files.iter().map(|f| f.bytes_completed).max().unwrap_or(0)
+            }
+            DownloadEvent::Complete => return,
+        };
+        self.current.fetch_max(reached, Ordering::Relaxed);
+    }
+}
+
+/// Download exactly the files the loader for `kind` reads (not the whole repo).
+pub fn pull(repo_id: &str, kind: Kind, progress: &Arc<PullProgress>) -> anyhow::Result<()> {
+    let handler: Progress = (Arc::clone(progress) as Arc<dyn ProgressHandler>).into();
+    let mut finished = |path: &Path| progress.file_finished(path);
+    match kind {
+        Kind::Asr => {
+            crate::whisper::fetch_files(repo_id, Some(&handler), &mut finished)?;
+        }
+        Kind::Translate => {
+            crate::translate::fetch_files(repo_id, Some(&handler), &mut finished)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hf_hub::progress::{FileProgress, FileStatus};
+
+    fn event(event: DownloadEvent) -> ProgressEvent {
+        ProgressEvent::Download(event)
+    }
+
+    #[test]
+    fn progress_follows_the_file_in_flight_and_adds_up_finished_files() {
+        let progress = PullProgress::default();
+        progress.on_progress(&event(DownloadEvent::Start {
+            total_files: 1,
+            total_bytes: 1000,
+        }));
+        assert_eq!(progress.current_total(), 1000);
+        progress.on_progress(&event(DownloadEvent::AggregateProgress {
+            bytes_completed: 400,
+            total_bytes: 1000,
+            bytes_per_sec: None,
+        }));
+        // A late, smaller report must not move the bar back.
+        progress.on_progress(&event(DownloadEvent::Progress {
+            files: vec![FileProgress {
+                filename: "model.safetensors".into(),
+                bytes_completed: 300,
+                total_bytes: 1000,
+                status: FileStatus::InProgress,
+            }],
+        }));
+        assert_eq!(progress.bytes_done(), 400);
+
+        let file = std::env::temp_dir().join(format!("pull-progress-{}", std::process::id()));
+        fs::write(&file, vec![0; 1000]).expect("file");
+        progress.file_finished(&file);
+        let _ = fs::remove_file(&file);
+        assert_eq!(progress.bytes_done(), 1000);
+        assert_eq!(progress.current_total(), 0);
+    }
 }
