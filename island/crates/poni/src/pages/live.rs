@@ -23,6 +23,7 @@ use crate::state::AppState;
 use crate::ui::{wid, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Rect};
 use poni_core::helper::PageState;
+use poni_core::capture::TranslateHint;
 use poni_core::models::Kind;
 
 const HEAD_H: f32 = 34.0;
@@ -59,20 +60,16 @@ fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let (title, line, bad, label, go) = if !st.helper.following {
         ("Unfollowed", "The island left the meeting alone. Follow shows the newest line again.".to_string(), false, Some("Follow"), Go::Follow)
     } else if st.capture.needs_model() {
-        // The first caption would otherwise start a download nobody asked for.
+        // The engine downloads nothing by itself: the person presses Download.
         if st.models.due(st.now) {
             st.cmd(Command::ModelsRefresh);
         }
-        let kind = if st.capture.needs_translation_model() { Kind::Translate } else { Kind::Asr };
-        let d = st.models.describe(kind);
+        let d = st.models.describe(Kind::Asr);
         let busy = st.models.pulling.is_some();
-        let (title, what, button) = match kind {
-            Kind::Asr => ("Speech model needed", "Captions need a speech model on this PC, and it is not downloaded yet.", "Download speech model"),
-            Kind::Translate => ("Translation model needed", "Captions in this language need a translation model on this PC, and it is not downloaded yet. Choosing English instead needs none.", "Download translation model"),
-        };
+        let what = "Captions need a speech model on this PC, and it is not downloaded yet.";
         let line = if busy || st.models.failed.is_some() { d.text } else { format!("{what} It downloads once and stays.") };
-        let label = (!busy).then_some(if st.models.failed.is_some() { "Retry" } else { button });
-        (title, line, st.models.failed.is_some(), label, Go::Download(kind))
+        let label = (!busy).then_some(if st.models.failed.is_some() { "Retry" } else { "Download speech model" });
+        ("Speech model needed", line, st.models.failed.is_some(), label, Go::Download(Kind::Asr))
     } else if let Some(why) = problem {
         let label = if running { "Stop captions" } else { "Try again" };
         ("Captions need attention", why, true, Some(label), Go::Captions(!running))
@@ -86,6 +83,36 @@ fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
             Go::Captions(on) => st.cmd(Command::Captions(on)),
             Go::Follow => st.helper.set_following(true),
             Go::Download(k) => st.cmd(Command::ModelPull(k)),
+        }
+    }
+}
+
+/// Under the source line, while the caption has no translation yet: a note that is not a stop.
+/// Missing offers Download (a press is the only thing that starts one); Loading is only said.
+fn translation_hint(ui: &mut Ui, st: &mut AppState, area: Rect, y: f32, hint: TranslateHint) {
+    let style = TextStyle::caption().color(palette::TEXT_DIM);
+    let row = Rect::new(area.x, y, area.w, 18.0);
+    let (text, button) = match hint {
+        TranslateHint::Loading => ("Loading the translation model\u{2026}".to_string(), None),
+        TranslateHint::NotDownloaded => {
+            if st.models.due(st.now) {
+                st.cmd(Command::ModelsRefresh);
+            }
+            let (busy, failed) = (st.models.pulling.is_some(), st.models.failed.is_some());
+            if busy || failed {
+                (st.models.describe(Kind::Translate).text, (!busy).then_some("Retry"))
+            } else {
+                ("Translation model not downloaded".to_string(), Some("Download"))
+            }
+        }
+    };
+    let w = ui.c.measure(&text, &style, row.w).0.ceil();
+    ui.c.text(&text, row, &style);
+    if let Some(label) = button {
+        let pw = ui.pill_width(label, false, true);
+        let b = Rect::new(row.x + w + 10.0, row.center().y - PILL_SMALL / 2.0, pw, PILL_SMALL);
+        if ui.pill(wid("live.translation.download"), b, label, None, PillStyle::Neutral).clicked {
+            st.cmd(Command::ModelPull(Kind::Translate));
         }
     }
 }
@@ -160,6 +187,8 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     y += 50.0;
     if !cap.translation.is_empty() {
         ui.c.text(&cap.translation, Rect::new(area.x, y, area.w, 40.0), &TextStyle::body().color(color).wrap().top());
+    } else if let Some(h) = st.caption_hint.filter(|_| !locked && st.capture.running()) {
+        translation_hint(ui, st, area, y, h);
     }
     // Hold and Unfollow act on this view only. Start captions is the island's own capture of what
     // the PC plays; recordings in the extension or the Mac app are theirs. A capture problem

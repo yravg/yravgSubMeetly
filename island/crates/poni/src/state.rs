@@ -585,6 +585,8 @@ pub struct AppState {
     pub calendar_pinged: Option<String>,
     /// The island's own capture of what the PC plays (`services::capture`).
     pub capture: poni_core::capture::CaptureState,
+    /// What the last caption said about its translation (missing, loading), for the Live page.
+    pub caption_hint: Option<poni_core::capture::TranslateHint>,
     /// The engine's models and the download under way (Settings, the Live page).
     pub models: poni_core::models::Models,
     /// Side effects requested during the frame.
@@ -664,6 +666,7 @@ impl AppState {
             calendar_confirm: None,
             calendar_pinged: None,
             capture: Default::default(),
+            caption_hint: None,
             models: Default::default(),
             cmds: Vec::new(),
         };

@@ -564,19 +564,30 @@ pub fn post_note(port: u16, body: &str) -> Result<(), String> {
     }
 }
 
-/// What `POST /draft` heard: the line and its translation (both empty for a silent window).
+/// What `POST /draft` heard: the line and its translation (both empty for a silent window), and
+/// why the translation is missing when it is (`translateState`).
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Draft {
     pub source: String,
     pub translation: String,
+    pub translate: Option<crate::capture::TranslateState>,
 }
 
-/// The engine's answer to `/draft`: the line, or the reason as one sentence.
+/// The engine's answer to `/draft`: the line, or the reason as one sentence. A 409
+/// `model-not-downloaded` is the speech model (the translation one never fails a draft: it
+/// answers with `translateState`), and says [`crate::capture::SPEECH_MISSING`].
 pub fn parse_draft(code: u16, body: &str) -> Result<Draft, String> {
     let v: Option<Value> = serde_json::from_str(body).ok();
     if code == 200 {
         let v = v.ok_or("The engine's answer was not JSON.")?;
-        return Ok(Draft { source: text(&v, "source").unwrap_or_default(), translation: text(&v, "translation").unwrap_or_default() });
+        return Ok(Draft {
+            source: text(&v, "source").unwrap_or_default(),
+            translation: text(&v, "translation").unwrap_or_default(),
+            translate: text(&v, "translateState").and_then(|s| crate::capture::TranslateState::parse(&s)),
+        });
+    }
+    if code == 409 && v.as_ref().and_then(|v| text(v, "code")).as_deref() == Some("model-not-downloaded") {
+        return Err(crate::capture::SPEECH_MISSING.into());
     }
     let why = v.as_ref().and_then(|v| text(v, "error")).unwrap_or_else(|| format!("The engine said {code}."));
     // Engine errors can be long (a missing model prints its whole path chain).
@@ -870,6 +881,15 @@ mod tests {
         assert_eq!(parse_draft(500, r#"{"error":"Error: model missing"}"#), Err("Error: model missing".into()));
         assert_eq!(parse_draft(503, "<html>"), Err("The engine said 503.".into()));
         assert!(parse_draft(200, "nope").is_err());
+        // The engine's 409 is the speech model, said in the one sentence the Live page keys on.
+        assert_eq!(parse_draft(409, r#"{"error":"model x is not downloaded","code":"model-not-downloaded","id":"x"}"#), Err(crate::capture::SPEECH_MISSING.into()));
+        assert_eq!(parse_draft(409, r#"{"error":"busy"}"#), Err("busy".into()), "another 409 is not a missing model");
+        // translateState rides along; an unknown word or none is no news.
+        use crate::capture::TranslateState as S;
+        let t = |b: &str| parse_draft(200, b).unwrap().translate;
+        assert_eq!(t(r#"{"source":"a","translation":"","translateState":"missing"}"#), Some(S::Missing));
+        assert_eq!(t(r#"{"source":"a","translation":"b","translateState":"ready"}"#), Some(S::Ready));
+        assert_eq!((t(r#"{"source":"a","translateState":"x"}"#), t(r#"{"source":"a"}"#)), (None, None));
         assert_eq!(parse_draft(500, &format!(r#"{{"error":"{}"}}"#, "x".repeat(400))).unwrap_err().len(), 160);
     }
 

@@ -173,18 +173,56 @@ pub fn draft_path(src: &str, tgt: &str) -> String {
     format!("/draft?src={src}&tgt={tgt}")
 }
 
-/// What the capture says while the speech model is not on disk: a `/draft` would start a
-/// download of several hundred MB that nobody asked for, so no audio is sent until it is there.
+/// What the capture says while the speech model is not on disk. The engine never downloads by
+/// itself (a `/draft` answers 409 `model-not-downloaded`), so no audio is sent until the person
+/// has pressed Download.
 pub const SPEECH_MISSING: &str = "The speech model is not downloaded yet. Download it and captions start by themselves.";
 
-/// The same for the translation model: the engine downloads it at the first request for a target
-/// other than English, so those wait for the download Settings offers. English never needs it (the
-/// engine falls back to Whisper's own translation).
-pub const TRANSLATION_MISSING: &str = "Translating into this language needs the translation model, which is not downloaded yet. Download it, or choose English, and captions go on.";
-
-/// Does captioning `src` into `tgt` run through the translation model?
+/// Does captioning `src` into `tgt` run through the translation model? English never does: the
+/// engine falls back to Whisper's own translation.
 pub fn needs_translation_model(src: &str, tgt: &str) -> bool {
     tgt != "en" && src != tgt
+}
+
+/// `translateState` of a `/draft` answer: why a caption has, or has not, its translation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TranslateState {
+    Off,
+    Missing,
+    Loading,
+    Ready,
+}
+
+impl TranslateState {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "off" => Self::Off,
+            "missing" => Self::Missing,
+            "loading" => Self::Loading,
+            "ready" => Self::Ready,
+            _ => return None,
+        })
+    }
+}
+
+/// The one-line note under the source caption while the translation is not there. The captions
+/// themselves go on (the source line, or Whisper's English); only a press downloads the model.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TranslateHint {
+    NotDownloaded,
+    Loading,
+}
+
+/// The note for what `/draft` said; `None` when nothing is wrong or nothing is being translated.
+pub fn translation_hint(state: Option<TranslateState>, src: &str, tgt: &str) -> Option<TranslateHint> {
+    if !needs_translation_model(src, tgt) {
+        return None;
+    }
+    match state? {
+        TranslateState::Missing => Some(TranslateHint::NotDownloaded),
+        TranslateState::Loading => Some(TranslateHint::Loading),
+        TranslateState::Off | TranslateState::Ready => None,
+    }
 }
 
 /// Where the island's own capture stands, for the Live page, the tray and the pill.
@@ -207,13 +245,9 @@ impl CaptureState {
         matches!(self, CaptureState::On | CaptureState::Warn(_))
     }
 
-    /// Captions wait for a model to be downloaded ([`SPEECH_MISSING`], [`TRANSLATION_MISSING`]).
+    /// Captions wait for the speech model to be downloaded ([`SPEECH_MISSING`]).
     pub fn needs_model(&self) -> bool {
-        matches!(self, CaptureState::Warn(m) if m == SPEECH_MISSING || m == TRANSLATION_MISSING)
-    }
-
-    pub fn needs_translation_model(&self) -> bool {
-        matches!(self, CaptureState::Warn(m) if m == TRANSLATION_MISSING)
+        matches!(self, CaptureState::Warn(m) if m == SPEECH_MISSING)
     }
 
     /// The sentence to show, if there is a problem.
@@ -234,8 +268,21 @@ mod tests {
         assert!(CaptureState::Warn(SPEECH_MISSING.into()).needs_model());
         assert!(!CaptureState::Warn("Loading the speech model.".into()).needs_model());
         assert!(!CaptureState::On.needs_model());
-        let tr = CaptureState::Warn(TRANSLATION_MISSING.into());
-        assert!(tr.needs_model() && tr.needs_translation_model() && !CaptureState::Warn(SPEECH_MISSING.into()).needs_translation_model());
+    }
+
+    #[test]
+    fn a_missing_or_loading_translation_model_is_a_hint_not_a_stop() {
+        use TranslateHint::*;
+        use TranslateState as S;
+        assert_eq!(translation_hint(Some(S::Missing), "de", "id"), Some(NotDownloaded));
+        assert_eq!(translation_hint(Some(S::Loading), "auto", "id"), Some(Loading));
+        assert_eq!(translation_hint(Some(S::Ready), "de", "id"), None);
+        assert_eq!(translation_hint(Some(S::Off), "de", "id"), None);
+        assert_eq!(translation_hint(None, "de", "id"), None, "an engine that does not say has no hint");
+        // English is Whisper's own job and the same language needs none: "missing" is not news there.
+        assert_eq!(translation_hint(Some(S::Missing), "de", "en"), None);
+        assert_eq!(translation_hint(Some(S::Missing), "id", "id"), None);
+        assert_eq!((TranslateState::parse("loading"), TranslateState::parse("nope")), (Some(S::Loading), None));
     }
 
     #[test]

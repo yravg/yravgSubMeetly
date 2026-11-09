@@ -58,12 +58,20 @@ pub fn translate_path(src: Option<&str>, tgt: &str) -> String {
     format!("/translate?src={}&tgt={}", src.unwrap_or("auto"), tgt)
 }
 
-/// The engine's answer: the translated text, or one sentence why not.
+/// What a song's translation says when the model is not on disk: one quiet line in place of the
+/// second row. The engine never downloads by itself; Settings > Models does, on a press.
+pub const MODEL_MISSING: &str = "The translation model is not downloaded. Download it in Settings, under Models.";
+
+/// The engine's answer: the translated text, or one sentence why not (a 409
+/// `model-not-downloaded` is [`MODEL_MISSING`]).
 pub fn parse_translation(code: u16, body: &str) -> Result<String, String> {
     let v: Option<serde_json::Value> = serde_json::from_str(body).ok();
     let field = |k: &str| v.as_ref().and_then(|v| v.get(k)).and_then(|t| t.as_str()).map(|t| t.trim().to_string());
     if code == 200 {
         return field("text").ok_or_else(|| "The engine's answer was not a translation.".to_string());
+    }
+    if code == 409 && field("code").as_deref() == Some("model-not-downloaded") {
+        return Err(MODEL_MISSING.into());
     }
     let why = field("error").unwrap_or_else(|| format!("The engine said {code}."));
     Err(why.chars().take(160).collect())
@@ -133,6 +141,8 @@ mod tests {
         assert_eq!(parse_translation(200, r#"{"text":" line one ","ms":5}"#), Ok("line one".into()));
         assert_eq!(parse_translation(501, r#"{"error":"no translation model"}"#), Err("no translation model".into()));
         assert!(parse_translation(200, "nope").is_err());
+        assert_eq!(parse_translation(409, r#"{"error":"not downloaded","code":"model-not-downloaded","id":"x"}"#), Err(MODEL_MISSING.into()));
+        assert_eq!(parse_translation(409, r#"{"error":"busy"}"#), Err("busy".into()));
         assert_eq!(parse_translation(500, "").unwrap_err(), "The engine said 500.");
     }
 

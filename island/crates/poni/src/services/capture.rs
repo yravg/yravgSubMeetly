@@ -100,6 +100,8 @@ pub enum CaptureEvent {
     State(CaptureState),
     /// The engine heard words: ask the helper link for the line now.
     Heard,
+    /// The translation is missing or loading (or no longer is): a note under the source line.
+    Hint(Option<poni_core::capture::TranslateHint>),
 }
 
 pub struct CaptureService {
@@ -153,6 +155,7 @@ impl Drop for CaptureService {
 struct HealthState {
     device: Option<String>,
     engine: Option<String>,
+    hint: Option<poni_core::capture::TranslateHint>,
     failed: Option<String>,
     sent: Option<CaptureState>,
     silenced: bool,
@@ -186,6 +189,17 @@ impl Health {
         self.update(|s| s.engine = why);
     }
 
+    /// Sent only when it changes.
+    fn hint(&self, h: Option<poni_core::capture::TranslateHint>) {
+        let mut s = self.st.lock().unwrap_or_else(|e| e.into_inner());
+        if s.hint != h {
+            s.hint = h;
+            if !s.silenced {
+                self.sink.send(AppEvent::Capture(CaptureEvent::Hint(h)));
+            }
+        }
+    }
+
     fn fail(&self, why: String) {
         self.update(|s| s.failed = Some(why));
     }
@@ -205,32 +219,33 @@ impl Health {
 // The poster: one request in flight, newest window wins.
 
 fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mutex<Option<Vec<f32>>>>, health: Arc<Health>, log: SessionLog) {
-    // A model that is not on disk would be downloaded by the first /draft, silently and for minutes
-    // (the speech model always; the translation one for a target other than English); the island
-    // says so and waits for the download Settings offers instead.
-    let (mut speech, mut translation) = (Gate::default(), Gate::default());
-    let needs_translation = poni_core::capture::needs_translation_model(src, tgt);
+    // The engine never downloads by itself: without the speech model a /draft answers 409. So the
+    // window is not even sent while /models says it is not there, and a 409 closes the gate until
+    // it says it is (a download the person pressed). The translation model is not a gate: the
+    // engine captions without it and each answer says so in `translateState`.
+    let mut speech = Gate::default();
     while wake.recv().is_ok() {
         let Some(window) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
         if !speech.open(|| speech_on_disk(port)) {
             health.engine(Some(poni_core::capture::SPEECH_MISSING.into()));
             continue;
         }
-        if needs_translation && !translation.open(|| translation_on_disk(port)) {
-            health.engine(Some(poni_core::capture::TRANSLATION_MISSING.into()));
-            continue;
-        }
         match helper::post_draft(port, src, tgt, &pcm_bytes(&window)) {
             Ok(d) => {
                 health.engine(None);
+                health.hint(poni_core::capture::translation_hint(d.translate, src, tgt));
                 if !d.source.is_empty() {
                     log.lock().unwrap_or_else(|e| e.into_inner()).push(d.source, d.translation);
                     health.heard();
                 }
             }
+            Err(e) if e == poni_core::capture::SPEECH_MISSING => {
+                speech.shut();
+                health.engine(Some(e));
+            }
             Err(e) => {
                 crate::pinfo!("capture: /draft failed: {e}");
-                (speech.ok, translation.ok) = (false, false);
+                speech.ok = false;
                 // A request that got no answer in its 25 s while /health still answers is a model loading.
                 // (On Windows a read timeout reads "os error 10060", so the test is `engine_unreachable`.)
                 let loading = engine_unreachable(&e).then(|| helper::request(port, "GET", "/health", None).ok()).flatten().filter(|(c, _)| *c == 200).and_then(|(_, b)| poni_core::capture::loading_notice(&b, src != tgt));
@@ -240,11 +255,14 @@ fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mute
     }
 }
 
-/// Whether windows may go to the engine for one model: once the model is known to be there, no more
+/// Whether windows may go to the engine for the speech model: once it is known to be there, no more
 /// asking until a request fails; while it is not, asked again at most every 2 s.
 #[derive(Default)]
 struct Gate {
     ok: bool,
+    /// The engine itself said "not downloaded" (a 409): only a "yes, on disk" opens the gate again,
+    /// an engine that does not say no longer counts as a yes.
+    strict: bool,
     checked: Option<Instant>,
 }
 
@@ -253,9 +271,15 @@ impl Gate {
     fn open(&mut self, check: impl FnOnce() -> Option<bool>) -> bool {
         if !self.ok && self.checked.is_none_or(|t| t.elapsed() > Duration::from_secs(2)) {
             self.checked = Some(Instant::now());
-            self.ok = check() != Some(false);
+            self.ok = check().unwrap_or(!self.strict);
+            self.strict &= !self.ok;
         }
         self.ok
+    }
+
+    /// The engine answered 409: not asked again for 2 s, and then only a "yes" opens it.
+    fn shut(&mut self) {
+        (self.ok, self.strict, self.checked) = (false, true, Some(Instant::now()));
     }
 }
 
@@ -463,6 +487,27 @@ mod tests {
         let mut g = Gate::default();
         assert!(g.open(|| None));
         assert!(g.open(|| panic!("a model known to be there is not asked about again")));
+    }
+
+    #[test]
+    fn a_409_keeps_the_gate_shut_until_the_engine_says_the_model_is_there() {
+        let mut g = Gate::default();
+        assert!(g.open(|| None), "an engine that does not say lets the first window through");
+        g.shut();
+        assert!(!g.open(|| panic!("asked again within 2 s of the 409")));
+        // After 2 s: an engine that still does not say is not a yes, so there is no retry loop.
+        g.checked = Some(Instant::now() - Duration::from_secs(3));
+        assert!(!g.open(|| None));
+        g.checked = Some(Instant::now() - Duration::from_secs(3));
+        assert!(!g.open(|| Some(false)));
+        // The download the person pressed lands: /models says so, and windows flow again.
+        g.checked = Some(Instant::now() - Duration::from_secs(3));
+        assert!(g.open(|| Some(true)));
+        assert!(g.open(|| panic!("a model known to be there is not asked about again")));
+        // A later plain failure (engine restarted) goes back to the lenient reading.
+        g.ok = false;
+        g.checked = None;
+        assert!(g.open(|| None));
     }
 
     #[test]

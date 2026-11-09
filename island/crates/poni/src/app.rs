@@ -1008,10 +1008,7 @@ impl App {
                     shell::open_app(&id);
                     opened = true;
                 }
-                Some(NoticeAction::DownloadModel) => {
-                    let kind = if self.st.capture.needs_translation_model() { poni_core::models::Kind::Translate } else { poni_core::models::Kind::Asr };
-                    self.pull_model(kind)
-                }
+                Some(NoticeAction::DownloadModel) => self.pull_model(poni_core::models::Kind::Asr),
                 None => {}
             }
         }
@@ -1770,6 +1767,7 @@ impl App {
         let (src, tgt) = (self.st.settings.source_lang.clone(), self.st.settings.target_lang.clone());
         self.st.settings.captions_on = on;
         self.save_settings();
+        self.st.caption_hint = None;
         let Some(svc) = self.services.as_mut() else { return };
         if on {
             svc.engine_start();
@@ -1941,7 +1939,7 @@ impl App {
         use services::capture::CaptureEvent;
         match e {
             // A late report from before Stop does not bring it back.
-            CaptureEvent::State(_) | CaptureEvent::Heard if self.st.capture == poni_core::capture::CaptureState::Off => {}
+            CaptureEvent::State(_) | CaptureEvent::Heard | CaptureEvent::Hint(_) if self.st.capture == poni_core::capture::CaptureState::Off => {}
             CaptureEvent::State(s) => {
                 if let (poni_core::capture::CaptureState::Failed(_), Some(svc)) = (&s, self.services.as_mut()) {
                     svc.capture_stop();
@@ -1950,8 +1948,7 @@ impl App {
                 self.st.helper.capturing = s.running();
                 // Captions cannot start without the speech model: the pill says so and a tap downloads it.
                 if s.needs_model() && !self.st.capture.needs_model() {
-                    let title = if s.needs_translation_model() { "Translation model needed" } else { "Speech model needed" };
-                    self.st.notify(Icon::Download, palette::ORANGE, title, "Tap to download it for captions", 8.0, Some(NoticeAction::DownloadModel));
+                    self.st.notify(Icon::Download, palette::ORANGE, "Speech model needed","Tap to download it for captions", 8.0, Some(NoticeAction::DownloadModel));
                     self.refresh_models();
                 }
                 self.st.capture = s;
@@ -1961,6 +1958,7 @@ impl App {
                     s.helper_poll();
                 }
             }
+            CaptureEvent::Hint(h) => self.st.caption_hint = h,
         }
     }
 

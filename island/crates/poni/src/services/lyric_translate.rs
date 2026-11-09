@@ -105,9 +105,10 @@ fn run(shared: &Shared, sink: &EventSink, job: Job) {
     if let Some(lines) = std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str::<Cache>(&t).ok()).and_then(|c| lyric_tr::usable(c, &job.tgt, job.lines.len())) {
         return send(&job, lines, TrState::Ready);
     }
-    // The engine downloads a translation model it lacks at the first request, silently and for minutes.
+    // Asked first so no request goes out for a model that is not there (the engine would answer 409,
+    // which `parse_translation` reads the same way): one quiet line, no second row, no retry.
     if crate::services::capture::translation_on_disk(job.port) == Some(false) {
-        return send(&job, Vec::new(), TrState::Unavailable("The translation model is not downloaded. Download it in Settings, under Models.".into()));
+        return send(&job, Vec::new(), TrState::Unavailable(lyric_tr::MODEL_MISSING.into()));
     }
     let mut out = vec![String::new(); job.lines.len()];
     send(&job, out.clone(), TrState::Working);
