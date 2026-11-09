@@ -18,11 +18,24 @@ pub const MESSAGE_H: f32 = 56.0;
 /// Centred in `area`. Returns true when the button was pressed.
 #[allow(clippy::too_many_arguments)]
 pub fn message(ui: &mut Ui, area: Rect, accent: Color, icon: Icon, title: &str, line: &str, bad: bool, button: Option<(&str, u64)>) -> bool {
+    block(ui, area, accent, Some(icon), title, line, bad, button)
+}
+
+/// [`message`] with a turning arc in the disc instead of an icon (`None`): something on its way.
+#[allow(clippy::too_many_arguments)]
+fn block(ui: &mut Ui, area: Rect, accent: Color, icon: Option<Icon>, title: &str, line: &str, bad: bool, button: Option<(&str, u64)>) -> bool {
     let top = area.y + ((area.h - MESSAGE_H) / 2.0).max(0.0);
     let c = Point::new(area.x + 18.0, top + 20.0);
     let tone = if bad { palette::ORANGE } else { accent };
     ui.c.fill_circle(c, 18.0, tone.with_alpha(0.22));
-    ui.c.icon(icon, Rect::from_center(c, 20.0, 20.0), tone);
+    match icon {
+        Some(icon) => ui.c.icon(icon, Rect::from_center(c, 20.0, 20.0), tone),
+        None => {
+            ui.c.stroke_circle(c, 9.0, tone.with_alpha(0.25), 2.5);
+            ui.c.arc(c, 9.0, (ui.now * 0.9).fract() as f32, 0.28, tone, 2.5);
+            ui.request_anim();
+        }
+    }
     let mut right = area.right();
     let mut clicked = false;
     if let Some((label, id)) = button {
@@ -47,7 +60,10 @@ pub fn offline(ui: &mut Ui, st: &mut AppState, area: Rect, retry_id: u64) {
         _ => "no answer yet",
     };
     let (title, line, bad) = engine_link::offline_message(&st.engine, why, helper::configured_port());
-    if message(ui, area, st.accent, Icon::Unlink, title, &line, bad, Some(("Try again", retry_id))) {
+    // Starting or connecting is not a fault: a spinner, no error icon, nothing to retry.
+    if !bad {
+        block(ui, area, st.accent, None, title, &line, false, None);
+    } else if message(ui, area, st.accent, Icon::Unlink, title, &line, bad, Some(("Try again", retry_id))) {
         st.cmd(Command::HelperPoll);
     }
 }

@@ -93,6 +93,7 @@ impl EngineService {
             let mut spawns = 0u32;
             let mut last_spawn: Option<Instant> = None;
             let mut last_info: Option<EngineInfo> = None;
+            let mut missing_logged = false;
             loop {
                 let msg = match rx.recv_timeout(EVERY) {
                     Ok(m) => Some(m),
@@ -122,6 +123,10 @@ impl EngineService {
                 let exe = engine_exe();
                 let action = engine_link::decide(health.is_some(), exe.is_some(), spawns, last_spawn.map(|t| t.elapsed().as_secs_f64()));
                 let mut shown = action;
+                if action == Action::Missing && !missing_logged {
+                    missing_logged = true;
+                    sink.send(AppEvent::Log(format!("engine: {EXE_NAME} not found next to the island (dev builds: set SUBMEETLY_ENGINE_EXE to its full path)")));
+                }
                 if action == Action::Spawn {
                     if let Some(exe) = &exe {
                         spawns += 1;

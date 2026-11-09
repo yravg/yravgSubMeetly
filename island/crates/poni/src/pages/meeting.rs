@@ -57,7 +57,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
             return;
         }
         PageState::Empty => {
-            hkit::message(ui, area, accent, Icon::Clipboard, "No decisions yet", "Notes from the extension or the Mac app land here. Items that wait on you get buttons.", false, None);
+            hkit::message(ui, area, accent, Icon::Clipboard, "No decisions yet", "A meeting lands here when you stop captions, or when you record in the extension or the Mac app. Items that wait on you get buttons.", false, None);
             return;
         }
         _ => {}
