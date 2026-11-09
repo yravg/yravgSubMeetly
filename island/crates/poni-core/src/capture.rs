@@ -35,15 +35,16 @@ pub fn lang_name(code: &str) -> String {
     LANGS.iter().find(|(c, _)| *c == code).map_or_else(|| code.to_string(), |(_, n)| n.to_string())
 }
 
-/// The next code in `LANGS` after `code` (wraps); `with_auto` puts `auto` first in the cycle.
-pub fn next_lang(code: &str, with_auto: bool) -> &'static str {
+/// The code `step` places after `code` in `LANGS` (wraps, either way); `with_auto` puts `auto`
+/// first in the cycle. A code not in the list counts as the position before the first.
+pub fn step_lang(code: &str, step: i32, with_auto: bool) -> &'static str {
     let mut all: Vec<&'static str> = Vec::new();
     if with_auto {
         all.push("auto");
     }
     all.extend(LANGS.iter().map(|(c, _)| *c));
-    let i = all.iter().position(|c| *c == code).map_or(0, |i| i + 1);
-    all[i % all.len()]
+    let at = all.iter().position(|c| *c == code).map_or(-1, |i| i as i32);
+    all[(at + step).rem_euclid(all.len() as i32) as usize]
 }
 
 /// Average the channels of interleaved frames into one.
@@ -274,11 +275,14 @@ mod tests {
 
     #[test]
     fn languages_cycle_and_have_names() {
-        assert_eq!(next_lang("auto", true), "en");
-        assert_eq!(next_lang("en", true), "id");
-        assert_eq!(next_lang("vi", true), "auto");
-        assert_eq!(next_lang("vi", false), "en");
-        assert_eq!(next_lang("xx", false), "en");
+        assert_eq!(step_lang("auto", 1, true), "en");
+        assert_eq!(step_lang("en", 1, true), "id");
+        assert_eq!(step_lang("vi", 1, true), "auto");
+        assert_eq!(step_lang("vi", 1, false), "en");
+        assert_eq!(step_lang("xx", 1, false), "en");
+        assert_eq!(step_lang("auto", -1, true), "vi");
+        assert_eq!(step_lang("en", -1, false), "vi");
+        assert_eq!(step_lang("en", -1, true), "auto");
         assert_eq!(lang_name("ja"), "Japanese");
         assert_eq!(lang_name("auto"), "Auto-detect");
         assert_eq!(lang_name("xx"), "xx");

@@ -28,6 +28,7 @@ use crate::pill::status;
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, CursorKind, Hit, Input, MouseButton, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use crate::version::VERSION;
+use poni_core::capture;
 use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::settings::{IdleStyle, MonitorChoice, Theme, TranslationColor};
 use std::collections::HashMap;
@@ -119,6 +120,7 @@ pub enum Section {
     Appearance,
     Island,
     Music,
+    Speech,
     Popups,
     Tabs,
     Addons,
@@ -127,11 +129,12 @@ pub enum Section {
 }
 
 impl Section {
-    pub const ALL: [Section; 9] = [
+    pub const ALL: [Section; 10] = [
         Section::General,
         Section::Appearance,
         Section::Island,
         Section::Music,
+        Section::Speech,
         Section::Popups,
         Section::Tabs,
         Section::Addons,
@@ -145,6 +148,7 @@ impl Section {
             Section::Appearance => "Appearance",
             Section::Island => "Island",
             Section::Music => "Music and lyrics",
+            Section::Speech => "Captions and languages",
             Section::Popups => "Pop-ups",
             Section::Tabs => "Tabs",
             Section::Addons => "Add-ons",
@@ -160,6 +164,7 @@ impl Section {
             Section::Appearance => "appearance",
             Section::Island => "island",
             Section::Music => "music",
+            Section::Speech => "speech",
             Section::Popups => "popups",
             Section::Tabs => "tabs",
             Section::Addons => "addons",
@@ -174,6 +179,7 @@ impl Section {
             Section::Appearance => Icon::Eye,
             Section::Island => Icon::AppWindow,
             Section::Music => Icon::Music,
+            Section::Speech => Icon::Lyrics,
             Section::Popups => Icon::Volume,
             Section::Tabs => Icon::App,
             Section::Addons => Icon::Addons,
@@ -189,6 +195,7 @@ impl Section {
             Section::Appearance => Color::hex(0x5E5CE6),
             Section::Island => palette::BLUE,
             Section::Music => palette::PINK,
+            Section::Speech => palette::PURPLE,
             Section::Popups => palette::CYAN,
             Section::Tabs => palette::GREEN,
             Section::Addons => Color::hex(0x0A84FF),
@@ -230,6 +237,10 @@ pub enum Key {
     Pronunciation,
     MediaActivity,
     LyricsOffset,
+    Captions,
+    SpokenLang,
+    TargetLang,
+    LyricsTranslate,
     HudVolume,
     HudPower,
     HudBluetooth,
@@ -424,6 +435,20 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             ),
             Block::Group(Some("Closed island"), vec![switch(Key::MediaActivity, "Show what's playing", Some("The song and its cover on the closed island"), s.show_media_activity)]),
         ],
+        Section::Speech => vec![
+            Block::Group(
+                Some("Captions"),
+                vec![switch(Key::Captions, "Caption what this PC plays", Some("The engine writes what it hears on the island, in the language it hears"), st.capture.running())],
+            ),
+            Block::Group(
+                Some("Languages"),
+                vec![
+                    item(Key::SpokenLang, "Spoken language", Some("What the sound is in; Auto-detect works it out"), Ctl::Stepper(capture::lang_name(&s.source_lang))),
+                    item(Key::TargetLang, "Translate into", Some("Captions and synced lyrics are translated into this"), Ctl::Stepper(capture::lang_name(&s.target_lang))),
+                ],
+            ),
+            Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
+        ],
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
             vec![
@@ -569,6 +594,14 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::MediaActivity => s.show_media_activity = !s.show_media_activity,
         // + shows the lines later, as people hear a late line.
         Key::LyricsOffset => s.lyrics_offset_ms = (s.lyrics_offset_ms - step * OFFSET_STEP).clamp(-5000, 5000),
+        Key::Captions => {
+            let on = st.capture.running();
+            st.cmd(Command::Captions(!on));
+            return;
+        }
+        Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
+        Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
+        Key::LyricsTranslate => s.lyrics_translate = !s.lyrics_translate,
         Key::HudVolume => s.hud_volume = !s.hud_volume,
         Key::HudPower => s.hud_power = !s.hud_power,
         Key::HudBluetooth => s.hud_bluetooth = !s.hud_bluetooth,
@@ -1540,6 +1573,7 @@ mod tests {
                 match it.key {
                     // Start with Windows waits for its reading; the buttons open things.
                     Key::Autostart => assert!(st.cmds.is_empty()),
+                    Key::Captions => assert!(st.cmds.iter().any(|c| matches!(c, Command::Captions(true))), "starts the captions"),
                     Key::SettingsFile | Key::DataFolder | Key::ReleaseNotes | Key::LyricsCredit => assert!(opens, "{:?}", it.key),
                     _ => assert!(saved, "{:?} didn't save", it.key),
                 }

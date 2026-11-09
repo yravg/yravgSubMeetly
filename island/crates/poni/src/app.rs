@@ -691,6 +691,9 @@ impl App {
             }
             self.try_add_tray();
             services::power::register_session(self.helper);
+            if self.st.settings.captions_on {
+                self.set_captions(true);
+            }
             if !crate::autostart::packaged() {
                 self.updater = Some(crate::updates::Updater::start(paths::data_dir().join("update.json"), &mut self.st, crate::updates::unix_now()));
                 self.schedule_update();
@@ -1717,15 +1720,17 @@ impl App {
         self.st.notify(Icon::Lyrics, palette::BLUE, "Apple Music lyrics off", "Lyrics from LRCLIB only", 4.0, None);
     }
 
-    /// Captions from what the PC plays on (true) or off. The languages are the
-    /// engine's own defaults for now: spoken language detected, translated to English
-    /// (shortcut: no Settings entry yet; add one when the island gets language settings).
+    /// Captions from what the PC plays on (true) or off, in the languages of Settings. On or off
+    /// is remembered (`captions_on`): the next start of the island picks it up again.
     fn set_captions(&mut self, on: bool) {
         let sink = self.sink.clone();
+        let (src, tgt) = (self.st.settings.source_lang.clone(), self.st.settings.target_lang.clone());
+        self.st.settings.captions_on = on;
+        self.save_settings();
         let Some(svc) = self.services.as_mut() else { return };
         if on {
             svc.engine_start();
-            self.st.capture = match svc.capture_start(&sink, poni_core::helper::configured_port(), "auto", "en") {
+            self.st.capture = match svc.capture_start(&sink, poni_core::helper::configured_port(), &src, &tgt) {
                 Ok(()) => poni_core::capture::CaptureState::On,
                 Err(e) => poni_core::capture::CaptureState::Failed(e),
             };
@@ -1837,8 +1842,14 @@ impl App {
                 }
             }
         }
-        if before.lyrics_translate != now.lyrics_translate || before.target_lang != now.target_lang {
+        let retranslate = before.lyrics_translate != now.lyrics_translate || before.target_lang != now.target_lang;
+        let new_language = before.source_lang != now.source_lang || before.target_lang != now.target_lang;
+        if retranslate {
             self.start_lyric_translation();
+        }
+        // Running captions pick up a new language by starting again.
+        if new_language && self.st.capture.running() {
+            self.set_captions(true);
         }
         self.st.pomodoro.cfg = self.st.settings.pomodoro.clone();
         // An add-on switched on downloads its files; off deletes them.
