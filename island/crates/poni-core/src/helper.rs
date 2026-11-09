@@ -767,6 +767,11 @@ impl View {
         }
     }
 
+    /// The pill's two lines: the source, and its translation (empty when the engine made none).
+    pub fn pill_text(&self, now_ms: u64) -> Option<(&str, &str)> {
+        self.pill_line(now_ms).map(|l| (l.source.as_str(), l.translation.as_str()))
+    }
+
     /// The engine's newest line while it is still fresh (the collapsed pill).
     pub fn live_line(&self, now_ms: u64) -> Option<&Live> {
         if !matches!(self.link, Link::Online) {
@@ -817,6 +822,13 @@ mod tests {
             v.pill_line(2000).is_some()
         };
         assert!(!pill(Surface::Overlay) && pill(Surface::Island) && pill(Surface::Both));
+        let mut v = View::default();
+        let heard = |t: &str| Snapshot { live: Some(Live { seq: 1, source: "Halo".into(), translation: t.into(), at: Some(1000), ..Default::default() }), surface: Surface::Both, ..Default::default() };
+        v.apply(Ok((heard("Hello"), 5)));
+        assert_eq!(v.pill_text(2000), Some(("Halo", "Hello")));
+        v.apply(Ok((heard(""), 5)));
+        assert_eq!(v.pill_text(2000), Some(("Halo", "")), "no translation: the second line is empty");
+        assert_eq!(v.pill_text(20_000), None, "an old line is not now");
     }
 
     #[test]
