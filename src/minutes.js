@@ -42,6 +42,17 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 // Kunci `lts` lama dipindah sebelum apa pun membacanya.
 migrateLegacyLocalKeys();
 
+// A04a "Modern" register: ?skin=tide adds the Tide colour layer. Classic (no parameter) is unchanged (TIDE-024).
+if (new URLSearchParams(globalThis.location?.search || '').get('skin') === 'tide') {
+  document.documentElement.dataset.reskin = 'tide';
+  for (const href of ['theme-tide.css', 'minutes-tide.css']) {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = href;
+    document.head.append(l);
+  }
+}
+
 const LS_LANG = 'ysmMinutesLang';
 const LS_NAME = 'ysmMinutesMe';
 const LS_GLOSSARY = 'ysmGlossary';
@@ -97,8 +108,12 @@ function replaceActive(meeting) {
   state.activeId = meeting.id;
   state.lastSaved = new Date();
 }
+// ?meeting=<id> (from the app shell's "Issue minutes"): open that meeting on first load.
+let wantedMeeting = new URLSearchParams(globalThis.location?.search || '').get('meeting');
 async function reloadAll(keepActive = true) {
   state.meetings = await listMeetings();
+  if (wantedMeeting && state.meetings.some((m) => m.id === wantedMeeting)) state.activeId = wantedMeeting;
+  wantedMeeting = null;
   if (!keepActive || !state.meetings.some((m) => m.id === state.activeId)) {
     state.activeId = state.meetings[0]?.id || null;
   }

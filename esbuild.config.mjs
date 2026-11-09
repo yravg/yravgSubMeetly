@@ -51,6 +51,9 @@ const statics = [
   ['src/minutes.html', 'minutes.html'],
   ['src/minutes.css', 'minutes.css'],
   ['src/theme-tide.css', 'theme-tide.css'],
+  ['src/app.html', 'app.html'],
+  ['src/app.css', 'app.css'],
+  ['src/minutes-tide.css', 'minutes-tide.css'],
 ];
 for (const [from, to] of statics) {
   await copyFile(path.join(root, from), path.join(dist, to));
@@ -58,6 +61,8 @@ for (const [from, to] of statics) {
 await cp(path.join(root, 'icons'), path.join(dist, 'icons'), { recursive: true });
 // Fredoka + Plus Jakarta Sans (SIL OFL 1.1) for theme-tide.css, with their licences.
 await cp(path.join(root, 'src/fonts'), path.join(dist, 'fonts'), { recursive: true });
+// Tide mascot poses + mark (yravgBuds, owner's brand) for the app shell.
+await cp(path.join(root, 'src/tide'), path.join(dist, 'tide'), { recursive: true });
 
 // ---- vendor runtime assets (must ship in package: MV3 forbids CDN) ------
 // Copy EVERY ort-wasm-simd-threaded* variant (plain/jsep/asyncify/jspi) — the
@@ -101,6 +106,7 @@ const builds = [
   { entryPoints: ['src/ai-worker.js'], outfile: 'dist/ai-worker.js', format: 'esm' },
   { entryPoints: ['src/sidepanel.js'], outfile: 'dist/sidepanel.js', format: 'esm' },
   { entryPoints: ['src/minutes.js'], outfile: 'dist/minutes.js', format: 'esm' },
+  { entryPoints: ['src/app.js'], outfile: 'dist/app.js', format: 'esm' },
   // overlay.css and tokens.css are inlined into the overlay's shadow root as text.
   { entryPoints: ['src/content.js'], outfile: 'dist/content.js', format: 'iife', loader: { '.css': 'text' } },
 ];

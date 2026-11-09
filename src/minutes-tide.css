@@ -1,0 +1,77 @@
+/* ==========================================================================
+   minutes-tide.css — register "Modern" (papan A04a): minutes.html?skin=tide.
+
+   Dimuat hanya oleh Modern (minutes.js menambahkannya bersama theme-tide.css);
+   register Classic (tanpa parameter) tidak berubah — TIDE-024.
+   Struktur tetap milik minutes.css: pilihan "Local · dark" memakai tata letak
+   gelap bawaan, pilihan terang memakai struktur terang yang sudah ada
+   (data-theme="coretax"). Di sini hanya warnanya yang diganti ke token Tide:
+   lime menggantikan emas, pil tinta untuk aksi utama, green-ink untuk hijau
+   yang dibaca. Selektor html[data-reskin][data-theme] (0,2,1) mengalahkan
+   cakupan theme-tide.css (0,1,0 dan 0,2,0).
+   ========================================================================== */
+
+/* ---- Gelap: struktur gelap bawaan, warna Tide gelap -------------------- */
+html[data-reskin="tide"]:not([data-theme="coretax"]) {
+  --bg: #0B1310; --bg-deep: #08100D; --card: #111C18; --card2: #12241B; --card3: #1A2E25;
+  --border: #24372F; --grid: rgba(232, 242, 236, 0.06); --row-hover: rgba(232, 242, 236, 0.04); --row-sel: rgba(74, 222, 128, 0.12);
+  --text: #E8F2EC; --text2: #C9D8CF; --muted: #A3B5AB; --muted2: #8FA299;
+  --accent: #22C55E; --accent-hover: #4ADE80; --accent-soft: #4ADE80; --accent-dim: rgba(34, 197, 94, 0.16);
+  --warn-text: #F5C16C; --danger: #FF8A80; --up: #4ADE80;
+  color-scheme: dark;
+}
+
+/* ---- Terang: struktur terang yang ada, warna Tide ---------------------- */
+html[data-reskin="tide"][data-theme="coretax"] {
+  --bg: #FFFFFF; --bg-deep: #F3FBF6; --card: #FFFFFF; --card2: #F3FBF6; --card3: #E9F7EE;
+  --border: #DCE8E1; --grid: rgba(10, 15, 12, 0.06); --row-hover: rgba(14, 122, 71, 0.05); --row-sel: rgba(182, 243, 92, 0.28);
+  --text: #0A0F0C; --text2: #33443A; --muted: #4B5A52; --muted2: #5B6B62;
+  --accent: #0A0F0C; --accent-hover: #1E2A23; --accent-soft: #0E7A47; --accent-dim: rgba(34, 197, 94, 0.16);
+  --gold: #B6F35C; --gold-dim: rgba(182, 243, 92, 0.45);
+  --warn-text: #8A5A00; --warn-ink: #8A5A00; --ok-ink: #0E7A47; --warn-line: rgba(138, 90, 0, 0.45);
+  --danger: #B42318; --up: #0E7A47; --down-bar: #B42318; --stack-bg: rgba(10, 15, 12, 0.08);
+  --glass: rgba(255, 255, 255, 0.88);
+  --shadow-float: 0 18px 48px rgba(11, 59, 36, 0.18), 0 0 0 1px rgba(10, 15, 12, 0.06);
+  --ink-hover: #1E2A23; --ink-line: rgba(14, 122, 71, 0.35); --green-wash: rgba(34, 197, 94, 0.18);
+}
+html[data-reskin="tide"] body { font-family: var(--font-ui); }
+
+/* Aturan Coretax yang menulis warna langsung, diganti token Tide. */
+html[data-reskin="tide"][data-theme="coretax"] .tabs button[aria-selected="true"],
+html[data-reskin="tide"][data-theme="coretax"] .langsw button[aria-pressed="true"],
+html[data-reskin="tide"][data-theme="coretax"] .seg2 button[aria-pressed="true"] { background: var(--tide-lime); color: var(--tide-ink); }
+html[data-reskin="tide"][data-theme="coretax"] .btn.primary { background: var(--tide-ink); border-color: var(--tide-ink); color: var(--tide-white); }
+html[data-reskin="tide"][data-theme="coretax"] .btn.primary:hover { background: var(--ink-hover); border-color: var(--ink-hover); }
+html[data-reskin="tide"][data-theme="coretax"] .navitem[aria-current="true"],
+html[data-reskin="tide"][data-theme="coretax"] .lp-row[aria-pressed="true"],
+html[data-reskin="tide"][data-theme="coretax"] .icon-btn[aria-pressed="true"],
+html[data-reskin="tide"][data-theme="coretax"] .icon-btn[aria-expanded="true"] { background: var(--tide-mint); color: var(--tide-ink); border-color: var(--ink-line); }
+html[data-reskin="tide"][data-theme="coretax"] .pill.ondevice { color: var(--tide-green-ink); background: var(--tide-mint); border-color: var(--ink-line); }
+html[data-reskin="tide"][data-theme="coretax"] .prov { background: var(--tide-surface-2); border-color: var(--tide-line); color: var(--text2); }
+html[data-reskin="tide"][data-theme="coretax"] .prov b { color: var(--tide-ink); }
+html[data-reskin="tide"][data-theme="coretax"] .prov svg { color: var(--tide-green-ink); }
+html[data-reskin="tide"][data-theme="coretax"] .stat .bar i { background: var(--tide-green); }
+html[data-reskin="tide"][data-theme="coretax"] .stat.is-ok .n { color: var(--tide-green-ink); }
+html[data-reskin="tide"][data-theme="coretax"] thead th { background: var(--tide-surface-2); }
+html[data-reskin="tide"][data-theme="coretax"] tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--tide-green); }
+html[data-reskin="tide"][data-theme="coretax"] .chip[aria-pressed="true"] { background: var(--tide-mint); border-color: var(--ink-line); }
+html[data-reskin="tide"][data-theme="coretax"] .viewdock .tabs { background: var(--tide-surface-2); }
+html[data-reskin="tide"][data-theme="coretax"] .split::after,
+html[data-reskin="tide"][data-theme="coretax"] .dock-hint i,
+html[data-reskin="tide"][data-theme="coretax"] .dock-snap { border-color: var(--tide-green); background: var(--green-wash); }
+html[data-reskin="tide"][data-theme="coretax"] .split::after { background: var(--tide-green); }
+html[data-reskin="tide"][data-theme="coretax"] .sw2[aria-pressed="true"]::after { background: var(--tide-green-ink); }
+html[data-reskin="tide"][data-theme="coretax"] .viewdock.dragging { box-shadow: var(--shadow-float), 0 0 0 2px var(--tide-green); }
+html[data-reskin="tide"][data-theme="coretax"] .toast { background: var(--tide-white); color: var(--tide-ink); }
+html[data-reskin="tide"][data-theme="coretax"] :focus-visible { outline-color: var(--tide-green-ink); }
+
+/* Perbaikan A04a: tipe = kata tinta + titik warna (bukan teks berwarna). */
+html[data-reskin="tide"] .type { color: var(--text); }
+html[data-reskin="tide"] .type i { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Perbaikan A04a: register kosong dengan Tide tertidur (satu maskot). */
+html[data-reskin="tide"] #empty-state .empty::before {
+  content: ''; display: block; width: 120px; height: 120px; margin: 0 auto 12px;
+  background: url('tide/tide-sleep.webp') center / contain no-repeat;
+}
+html[data-reskin="tide"] #empty-state .empty { text-align: center; }

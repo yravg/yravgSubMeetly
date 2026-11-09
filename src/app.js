@@ -1,0 +1,493 @@
+/**
+ * App shell yravgSubMeetly (TIDE-002..005, 008, 014 — papan A01, A04, A09).
+ *
+ * Halaman (hash): today · live · minutes · history · files · addins · glossary ·
+ * island · perf · settings · helper. Today dan Minutes digambar di sini; halaman
+ * lain memasang tampilan panel samping yang sudah ada (sidepanel.html?view=…),
+ * jadi setiap kendali lama tetap ada sampai halaman barunya dibangun (T6).
+ *
+ * Data: register (notes-store, sama dengan minutes.html), helper /health,
+ * chrome.storage.local `captionSurface`. Tidak ada data contoh di sini.
+ * Teks UI: en + id (STR).
+ */
+import { listMeetings } from './lib/notes-store.js';
+import { computeToday, greetingKey } from './lib/today.js';
+import { nativeHealth } from './lib/native.js';
+import { LOCAL_HELPER_ORIGIN } from './lib/native-protocol.js';
+import { TYPE_COLOR } from './lib/notes-schema.js';
+import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minutes-window.js';
+import { mountAskTide } from './ask-tide.js';
+
+const IS_EXT = location.protocol === 'chrome-extension:';
+
+/* ---------- strings ---------- */
+const STR = {
+  en: {
+    meetings: 'Meetings', features: 'Features', today: 'Today', live: 'Live captions', minutes: 'Minutes', history: 'History', files: 'Files',
+    addins: 'Add-ins', glossary: 'Glossary', island: 'Island', perf: 'Performance', settings: 'Settings', helper: 'Helper',
+    startCaptions: 'Start captions', thisDevice: 'This device', allSeries: 'All series', series: 'Meeting series',
+    notices: 'Notices', noNotices: 'Nothing needs you right now.', openMenu: 'Open menu', closeMenu: 'Close menu',
+    morning: 'Good morning.', afternoon: 'Good afternoon.', evening: 'Good evening.',
+    todayLine: (d) => `Today · ${d}`, hideNumbers: 'Hide numbers', showNumbers: 'Show numbers',
+    captured: 'captured today', hm: (h, m) => (h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`),
+    nMeetings: (n) => `${n} meeting${n === 1 ? '' : 's'} today`,
+    itemsWeek: 'Items this week', moreThan: (n) => `${n} more than last week`, fewerThan: (n) => `${n} fewer than last week`, sameAs: 'Same as last week',
+    whereWent: 'Where it went', owner: 'Owner', everyone: 'Everyone',
+    decision: 'Decisions', action: 'Actions', question: 'Open questions', risk: 'Risks', ofItems: (n, t) => `${n} of ${t} items`,
+    overdue: (n) => `${n} overdue`, overdueFirst: (ref, due, more) => `${ref} was due ${due}${more ? ` · ${more} more` : ''}`, noOverdue: 'Nothing overdue',
+    ydayTitle: 'Yesterday’s minutes are still open', ydayBody: 'Issue them so owners get their actions.', issueMinutes: 'Issue minutes',
+    todayCard: (n, hm) => `${n} meeting${n === 1 ? '' : 's'} · ${hm}`, todayNone: 'No meetings yet today.', checkIssue: 'Check them, then issue the minutes.',
+    issued: 'Issued', draft: 'Draft',
+    helperLive: 'Live', helperOff: 'Offline', engine: 'Engine', device: 'Device', model: 'Model', nativeHelper: 'Native helper',
+    helperPill: (d) => `Helper · ${d}`, helperPillOff: 'Helper offline', helperChecking: 'Checking helper…',
+    lockedHelper: 'Needs the helper', lockedHelperBody: 'Start the Native Helper to see the engine, device and model here.', openHelper: 'Open Helper',
+    lockedExt: 'Needs the extension', lockedExtBody: 'Tab capture and the page overlay only run inside the Chrome extension. In the lab the panel plays a CC0 sample instead.',
+    loading: 'Reading your register…', errTitle: 'The register could not be read.', errBody: (m) => `${m} Reload the page; if it keeps failing, export your minutes from the Minutes page.`, reload: 'Reload',
+    emptyTitle: 'No meetings yet', emptyBody: 'Start captions in a meeting, or import a sample series from the Library on the Minutes page.', openMinutes: 'Open Minutes',
+    welcomeTitle: 'Welcome to yravgSubMeetly', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it',
+    caughtUp: 'All caught up: nothing overdue and yesterday is issued.',
+    openRegister: 'Open register', classic: 'Classic ↗', openWindow: 'Open Minutes window ↗', windowOpen: 'Minutes window is open · Focus',
+    minutesHint: 'Classic and Modern are the same register; edits show in both.', modern: 'Modern ↗',
+    all: 'All features', dev: 'Developer', devArea: 'Developer area', devAreaBody: 'Lab tools: test pages, mock helper, guides, CC0 samples. Off unless you build or test the extension.',
+    lockedLab: 'Needs the lab server', lockedLabBody: 'The Developer area shows the local lab. Start it with ./scripts/start-lab.sh, then reload.',
+    installed: 'Installed add-ins', builtIn: 'Built in', open: 'Open',
+    fRecap: 'Recap email', fRecapD: 'Builds a plain-text recap and opens it as a mail draft. Nothing is sent for you.',
+    fGlossary: 'Glossary', fGlossaryD: 'Per-series terms fixed in captions and in the minutes draft.',
+    fDue: 'Due dates to calendar', fDueD: 'Saves open actions with a due date as one .ics file.',
+    fIsland: 'Island', fIslandD: 'Caption pill under the notch, beside or instead of the page overlay.',
+    fPerf: 'Performance', fPerfD: 'Speed of each stage: p50, p95 and real-time factor.',
+    fLibrary: 'Library', fLibraryD: 'Sample transcripts in weekly series to try the register.',
+    fTraining: 'Training', fTrainingD: 'Guided tours and quizzes with XP and levels.',
+    fExport: 'Export', fExportD: 'Minutes as MD, TXT or DOCX; captions as TXT, SRT or VTT.',
+    addinNote: 'Add-ins turn on in the list below after you review and trust them.',
+    askTide: 'Ask Tide…', askBar: 'Ask Tide about your meetings…', send: 'Send', chips: ['Recap last meeting', 'What did I promise?', 'Open actions', 'Translate a file'],
+    plans: 'Plans', planFree: 'Free', planPro: 'Pro', planAgent: 'Agent', perMonth: '/ month', comingSoon: 'Coming soon', current: 'What you have now', beta: 'Beta',
+    freeList: ['Unlimited Ask Tide with the local model', 'Register-only answers', '50 starter credits for cloud answers (14 days)', 'Captions, minutes, Island and add-ins'],
+    proList: ['Everything in Free', '400 credits every month for cloud answers', 'Unlimited file transcription', 'Shared register'],
+    agentList: ['Everything in Pro', '1,000 credits every month', 'Weekly recap emails', 'Series reports', 'Action follow-ups'],
+    topUpTitle: 'Top up credits', creditRate: '1 credit = Rp100. Cloud answers cost what the model costs plus a margin; Local and Register-only answers cost 0.',
+    noServerTitle: 'No server yet', noServerBody: 'Plans and credits need the account server, which is not built yet. Local and Register-only answers are free and work now.',
+  },
+  id: {
+    meetings: 'Rapat', features: 'Fitur', today: 'Hari ini', live: 'Teks langsung', minutes: 'Notulen', history: 'Riwayat', files: 'Berkas',
+    addins: 'Add-in', glossary: 'Glosarium', island: 'Island', perf: 'Kinerja', settings: 'Pengaturan', helper: 'Helper',
+    startCaptions: 'Mulai teks', thisDevice: 'Perangkat ini', allSeries: 'Semua seri', series: 'Seri rapat',
+    notices: 'Pemberitahuan', noNotices: 'Tidak ada yang menunggu Anda.', openMenu: 'Buka menu', closeMenu: 'Tutup menu',
+    morning: 'Selamat pagi.', afternoon: 'Selamat siang.', evening: 'Selamat malam.',
+    todayLine: (d) => `Hari ini · ${d}`, hideNumbers: 'Sembunyikan angka', showNumbers: 'Tampilkan angka',
+    captured: 'terekam hari ini', hm: (h, m) => (h ? `${h} j ${String(m).padStart(2, '0')} m` : `${m} m`),
+    nMeetings: (n) => `${n} rapat hari ini`,
+    itemsWeek: 'Butir minggu ini', moreThan: (n) => `${n} lebih banyak dari minggu lalu`, fewerThan: (n) => `${n} lebih sedikit dari minggu lalu`, sameAs: 'Sama dengan minggu lalu',
+    whereWent: 'Sebarannya', owner: 'Pemilik', everyone: 'Semua orang',
+    decision: 'Keputusan', action: 'Tindak lanjut', question: 'Pertanyaan terbuka', risk: 'Risiko', ofItems: (n, t) => `${n} dari ${t} butir`,
+    overdue: (n) => `${n} lewat tenggat`, overdueFirst: (ref, due, more) => `${ref} jatuh tempo ${due}${more ? ` · ${more} lagi` : ''}`, noOverdue: 'Tidak ada yang lewat tenggat',
+    ydayTitle: 'Notulen kemarin belum diterbitkan', ydayBody: 'Terbitkan supaya pemilik menerima tindak lanjutnya.', issueMinutes: 'Terbitkan notulen',
+    todayCard: (n, hm) => `${n} rapat · ${hm}`, todayNone: 'Belum ada rapat hari ini.', checkIssue: 'Periksa, lalu terbitkan notulennya.',
+    issued: 'Terbit', draft: 'Draf',
+    helperLive: 'Aktif', helperOff: 'Mati', engine: 'Mesin', device: 'Perangkat', model: 'Model', nativeHelper: 'Native helper',
+    helperPill: (d) => `Helper · ${d}`, helperPillOff: 'Helper mati', helperChecking: 'Memeriksa helper…',
+    lockedHelper: 'Perlu helper', lockedHelperBody: 'Jalankan Native Helper untuk melihat mesin, perangkat dan model di sini.', openHelper: 'Buka Helper',
+    lockedExt: 'Perlu ekstensi', lockedExtBody: 'Tangkap tab dan overlay halaman hanya berjalan di ekstensi Chrome. Di lab panel memutar sampel CC0.',
+    loading: 'Membaca register…', errTitle: 'Register tidak terbaca.', errBody: (m) => `${m} Muat ulang halaman; bila tetap gagal, ekspor notulen dari halaman Notulen.`, reload: 'Muat ulang',
+    emptyTitle: 'Belum ada rapat', emptyBody: 'Mulai teks di rapat, atau impor seri contoh dari Library di halaman Notulen.', openMinutes: 'Buka Notulen',
+    welcomeTitle: 'Selamat datang di yravgSubMeetly', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti',
+    caughtUp: 'Semua beres: tidak ada yang lewat tenggat dan notulen kemarin sudah terbit.',
+    openRegister: 'Buka register', classic: 'Klasik ↗', openWindow: 'Buka jendela Notulen ↗', windowOpen: 'Jendela Notulen terbuka · Fokus',
+    minutesHint: 'Klasik dan Modern adalah register yang sama; suntingan tampil di keduanya.', modern: 'Modern ↗',
+    all: 'Semua fitur', dev: 'Developer', devArea: 'Area developer', devAreaBody: 'Alat lab: halaman uji, mock helper, panduan, sampel CC0. Mati kecuali Anda membangun atau menguji ekstensi.',
+    lockedLab: 'Perlu server lab', lockedLabBody: 'Area developer menampilkan lab lokal. Jalankan ./scripts/start-lab.sh, lalu muat ulang.',
+    installed: 'Add-in terpasang', builtIn: 'Bawaan', open: 'Buka',
+    fRecap: 'Email rekap', fRecapD: 'Menyusun rekap teks biasa dan membukanya sebagai draf email. Tidak ada yang dikirim otomatis.',
+    fGlossary: 'Glosarium', fGlossaryD: 'Istilah per seri yang diperbaiki di teks dan draf notulen.',
+    fDue: 'Tenggat ke kalender', fDueD: 'Menyimpan tindak lanjut bertenggat sebagai satu berkas .ics.',
+    fIsland: 'Island', fIslandD: 'Pil teks di bawah notch, di samping atau menggantikan overlay halaman.',
+    fPerf: 'Kinerja', fPerfD: 'Kecepatan tiap tahap: p50, p95 dan faktor waktu nyata.',
+    fLibrary: 'Library', fLibraryD: 'Transkrip contoh dalam seri mingguan untuk mencoba register.',
+    fTraining: 'Training', fTrainingD: 'Tur terpandu dan kuis dengan XP dan level.',
+    fExport: 'Ekspor', fExportD: 'Notulen sebagai MD, TXT atau DOCX; teks sebagai TXT, SRT atau VTT.',
+    addinNote: 'Add-in menyala di daftar bawah setelah Anda meninjau dan mempercayainya.',
+    askTide: 'Tanya Tide…', askBar: 'Tanyakan rapat Anda ke Tide…', send: 'Kirim', chips: ['Ringkas rapat terakhir', 'Apa yang saya janjikan?', 'Tindak lanjut terbuka', 'Terjemahkan berkas'],
+    plans: 'Paket', planFree: 'Gratis', planPro: 'Pro', planAgent: 'Agent', perMonth: '/ bulan', comingSoon: 'Segera hadir', current: 'Yang Anda pakai sekarang', beta: 'Beta',
+    freeList: ['Tanya Tide tanpa batas dengan model lokal', 'Jawaban dari register', '50 kredit awal untuk jawaban awan (14 hari)', 'Teks, notulen, Island dan add-in'],
+    proList: ['Semua di Gratis', '400 kredit tiap bulan untuk jawaban awan', 'Transkripsi berkas tanpa batas', 'Register bersama'],
+    agentList: ['Semua di Pro', '1.000 kredit tiap bulan', 'Email rekap mingguan', 'Laporan seri', 'Tindak lanjut otomatis'],
+    topUpTitle: 'Isi ulang kredit', creditRate: '1 kredit = Rp100. Jawaban awan dikenai biaya model ditambah margin; jawaban Lokal dan Hanya register 0 kredit.',
+    noServerTitle: 'Belum ada server', noServerBody: 'Paket dan kredit butuh server akun, yang belum dibangun. Jawaban Lokal dan Hanya register gratis dan sudah berjalan.',
+  },
+};
+const LANG = (new URLSearchParams(location.search).get('lang') || navigator.language || 'en').toLowerCase().startsWith('id') ? 'id' : 'en';
+document.documentElement.lang = LANG;
+const T = (k, ...a) => { const v = STR[LANG][k] ?? STR.en[k] ?? k; return typeof v === 'function' ? v(...a) : v; };
+
+/* ---------- icons (garis 1,7, kisi 24) ---------- */
+const P = {
+  today: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>',
+  live: '<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7.5 11h3M13.5 11h3M7.5 14.5h5"/>',
+  minutes: '<path d="M6 3.5h8.5L19 8v12.5H6z"/><path d="M9.5 12.5h6M9.5 16h6"/>',
+  history: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  files: '<path d="M3.5 7.5a2 2 0 0 1 2-2H10l2 2.5h6.5a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  addins: '<path d="M10 4.5a2 2 0 1 1 4 0V7h3.5v3.5H20a2 2 0 1 1 0 4h-2.5V18H14v-2.5a2 2 0 1 0-4 0V18H6.5v-3.5H4a2 2 0 1 1 0-4h2.5V7H10z"/>',
+  glossary: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
+  island: '<rect x="3" y="8.5" width="18" height="7" rx="3.5"/><circle cx="8" cy="12" r="1.2"/>',
+  perf: '<path d="M4 19V5M4 19h16M8 15v-3M12 15V8M16 15v-5"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15zM10 20.5h4"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.7"/>',
+  eyeOff: '<path d="M3 3l18 18M10.6 6a9.6 9.6 0 0 1 1.4-.1c6 0 9.5 6.1 9.5 6.1a16 16 0 0 1-3 3.6M6.4 7.6A15.6 15.6 0 0 0 2.5 12S6 18.5 12 18.5a9 9 0 0 0 4-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  play: '<path d="M8 5.5v13l10-6.5z"/>', up: '<path d="m6 15 6-6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
+  cal: '<rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7"/>', flag: '<path d="M5.5 21V4M5.5 4.5h11l-2 3.5 2 3.5h-11"/>',
+  chat: '<path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 13.5z"/>',
+  bolt: '<path d="M13 3 5.5 14H11l-1 7 7.5-11H12z"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  ext: '<path d="M8 16 16 8"/><path d="M9.5 8H16v6.5"/>', lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',
+  all: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
+  dev: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5.5l-3 13"/>', mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4 7 8 6 8-6"/>',
+  book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>', sparkle: '<path d="M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 18l-1.8-5.4L4.5 10.8 10.2 9z"/>',
+  export: '<path d="M12 15V4M8 8l4-4 4 4M5 14v5.5h14V14"/>',
+  send: '<path d="M12 19V5M6 11l6-6 6 6"/>', globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17M12 3.5c-3 3.2-3 13.8 0 17"/>', list: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
+};
+const ic = (n, s = 18) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const $ = (s) => document.querySelector(s);
+
+/* ---------- routes ---------- */
+const MEETING_ROUTES = ['today', 'live', 'minutes', 'history', 'files'];
+const FEATURE_ROUTES = ['addins', 'glossary', 'island', 'perf', 'all', 'settings'];
+// Halaman yang masih memasang panel samping: view (+ tab Pengaturan).
+const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], glossary: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
+const panelUrl = ([view, stab]) => `${IS_EXT ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
+
+const state = { meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'classic', developer: !IS_EXT };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* privat */ } },
+};
+
+/* ---------- formatters ---------- */
+const fmtDate = (d) => new Intl.DateTimeFormat(LANG === 'id' ? 'id-ID' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(d);
+const fmtShort = (iso) => new Intl.DateTimeFormat(LANG === 'id' ? 'id-ID' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(`${iso}T00:00:00`));
+const hm = (min) => T('hm', Math.floor(min / 60), min % 60);
+const num = (v) => `<span class="num" data-num>${esc(v)}</span>`;
+
+/* ---------- Tide states (A09) ---------- */
+const tide = (pose, cls = '') => `<img class="tide-art ${cls}" src="tide/tide-${pose}.webp" alt="" />`;
+const stateCard = ({ pose, title, body, actions = '', cls = '' }) => `<div class="st ${cls}">${pose ? tide(pose, 'st-art') : ''}<h3>${esc(title)}</h3><p>${esc(body)}</p>${actions ? `<div class="st-act">${actions}</div>` : ''}</div>`;
+const errorCard = (msg) => `<div class="callout danger" role="alert">${ic('info', 20)}<div><b>${esc(T('errTitle'))}</b><p>${esc(T('errBody', msg))}</p><button type="button" class="btn" data-act="reload">${esc(T('reload'))}</button></div></div>`;
+const lockedCard = (title, body, action = '') => `<div class="callout locked">${ic('lock', 20)}<div><b>${esc(title)}</b><p>${esc(body)}</p>${action}</div></div>`;
+
+/* ---------- sidebar ---------- */
+function paintNav(route) {
+  const item = (r) => `<a href="#${r}" class="${r === route ? 'on' : ''}"${r === route ? ' aria-current="page"' : ''} data-route="${r}" aria-label="${esc(T(r))}" title="${esc(T(r))}">${ic(r, 20)}<span class="hide-rail">${esc(T(r))}</span>${r === 'minutes' && seriesMeetings()[0]?.items.length ? `<span class="n hide-rail">${seriesMeetings()[0].items.length}</span>` : ''}</a>`;
+  $('#nav-meetings').innerHTML = MEETING_ROUTES.map(item).join('');
+  $('#nav-features').innerHTML = FEATURE_ROUTES.map(item).join('') + (state.developer ? item('dev') : '');
+}
+
+function paintSeries() {
+  const sel = $('#series-select');
+  const seen = new Map();
+  for (const m of state.meetings || []) if (!seen.has(m.seriesId)) seen.set(m.seriesId, m.title);
+  sel.innerHTML = `<option value="">${esc(T('allSeries'))}</option>${[...seen].map(([id, t]) => `<option value="${esc(id)}"${id === state.series ? ' selected' : ''}>${esc(t)}</option>`).join('')}`;
+  sel.setAttribute('aria-label', T('series'));
+  const label = state.series ? seen.get(state.series) || '' : T('allSeries');
+  $('#series-av').textContent = label.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+}
+
+function paintHelper() {
+  const h = state.health;
+  const on = !!h;
+  const dev = h?.device ? String(h.device).toUpperCase() : 'CPU';
+  for (const el of [$('#helper-dot'), $('#foot-dot')]) el.className = `dot ${h === undefined ? 'wait' : on ? 'ok' : 'off'}`;
+  $('#helper-pill-text').textContent = h === undefined ? T('helperChecking') : on ? T('helperPill', dev) : T('helperPillOff');
+  $('#foot-helper').textContent = h === undefined ? T('helperChecking') : on ? `${T('helperPill', dev)} · ${h.model || ''}` : T('helperPillOff');
+}
+
+/* ---------- notices (bell) ---------- */
+function notices() {
+  const out = [];
+  if (!state.meetings) return out;
+  const t = computeToday(seriesMeetings());
+  if (t.yesterdayOpen) out.push({ icon: 'minutes', text: T('ydayTitle'), href: `#minutes?meeting=${encodeURIComponent(t.yesterdayOpen.id)}` });
+  if (t.overdue.count) out.push({ icon: 'cal', text: T('overdue', t.overdue.count), href: '#minutes', danger: true });
+  if (state.health === null) out.push({ icon: 'bolt', text: T('helperPillOff'), href: '#helper' });
+  return out;
+}
+function paintBell() {
+  const n = notices().length;
+  $('#btn-bell').innerHTML = `${ic('bell', 20)}${n ? `<span class="badge">${n}</span>` : ''}`;
+  $('#btn-bell').setAttribute('aria-label', `${T('notices')}${n ? ` (${n})` : ''}`);
+}
+function toggleBell(force) {
+  const pop = $('#bell-pop');
+  const open = force ?? pop.hidden;
+  pop.hidden = !open;
+  $('#btn-bell').setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  const list = notices();
+  pop.setAttribute('aria-label', T('notices'));
+  pop.innerHTML = `<h3>${esc(T('notices'))}</h3>${list.length ? list.map((x) => `<a class="nt${x.danger ? ' danger' : ''}" href="${x.href}">${ic(x.icon, 18)}<span>${esc(x.text)}</span></a>`).join('') : `<p class="mut">${esc(T('noNotices'))}</p>`}`;
+  const r = $('#btn-bell').getBoundingClientRect();
+  pop.style.left = `${Math.min(r.left, innerWidth - 300)}px`;
+  pop.style.top = `${r.bottom + 6}px`;
+  pop.querySelector('a, p')?.focus?.();
+}
+
+/* ---------- Today (A01) ---------- */
+const seriesMeetings = () => (state.series ? state.meetings.filter((m) => m.seriesId === state.series) : state.meetings) || [];
+
+function todayPage() {
+  if (state.error) return errorCard(state.error);
+  if (!state.meetings) return stateCard({ pose: 'compass', title: T('loading'), body: '', cls: 'loading' });
+  const now = new Date();
+  const t = computeToday(seriesMeetings(), { now, owner: state.owner || null });
+  const welcome = !state.welcomed;
+  const caughtUp = !t.empty && !t.yesterdayOpen && !t.overdue.count;
+  // Satu maskot per layar: sambutan (wave) > kosong (sleep) > beres (celebrate) > biasa (shell).
+  const pose = welcome ? 'wave' : t.empty ? 'sleep' : caughtUp ? 'celebrate' : 'shell';
+  const eye = `<button type="button" class="icon-b eye" data-act="eye" aria-pressed="${state.hideNumbers}" aria-label="${esc(T(state.hideNumbers ? 'showNumbers' : 'hideNumbers'))}" title="${esc(T(state.hideNumbers ? 'showNumbers' : 'hideNumbers'))}">${ic(state.hideNumbers ? 'eyeOff' : 'eye', 18)}</button>`;
+  const hero = `<section class="hero${state.hideNumbers ? ' masked' : ''}">
+    <div class="hero-bg" aria-hidden="true"></div>
+    ${welcome || t.empty || pose === 'shell' ? '' : tide(pose, 'hero-art')}
+    <h2>${esc(T(greetingKey(now)))}</h2>
+    <div class="dateline">${esc(T('todayLine', fmtDate(now)))} ${eye}</div>
+    <div class="bignum"><b>${num(hm(t.minutesToday))}</b><span>${esc(T('captured'))}</span></div>
+    <div class="sub">${num(T('nMeetings', t.meetingsToday.length))}${caughtUp ? ` · ${esc(T('caughtUp'))}` : ''}</div>
+    ${welcome || t.empty ? '' : `<div class="askbar">${pose === 'shell' ? `<span class="peek">${tide('shell', 'peek-art')}</span>` : ''}${ic('sparkle', 20)}<input type="text" data-act="askbar" placeholder="${esc(T('askBar'))}" aria-label="${esc(T('askBar'))}" /><button type="button" class="send" data-act="askgo" aria-label="${esc(T('send'))}">${ic('send', 20)}</button></div>
+    <div class="chips">${T('chips').map((c, i) => `<button type="button" class="chip" data-act="chip" data-i="${i}">${ic(['chat', 'flag', 'list', 'globe'][i], 18)}${esc(c)}</button>`).join('')}</div>`}
+    ${welcome ? stateCard({ pose: 'wave', title: T('welcomeTitle'), body: T('welcomeBody'), actions: `<button type="button" class="pill-b" data-act="welcomed">${esc(T('gotIt'))}</button>`, cls: 'in-hero' }) : ''}
+    ${!welcome && t.empty ? stateCard({ pose: 'sleep', title: T('emptyTitle'), body: T('emptyBody'), actions: `<a class="pill-b" href="#live">${ic('play', 16)}${esc(T('startCaptions'))}</a><a class="btn" href="#minutes">${esc(T('openMinutes'))}</a>`, cls: 'in-hero' }) : ''}
+  </section>`;
+
+  const total = t.week.items;
+  const types = [['decision', 'check'], ['action', 'flag'], ['question', 'chat'], ['risk', 'bolt']];
+  const delta = t.week.delta > 0 ? `<div class="delta up">${ic('up', 16)}${esc(T('moreThan', t.week.delta))}</div>`
+    : t.week.delta < 0 ? `<div class="delta down">${ic('down', 16)}${esc(T('fewerThan', -t.week.delta))}</div>` : `<div class="delta">${esc(T('sameAs'))}</div>`;
+  const ownerSel = `<label class="sel">${esc(T('owner'))}: <select data-act="owner"><option value="">${esc(T('everyone'))}</option>${t.week.owners.map((o) => `<option${o === state.owner ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
+  const filtered = types.reduce((s, [k]) => s + t.week.byType[k], 0) || 1;
+  const bars = types.map(([k, icn]) => `<div class="brow"><span class="tl" style="--c:${TYPE_COLOR[k]}">${ic(icn, 18)}</span><span class="nm">${esc(T(k))}<small>${esc(T('ofItems', t.week.byType[k], total))}</small></span><span class="v">${num(t.week.byType[k])}</span><span class="bar"><i style="width:${Math.round((t.week.byType[k] / filtered) * 100)}%;--c:${TYPE_COLOR[k]}"></i></span></div>`).join('');
+  const over = t.overdue.count
+    ? `<a class="over" href="#minutes?meeting=${encodeURIComponent(t.overdue.first.meetingId)}">${ic('cal', 20)}<span>${esc(T('overdue', t.overdue.count))}<small>${esc(T('overdueFirst', t.overdue.first.ref, fmtShort(t.overdue.first.due), t.overdue.count - 1))}</small></span></a>`
+    : `<div class="over ok">${ic('check', 20)}<span>${esc(T('noOverdue'))}</span></div>`;
+  const week = `<section class="cd week"><div class="wih">${esc(T('itemsWeek'))}</div><div class="kpi">${num(total)}</div>${delta}
+    <div class="wih row"><span>${esc(T('whereWent'))}</span><span class="grow"></span>${ownerSel}</div><div class="bars">${bars}</div>${over}</section>`;
+
+  const ydayCard = t.yesterdayOpen ? `<section class="cd rail1"><span class="eyebrow">${esc(fmtShort(t.yesterdayOpen.date))} · ${esc(t.yesterdayOpen.title)}</span><h3>${esc(T('ydayTitle'))}</h3><p>${esc(T('ydayBody'))}</p><a class="pill-b full" href="#minutes?meeting=${encodeURIComponent(t.yesterdayOpen.id)}">${esc(T('issueMinutes'))}</a></section>` : '';
+  const rows = t.meetingsToday.map((m) => `<a class="mrow" href="#minutes?meeting=${encodeURIComponent(m.id)}"><span class="t">${esc(m.start || '—')}</span><span><b>${esc(m.title)}</b><small>${esc(hm(m.minutes))}</small></span><span class="chip sm ${m.status === 'issued' ? 'ok' : 'warn'}">${esc(T(m.status))}</span></a>`).join('');
+  const todayCard = `<section class="cd"><span class="eyebrow">${esc(T('today'))} · ${esc(fmtShort(new Date().toISOString().slice(0, 10)))}</span><h3>${t.meetingsToday.length ? esc(T('todayCard', t.meetingsToday.length, hm(t.minutesToday))) : esc(T('todayNone'))}</h3>${rows}${t.meetingsToday.some((m) => m.status === 'draft') ? `<small class="mut">${esc(T('checkIssue'))}</small>` : ''}</section>`;
+  const h = state.health;
+  const helperCard = h ? `<section class="cd"><div class="row"><h3>${esc(T('helper'))}</h3><span class="grow"></span><span class="chip sm ok"><span class="dot ok"></span>${esc(T('helperLive'))}</span></div>
+      <div class="kv"><span>${esc(T('engine'))}</span><b>${esc(h.engine_label || h.engine || T('nativeHelper'))}</b></div><div class="kv"><span>${esc(T('device'))}</span><b>${esc(String(h.device || 'cpu').toUpperCase())}</b></div><div class="kv"><span>${esc(T('model'))}</span><b>${esc(h.model || '—')}</b></div></section>`
+    : h === null ? `<section class="cd">${lockedCard(T('lockedHelper'), T('lockedHelperBody'), `<a class="btn" href="#helper">${esc(T('openHelper'))}</a>`)}</section>` : '';
+  return `${hero}<div class="cols">${week}<div class="rail">${ydayCard}${todayCard}${helperCard}</div></div>`;
+}
+
+/* ---------- Minutes (A04) ---------- */
+const registerSrc = (kind, meeting) => `minutes.html?lang=${LANG}${kind === 'modern' ? '&skin=tide' : ''}${meeting ? `&meeting=${encodeURIComponent(meeting)}` : ''}`;
+function minutesPage(params) {
+  const meeting = params.get('meeting');
+  // Pilihan terakhir tampil lebih dulu dan menentukan register yang dimuat di bawah.
+  const kinds = state.register === 'modern' ? ['modern', 'classic'] : ['classic', 'modern'];
+  const links = kinds.map((k) => `<a href="${esc(registerSrc(k, meeting))}" target="_blank" rel="noopener" data-register="${k}">${esc(T(k))}</a>`).join('');
+  return `<div class="tool"><span class="seg-o"><span class="lb">${esc(T('openRegister'))}</span>${links}</span>
+    <button type="button" class="btn" data-act="win" aria-live="polite">${state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'))}</button>
+    <span class="mut hint">${esc(T('minutesHint'))}</span></div>
+    <iframe class="frame reg" title="${esc(T('minutes'))}" src="${esc(registerSrc(state.register, meeting))}"></iframe>`;
+}
+
+/* ---------- All features (A06) ---------- */
+function allPage() {
+  const tile = (icn, name, desc, right) => `<div class="cd tile2"><span class="tl">${ic(icn, 20)}</span><b>${esc(name)}</b><p>${esc(desc)}</p><div class="ft">${right}</div></div>`;
+  const open = (href) => `<span class="grow"></span><a class="btn sm" href="${href}">${esc(T('open'))}</a>`;
+  const addinOpen = `<span class="mut small">${esc(T('installed'))}</span>${open('#all?pane=addins')}`;
+  const builtIn = (href) => `<span class="mut small">${esc(T('builtIn'))}</span>${open(href)}`;
+  const island = `<label class="sw-chip bare"><input type="checkbox" role="switch" data-act="island"${$('#island-switch').checked ? ' checked' : ''} aria-label="${esc(T('fIsland'))}" /></label>${open('#island')}`;
+  return `<div class="tiles">
+    ${tile('mail', T('fRecap'), T('fRecapD'), addinOpen)}
+    ${tile('book', T('fGlossary'), T('fGlossaryD'), addinOpen)}
+    ${tile('cal', T('fDue'), T('fDueD'), addinOpen)}
+    ${tile('island', T('fIsland'), T('fIslandD'), island)}
+    ${tile('perf', T('fPerf'), T('fPerfD'), builtIn('#perf'))}
+    ${tile('glossary', T('fLibrary'), T('fLibraryD'), builtIn('#minutes'))}
+    ${tile('sparkle', T('fTraining'), T('fTrainingD'), builtIn('#minutes'))}
+    ${tile('export', T('fExport'), T('fExportD'), builtIn('#history'))}
+  </div>
+  <section class="addins-sec" id="addins-pane"><h2>${esc(T('installed'))}</h2><p class="mut">${esc(T('addinNote'))}</p>
+  <iframe class="frame panel" title="${esc(T('installed'))}" src="${esc(panelUrl(PANEL.addins))}"></iframe></section>`;
+}
+
+/* ---------- Developer (A08) ---------- */
+function devPage() {
+  // Lab: lab yang sudah ada (test/app.html) — setiap alat lab tetap di tempatnya.
+  const src = IS_EXT ? 'http://127.0.0.1:8799/app.html' : '/app.html';
+  return `${IS_EXT ? lockedCard(T('lockedLab'), T('lockedLabBody')) : ''}<iframe class="frame panel dev" title="${esc(T('devArea'))}" src="${src}"></iframe>`;
+}
+
+/* ---------- Plans (A10): belum ada server akun ---------- */
+function plansPage() {
+  const card = (name, price, list, cur) => `<div class="cd plan${cur ? ' cur' : ''}"><b>${esc(name)}</b><div class="price"><span>${esc(price)}</span>${price === '$0.00' ? '' : `<small>${esc(T('perMonth'))}</small>`}</div>
+    <ul>${list.map((x, i) => `<li>${ic('check', 16)}<span>${esc(x)}${name === T('planAgent') && i === list.length - 1 ? ` <em class="chip sm">${esc(T('beta'))}</em>` : ''}</span></li>`).join('')}</ul>
+    <button type="button" class="${cur ? 'btn' : 'pill-b'} full" disabled>${esc(cur ? T('current') : T('comingSoon'))}</button></div>`;
+  const packs = [[25000, 250], [50000, 525], [100000, 1100], [250000, 2750]];
+  const rp = (n) => new Intl.NumberFormat('id-ID').format(n);
+  return `${lockedCard(T('noServerTitle'), T('noServerBody'))}
+    <div class="plans">${card(T('planFree'), '$0.00', T('freeList'), true)}${card(T('planPro'), '$4.99', T('proList'))}${card(T('planAgent'), '$9.99', T('agentList'))}</div>
+    <section class="cd"><h3>${esc(T('topUpTitle'))}</h3><div class="packs">${packs.map(([p, c]) => `<div class="pack"><b>${rp(c)}</b><small>Rp${rp(p)}</small></div>`).join('')}</div><p class="mut">${esc(T('creditRate'))}</p></section>`;
+}
+
+/* ---------- Settings: Developer switch (extension) ---------- */
+function settingsPage() {
+  const sw = IS_EXT ? `<div class="cd devsw"><div><b>${esc(T('devArea'))}</b><p class="mut">${esc(T('devAreaBody'))}</p></div><label class="sw-chip bare"><input type="checkbox" role="switch" data-act="dev"${state.developer ? ' checked' : ''} aria-label="${esc(T('devArea'))}" /></label></div>` : '';
+  return `${sw}<iframe class="frame panel" title="${esc(T('settings'))}" src="${esc(panelUrl(PANEL.settings))}"></iframe>`;
+}
+
+/* ---------- panel-backed pages ---------- */
+function panelPage(route) {
+  const lock = route === 'live' && !IS_EXT ? lockedCard(T('lockedExt'), T('lockedExtBody')) : '';
+  return `${lock}<iframe class="frame panel" title="${esc(T(route))}" src="${esc(panelUrl(PANEL[route]))}"></iframe>`;
+}
+
+/* ---------- router ---------- */
+function parseHash() {
+  const [r, q] = location.hash.replace(/^#/, '').split('?');
+  const route = [...MEETING_ROUTES, ...FEATURE_ROUTES, 'helper', 'plans', ...(state.developer ? ['dev'] : [])].includes(r) ? r : 'today';
+  return { route, params: new URLSearchParams(q || '') };
+}
+
+let lastRoute = null;
+function render() {
+  const { route, params } = parseHash();
+  document.title = `${T(route)} · yravgSubMeetly`;
+  $('#page-title').textContent = T(route);
+  paintNav(route);
+  paintBell();
+  const page = $('#page');
+  page.dataset.route = route;
+  // Bingkai panel tidak dimuat ulang saat hanya data beranda yang berubah.
+  if (route === lastRoute && !['today', 'minutes', 'all', 'plans'].includes(route)) return;
+  if (route === 'minutes' && lastRoute === 'minutes' && page.querySelector('iframe.reg')) {
+    const btn = page.querySelector('[data-act="win"]');
+    if (btn) btn.innerHTML = state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'));
+    return;
+  }
+  lastRoute = route;
+  page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'all' ? allPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage() : route === 'plans' ? plansPage() : panelPage(route);
+  if (route === 'all' && params.get('pane') === 'addins') $('#addins-pane')?.scrollIntoView({ block: 'start' });
+}
+
+/* ---------- events ---------- */
+function setSheet(open) {
+  $('#app').classList.toggle('sheet-open', open);
+  $('#scrim').hidden = !open;
+  $('#btn-menu').setAttribute('aria-expanded', String(open));
+}
+
+function wire() {
+  for (const el of document.querySelectorAll('[data-t]')) el.textContent = T(el.dataset.t);
+  for (const el of document.querySelectorAll('.ic-slot')) el.innerHTML = ic(el.dataset.ic, 18);
+  $('#btn-menu').innerHTML = ic('menu', 22);
+  $('#btn-menu').setAttribute('aria-label', T('openMenu'));
+  $('#btn-sb-close').innerHTML = ic('x', 20);
+  $('#btn-sb-close').setAttribute('aria-label', T('closeMenu'));
+  $('#island-switch').setAttribute('aria-label', T('island'));
+  $('#ask-field').innerHTML = `${ic('sparkle', 18)}<span class="hide-rail">${esc(T('askTide'))}</span><kbd class="hide-rail">/</kbd>`;
+  $('#ask-field').setAttribute('aria-label', T('askTide'));
+  $('#plans-link').textContent = T('plans');
+  $('#btn-start').setAttribute('aria-label', `${T('startCaptions')} (Shift+S)`);
+  $('#btn-start').title = `${T('startCaptions')} (⇧S)`;
+
+  window.addEventListener('hashchange', () => { setSheet(false); toggleBell(false); render(); $('#page').focus({ preventScroll: true }); });
+  $('#btn-bell').addEventListener('click', (e) => { e.stopPropagation(); toggleBell(); });
+  document.addEventListener('click', (e) => { if (!$('#bell-pop').hidden && !e.target.closest('#bell-pop')) toggleBell(false); });
+  $('#btn-menu').addEventListener('click', () => setSheet(true));
+  $('#btn-sb-close').addEventListener('click', () => setSheet(false));
+  $('#scrim').addEventListener('click', () => setSheet(false));
+  $('#series-select').addEventListener('change', (e) => { state.series = e.target.value; state.owner = ''; store.set('ysmShellSeries', state.series); paintSeries(); lastRoute = null; render(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { toggleBell(false); setSheet(false); }
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+    if (!typing && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); location.hash = '#live'; }
+    if (!typing && e.key === '/' && !e.metaKey && !e.ctrlKey && $('.ask-ov')?.hidden !== false) { e.preventDefault(); ask.open(); }
+  });
+  $('#page').addEventListener('click', async (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'eye') { state.hideNumbers = !state.hideNumbers; store.set('ysmShellHideNumbers', state.hideNumbers); lastRoute = null; render(); }
+    else if (act === 'welcomed') { state.welcomed = true; store.set('ysmShellWelcomed', true); lastRoute = null; render(); }
+    else if (act === 'reload') location.reload();
+    else if (act === 'chip') ask.open(T('chips')[Number(e.target.closest('[data-act]').dataset.i)]);
+    else if (act === 'askgo') { const q = $('[data-act="askbar"]').value; ask.open(q.trim() || undefined); }
+    else if (act === 'win') { await openMinutesWindow(globalThis.chrome, registerSrc(state.register)); refreshWin(); }
+    else if (e.target.closest('[data-register]')) { state.register = e.target.closest('[data-register]').dataset.register; store.set('ysmShellRegister', state.register); lastRoute = null; render(); }
+  });
+  $('#page').addEventListener('change', (e) => {
+    if (e.target.matches('[data-act="owner"]')) { state.owner = e.target.value; lastRoute = null; render(); }
+    else if (e.target.matches('[data-act="island"]')) { $('#island-switch').checked = e.target.checked; $('#island-switch').dispatchEvent(new Event('change')); }
+    else if (e.target.matches('[data-act="dev"]')) { state.developer = e.target.checked; globalThis.chrome?.storage?.local.set({ ysmDeveloper: state.developer }); paintNav(parseHash().route); }
+  });
+  $('#page').addEventListener('keydown', (e) => {
+    if (e.target.matches('[data-act="askbar"]') && e.key === 'Enter') { e.preventDefault(); ask.open(e.target.value.trim() || undefined); }
+  });
+  $('#ask-field').addEventListener('click', () => ask.open());
+  $('#island-switch').addEventListener('change', (e) => {
+    globalThis.chrome?.storage?.local.set({ captionSurface: e.target.checked ? 'both' : 'overlay' });
+  });
+}
+
+async function refreshWin() {
+  const open = await isMinutesWindowOpen(globalThis.chrome).catch(() => false);
+  if (open !== state.minutesWin) { state.minutesWin = open; render(); }
+}
+
+async function loadRegister() {
+  try {
+    state.meetings = await listMeetings();
+    state.error = null;
+  } catch (err) {
+    state.error = String(err?.message || err);
+  }
+  paintSeries();
+  // Hanya Today yang digambar ulang dari data; halaman berbingkai (register, panel)
+  // tidak boleh dimuat ulang saat register berubah dari dalam bingkainya sendiri.
+  if (parseHash().route === 'today') lastRoute = null;
+  render();
+}
+
+async function pollHelper() {
+  state.health = await nativeHealth(LOCAL_HELPER_ORIGIN);
+  paintHelper();
+  paintBell();
+  if (parseHash().route === 'today') { lastRoute = null; render(); }
+}
+
+async function syncIsland() {
+  const { captionSurface = 'overlay' } = (await globalThis.chrome?.storage?.local.get('captionSurface')) || {};
+  $('#island-switch').checked = captionSurface === 'island' || captionSurface === 'both';
+}
+
+let ask = null;
+async function boot() {
+  // Lab: chrome-mock.js (localStorage, nama kunci sama) memberi chrome.storage dan mock helper.
+  if (!IS_EXT && !globalThis.chrome?.storage) {
+    await new Promise((res) => { const s = document.createElement('script'); s.src = '/chrome-mock.js'; s.onload = res; s.onerror = res; document.head.append(s); });
+  }
+  state.series = store.get('ysmShellSeries', '');
+  state.hideNumbers = store.get('ysmShellHideNumbers', false);
+  state.welcomed = store.get('ysmShellWelcomed', false);
+  state.register = store.get('ysmShellRegister', 'classic') === 'modern' ? 'modern' : 'classic';
+  if (IS_EXT) state.developer = !!(await globalThis.chrome?.storage?.local.get('ysmDeveloper'))?.ysmDeveloper;
+  ask = mountAskTide({ lang: LANG, getMeetings: async () => state.meetings || listMeetings(), onSaved: () => loadRegister() });
+  wire();
+  paintHelper();
+  render();
+  await syncIsland();
+  globalThis.chrome?.storage?.onChanged?.addListener((ch) => {
+    if ('captionSurface' in ch) syncIsland();
+    if (WIN_ID_KEY in ch) refreshWin();
+  });
+  window.addEventListener('storage', (e) => { if (e.key === 'minutesRegister') loadRegister(); });
+  await loadRegister();
+  refreshWin();
+  pollHelper();
+  setInterval(pollHelper, 15000);
+}
+
+boot();
