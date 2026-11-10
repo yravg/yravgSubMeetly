@@ -160,8 +160,10 @@ pub enum AppEvent {
     Sound(bool),
     /// Windows and microphone users changed (`services::meeting_probe`).
     MeetingSignals(crate::services::meeting_probe::Seen),
-    /// A captioned session saved as a meeting (its id), or why not, with its lines back.
-    MeetingSaved(Result<String, (String, Vec<poni_core::helper::Line>)>),
+    /// A captioned session saved as a meeting (its id, and what its notes held), or why not, with its lines back.
+    MeetingSaved(crate::services::capture::Saved),
+    /// The Meeting tab's notes refresh came back: the draft, or `None` when the engine did not answer.
+    CallNotes(Option<Vec<poni_core::live_notes::Item>>),
     /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.
     LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
     /// What the engine says its models are (or why it could not say), during a download too.

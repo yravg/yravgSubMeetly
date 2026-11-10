@@ -606,6 +606,8 @@ pub struct AppState {
     pub meeting_seen: crate::services::meeting_probe::Seen,
     /// The meeting link joined last, active for 10 minutes (PMM-018).
     pub joined: poni_core::meeting_source::Joined,
+    /// The Meeting tab: the running meeting's lines and notes, and its saved result.
+    pub call: CallState,
     /// Running apps offered by Settings › Meeting apps › Pick, while that list is open.
     pub meeting_pick: Option<Vec<String>>,
     /// What the last caption said about its translation (missing, loading), for the Live page.
@@ -698,6 +700,7 @@ impl AppState {
             kept_transcript: None,
             meeting_seen: Default::default(),
             joined: Default::default(),
+            call: Default::default(),
             meeting_pick: None,
             caption_hint: None,
             models: Default::default(),
@@ -717,6 +720,7 @@ impl AppState {
             PageKind::Timer | PageKind::Talk | PageKind::Engine => !crate::pages::tabs(&st).contains(&st.page),
             PageKind::Downloads => !st.downloader_on(),
             PageKind::Notifications => !st.notifications_on(),
+            PageKind::Call => !st.call_tab_on() || st.tab_hidden(PageKind::Call),
             p => st.tab_hidden(p),
         };
         if off {
@@ -824,6 +828,28 @@ impl AppState {
     /// it off.
     pub fn notifications_on(&self) -> bool {
         self.notify_can && !self.tab_hidden(PageKind::Notifications)
+    }
+
+    /// The title of the calendar meeting running now (it names a saved session and the Meeting tab).
+    pub fn running_event_title(&self) -> Option<String> {
+        let cal = self.helper.calendar.as_ref()?;
+        cal.events.iter().find(|e| !e.all_day && e.start <= self.unix && self.unix < e.end).map(|e| e.title.clone())
+    }
+
+    /// A meeting runs now: a meeting source plays, or a link joined in the last 10 minutes.
+    pub fn meeting_now(&self) -> bool {
+        matches!(self.meeting_source, poni_core::meeting_source::SourceKind::Meeting { .. }) || self.joined.active(self.now).is_some()
+    }
+
+    /// Captions of a meeting run now (the Meeting tab's red dot, its live view).
+    pub fn call_live(&self) -> bool {
+        self.capture.running() && self.call.meeting
+    }
+
+    /// The Meeting tab belongs in the row: a meeting runs, or its session was saved in the last
+    /// 10 minutes (PMM-005). Settings › Tabs can still take it off.
+    pub fn call_tab_on(&self) -> bool {
+        poni_core::live_notes::shows_tab(self.meeting_now() || self.call_live(), self.call.saved.as_ref().map(|s| s.at), self.now)
     }
 
     /// Settings took this page's tab off the header's row (Music, Shelf,
@@ -937,4 +963,41 @@ mod tests {
         assert!(st.settings.addon_on(JAPANESE_READINGS.id));
         assert!(matches!(st.cmds.pop(), Some(Command::SaveSettings)));
     }
+}
+
+/// The Meeting tab (PMM-005..009, PMM-018).
+#[derive(Default)]
+pub struct CallState {
+    /// The running session heard a meeting source (its notes refresh; Stop shows "Saved" here).
+    pub meeting: bool,
+    /// When the running session's captions started (`now`), for the elapsed time.
+    pub started: Option<f64>,
+    /// The session's newest lines, oldest first, and how many it has.
+    pub lines: Vec<poni_core::helper::Line>,
+    pub heard: usize,
+    /// "Notes so far": the engine's draft and the person's items.
+    pub notes: poni_core::live_notes::LiveNotes,
+    /// A session on its way to the engine: its id, title and length in minutes.
+    pub saving: Option<(String, String, u32)>,
+    /// The session saved last; the tab shows it for 10 minutes.
+    pub saved: Option<CallSaved>,
+    /// The note being edited: its place in `notes.items` and the text so far.
+    pub editing: Option<(usize, String)>,
+    /// "+ Note" open: the kind picked and the text so far.
+    pub adding: Option<(poni_core::live_notes::Kind, String)>,
+    /// Hosts answered for "Always treat <host> as a meeting" (asked once each).
+    pub asked_hosts: Vec<String>,
+    /// How far the notes column is scrolled (DIPs).
+    pub scroll: f32,
+}
+
+pub struct CallSaved {
+    pub id: String,
+    pub title: String,
+    pub minutes: u32,
+    pub counts: poni_core::live_notes::Counts,
+    /// When it was saved (`now`).
+    pub at: f64,
+    /// Dismiss pressed: the tab stays its 10 minutes, without the result.
+    pub dismissed: bool,
 }

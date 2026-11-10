@@ -247,6 +247,12 @@ pub fn is_known_host(host: &str, mine: &[MeetingApp]) -> bool {
         || mine.iter().any(|a| a.kind == MeetingAppKind::Host && a.value.eq_ignore_ascii_case(&h))
 }
 
+/// The active joined host when no list knows it and the person has not answered for it yet:
+/// the Meeting tab offers "Always treat <host> as a meeting" once (`asked`: hosts answered).
+pub fn host_offer<'a>(joined: Option<&'a str>, mine: &[MeetingApp], asked: &[String]) -> Option<&'a str> {
+    joined.filter(|h| !is_known_host(h, mine) && !asked.iter().any(|a| a.eq_ignore_ascii_case(h)))
+}
+
 /// Add the host of `link` to the person's list; `None` when the link has no host or it is there already.
 pub fn add_link(apps: &mut Vec<MeetingApp>, link: &str) -> Option<String> {
     let host = host_of(link)?;
@@ -320,6 +326,11 @@ impl SessionSeen {
 
     pub fn transcript(&self) -> bool {
         self.media && !self.meeting
+    }
+
+    /// A meeting source played at some moment of the session (its notes are the Meeting tab's).
+    pub fn meeting(&self) -> bool {
+        self.meeting
     }
 }
 
@@ -485,5 +496,26 @@ mod tests {
         assert_eq!(j.active(100.0), Some("meeting.tencent.com"));
         assert_eq!(j.active(100.0 + JOINED_S - 0.1), Some("meeting.tencent.com"));
         assert_eq!(j.active(100.0 + JOINED_S), None);
+    }
+
+    #[test]
+    fn an_unknown_joined_host_is_offered_once_and_never_once_listed() {
+        let mut mine = Vec::new();
+        let asked = vec!["zoom.example.org".to_string()];
+        assert_eq!(host_offer(Some("meeting.tencent.com"), &mine, &asked), Some("meeting.tencent.com"));
+        assert_eq!(host_offer(Some("Zoom.Example.org"), &mine, &asked), None, "answered already");
+        assert_eq!(host_offer(Some("teams.microsoft.com"), &mine, &asked), None, "a built-in");
+        assert_eq!(host_offer(None, &mine, &asked), None);
+        add_link(&mut mine, "https://meeting.tencent.com/dm/x");
+        assert_eq!(host_offer(Some("meeting.tencent.com"), &mine, &asked), None, "added");
+    }
+
+    #[test]
+    fn a_session_says_whether_it_heard_a_meeting() {
+        let mut s = SessionSeen::default();
+        s.saw(&SourceKind::Media, Some("A video"));
+        assert!(!s.meeting());
+        s.saw(&SourceKind::Meeting { label: "Teams".into(), via: "ms-teams.exe".into() }, None);
+        assert!(s.meeting());
     }
 }

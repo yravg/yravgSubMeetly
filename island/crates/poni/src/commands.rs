@@ -149,6 +149,12 @@ pub enum Command {
     PasteTranscript,
     /// Open a meeting's join link: the Teams app when it is installed, else the browser.
     JoinMeeting(String),
+    /// Meeting tab › Paste a meeting link: join the link on the clipboard (PMM-018).
+    JoinPastedLink,
+    /// Meeting tab › Always treat <host> as a meeting: add it to Meeting apps.
+    MeetingAddHost(String),
+    /// Meeting tab › Try again: ask for the notes so far now.
+    CallNotesRefresh,
     /// Ask the engine which models it has.
     ModelsRefresh,
     /// Download this model.

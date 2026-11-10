@@ -133,6 +133,10 @@ pub enum Icon {
     /// A padlock: an IELTS level not open yet. (The IELTS tab and its answer
     /// button use `Mic`, the Record page's microphone.)
     Lock,
+    /// A phone handset: the Meeting tab (a call running now).
+    Call,
+    /// A pencil: Edit on a Meeting tab note.
+    Pencil,
 }
 
 pub struct Part {
@@ -365,6 +369,8 @@ pub fn parts(icon: Icon) -> &'static [Part] {
             s("M6.5 11h11A1.5 1.5 0 0 1 19 12.5v6a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-6A1.5 1.5 0 0 1 6.5 11z"),
             s("M8 11V8a4 4 0 0 1 8 0v3"),
         ],
+        Call => p![s("M21 16.4v2.8a1.9 1.9 0 0 1-2 1.9 18.8 18.8 0 0 1-8.2-2.9 18.5 18.5 0 0 1-5.7-5.7A18.8 18.8 0 0 1 2.2 4.3 1.9 1.9 0 0 1 4.1 2.2h2.8a1.9 1.9 0 0 1 1.9 1.6c.1.9.4 1.8.7 2.7a1.9 1.9 0 0 1-.4 2L7.9 9.7a15.2 15.2 0 0 0 5.7 5.7l1.2-1.2a1.9 1.9 0 0 1 2-.4c.9.3 1.8.6 2.7.7a1.9 1.9 0 0 1 1.6 1.9z")],
+        Pencil => p![s("M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"), s("M14.5 5.5l3 3")],
     }
 }
 
@@ -456,7 +462,7 @@ mod tests {
         Icon::Recorder, Icon::Screen, Icon::AppWindow, Icon::Area, Icon::Camera, Icon::Mic, Icon::Bell, Icon::Notes, Icon::Message,
         Icon::Ai, Icon::OpenAi, Icon::Claude, Icon::OpenCode, Icon::Gemini, Icon::Antigravity, Icon::Cursor, Icon::Copilot, Icon::Kimi, Icon::Zai,
         Icon::MiniMax, Icon::OpenRouter,
-        Icon::Lock,
+        Icon::Lock, Icon::Call, Icon::Pencil,
     ];
 
     #[test]

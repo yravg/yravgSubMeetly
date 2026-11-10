@@ -599,7 +599,11 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             let tabs = crate::pages::hideable_tabs(st)
                 .iter()
                 .map(|&p| {
-                    let sub = (p == PageKind::Notifications).then_some("Messages from WhatsApp, Telegram and your phone");
+                    let sub = match p {
+                        PageKind::Notifications => Some("Messages from WhatsApp, Telegram and your phone"),
+                        PageKind::Call => Some("Shown while a meeting is running, and 10 minutes after"),
+                        _ => None,
+                    };
                     item(Key::Tab(p), p.title(), sub, Ctl::Switch(Some(!st.tab_hidden(p))))
                 })
                 .collect();

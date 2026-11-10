@@ -11,6 +11,7 @@
 
 pub mod addons;
 pub mod calendar;
+pub mod call;
 pub mod card;
 pub mod downloads;
 pub mod downloads_offer;
@@ -57,6 +58,9 @@ pub fn header_rect(body: Rect) -> Rect {
 pub enum PageKind {
     /// The helper's newest line (board I02).
     Live,
+    /// The meeting running now: its captions and notes so far (PMM-005..009). Titled "Meeting";
+    /// `Meeting` below is the Minutes tab.
+    Call,
     /// The newest meeting's decisions (I03).
     Meeting,
     /// Open items across meetings (I04).
@@ -94,8 +98,9 @@ pub enum PageKind {
 impl PageKind {
     /// The tab row's order: the island's own pages, Oyenza, then the
     /// add-ons' pages and the "+".
-    pub const ALL: [PageKind; 18] = [
+    pub const ALL: [PageKind; 19] = [
         PageKind::Live,
+        PageKind::Call,
         PageKind::Meeting,
         PageKind::Inbox,
         PageKind::Calendar,
@@ -118,6 +123,7 @@ impl PageKind {
     pub fn key(self) -> &'static str {
         match self {
             PageKind::Live => "live",
+            PageKind::Call => "call",
             PageKind::Meeting => "meeting",
             PageKind::Inbox => "inbox",
             PageKind::Calendar => "calendar",
@@ -146,6 +152,7 @@ impl PageKind {
     pub fn title(self) -> &'static str {
         match self {
             PageKind::Live => "Live",
+            PageKind::Call => "Meeting",
             PageKind::Meeting => "Minutes",
             PageKind::Inbox => "Inbox",
             PageKind::Calendar => "Today",
@@ -169,6 +176,7 @@ impl PageKind {
     pub fn icon(self) -> Icon {
         match self {
             PageKind::Live => Icon::Lyrics,
+            PageKind::Call => Icon::Call,
             PageKind::Meeting => Icon::Clipboard,
             PageKind::Inbox => Icon::CheckCircle,
             PageKind::Calendar => Icon::Calendar,
@@ -208,7 +216,7 @@ impl PageKind {
     /// Notifications, which goes off with its tab (it's offered only where
     /// the copy can read notifications). The add-ons' pages come and go with
     /// their switches.
-    pub const HIDEABLE: [PageKind; 5] = [PageKind::Media, PageKind::Shelf, PageKind::Tasks, PageKind::Focus, PageKind::Notifications];
+    pub const HIDEABLE: [PageKind; 6] = [PageKind::Media, PageKind::Call, PageKind::Shelf, PageKind::Tasks, PageKind::Focus, PageKind::Notifications];
 
     pub fn hideable(self) -> bool {
         Self::HIDEABLE.contains(&self)
@@ -259,6 +267,7 @@ fn row(st: &AppState, open: Option<PageKind>) -> Vec<PageKind> {
             PageKind::Script => st.script_on(),
             PageKind::Downloads => st.downloader_on(),
             PageKind::Notifications => st.notifications_on(),
+            PageKind::Call => (st.call_tab_on() && !st.tab_hidden(p)) || open == Some(p),
             p if p.hideable() => !st.tab_hidden(p) || open == Some(p),
             p => p.tabbed(),
         })
@@ -276,6 +285,7 @@ pub fn step_tab(p: PageKind, st: &AppState, forward: bool) -> PageKind {
 pub fn content_height(p: PageKind, st: &AppState) -> f32 {
     match p {
         PageKind::Live => live::height(st),
+        PageKind::Call => call::height(st),
         PageKind::Meeting => meeting::height(st),
         PageKind::Inbox => inbox::height(st),
         PageKind::Calendar => calendar::height(st),
@@ -308,6 +318,7 @@ pub fn next_wake(page: PageKind, st: &AppState) -> Option<f64> {
         PageKind::Timer => tools::timer_wake(st),
         PageKind::Prayer => prayer::next_wake(st),
         PageKind::Downloads => downloads::next_wake(st),
+        PageKind::Call => call::next_wake(st),
         _ => None,
     }
 }
@@ -407,6 +418,7 @@ pub(crate) fn draw_pages(ui: &mut Ui, st: &mut AppState, body: Rect, header: Rec
 pub(crate) fn draw_page(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKind) {
     match page {
         PageKind::Live => live::draw(ui, st, area),
+        PageKind::Call => call::draw(ui, st, area),
         PageKind::Meeting => meeting::draw(ui, st, area),
         PageKind::Inbox => inbox::draw(ui, st, area),
         PageKind::Calendar => calendar::draw(ui, st, area),
@@ -487,7 +499,9 @@ fn tab_layout(ui: &mut Ui, x0: f32, tabs: &[PageKind], active: PageKind, label_s
     let mut x = x0;
     tabs.iter()
         .map(|&p| {
-            let w = if p == active { snap(TAB_LABEL_X + ui.c.measure(p.title(), label_st, 200.0).0 + TAB_LABEL_END, scale) } else { TAB_W };
+            // The Meeting tab stays an icon when open (its page names the meeting): with it in the
+            // row a label would push the pin and the gear off a 620 DIP island.
+            let w = if p == active && p != PageKind::Call { snap(TAB_LABEL_X + ui.c.measure(p.title(), label_st, 200.0).0 + TAB_LABEL_END, scale) } else { TAB_W };
             let slot = (snap(x, scale), w);
             x += w + TAB_GAP;
             slot
@@ -550,6 +564,10 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
         let ic = if resp.hovered { palette::TEXT } else { Color::lerp(palette::TEXT_FAINT, palette::TEXT, k) };
         let ix = snap(tr.x + (TAB_W - TAB_ICON) / 2.0, scale);
         ui.c.icon(p.icon(), Rect::new(ix, snap(cy - TAB_ICON / 2.0, scale), TAB_ICON, TAB_ICON), ic);
+        // Steady red dot while the meeting's captions run (board P01).
+        if p == PageKind::Call && st.call_live() {
+            ui.c.fill_circle(Point::new(ix + TAB_ICON, cy - TAB_ICON / 2.0 + 1.0), 3.0, palette::RED);
+        }
         if resp.clicked && !active {
             st.cmd(Command::SetPage(p));
         }
@@ -739,8 +757,8 @@ mod tests {
         let st = AppState::new(poni_core::settings::Settings::default().fresh_install(), Store::default());
         assert_eq!(st.page, Live);
         assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Addons]);
-        // The tucked-away tabs are one chip away in Settings.
-        assert_eq!(hideable_tabs(&st).len(), 4);
+        // The tucked-away tabs are one chip away in Settings (Meeting among them).
+        assert_eq!(hideable_tabs(&st).len(), 5);
     }
 
     #[test]
@@ -762,6 +780,35 @@ mod tests {
         st.page = Live;
         assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Addons]);
         assert_eq!(first_tab(&st), Live);
+    }
+
+    #[test]
+    fn the_meeting_tab_follows_live_while_a_meeting_runs_and_ten_minutes_after_its_save() {
+        use poni_core::meeting_source::SourceKind;
+        use PageKind::*;
+        let mut st = state();
+        st.now = 1000.0;
+        assert!(!tabs(&st).contains(&Call), "no meeting");
+        st.meeting_source = SourceKind::Meeting { label: "Teams".into(), via: "ms-teams.exe".into() };
+        assert_eq!(&tabs(&st)[..3], [Live, Call, Meeting]);
+        assert_eq!((Call.title(), Meeting.title()), ("Meeting", "Minutes"));
+        // Switched off in Settings › Tabs: never shown.
+        st.settings.hidden_tabs = vec!["call".into()];
+        assert!(!tabs(&st).contains(&Call));
+        st.settings.hidden_tabs.clear();
+        // A joined link marks a meeting before any sound.
+        st.meeting_source = SourceKind::None;
+        st.joined.joined("meeting.tencent.com", 990.0);
+        assert!(tabs(&st).contains(&Call));
+        st.joined = Default::default();
+        // Saved: 10 minutes, then gone (unless it is the page open).
+        st.call.saved = Some(crate::state::CallSaved { id: "MOM-WIN-1".into(), title: "Site".into(), minutes: 38, counts: Default::default(), at: 600.0, dismissed: false });
+        assert!(tabs(&st).contains(&Call));
+        st.now = 1200.0;
+        assert!(!tabs(&st).contains(&Call));
+        st.page = Call;
+        assert!(tabs(&st).contains(&Call));
+        assert!(content_height(Call, &st) <= content_height(System, &st));
     }
 
     #[test]
@@ -797,7 +844,7 @@ mod tests {
         // The download can't read other apps' notifications: no tab, nothing listens.
         let mut st = state();
         assert!(!st.notifications_on() && !tabs(&st).contains(&PageKind::Notifications));
-        assert_eq!(hideable_tabs(&st), &PageKind::HIDEABLE[..4], "Settings doesn't offer it");
+        assert_eq!(hideable_tabs(&st), &PageKind::HIDEABLE[..5], "Settings doesn't offer it");
         // The Store copy: on for everyone, without an add-on to switch on.
         st.notify_can = true;
         assert!(st.notifications_on() && tabs(&st).contains(&PageKind::Notifications));

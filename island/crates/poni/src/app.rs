@@ -1869,6 +1869,7 @@ impl App {
         if self.st.capture.running() {
             let title = self.st.media.as_ref().filter(|m| m.is_playing()).map(|m| m.title.as_str());
             self.session_seen.saw(&self.st.meeting_source, title);
+            self.st.call.meeting = self.session_seen.meeting();
         }
     }
 
@@ -1890,6 +1891,10 @@ impl App {
             AutoStep::Start => {
                 self.set_captions(true);
                 if self.st.capture.running() {
+                    // A meeting's captions open the Meeting tab (PMM-005), unless Settings says Live.
+                    if self.captions_page() == PageKind::Call {
+                        self.set_page(PageKind::Call);
+                    }
                     self.captions_notice();
                 }
             }
@@ -1923,6 +1928,7 @@ impl App {
             locale: self.st.settings.source_lang.clone(),
             lines: p.lines,
             transcript: false,
+            notes: None,
         };
         let cut = if p.dropped > 0 { format!(" (the first {} left out)", p.dropped) } else { String::new() };
         self.st.helper_notice = Some((format!("Drafting minutes from {} lines{cut}\u{2026}", m.lines.len()), self.st.now + 30.0, false));
@@ -1936,15 +1942,56 @@ impl App {
         let s = &self.st.settings;
         let sub = if s.translate_captions { format!("Translating into {}", poni_core::capture::lang_name(&s.target_lang)) } else { "Original language only".to_string() };
         let accent = self.st.accent;
-        self.st.notify(Icon::Lyrics, accent, "Captions on", sub, 8.0, Some(NoticeAction::OpenPage(PageKind::Live)));
+        let page = self.captions_page();
+        self.st.notify(Icon::Lyrics, accent, "Captions on", sub, 8.0, Some(NoticeAction::OpenPage(page)));
         self.st.set_notice_inline(InlineAction::Translate);
     }
 
-    /// What names a meeting that no calendar event does. shortcut: no calendar hook yet; when the
-    /// Calendar page lands, return the running event's title here.
-    fn running_event_title(&self) -> Option<String> {
-        let cal = self.st.helper.calendar.as_ref()?;
-        cal.events.iter().find(|e| !e.all_day && e.start <= self.st.unix && self.st.unix < e.end).map(|e| e.title.clone())
+    /// Where captions show: the Meeting tab while a meeting runs (Settings › Open the Meeting tab
+    /// when a meeting starts, and its tab not switched off), else Live.
+    fn captions_page(&self) -> PageKind {
+        if self.st.meeting_now() && self.st.settings.open_meeting_tab && !self.st.tab_hidden(PageKind::Call) {
+            PageKind::Call
+        } else {
+            PageKind::Live
+        }
+    }
+
+    /// The engine heard a line: the Meeting tab's view of the session, and its notes when a
+    /// refresh is due (60 s or 12 new lines, not on battery saver).
+    fn call_heard(&mut self) {
+        let Some(svc) = self.services.as_ref() else { return };
+        let (n, tail) = svc.session_tail(crate::pages::call::LINES);
+        self.st.call.heard = n;
+        self.st.call.lines = tail;
+        if self.st.call.meeting && !self.st.tab_hidden(PageKind::Call) && self.st.call.notes.due(self.st.now, n, self.st.power.saver) {
+            self.call_refresh();
+        }
+    }
+
+    /// Ask the engine for the notes so far, off the UI thread (`AppEvent::CallNotes`).
+    fn call_refresh(&mut self) {
+        let Some(svc) = self.services.as_ref() else { return };
+        let lines = svc.session_lines();
+        if lines.is_empty() || self.st.call.notes.busy {
+            return;
+        }
+        self.st.call.notes.ask(self.st.now, lines.len());
+        let (sink, port, title) = (self.sink.clone(), poni_core::helper::configured_port(), self.st.running_event_title().unwrap_or_default());
+        std::thread::spawn(move || sink.send(AppEvent::CallNotes(services::capture::draft_notes(port, &title, &lines))));
+    }
+
+    /// Join a meeting link: its host is the active meeting for 10 minutes (the Meeting tab offers
+    /// "Always treat <host> as a meeting" for an unknown one), then open it: the Teams app when it
+    /// is installed, else the browser.
+    fn join_meeting(&mut self, u: &str) {
+        if let Some(host) = self.join_link(u) {
+            pinfo!("meeting host not in Meeting apps: {host}");
+        }
+        match poni_core::calendar::teams_app_link(u).filter(|_| crate::window::url_scheme_registered("msteams")) {
+            Some(app) => shell::open_teams(&app, u),
+            None => shell::open(u),
+        }
     }
 
     /// Captions stopped: what they heard becomes a meeting in the engine, or, when the session
@@ -1953,6 +2000,10 @@ impl App {
     /// reported by an event.
     fn end_session(&mut self, wait: bool) {
         let seen = std::mem::take(&mut self.session_seen);
+        // The Meeting tab's live view ends with the session; its notes go with the save.
+        let call = std::mem::take(&mut self.st.call);
+        self.st.call = crate::state::CallState { saved: call.saved, asked_hosts: call.asked_hosts, ..Default::default() };
+        let notes = call.notes;
         let Some(svc) = self.services.as_ref() else { return };
         let lines = svc.take_session();
         if lines.is_empty() {
@@ -1962,9 +2013,9 @@ impl App {
         let start = poni_core::meeting_doc::start_stamp(&t);
         let transcript = seen.transcript();
         let title = if transcript {
-            seen.title.unwrap_or_else(|| format!("Video {}", start.replace('T', " ")))
+            seen.title.clone().unwrap_or_else(|| format!("Video {}", start.replace('T', " ")))
         } else {
-            self.running_event_title().unwrap_or_else(|| poni_core::meeting_doc::default_title(&t))
+            self.st.running_event_title().unwrap_or_else(|| poni_core::meeting_doc::default_title(&t))
         };
         let m = services::capture::Meeting {
             id: format!("MOM-WIN-{}", self.st.unix),
@@ -1972,15 +2023,21 @@ impl App {
             date: t.day_key(),
             start,
             locale: self.st.settings.source_lang.clone(),
+            // A meeting's session keeps the Meeting tab's notes (not with that tab switched off).
+            notes: (seen.meeting() && !transcript && !self.st.tab_hidden(PageKind::Call)).then_some(notes),
             lines,
             transcript,
         };
+        if m.notes.is_some() {
+            let minutes = (m.lines.last().map_or(0.0, |l| l.t1) / 60.0).round().max(1.0) as u32;
+            self.st.call.saving = Some((m.id.clone(), m.title.clone(), minutes));
+        }
         // The track it captioned offers "Save as meeting" on the Media page (board P04 b).
         self.st.kept_transcript = transcript.then(|| (m.id.clone(), self.st.media.as_ref().map(|x| x.track_key.clone()).unwrap_or_default()));
         let port = poni_core::helper::configured_port();
         if wait {
             match services::capture::save_meeting(port, m) {
-                Ok(id) => pinfo!("meeting {id} saved at quit"),
+                Ok((id, _)) => pinfo!("meeting {id} saved at quit"),
                 Err((e, _)) => pwarn!("meeting not saved at quit: {e}"),
             }
         } else {
@@ -2009,10 +2066,16 @@ impl App {
         self.st.helper_notice = Some(("Saved as meeting".into(), self.st.now + 4.0, false));
     }
 
-    fn on_meeting_saved(&mut self, r: std::result::Result<String, (String, Vec<poni_core::helper::Line>)>) {
+    fn on_meeting_saved(&mut self, r: services::capture::Saved) {
+        let saving = self.st.call.saving.take();
         match r {
-            Ok(id) => {
+            Ok((id, counts)) => {
                 pinfo!("meeting {id} saved");
+                // The Meeting tab shows the result for 10 minutes (PMM-009).
+                let on_tab = self.st.page == PageKind::Call;
+                if let Some((sid, title, minutes)) = saving.filter(|(sid, ..)| *sid == id) {
+                    self.st.call.saved = Some(crate::state::CallSaved { id: sid, title, minutes, counts, at: self.st.now, dismissed: false });
+                }
                 // The new meeting is the one shown, from its first item.
                 self.st.helper.select(&id);
                 self.st.meeting_page = 0;
@@ -2027,7 +2090,10 @@ impl App {
                     self.st.notify(Icon::Lyrics, palette::GREEN, "Kept as transcript", "Video sessions are not meetings. Tap to see it in Minutes.", 8.0, Some(NoticeAction::OpenPage(PageKind::Meeting)));
                     return;
                 }
-                self.set_page(PageKind::Meeting);
+                // On the Meeting tab the result stays there; elsewhere Minutes opens, as before.
+                if !on_tab || self.st.call.saved.is_none() {
+                    self.set_page(PageKind::Meeting);
+                }
                 self.st.notify(Icon::Lyrics, palette::GREEN, "Meeting saved", "Tap to open it", 8.0, Some(NoticeAction::OpenPage(PageKind::Meeting)));
             }
             Err((e, lines)) => {
@@ -2156,6 +2222,9 @@ impl App {
                     self.end_session(false);
                 }
                 self.st.helper.capturing = s.running();
+                if s.running() && self.st.call.started.is_none() {
+                    self.st.call.started = Some(self.st.now);
+                }
                 // Captions cannot start without the speech model: the pill says so and a tap downloads it.
                 if s.needs_model() && !self.st.capture.needs_model() {
                     self.st.notify(Icon::Download, palette::ORANGE, "Speech model needed","Tap to download it for captions", 8.0, Some(NoticeAction::DownloadModel));
@@ -2167,6 +2236,8 @@ impl App {
                 if let Some(s) = self.services.as_ref() {
                     s.helper_poll();
                 }
+                self.fold_session_source();
+                self.call_heard();
             }
             CaptureEvent::Hint(h) => self.st.caption_hint = h,
         }
@@ -2421,6 +2492,7 @@ impl App {
             }
             CheckForUpdates => self.check_for_updates(),
             OpenLive => self.open_page(PageKind::Live),
+            OpenCall => self.open_page(PageKind::Call),
             OpenMeeting => self.open_page(PageKind::Meeting),
             OpenInbox => self.open_page(PageKind::Inbox),
             OpenApp => {
@@ -2737,6 +2809,13 @@ impl App {
                 self.auto_captions_step();
             }
             AppEvent::MeetingSaved(r) => self.on_meeting_saved(r),
+            AppEvent::CallNotes(draft) => {
+                // A refresh from a session that has since ended is dropped.
+                if self.st.call.notes.busy {
+                    self.st.call.notes.answer(self.st.now, draft);
+                    self.request_frame();
+                }
+            }
             AppEvent::Models(r) => {
                 let was = self.st.models.moving();
                 self.st.models.apply(r, now);
@@ -4618,16 +4697,28 @@ impl App {
                 Command::Calendar(c) => self.calendar_cmd(c),
                 Command::Captions(on) => self.captions_by_hand(on),
                 Command::PasteTranscript => self.paste_transcript(),
-                Command::JoinMeeting(u) => {
-                    // shortcut: the unknown-host offer has no UI yet (Meeting tab, later step); only logged.
-                    if let Some(host) = self.join_link(&u) {
-                        pinfo!("meeting host not in Meeting apps: {host}");
-                    }
-                    match poni_core::calendar::teams_app_link(&u).filter(|_| crate::window::url_scheme_registered("msteams")) {
-                        Some(app) => shell::open_teams(&app, &u),
-                        None => shell::open(&u),
+                Command::JoinMeeting(u) => self.join_meeting(&u),
+                Command::JoinPastedLink => {
+                    let text = services::clipboard::read_text(self.hwnd).unwrap_or_default();
+                    let link = text.trim();
+                    if poni_core::meeting_source::host_of(link).is_some() {
+                        self.join_meeting(link);
+                    } else {
+                        self.st.notify(Icon::Call, palette::ORANGE, "No meeting link copied", "Copy a meeting link first, then Paste a meeting link", 5.0, None);
                     }
                 }
+                Command::MeetingAddHost(host) => {
+                    self.st.call.asked_hosts.push(host.clone());
+                    if poni_core::meeting_source::add_link(&mut self.st.settings.meeting_apps, &format!("https://{host}")).is_some() {
+                        pinfo!("meeting apps: added {host}");
+                        self.st.notify(Icon::Call, palette::GREEN, "Added to Meeting apps", format!("{host} is a meeting from now on"), 4.0, None);
+                        self.st.cmd(Command::SaveSettings);
+                    }
+                    if let Some(w) = self.settings_win.as_mut() {
+                        w.view.dirty = true;
+                    }
+                }
+                Command::CallNotesRefresh => self.call_refresh(),
                 Command::ModelsRefresh => self.refresh_models(),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),

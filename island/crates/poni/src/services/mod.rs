@@ -215,6 +215,16 @@ impl Services {
         self.session.lock().unwrap_or_else(|e| e.into_inner()).take()
     }
 
+    /// How many lines the running session has and its newest `n` (the Meeting tab).
+    pub fn session_tail(&self, n: usize) -> (usize, Vec<poni_core::helper::Line>) {
+        self.session.lock().unwrap_or_else(|e| e.into_inner()).tail(n)
+    }
+
+    /// The running session's lines so far, for a notes refresh.
+    pub fn session_lines(&self) -> Vec<poni_core::helper::Line> {
+        self.session.lock().unwrap_or_else(|e| e.into_inner()).lines()
+    }
+
     pub fn restore_session(&self, lines: Vec<poni_core::helper::Line>) {
         self.session.lock().unwrap_or_else(|e| e.into_inner()).restore(lines);
     }

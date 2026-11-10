@@ -62,6 +62,16 @@ impl Log {
         self.lines.push(helper::Line { t0: (end - poni_core::capture::WINDOW_S as f64).max(0.0), t1: end, source, translation });
     }
 
+    /// How many lines the session has, and its newest `n` (oldest first): the Meeting tab's view.
+    pub fn tail(&self, n: usize) -> (usize, Vec<helper::Line>) {
+        (self.lines.len(), self.lines[self.lines.len().saturating_sub(n)..].to_vec())
+    }
+
+    /// Every line so far, for a notes refresh (the session goes on).
+    pub fn lines(&self) -> Vec<helper::Line> {
+        self.lines.clone()
+    }
+
     pub fn take(&mut self) -> Vec<helper::Line> {
         std::mem::take(&mut self.lines)
     }
@@ -83,31 +93,58 @@ pub struct Meeting {
     pub lines: Vec<helper::Line>,
     /// A media session: kept as a transcript, not a meeting (PMM-015).
     pub transcript: bool,
+    /// The Meeting tab's notes so far (a meeting session): saved with the final draft (PMM-009).
+    pub notes: Option<poni_core::live_notes::LiveNotes>,
 }
+
+/// A saved session's id and what its notes held, or why not with its lines back.
+pub type Saved = Result<(String, poni_core::live_notes::Counts), (String, Vec<helper::Line>)>;
 
 /// Save a session as a meeting: the engine drafts the summary, decisions and actions (best effort,
 /// the transcript is kept without them), then keeps the document. `Err` returns the lines.
-pub fn save_meeting(port: u16, m: Meeting) -> Result<String, (String, Vec<helper::Line>)> {
+pub fn save_meeting(port: u16, m: Meeting) -> Saved {
+    use poni_core::live_notes::{draft_items, onto_doc};
     use poni_core::meeting_doc::{as_transcript, generate_body, generated_note, meeting_doc};
     let draft = helper::request(port, "POST", "/notes/generate", Some(&generate_body(&m.title, &m.lines))).ok().filter(|(c, _)| *c == 200).and_then(|(_, b)| generated_note(&b));
     let Some(doc) = meeting_doc(&m.id, &m.title, &m.date, &m.start, &m.locale, &m.lines, draft.as_ref()) else { return Err(("Nothing was heard.".into(), Vec::new())) };
     // The draft is kept on a transcript too, so "Save as meeting" gives a meeting with its notes.
     let doc = if m.transcript { as_transcript(doc) } else { doc };
+    // A Meeting tab session: the final draft joins the kept and typed items (the last draft stays
+    // when the engine gives none).
+    let (doc, counts) = match m.notes {
+        Some(mut notes) => {
+            if let Some(d) = draft.as_ref() {
+                notes.answer(0.0, Some(draft_items(d, &m.lines)));
+            }
+            (onto_doc(doc, &notes), notes.counts())
+        }
+        None => (doc, Default::default()),
+    };
     match helper::post_note(port, &doc.to_string()) {
-        Ok(()) => Ok(m.id),
+        Ok(()) => Ok((m.id, counts)),
         Err(e) => Err((e, m.lines)),
     }
 }
 
+/// Ask the engine for a draft of the session so far (the Meeting tab's notes): `None` when it does
+/// not answer. Runs off the UI thread.
+pub fn draft_notes(port: u16, title: &str, lines: &[helper::Line]) -> Option<Vec<poni_core::live_notes::Item>> {
+    use poni_core::meeting_doc::{generate_body, generated_note};
+    let body = generate_body(title, lines);
+    let (code, b) = helper::request_bytes(port, "POST", "/notes/generate", "application/json", body.as_bytes(), Duration::from_secs(15)).ok()?;
+    let note = (code == 200).then(|| generated_note(&b)).flatten()?;
+    Some(poni_core::live_notes::draft_items(&note, lines))
+}
+
 /// Save pasted lines as a meeting, poured into `base` (a meeting started from Calendar) when given.
-pub fn save_pasted(port: u16, m: Meeting, base: Option<serde_json::Value>, speakers: Vec<String>) -> Result<String, (String, Vec<helper::Line>)> {
+pub fn save_pasted(port: u16, m: Meeting, base: Option<serde_json::Value>, speakers: Vec<String>) -> Saved {
     use poni_core::meeting_doc::{generate_body, generated_note, meeting_doc, with_base};
     let draft = helper::request_bytes(port, "POST", "/notes/generate", "application/json", generate_body(&m.title, &m.lines).as_bytes(), Duration::from_secs(30)).ok().filter(|(c, _)| *c == 200).and_then(|(_, b)| generated_note(&b));
     let Some(doc) = meeting_doc(&m.id, &m.title, &m.date, &m.start, &m.locale, &m.lines, draft.as_ref()) else { return Err(("The paste held no lines.".into(), Vec::new())) };
     let doc = with_base(doc, base.as_ref(), &speakers);
     let id = doc.get("id").and_then(|v| v.as_str()).unwrap_or(&m.id).to_string();
     // Pasted lines are not captions: on failure nothing is handed back to the next Stop.
-    helper::post_note(port, &doc.to_string()).map(|()| id).map_err(|e| (e, Vec::new()))
+    helper::post_note(port, &doc.to_string()).map(|()| (id, Default::default())).map_err(|e| (e, Vec::new()))
 }
 
 pub enum CaptureEvent {
