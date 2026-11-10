@@ -25,8 +25,15 @@ export function samplesBaseUrl() {
   return null;
 }
 
-export async function loadSampleCatalog() {
-  if (catalogTried) return catalogCache;
+let catalogPromise = null;
+// One shared promise: a second caller while the first fetch is in flight must wait for it,
+// not read the still-empty cache (that made an early Start fall back to a missing /speech.wav).
+export function loadSampleCatalog() {
+  if (!catalogPromise) catalogPromise = fetchCatalog();
+  return catalogPromise;
+}
+
+async function fetchCatalog() {
   catalogTried = true;
   const base = samplesBaseUrl();
   if (!base) {
