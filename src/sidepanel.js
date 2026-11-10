@@ -1500,7 +1500,7 @@ function applyExternalSettings(next) {
     applyTheme();
   }
   if (
-    ['yraverage', 'coretax', 'modern'].includes(next.reskin) &&
+    RESKINS.includes(next.reskin) &&
     next.reskin !== state.settings.reskin
   ) {
     state.settings.reskin = next.reskin;
@@ -1508,9 +1508,13 @@ function applyExternalSettings(next) {
   }
 }
 
+// TIDE-012: 'tide' memakai theme-tide.css (token merek yravg). Helper belum mencerminkan 'tide'
+// (UI_RESKINS di engine-rs mengabaikan nilai yang tidak dikenal), jadi pilihan ini lokal.
+const RESKINS = ['yraverage', 'coretax', 'modern', 'tide'];
+
 // Reskin pattern: hanya token visual lokal (aksen + radius), bukan branding.
 function applyReskin() {
-  const reskin = ['yraverage', 'coretax', 'modern'].includes(state.settings.reskin)
+  const reskin = RESKINS.includes(state.settings.reskin)
     ? state.settings.reskin
     : 'yraverage';
   document.documentElement.dataset.reskin = reskin;
@@ -1522,7 +1526,7 @@ function applyReskin() {
 }
 
 async function setReskin(reskin) {
-  const next = ['yraverage', 'coretax', 'modern'].includes(reskin) ? reskin : 'yraverage';
+  const next = RESKINS.includes(reskin) ? reskin : 'yraverage';
   state.settings.reskin = next;
   await saveSettings();
   applyReskin();
@@ -1569,7 +1573,7 @@ async function pullUiPrefs() {
     changed = true;
   }
   if (
-    ['yraverage', 'coretax', 'modern'].includes(res.prefs?.reskin) &&
+    RESKINS.includes(res.prefs?.reskin) &&
     res.prefs.reskin !== state.settings.reskin
   ) {
     state.settings.reskin = res.prefs.reskin;
@@ -1606,7 +1610,7 @@ async function loadSettings() {
     state.settings.theme = 'auto';
   }
   applyTheme();
-  if (!['yraverage', 'coretax', 'modern'].includes(state.settings.reskin)) {
+  if (!RESKINS.includes(state.settings.reskin)) {
     state.settings.reskin = 'yraverage';
   }
   applyReskin();

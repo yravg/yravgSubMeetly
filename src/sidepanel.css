@@ -1080,6 +1080,15 @@ input[type="range"] { accent-color: var(--accent); width: 130px; }
 .reskin-mock-modern { border-radius: 14px; }
 .reskin-mock-modern i { background: #7c3aed; }
 .reskin-mock-modern b { border-radius: var(--radius-full); background: linear-gradient(90deg, #3a3a3a, #4c1d95); }
+.reskin-mock-tide { border-radius: 14px; }
+.reskin-mock-tide i { background: #22C55E; }
+.reskin-mock-tide b { border-radius: var(--radius-full); background: linear-gradient(90deg, #0A0F0C, #B6F35C); }
+/* TIDE-012: dengan Tide, maskot hanya di keadaan kosong (satu per layar). */
+:root[data-reskin='tide'] body { font-family: var(--font-ui); }
+:root[data-reskin='tide'] #history-list > .empty::before {
+  content: ''; display: block; width: 88px; height: 88px; margin: 0 auto 8px;
+  background: url('tide/tide-sleep.webp') center / contain no-repeat;
+}
 .reskin-foot { display: flex; justify-content: flex-end; margin-top: var(--space-2); }
 
 /* ---- Responsive layout: narrow side-panel vs wide/lab surfaces ---------- */

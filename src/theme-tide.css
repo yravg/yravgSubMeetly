@@ -5,7 +5,9 @@
    2026-11-09), disalin dari papan K01 (docs/design/tide-shell-canvas/kit.mjs).
    Skala jarak, ukuran teks dan tangga lapisan tetap dari tokens.css.
 
-   Cakupan: hanya di bawah [data-reskin='tide'] — token global tidak berubah.
+   Cakupan: hanya di bawah :root[data-reskin='tide'] — token global tidak berubah.
+   Spesifisitas (0,2,0) sengaja menyamai tema terang sistem panel samping
+   (:root:not(.theme-dark)); berkas ini dimuat sesudahnya sehingga menang.
    Gelap: kelas .theme-dark, atau sistem gelap selama tidak ada .theme-light.
 
    Aturan merek:
@@ -31,7 +33,7 @@
   font-display: swap;
 }
 
-[data-reskin='tide'] {
+:root[data-reskin='tide'] {
   /* ---- Primitif merek (tidak dipakai langsung oleh komponen) ---------- */
   --tide-green: #22C55E;
   --tide-lime: #B6F35C;
@@ -87,7 +89,7 @@
 }
 
 /* ---- Gelap ------------------------------------------------------------ */
-[data-reskin='tide'].theme-dark {
+:root[data-reskin='tide'].theme-dark {
   --tide-surface: #0B1310;
   --tide-surface-2: #111C18;
   --tide-mint: #12241B;
@@ -116,7 +118,7 @@
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
-  [data-reskin='tide']:not(.theme-light) {
+  :root[data-reskin='tide']:not(.theme-light) {
     --tide-surface: #0B1310;
     --tide-surface-2: #111C18;
     --tide-mint: #12241B;
@@ -148,7 +150,7 @@
 
 /* Gerak berkurang: pegas jadi pudar 120 ms (papan K01). */
 @media (prefers-reduced-motion: reduce) {
-  [data-reskin='tide'] {
+  :root[data-reskin='tide'] {
     --ease-spring: ease-out;
   }
 }

@@ -36,7 +36,7 @@ use crate::whisper::Task;
 const ENGINE_MODES: [&str; 3] = ["fast", "balanced", "accurate"];
 const DEVICE_CHOICES: [&str; 3] = ["auto", "cpu", "cuda"];
 const UI_THEMES: [&str; 3] = ["auto", "light", "dark"];
-const UI_RESKINS: [&str; 3] = ["yraverage", "coretax", "modern"];
+const UI_RESKINS: [&str; 4] = ["yraverage", "coretax", "modern", "tide"];
 const UI_SURFACES: [&str; 3] = ["overlay", "island", "both"];
 const TARGET_LANGS: [&str; 11] = [
     "en", "zh", "de", "fr", "es", "ru", "it", "id", "vi", "ja", "ko",
