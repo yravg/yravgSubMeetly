@@ -599,6 +599,9 @@ pub struct AppState {
     pub capture: poni_core::capture::CaptureState,
     /// Where the sound playing now goes: a meeting, media or nothing (PMM-004).
     pub meeting_source: poni_core::meeting_source::SourceKind,
+    /// The transcript a media captions session was just kept as (PMM-015): its id and the track
+    /// it captioned, so that track's Media page offers "Save as meeting".
+    pub kept_transcript: Option<(String, String)>,
     /// The probe's last windows and microphone users.
     pub meeting_seen: crate::services::meeting_probe::Seen,
     /// The meeting link joined last, active for 10 minutes (PMM-018).
@@ -692,6 +695,7 @@ impl AppState {
             calendar_day: None,
             capture: Default::default(),
             meeting_source: poni_core::meeting_source::SourceKind::None,
+            kept_transcript: None,
             meeting_seen: Default::default(),
             joined: Default::default(),
             meeting_pick: None,

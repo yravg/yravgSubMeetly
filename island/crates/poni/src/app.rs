@@ -457,6 +457,8 @@ pub struct App {
     store_writable: bool,
     /// Captions that start by themselves with a video or a meeting.
     auto_captions: poni_core::capture::Auto,
+    /// What the running captions session heard from: a meeting, or media only (PMM-015).
+    session_seen: poni_core::meeting_source::SessionSeen,
     /// The PC plays sound now (`services::meter`).
     sound_on: bool,
     /// The current press started as a double-click (its click is ignored).
@@ -666,6 +668,7 @@ impl App {
             settings_writable,
             store_writable,
             auto_captions: Default::default(),
+            session_seen: Default::default(),
             sound_on: false,
             dbl_press: false,
             high_surrogate: None,
@@ -1785,6 +1788,8 @@ impl App {
                 Err(e) => poni_core::capture::CaptureState::Failed(e),
             };
             self.st.helper.set_following(true);
+            self.st.kept_transcript = None;
+            self.fold_session_source();
         } else {
             svc.capture_stop();
             self.st.capture = poni_core::capture::CaptureState::Off;
@@ -1856,6 +1861,15 @@ impl App {
             }
             self.st.meeting_source = kind;
         }
+        self.fold_session_source();
+    }
+
+    /// The running captions session notes where its sound comes from now (PMM-015).
+    fn fold_session_source(&mut self) {
+        if self.st.capture.running() {
+            let title = self.st.media.as_ref().filter(|m| m.is_playing()).map(|m| m.title.as_str());
+            self.session_seen.saw(&self.st.meeting_source, title);
+        }
     }
 
     /// A meeting link was joined (Today › Join; later the Meeting tab's pasted link): its host is
@@ -1908,6 +1922,7 @@ impl App {
             start: poni_core::meeting_doc::start_stamp(&t),
             locale: self.st.settings.source_lang.clone(),
             lines: p.lines,
+            transcript: false,
         };
         let cut = if p.dropped > 0 { format!(" (the first {} left out)", p.dropped) } else { String::new() };
         self.st.helper_notice = Some((format!("Drafting minutes from {} lines{cut}\u{2026}", m.lines.len()), self.st.now + 30.0, false));
@@ -1932,23 +1947,36 @@ impl App {
         cal.events.iter().find(|e| !e.all_day && e.start <= self.st.unix && self.st.unix < e.end).map(|e| e.title.clone())
     }
 
-    /// Captions stopped: what they heard becomes a meeting in the engine. `wait`: on quit, answer
-    /// before the engine goes; otherwise it is saved off the UI thread and reported by an event.
+    /// Captions stopped: what they heard becomes a meeting in the engine, or, when the session
+    /// heard media and never a meeting, a transcript (PMM-015, `meeting_doc::as_transcript`).
+    /// `wait`: on quit, answer before the engine goes; otherwise it is saved off the UI thread and
+    /// reported by an event.
     fn end_session(&mut self, wait: bool) {
+        let seen = std::mem::take(&mut self.session_seen);
         let Some(svc) = self.services.as_ref() else { return };
         let lines = svc.take_session();
         if lines.is_empty() {
             return;
         }
         let t = clock::local_now();
+        let start = poni_core::meeting_doc::start_stamp(&t);
+        let transcript = seen.transcript();
+        let title = if transcript {
+            seen.title.unwrap_or_else(|| format!("Video {}", start.replace('T', " ")))
+        } else {
+            self.running_event_title().unwrap_or_else(|| poni_core::meeting_doc::default_title(&t))
+        };
         let m = services::capture::Meeting {
             id: format!("MOM-WIN-{}", self.st.unix),
-            title: self.running_event_title().unwrap_or_else(|| poni_core::meeting_doc::default_title(&t)),
+            title,
             date: t.day_key(),
-            start: poni_core::meeting_doc::start_stamp(&t),
+            start,
             locale: self.st.settings.source_lang.clone(),
             lines,
+            transcript,
         };
+        // The track it captioned offers "Save as meeting" on the Media page (board P04 b).
+        self.st.kept_transcript = transcript.then(|| (m.id.clone(), self.st.media.as_ref().map(|x| x.track_key.clone()).unwrap_or_default()));
         let port = poni_core::helper::configured_port();
         if wait {
             match services::capture::save_meeting(port, m) {
@@ -1959,6 +1987,26 @@ impl App {
             let sink = self.sink.clone();
             std::thread::spawn(move || sink.send(AppEvent::MeetingSaved(services::capture::save_meeting(port, m))));
         }
+    }
+
+    /// "Save as meeting" on a kept transcript (PMM-015): the same document, its marker cleared,
+    /// posted back; it then lists in the register like any meeting.
+    fn save_as_meeting(&mut self, id: &str) {
+        let doc = self.st.helper.snap.notes.iter().find(|n| n.id == id).and_then(|n| poni_core::meeting_doc::promote(&n.raw));
+        let Some(doc) = doc else {
+            self.st.helper_notice = Some(("Still saving the transcript. Try again in a moment.".into(), self.st.now + 5.0, true));
+            return;
+        };
+        if let Some(s) = self.services.as_ref() {
+            s.helper_post(doc.to_string());
+        }
+        if self.st.kept_transcript.as_ref().is_some_and(|(k, _)| k == id) {
+            self.st.kept_transcript = None;
+        }
+        self.st.helper.select(id);
+        self.st.meeting_page = 0;
+        self.set_page(PageKind::Meeting);
+        self.st.helper_notice = Some(("Saved as meeting".into(), self.st.now + 4.0, false));
     }
 
     fn on_meeting_saved(&mut self, r: std::result::Result<String, (String, Vec<poni_core::helper::Line>)>) {
@@ -1973,6 +2021,11 @@ impl App {
                 }
                 if let Some(s) = self.services.as_ref() {
                     s.helper_poll();
+                }
+                if self.st.kept_transcript.as_ref().is_some_and(|(k, _)| *k == id) {
+                    // A video is not a meeting: no jump to Minutes; the Media page and Minutes offer "Save as meeting".
+                    self.st.notify(Icon::Lyrics, palette::GREEN, "Kept as transcript", "Video sessions are not meetings. Tap to see it in Minutes.", 8.0, Some(NoticeAction::OpenPage(PageKind::Meeting)));
+                    return;
                 }
                 self.set_page(PageKind::Meeting);
                 self.st.notify(Icon::Lyrics, palette::GREEN, "Meeting saved", "Tap to open it", 8.0, Some(NoticeAction::OpenPage(PageKind::Meeting)));
@@ -1991,7 +2044,8 @@ impl App {
                 if let Some(s) = self.services.as_ref() {
                     s.restore_session(lines);
                 }
-                self.st.notify(Icon::Lyrics, palette::ORANGE, "Meeting not saved", "The engine did not take it. It is kept for the next Stop.", 8.0, None);
+                let what = if self.st.kept_transcript.take().is_some() { "Transcript not saved" } else { "Meeting not saved" };
+                self.st.notify(Icon::Lyrics, palette::ORANGE, what, "The engine did not take it. It is kept for the next Stop.", 8.0, None);
             }
         }
     }
@@ -4554,6 +4608,7 @@ impl App {
                         s.helper_post(body);
                     }
                 }
+                Command::SaveAsMeeting(id) => self.save_as_meeting(&id),
                 Command::HelperPoll => {
                     if let Some(s) = self.services.as_ref() {
                         s.engine_start(); // Try again also starts the engine

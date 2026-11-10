@@ -30,7 +30,7 @@
 use crate::commands::{Command, MediaCmd};
 use crate::gfx::{Image, TextStyle, Weight};
 use crate::icons::Icon;
-use crate::pages::media::{self as classic, Anim, Frame, LyricsCtx};
+use crate::pages::media::{self as classic, Anim, Column, Frame, LyricsCtx};
 use crate::state::{AppState, JaClick};
 use crate::ui::{wid, Ui, WidgetId};
 use poni_core::datetime::fmt_duration;
@@ -121,7 +121,7 @@ pub fn height(st: &AppState) -> Option<f32> {
     if !super::on(st.settings.theme) {
         return None;
     }
-    Some(if st.media.is_some() { H_SESSION } else { H_EMPTY })
+    Some(if st.media.is_some() { H_SESSION + classic::strip_height(st, classic::column_for(st)) } else { H_EMPTY })
 }
 
 /// Draw the page in `area`. `false` = the Classic page draws.
@@ -134,7 +134,12 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) -> bool {
     let mut a = classic::take_anim();
     let fr = a.frame(st.now, ui.c.alpha());
     if st.media.is_some() {
-        draw_session(ui, st, area, &mut a, &fr);
+        let which = classic::column_for(st);
+        let (body, strip) = if which == Column::Captions { super::quick_captions::split(st, area) } else { (area, None) };
+        draw_session(ui, st, body, &mut a, &fr, which);
+        if let Some(r) = strip {
+            super::quick_captions::strip(ui, st, r, body);
+        }
     } else {
         draw_empty(ui, area);
     }
@@ -160,10 +165,10 @@ fn columns(w: f32, lyrics_on: bool, scale: f32) -> Columns {
     }
 }
 
-fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &Frame) {
+fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &Frame, which: Column) {
     let now = st.now;
     let accent = eq_color(st.media_accent());
-    let lyrics_on = st.settings.lyrics;
+    let lyrics_on = classic::column_shown(st, which);
     let pronounce = st.settings.lyrics_pronunciation;
     let offset_s = f64::from(st.settings.lyrics_offset_ms) / 1000.0;
     let Some(m) = st.media.as_ref() else { return };
@@ -269,8 +274,9 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     let mut open_credit = false;
     let mut synced_shown = false;
     let mut get_ja_readings = false;
-    if let Some(lyr_w) = cols.lyrics_w {
-        let col = Rect::new(snap(x0 + area.w - lyr_w), y0, lyr_w, H_SESSION);
+    let mut caption_this = false;
+    let col = cols.lyrics_w.map(|lyr_w| Rect::new(snap(x0 + area.w - lyr_w), y0, lyr_w, H_SESSION));
+    if let Some(col) = col.filter(|_| matches!(which, Column::Lyrics | Column::Offer)) {
         let offer = if pronounce && st.lyrics.wants_ja_readings { st.ja_offer().map(|(line, click)| (line, click != JaClick::None)) } else { None };
         let ctx = LyricsCtx { now, pos: lyric_pos, live: playing && has_dur, can_seek: m.can_seek, scale, track_key: &m.track_key, pronounce, offer };
         let out = classic::draw_lyrics(ui, &st.lyrics, &mut st.ui, col, a, fr, &ctx, &mut acts);
@@ -278,6 +284,7 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
         synced_shown = out.synced;
         open_credit = out.open_credit;
         get_ja_readings = out.get_ja_readings;
+        caption_this = which == Column::Offer && classic::draw_caption_offer(ui, st.accent, col);
     }
 
     // The equalizer dances only on the frames the page gets anyway while
@@ -301,6 +308,12 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
 
     for c in acts {
         classic::push_media(st, c);
+    }
+    if let Some(col) = col {
+        classic::draw_side(ui, st, which, col);
+    }
+    if caption_this {
+        st.cmd(Command::Captions(true));
     }
     if open_credit {
         let url = classic::source_url(classic::lyrics_source(&st.lyrics)).to_string();

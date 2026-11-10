@@ -66,6 +66,8 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     };
     let locked = state == PageState::Locked;
     let waiting = note.waiting();
+    // A media session kept as a transcript (PMM-015): tagged "Video", one press makes it a meeting.
+    let transcript = poni_core::meeting_doc::is_transcript(&note.raw);
 
     // Head: the meeting's title, and which of all meetings it is.
     let head = Rect::new(area.x, area.y, area.w, HEAD_H);
@@ -77,7 +79,8 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         st.meeting_page = 0;
     }
     let title = if note.date.is_empty() { note.title.clone() } else { format!("{} \u{b7} {}", note.title, note.date) };
-    ui.c.text(&title, Rect::new(head.x, cy - 11.0, (px - head.x - 10.0).max(0.0), 22.0), &TextStyle::headline());
+    let tx = if transcript { head.x + hkit::chip(ui, head.x, cy, "Video", accent) + 8.0 } else { head.x };
+    ui.c.text(&title, Rect::new(tx, cy - 11.0, (px - tx - 10.0).max(0.0), 22.0), &TextStyle::headline());
 
     // Foot: what the meeting waits on (or the last press), Paste, and the item pages.
     let foot = Rect::new(area.x, area.bottom() - FOOT_H, area.w, FOOT_H);
@@ -98,6 +101,16 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     if ui.pill(wid("meeting.paste"), b, "Paste transcript", None, PillStyle::Utility).clicked {
         st.cmd(Command::PasteTranscript);
     }
+    let b = if transcript {
+        let w = ui.pill_width("Save as meeting", false, true);
+        let s = Rect::new(b.x - PILL_GAP - w, fy - PILL_SMALL / 2.0, w, PILL_SMALL);
+        if ui.pill(wid("meeting.save_as_meeting"), s, "Save as meeting", None, PillStyle::Primary(accent)).clicked {
+            st.cmd(Command::SaveAsMeeting(note.id.clone()));
+        }
+        s
+    } else {
+        b
+    };
     let toast = st.helper_notice.as_ref().filter(|(_, until, _)| *until > ui.now).map(|(m, _, bad)| (m.clone(), *bad));
     let status = match (&toast, locked, waiting) {
         (Some((t, _)), _, _) => t.clone(),

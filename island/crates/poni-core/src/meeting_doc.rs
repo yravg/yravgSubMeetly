@@ -71,6 +71,31 @@ pub fn meeting_doc(id: &str, title: &str, date: &str, start: &str, locale: &str,
     }))
 }
 
+/// PMM-015: a media (video) session is kept as a transcript, not a meeting. It is the same
+/// document saved through the same `POST /notes`, with `source: "media"` as the only marker: the
+/// engine keeps `source` as given, the register's sync leaves such documents out of its meetings
+/// (`src/lib/engine-sync.js`), and the Minutes page tags them "Video". "Save as meeting" sets
+/// `source` back to the island's own ([`promote`]).
+pub const SOURCE_MEDIA: &str = "media";
+
+pub fn as_transcript(mut doc: Value) -> Value {
+    doc["source"] = json!(SOURCE_MEDIA);
+    doc
+}
+
+pub fn is_transcript(doc: &Value) -> bool {
+    doc.get("source").and_then(Value::as_str) == Some(SOURCE_MEDIA)
+}
+
+/// The kept transcript as a meeting (`None` when it is one already).
+pub fn promote(doc: &Value) -> Option<Value> {
+    is_transcript(doc).then(|| {
+        let mut d = doc.clone();
+        d["source"] = json!("island");
+        d
+    })
+}
+
 /// A meeting document built from pasted lines (`doc`), poured into the meeting it belongs to
 /// (`base`, one started from Calendar's Notes: its title, date, attendees and calendar fields
 /// stay). The people who spoke join the attendees.
@@ -110,6 +135,22 @@ pub fn with_base(doc: Value, base: Option<&Value>, speakers: &[String]) -> Value
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_media_session_is_kept_as_a_transcript_until_saved_as_a_meeting() {
+        let doc = meeting_doc("MOM-WIN-1", "macOS 27.2.1 is out", "2026-11-11", "2026-11-11T09:00", "en", &[line(0.0, "Hi", "")], None).unwrap();
+        assert!(!is_transcript(&doc), "a captions session is a meeting by default");
+        assert_eq!(promote(&doc), None, "a meeting has nothing to promote");
+        let kept = as_transcript(doc);
+        assert!(is_transcript(&kept));
+        assert_eq!(kept["source"], "media");
+        let meeting = promote(&kept).unwrap();
+        assert!(!is_transcript(&meeting));
+        assert_eq!(meeting["source"], "island");
+        // Everything else (id, transcript, items) rides along unchanged.
+        assert_eq!((meeting["id"].clone(), meeting["transcript"].clone()), (kept["id"].clone(), kept["transcript"].clone()));
+        assert!(!is_transcript(&json!({ "id": "x" })) && !is_transcript(&json!(null)));
+    }
 
     #[test]
     fn a_paste_fills_the_calendar_meeting_and_adds_who_spoke() {

@@ -24,8 +24,8 @@ use crate::pages::PageKind;
 use crate::pill::quick_captions;
 use crate::state::AppState;
 use crate::ui::{wid, PillStyle, Ui, PILL_GAP, PILL_SMALL};
-use poni_core::geom::{palette, Rect};
-use poni_core::helper::PageState;
+use poni_core::geom::{palette, Color, Rect};
+use poni_core::helper::{Captions, PageState};
 use poni_core::capture::TranslateHint;
 use poni_core::models::Kind;
 
@@ -85,7 +85,7 @@ fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
         let label = if running { "Stop captions" } else { "Try again" };
         ("Captions need attention", why, true, Some(label), Go::Captions(!running))
     } else if running {
-        ("Listening to this PC", "Play a video or join a meeting. Its captions show up here and in the island, and are saved as a meeting when you stop.".to_string(), false, Some("Stop captions"), Go::Captions(false))
+        ("Listening to this PC", "Play a video or join a meeting. Its captions show up here and in the island, and are saved when you stop: a meeting as a meeting, a video as a transcript.".to_string(), false, Some("Stop captions"), Go::Captions(false))
     } else {
         ("Nothing to follow", "Start captions to caption whatever this PC plays: videos, Teams, Zoom. They also start by themselves when a video or a calendar meeting begins.".to_string(), false, Some("Start captions"), Go::Captions(true))
     };
@@ -126,6 +126,23 @@ fn translation_hint(ui: &mut Ui, st: &mut AppState, area: Rect, y: f32, hint: Tr
             st.cmd(Command::ModelPull(Kind::Translate));
         }
     }
+}
+
+/// The previous line dim, the current line large in `now`, its translation under it in the
+/// person's colour, from `y` in a column `w` wide (Live, and the Media page's caption column).
+/// Returns where the translation goes.
+pub(crate) fn caption_lines(ui: &mut Ui, st: &AppState, cap: &Captions, x: f32, mut y: f32, w: f32, now: Color) -> f32 {
+    if !cap.previous.is_empty() {
+        ui.c.text(&cap.previous, Rect::new(x, y, w, 18.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
+    }
+    y += 22.0;
+    ui.c.text(&cap.current, Rect::new(x, y, w, 46.0), &TextStyle::headline().color(now).wrap().top());
+    y += 50.0;
+    if !cap.translation.is_empty() {
+        let color = hkit::translation_color(ui, st.settings.translation_color);
+        ui.c.text(&cap.translation, Rect::new(x, y, w, 40.0), &TextStyle::body().color(color).wrap().top());
+    }
+    y
 }
 
 fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
@@ -190,18 +207,8 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     ui.c.text(&caption, Rect::new(head.x + 16.0, cy - 10.0, w, 20.0), &TextStyle::footnote().weight(Weight::Semibold).color(palette::TEXT_DIM));
 
     let cap = st.helper.captions();
-    let color = hkit::translation_color(ui, st.settings.translation_color);
-    let mut y = head.bottom() + 6.0;
-    if !cap.previous.is_empty() {
-        ui.c.text(&cap.previous, Rect::new(area.x, y, area.w, 18.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
-    }
-    y += 22.0;
-    let now_st = TextStyle::headline().color(if locked { palette::TEXT_DIM } else { palette::TEXT });
-    ui.c.text(&cap.current, Rect::new(area.x, y, area.w, 46.0), &now_st.wrap().top());
-    y += 50.0;
-    if !cap.translation.is_empty() {
-        ui.c.text(&cap.translation, Rect::new(area.x, y, area.w, 40.0), &TextStyle::body().color(color).wrap().top());
-    } else if let Some(h) = st.caption_hint.filter(|_| !locked && st.capture.running()) {
+    let y = caption_lines(ui, st, &cap, area.x, head.bottom() + 6.0, area.w, if locked { palette::TEXT_DIM } else { palette::TEXT });
+    if let Some(h) = st.caption_hint.filter(|_| cap.translation.is_empty() && !locked && st.capture.running()) {
         translation_hint(ui, st, area, y, h);
     }
     // Hold and Unfollow act on this view only. Start captions is the island's own capture of what
@@ -210,7 +217,7 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     if !locked {
         let (note, tone) = match st.capture.problem() {
             Some(why) => (why, palette::ORANGE),
-            None if st.capture.running() => ("Captions are saved as a meeting when you stop.", palette::TEXT_FAINT),
+            None if st.capture.running() => ("Saved when you stop: a meeting as a meeting, a video as a transcript.", palette::TEXT_FAINT),
             None => ("Hold and Unfollow change this view. Start captions listens to what this PC plays.", palette::TEXT_FAINT),
         };
         ui.c.text(note, Rect::new(area.x, area.bottom() - 14.0, (area.w - 70.0).max(0.0), 14.0), &TextStyle::caption().color(tone));

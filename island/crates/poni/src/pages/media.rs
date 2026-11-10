@@ -308,7 +308,7 @@ pub fn height(st: &AppState) -> f32 {
         return h;
     }
     if st.media.is_some() {
-        H_SESSION
+        H_SESSION + strip_height(st, column_for(st))
     } else {
         H_EMPTY
     }
@@ -321,7 +321,12 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let mut a = take_anim();
     let fr = a.frame(st.now, ui.c.alpha());
     if st.media.is_some() {
-        draw_session(ui, st, area, &mut a, &fr);
+        let which = column_for(st);
+        let (body, strip) = if which == Column::Captions { crate::pill::quick_captions::split(st, area) } else { (area, None) };
+        draw_session(ui, st, body, &mut a, &fr, which);
+        if let Some(r) = strip {
+            crate::pill::quick_captions::strip(ui, st, r, body);
+        }
     } else {
         let r = Rect::new(area.x, area.y, area.w, H_EMPTY);
         super::empty_state(ui, r, Icon::Music, "Nothing playing", "Play music in Spotify, a browser or any media app");
@@ -329,10 +334,10 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     put_anim(a);
 }
 
-fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &Frame) {
+fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &Frame, which: Column) {
     let now = st.now;
     let accent = st.media_accent();
-    let lyrics_enabled = st.settings.lyrics;
+    let lyrics_enabled = column_shown(st, which);
     let Some(m) = st.media.as_ref() else { return };
 
     let scale = ui.c.scale().max(0.5);
@@ -448,7 +453,8 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     let mut open_credit = false;
     let mut synced_shown = false;
     let mut get_ja_readings = false;
-    if show_lyrics {
+    let mut caption_this = false;
+    if show_lyrics && matches!(which, Column::Lyrics | Column::Offer) {
         let pronounce = st.settings.lyrics_pronunciation;
         // A Japanese song whose kanji went unread: the readings add-on coming
         // in (the app switched it on), or offered after a switch-off by hand.
@@ -459,6 +465,7 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
         synced_shown = out.synced;
         open_credit = out.open_credit;
         get_ja_readings = out.get_ja_readings;
+        caption_this = which == Column::Offer && draw_caption_offer(ui, st.accent, col);
     }
 
     // Real transitions (a lyric scroll catching up, a press) get full-rate
@@ -472,6 +479,12 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
 
     for c in acts {
         push_media(st, c);
+    }
+    if show_lyrics {
+        draw_side(ui, st, which, col);
+    }
+    if caption_this {
+        st.cmd(Command::Captions(true));
     }
     if open_credit {
         let url = source_url(lyrics_source(&st.lyrics)).to_string();
@@ -620,13 +633,115 @@ fn lyrics_view<'a>(lyr: &'a LyricsState, track_key: &str) -> View<'a> {
     match &lyr.status {
         LyricsStatus::Loading => View::Status { msg: "Finding lyrics\u{2026}", busy: true },
         LyricsStatus::Instrumental => View::Status { msg: "Instrumental", busy: false },
-        LyricsStatus::NotFound => View::Status { msg: "No synced lyrics for this song", busy: false },
+        LyricsStatus::NotFound => View::Status { msg: NO_SYNCED, busy: false },
         LyricsStatus::Error(_) | LyricsStatus::Idle => View::Status { msg: "Lyrics unavailable", busy: false },
         LyricsStatus::Found => match &lyr.lyrics {
             Some(l) if !l.is_empty() && l.synced => View::Synced(l),
             Some(l) if !l.is_empty() => View::Plain(l),
-            _ => View::Status { msg: "No synced lyrics for this song", busy: false },
+            _ => View::Status { msg: NO_SYNCED, busy: false },
         },
+    }
+}
+
+const NO_SYNCED: &str = "No synced lyrics for this song";
+
+/// What the right column shows (boards P02, P04 b).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Column {
+    /// The lyrics column as it always was (`draw_lyrics`).
+    Lyrics,
+    /// PMM-002: the running captions of a media source.
+    Captions,
+    /// PMM-015: this track's media session was kept as a transcript; "Save as meeting".
+    Kept,
+    /// PMM-003: "No synced lyrics" with "Caption this".
+    Offer,
+}
+
+/// Synced lyrics always keep the column; else running captions, else the transcript just kept,
+/// else "Caption this" under "No synced lyrics" while the song plays; else the lyrics column.
+pub(crate) fn column(synced: bool, no_lyrics: bool, captions: bool, kept: bool, playing: bool) -> Column {
+    if synced {
+        Column::Lyrics
+    } else if captions {
+        Column::Captions
+    } else if kept {
+        Column::Kept
+    } else if no_lyrics && playing {
+        Column::Offer
+    } else {
+        Column::Lyrics
+    }
+}
+
+/// [`column`] for what the app knows now. Captions count while they run for anything but a
+/// meeting (a meeting's captions belong to the Meeting tab).
+pub(crate) fn column_for(st: &AppState) -> Column {
+    let Some(m) = st.media.as_ref() else { return Column::Lyrics };
+    let lyrics_on = st.settings.lyrics;
+    let view = lyrics_view(&st.lyrics, &m.track_key);
+    let synced = lyrics_on && matches!(view, View::Synced(_));
+    let no_lyrics = lyrics_on && matches!(view, View::Status { msg, .. } if msg == NO_SYNCED);
+    let captions = st.capture.running() && !matches!(st.meeting_source, poni_core::meeting_source::SourceKind::Meeting { .. });
+    let kept = st.kept_transcript.as_ref().is_some_and(|(_, track)| *track == m.track_key);
+    column(synced, no_lyrics, captions, kept, m.is_playing())
+}
+
+/// The column shows: the lyrics are on, or it has captions or a kept transcript to show.
+pub(crate) fn column_shown(st: &AppState, c: Column) -> bool {
+    st.settings.lyrics || c != Column::Lyrics
+}
+
+/// The page height the Aa strip adds: only under the caption column (board P02 d).
+pub(crate) fn strip_height(st: &AppState, c: Column) -> f32 {
+    if c == Column::Captions {
+        crate::pill::quick_captions::extra_height(st)
+    } else {
+        0.0
+    }
+}
+
+/// "Caption this" under the "No synced lyrics" line (PMM-003). Returns true when pressed.
+pub(crate) fn draw_caption_offer(ui: &mut Ui, accent: Color, col: Rect) -> bool {
+    let vp = Rect::new(col.x, col.y, col.w, col.h - CREDIT_H - CREDIT_GAP);
+    let label = "Caption this";
+    let w = ui.pill_width(label, false, true);
+    let b = Rect::new(vp.center().x - w / 2.0, vp.center().y + 26.0, w, crate::ui::PILL_SMALL);
+    ui.pill(wid("media.caption_this"), b, label, None, crate::ui::PillStyle::Primary(accent)).clicked
+}
+
+/// The caption column (PMM-002, with Aa) or the kept transcript (PMM-015) in `col`.
+pub(crate) fn draw_side(ui: &mut Ui, st: &mut AppState, c: Column, col: Rect) {
+    match c {
+        Column::Captions => {
+            let cy = col.y + crate::ui::PILL_SMALL / 2.0;
+            let aa = crate::pill::quick_captions::aa_button(ui, st, col.right(), cy);
+            ui.c.fill_circle(Point::new(col.x + 4.0, cy), 3.5, palette::GREEN);
+            let label = TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT_DIM);
+            ui.c.text("CAPTIONS", Rect::new(col.x + 13.0, cy - 8.0, (aa - col.x - 17.0).max(0.0), 16.0), &label);
+            // Only the engine's fresh line: the newest saved meeting's last line is not this video.
+            let cap = if st.helper.on_live_line() { st.helper.captions() } else { Default::default() };
+            if cap.current.is_empty() {
+                let why = st.capture.problem().unwrap_or("Listening\u{2026}");
+                ui.c.text(why, Rect::new(col.x, cy + 18.0, col.w, 36.0), &TextStyle::footnote().color(palette::TEXT_DIM).wrap().top());
+            } else {
+                super::live::caption_lines(ui, st, &cap, col.x, cy + 14.0, col.w, palette::TEXT);
+            }
+        }
+        Column::Kept => {
+            let Some(id) = st.kept_transcript.as_ref().map(|(id, _)| id.clone()) else { return };
+            let c = col.center();
+            ui.c.icon(Icon::Check, Rect::from_center(Point::new(c.x, c.y - 38.0), 18.0, 18.0), palette::TEXT_DIM);
+            ui.c.text("Kept as transcript", Rect::new(col.x, c.y - 24.0, col.w, 20.0), &TextStyle::body().weight(Weight::Semibold).center());
+            ui.c.text("Video sessions are not meetings.", Rect::new(col.x, c.y - 4.0, col.w, 18.0), &TextStyle::footnote().color(palette::TEXT_DIM).center());
+            let label = "Save as meeting";
+            let w = ui.pill_width(label, false, true);
+            let b = Rect::new(c.x - w / 2.0, c.y + 20.0, w, crate::ui::PILL_SMALL);
+            if ui.pill(wid("media.save_as_meeting"), b, label, None, crate::ui::PillStyle::Primary(st.accent)).clicked {
+                st.cmd(Command::SaveAsMeeting(id));
+            }
+        }
+        Column::Lyrics | Column::Offer => {}
     }
 }
 
@@ -1188,6 +1303,19 @@ fn draw_plain(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_right_column_keeps_synced_lyrics_and_otherwise_follows_captions() {
+        use Column::*;
+        // (synced, no_lyrics, captions, kept, playing)
+        assert_eq!(column(true, false, true, true, true), Lyrics, "synced lyrics are never replaced");
+        assert_eq!(column(false, true, true, false, true), Captions, "PMM-002: captions instead of 'No synced lyrics'");
+        assert_eq!(column(false, false, true, false, true), Captions, "unsynced or still loading lyrics give way too");
+        assert_eq!(column(false, true, false, true, true), Kept, "PMM-015: a media session that just ended");
+        assert_eq!(column(false, true, false, false, true), Offer, "PMM-003: Caption this");
+        assert_eq!(column(false, true, false, false, false), Lyrics, "no offer while paused");
+        assert_eq!(column(false, false, false, false, true), Lyrics, "instrumental, unsynced or unavailable: as before");
+    }
 
     #[test]
     fn lyric_size_glides_and_rests_on_whole_layouts() {

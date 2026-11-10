@@ -138,6 +138,8 @@ pub enum Command {
     Notify(NotifyCmd),
     /// `POST /notes` to the helper with this body (a decision on a page).
     HelperPost(String),
+    /// A kept transcript (this id) becomes a meeting (PMM-015).
+    SaveAsMeeting(String),
     /// Ask the helper again now.
     HelperPoll,
     Calendar(CalendarCmd),

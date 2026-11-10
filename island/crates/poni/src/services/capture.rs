@@ -81,14 +81,18 @@ pub struct Meeting {
     pub start: String,
     pub locale: String,
     pub lines: Vec<helper::Line>,
+    /// A media session: kept as a transcript, not a meeting (PMM-015).
+    pub transcript: bool,
 }
 
 /// Save a session as a meeting: the engine drafts the summary, decisions and actions (best effort,
 /// the transcript is kept without them), then keeps the document. `Err` returns the lines.
 pub fn save_meeting(port: u16, m: Meeting) -> Result<String, (String, Vec<helper::Line>)> {
-    use poni_core::meeting_doc::{generate_body, generated_note, meeting_doc};
+    use poni_core::meeting_doc::{as_transcript, generate_body, generated_note, meeting_doc};
     let draft = helper::request(port, "POST", "/notes/generate", Some(&generate_body(&m.title, &m.lines))).ok().filter(|(c, _)| *c == 200).and_then(|(_, b)| generated_note(&b));
     let Some(doc) = meeting_doc(&m.id, &m.title, &m.date, &m.start, &m.locale, &m.lines, draft.as_ref()) else { return Err(("Nothing was heard.".into(), Vec::new())) };
+    // The draft is kept on a transcript too, so "Save as meeting" gives a meeting with its notes.
+    let doc = if m.transcript { as_transcript(doc) } else { doc };
     match helper::post_note(port, &doc.to_string()) {
         Ok(()) => Ok(m.id),
         Err(e) => Err((e, m.lines)),

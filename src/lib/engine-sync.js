@@ -63,7 +63,8 @@ export function startEngineSync({ lang = () => 'en', onError = () => {}, onSync 
     const mine = new Map((await listMeetings()).map((m) => [m.id, m]));
     let changed = 0;
     for (const doc of docs) {
-      if (!doc?.id || isDemoMeeting(doc) || dirty.has(doc.id)) continue;
+      // source 'media': a video the island kept as a transcript, not a meeting, until its "Save as meeting" (PMM-015).
+      if (!doc?.id || isDemoMeeting(doc) || doc.source === 'media' || dirty.has(doc.id)) continue;
       const own = mine.get(doc.id);
       if (own && sig(meetingToDoc(own, lang())) === sig(doc)) { seen.set(own.id, JSON.stringify(own)); continue; }
       const saved = await saveMeeting(docToMeeting(doc, lang(), own));

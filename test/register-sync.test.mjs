@@ -181,6 +181,16 @@ test('demo meetings are never pushed, nor imported from the engine, and are reco
   assert.ok(isDemoMeeting({ id: 'MOM-CPOC7-W36' }));
 });
 
+test('a video kept as a transcript stays out of the register until it is saved as a meeting (PMM-015)', async () => {
+  engineDocs.set('MOM-WIN-2', { ...islandDoc(), id: 'MOM-WIN-2', source: 'media' });
+  await settle(sync());
+  assert.deepEqual(await listMeetings(), [], 'a transcript is not a meeting');
+  assert.deepEqual(posts, [], 'and nothing is pushed or deleted for it');
+  engineDocs.set('MOM-WIN-2', { ...islandDoc(), id: 'MOM-WIN-2', source: 'island' }); // Save as meeting on the island
+  await settle(sync());
+  assert.deepEqual((await listMeetings()).map((m) => m.id), ['MOM-WIN-2']);
+});
+
 test('a register edit is written back to the engine', async () => {
   engineDocs.set('MOM-WIN-1731234567', islandDoc());
   const h = await settle(sync());

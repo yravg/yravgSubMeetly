@@ -293,9 +293,65 @@ impl Joined {
     }
 }
 
+/// What one captions session heard from over its whole run (PMM-015). A meeting at any moment
+/// makes it a meeting; media without a meeting keeps it as a transcript; neither (a room, sound
+/// with no media session) stays a meeting, as every session was before.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SessionSeen {
+    meeting: bool,
+    media: bool,
+    /// The first media title heard (the video's): it names the transcript.
+    pub title: Option<String>,
+}
+
+impl SessionSeen {
+    pub fn saw(&mut self, kind: &SourceKind, media_title: Option<&str>) {
+        match kind {
+            SourceKind::Meeting { .. } => self.meeting = true,
+            SourceKind::Media => {
+                self.media = true;
+                if self.title.is_none() {
+                    self.title = media_title.map(str::trim).filter(|t| !t.is_empty()).map(String::from);
+                }
+            }
+            SourceKind::None => {}
+        }
+    }
+
+    pub fn transcript(&self) -> bool {
+        self.media && !self.meeting
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_session_is_a_transcript_only_when_it_heard_media_and_never_a_meeting() {
+        let teams = SourceKind::Meeting { label: "Teams".into(), via: "ms-teams".into() };
+        let mut video = SessionSeen::default();
+        video.saw(&SourceKind::None, Some("ignored: no media yet"));
+        video.saw(&SourceKind::Media, Some("macOS 27.2.1 is out"));
+        video.saw(&SourceKind::Media, Some("the next video"));
+        video.saw(&SourceKind::None, None);
+        assert!(video.transcript());
+        assert_eq!(video.title.as_deref(), Some("macOS 27.2.1 is out"), "the first media title names it");
+
+        let mut call = SessionSeen::default();
+        call.saw(&SourceKind::Media, Some("a video"));
+        call.saw(&teams, None);
+        assert!(!call.transcript(), "a meeting at any moment keeps today's save");
+
+        let mut room = SessionSeen::default();
+        room.saw(&SourceKind::None, None);
+        assert!(!room.transcript(), "no source at all (a room, sound alone) stays a meeting");
+        assert!(!SessionSeen::default().transcript());
+
+        let mut untitled = SessionSeen::default();
+        untitled.saw(&SourceKind::Media, Some("  "));
+        assert_eq!((untitled.transcript(), untitled.title), (true, None));
+    }
 
     fn sig(sounding: &[&str], windows: &[(&str, &str)], mic: &[&str]) -> Signals {
         Signals {

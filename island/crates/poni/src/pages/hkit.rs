@@ -82,11 +82,16 @@ pub fn kind_color(k: Kind) -> Color {
 
 /// A small label in the kind's colour, left of an item's text. Returns its width.
 pub fn kind_chip(ui: &mut Ui, x: f32, cy: f32, k: Kind) -> f32 {
-    let st = TextStyle::caption().weight(Weight::Semibold).color(kind_color(k));
-    let w = ui.c.measure(k.label(), &st, 200.0).0.ceil() + 12.0;
+    chip(ui, x, cy, k.label(), kind_color(k))
+}
+
+/// A tinted capsule with `label` from `x`, centred on `cy`. Returns its width.
+pub fn chip(ui: &mut Ui, x: f32, cy: f32, label: &str, color: Color) -> f32 {
+    let st = TextStyle::caption().weight(Weight::Semibold).color(color);
+    let w = ui.c.measure(label, &st, 200.0).0.ceil() + 12.0;
     let r = Rect::new(x, cy - 9.0, w, 18.0);
-    ui.c.fill_rrect(r, 9.0, kind_color(k).with_alpha(0.16));
-    ui.c.text(k.label(), r, &st.center());
+    ui.c.fill_rrect(r, 9.0, color.with_alpha(0.16));
+    ui.c.text(label, r, &st.center());
     w
 }
 
