@@ -14,6 +14,7 @@ Use these justifications in the Chrome Web Store “single purpose” / permissi
 | `activeTab` / `tabs` | Resolve the current tab title/URL for the Side Panel target card and capture targeting. |
 | `contextMenus` | Optional right-click entry points into extension actions. |
 | `nativeMessaging` | Optional start/stop of the local Native Helper (loopback ASR). |
+| `downloads` (optional) | Not requested at install. Asked once, from a click, when the user exports from Ask Tide, so the file is saved with `chrome.downloads.download` and "Open" can show it in its folder with `chrome.downloads.show`. If declined, the export falls back to a normal browser download. |
 
 ## Policy compliance notes
 - No remote script tags / CDN runtime — ORT and VAD ship in the package.

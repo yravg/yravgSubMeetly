@@ -60,6 +60,7 @@ machine. That path is inert in the packaged extension.
 | `storage`, `unlimitedStorage` | Settings, session history, minutes, training progress, model cache |
 | `sidePanel`, `contextMenus` | The side-panel UI and its context-menu entries |
 | `nativeMessaging` | Starting/stopping the optional local helper without a terminal |
+| `downloads` (optional, asked only when you first export from Ask Tide) | Saving the exported file and showing it in its folder. Nothing is downloaded from the network by this permission |
 
 ## Your control
 

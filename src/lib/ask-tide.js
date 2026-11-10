@@ -7,7 +7,8 @@
  *  CLOUD_MODELS     tiga preset dari papan A03b; id OpenRouter dipetakan helper.
  *  trimHistory(h)   6 giliran terakhir.
  *  chatRequest({ provider, model, system, history, question, fetch, origin, signal })
- *                   → async iterable event SSE dari helper POST /ask:
+ *                   → async iterable event SSE dari helper POST /ask
+ *                     {provider, model, question, grounding, history≤6}:
  *                     { delta } … { done, model? } atau tepat satu { error }:
  *                     'helper-offline' (fetch gagal), 'not-connected' (404/501: helper tanpa
  *                     /ask, atau cloud tanpa kunci), 'http' + status untuk lainnya.
@@ -19,6 +20,9 @@
  *                   intent: recap | promises | open | translate-file | unknown.
  *                   Teks memakai **tebal** untuk angka kunci. Kartu: list | bars | action | link.
  *  proposeStatus(meetings, meetingId, refs, status) → kartu aksi; TIDAK mengubah apa pun.
+ *  exportAnswer(question, meetings, { now }) → null | { text, steps, card, file } untuk "Export …":
+ *                   berkas Markdown (butir terbuka / tipe yang disebut) + kartu export; tanpa baris
+ *                   → card dan file null. Tidak mengubah register. Penyimpanannya: ask-export.js.
  *  applyProposal(meeting, proposal) → rapat baru (salinan); melempar bila rapat lain
  *                   atau sudah terbit. Hanya dipanggil setelah pengguna menekan Confirm.
  */
@@ -30,6 +34,8 @@ export const PROVIDERS = [
   { id: 'register', label: 'Register only', needsConsent: false },
   { id: 'cloud', label: 'Cloud · OpenRouter', needsConsent: true },
 ];
+// Ids checked against https://openrouter.ai/api/v1/models on 2026-11-10: all three exist,
+// names match, and the "~1–3 credits" hint holds at the listed prices (a ~2k-token prompt).
 export const CLOUD_MODELS = [
   { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', hint: '~1–3 credits / answer' },
   { id: 'google/gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', hint: '~1–3 credits / answer' },
@@ -67,7 +73,7 @@ export async function* chatRequest({ provider, model = null, system, history = [
     res = await f(`${origin}/ask`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ provider, model, stream: true, messages: [{ role: 'system', content: system }, ...trimHistory(history), { role: 'user', content: question }] }),
+      body: JSON.stringify({ provider, model, question, grounding: system, history: trimHistory(history) }),
       signal,
     });
   } catch {
@@ -95,7 +101,20 @@ function latestItems(meetings) {
   }
   return [...map.values()];
 }
-const row = (i) => ({ ref: i.ref, type: i.type, text: textOf(i.text), owner: i.owner || null, due: i.due || null, status: i.status, meetingId: i.meetingId });
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Label at the right of a list row: Done, Overdue, "Due Wed" within the next week, else "Due 20 Nov". */
+function dueLabel(i, today) {
+  if (i.status === 'closed') return { label: 'Done', late: false };
+  if (!i.due) return { label: '', late: false };
+  if (i.due < today) return { label: 'Overdue', late: true };
+  const [y, m, d] = i.due.split('-').map(Number);
+  const [ty, tm, td] = today.split('-').map(Number);
+  const days = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86_400_000);
+  return { label: days < 7 ? `Due ${DAYS[new Date(y, m - 1, d).getDay()]}` : `Due ${d} ${MONTHS[m - 1]}`, late: false };
+}
+const rowOf = (titles, today) => (i) => ({ ref: i.ref, type: i.type, text: textOf(i.text), owner: i.owner || null, due: i.due || null, status: i.status, meetingId: i.meetingId, meeting: titles.get(i.meetingId) || '', ...dueLabel(i, today) });
+const listCard = (title, rows) => ({ kind: 'list', title, rows, meetings: new Set(rows.map((r) => r.meetingId)).size });
 const itemLine = (i) => {
   const parts = [i.owner && `owner ${i.owner}`, i.due && `due ${i.due}`, i.status].filter(Boolean);
   return `${i.ref} [${i.type}] ${textOf(i.text)} — ${parts.join(', ')}`;
@@ -142,6 +161,8 @@ export function registerAnswer(question, meetings = [], { now = new Date(), me =
   const intent = (INTENTS.find(([, re]) => re.test(question)) || ['unknown'])[0];
   const today = isoDay(now);
   const sorted = [...meetings].sort(byNewest);
+  const titles = new Map(meetings.map((m) => [m.id, m.title]));
+  const row = rowOf(titles, today);
   if (intent === 'recap') {
     const m = sorted[0];
     if (!m) return { intent, text: 'There is no meeting in the register yet.', steps: ['Looked at the register'], cards: [] };
@@ -151,25 +172,25 @@ export function registerAnswer(question, meetings = [], { now = new Date(), me =
       intent,
       text: `**${plural(m.items.length, 'item')}** in ${m.title} (${m.date})${words ? `: ${words}` : ''}.${m.issuedAt ? '' : ' The minutes are not issued yet.'}`,
       steps: [`Looked at ${m.title}`],
-      cards: [{ kind: 'bars', rows: counts }, { kind: 'list', rows: m.items.slice(0, 8).map((i) => row({ ...i, meetingId: m.id })) }],
+      cards: [{ kind: 'bars', rows: counts }, listCard(m.title, m.items.slice(0, 8).map((i) => row({ ...i, meetingId: m.id })))],
     };
   }
   if (intent === 'promises') {
     if (!me) return { intent, text: 'Tell me your name first: set it in the Minutes register (Mine filter), then ask again.', steps: [], cards: [] };
     const mine = latestItems(meetings).filter((i) => i.type === 'action' && i.status !== 'closed' && i.owner === me)
       .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
-    return { intent, text: `**${plural(mine.length, 'open action')}** owned by ${me}.`, steps: [`Looked at ${plural(meetings.length, 'meeting')}`], cards: mine.length ? [{ kind: 'list', rows: mine.map(row) }] : [] };
+    return { intent, text: `**${plural(mine.length, 'open action')}** owned by ${me}.`, steps: [`Looked at ${plural(meetings.length, 'meeting')}`], cards: mine.length ? [listCard('Your actions', mine.map(row))] : [] };
   }
   if (intent === 'open') {
     const open = latestItems(meetings).filter((i) => i.type === 'action' && i.status !== 'closed')
       .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
     const overdue = open.filter((i) => i.due && i.due < today);
-    const cards = open.length ? [{ kind: 'list', rows: open.map(row) }] : [];
+    const cards = open.length ? [listCard('Open actions', open.map(row))] : [];
     if (overdue.length) {
       const first = overdue[0].meetingId;
       const refs = overdue.filter((i) => i.meetingId === first).map((i) => i.ref);
       const m = meetings.find((x) => x.id === first);
-      if (m && !m.issuedAt) cards.push({ ...proposeStatus(meetings, first, refs, 'closed'), label: `Mark ${refs.join(', ')} done in ${m.title}?` });
+      if (m && !m.issuedAt) cards.push({ ...proposeStatus(meetings, first, refs, 'closed'), head: 'Mark as done', label: `${refs.join(', ')} · ${m.title}` });
     }
     return { intent, text: `**${plural(open.length, 'open action')}**, **${overdue.length} overdue**.`, steps: [`Looked at ${plural(meetings.length, 'meeting')}`], cards };
   }
@@ -177,4 +198,44 @@ export function registerAnswer(question, meetings = [], { now = new Date(), me =
     return { intent, text: 'Drop the file on the **Files** page; it is transcribed and translated on this device, then exported as TXT, SRT or VTT.', steps: [], cards: [{ kind: 'link', href: '#files', label: 'Open Files' }] };
   }
   return { intent, text: 'Register only answers recaps, promises and open actions. Switch to the Local model for other questions.', steps: [], cards: [] };
+}
+
+/* ---------- ekspor (kartu "Done · N rows · Open →") ---------- */
+const EXPORT_RE = /\b(export|ekspor|download|unduh)\b/i;
+const TYPE_PLURAL = { decision: 'Decisions', action: 'Actions', question: 'Questions', risk: 'Risks', metric: 'Metrics', info: 'Info items' };
+const cell = (v) => String(v ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ').trim();
+
+/**
+ * exportAnswer(question, meetings, { now }) → null bila bukan permintaan ekspor; selain itu
+ * { text, steps, card, file }. Cakupan: tipe yang disebut (bawaan action); "open" atau action
+ * = hanya yang belum closed. Tanpa baris → card dan file null. Format: Markdown. Tidak mengubah
+ * register, jadi tidak lewat kartu Confirm.
+ */
+export function exportAnswer(question, meetings = [], { now = new Date() } = {}) {
+  if (!EXPORT_RE.test(question)) return null;
+  const type = TYPES.find((t) => new RegExp(t, 'i').test(question)) || 'action';
+  const openOnly = type === 'action' || /\bopen\b/i.test(question);
+  const label = `${openOnly ? 'Open ' : ''}${openOnly ? TYPE_PLURAL[type].toLowerCase() : TYPE_PLURAL[type]}`;
+  const title = label[0].toUpperCase() + label.slice(1);
+  const titles = new Map(meetings.map((m) => [m.id, m.title]));
+  const rows = latestItems(meetings)
+    .filter((i) => i.type === type && (!openOnly || i.status !== 'closed'))
+    .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
+  const steps = [`Looked at ${plural(meetings.length, 'meeting')}`];
+  if (!rows.length) return { text: `There is nothing to export: no ${label.toLowerCase()} in the register.`, steps, card: null, file: null };
+  const day = isoDay(now);
+  const name = `${label.toLowerCase().replace(/\s+/g, '-')}-${day}.md`;
+  const content = [
+    `# ${title}`, '',
+    `Exported from yravgSubMeetly on ${day} · ${plural(rows.length, 'row')}`, '',
+    '| Ref | Item | Owner | Due | Status | Meeting |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...rows.map((i) => `| ${[i.ref, textOf(i.text), i.owner, i.due, i.status, titles.get(i.meetingId)].map(cell).join(' | ')} |`), '',
+  ].join('\n');
+  return {
+    text: `Exported **${plural(rows.length, 'row')}** to Markdown.`,
+    steps,
+    card: { kind: 'export', title: 'Export to Markdown', sub: `${title} · all series`, count: rows.length, filename: name },
+    file: { name, content, mime: 'text/markdown' },
+  };
 }
