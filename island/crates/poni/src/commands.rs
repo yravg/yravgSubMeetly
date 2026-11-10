@@ -76,6 +76,10 @@ pub enum Command {
     Media(MediaCmd),
     /// Open a file/folder with its default handler.
     OpenPath(String),
+    /// Settings › Meeting apps: add the host of the link on the clipboard.
+    MeetingAddLink,
+    /// Settings › Meeting apps: list the running apps with windows to pick from.
+    MeetingPickApps,
     /// Show a file in Explorer.
     RevealPath(String),
     /// Begin an OLE drag of these paths out of the island.

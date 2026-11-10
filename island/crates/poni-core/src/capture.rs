@@ -278,6 +278,8 @@ pub fn captionable_app(app_id: &str) -> bool {
     !["music", "spotify", "itunes", "foobar", "aimp", "winamp", "tidal", "deezer"].iter().any(|m| a.contains(m))
 }
 
+pub use crate::meeting_source::source_kind;
+
 /// Is a timed calendar meeting with a join link running at `unix`?
 pub fn meeting_now(cal: &crate::calendar::Calendar, unix: i64) -> bool {
     cal.events.iter().any(|e| !e.all_day && e.join_url.is_some() && e.start <= unix && unix < e.end)

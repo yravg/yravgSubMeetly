@@ -309,6 +309,17 @@ pub enum Key {
     WinLang(usize),
     /// Open Windows' own page for adding a language.
     WinLangSettings,
+    /// A built-in meeting family's switch.
+    MeetingFamily(poni_core::meeting_source::Family),
+    /// Remove the person's meeting app or host at this place in `meeting_apps`.
+    MeetingRemove(usize),
+    /// Add: the host of the meeting link on the clipboard.
+    MeetingAddLink,
+    /// Add: list the running apps to pick from.
+    MeetingPickApps,
+    /// Add the running app at this place in `AppState::meeting_pick`.
+    MeetingPickApp(usize),
+    OpenMeetingTab,
 }
 
 /// A row's control, at its right end.
@@ -340,6 +351,31 @@ fn item(key: Key, label: &str, sub: Option<&str>, ctl: Ctl) -> Item {
 
 fn switch(key: Key, label: &str, sub: Option<&str>, on: bool) -> Item {
     item(key, label, sub, Ctl::Switch(Some(on)))
+}
+
+/// Settings › Captions and languages › Meeting apps (canvas P07): the five families, the person's
+/// own entries, the Add rows, and the running apps while the picker is open. The kit has no dialog
+/// or text field: Paste link reads the clipboard (as the calendar does) and Pick lists apps inline.
+fn meeting_rows(st: &AppState) -> Vec<Item> {
+    use poni_core::meeting_source::{app_listed, Family, MeetingAppKind};
+    let s = &st.settings;
+    let mut rows: Vec<Item> = Family::ALL.iter().map(|&f| switch(Key::MeetingFamily(f), f.row().0, Some(f.row().1), f.on(&s.meeting_families))).collect();
+    for (i, a) in s.meeting_apps.iter().enumerate() {
+        let from = if a.kind == MeetingAppKind::Host { "a link" } else { "a running app" };
+        rows.push(item(Key::MeetingRemove(i), &a.label, Some(&format!("Added from {from}: {}", a.value)), Ctl::Button("Remove")));
+    }
+    rows.push(item(Key::MeetingAddLink, "Add a meeting app or link", Some("Pick a running app or paste a meeting link"), Ctl::Button("Paste link")));
+    match &st.meeting_pick {
+        None => rows.push(item(Key::MeetingPickApps, "Add a running app", Some("Its process name is kept; remove it later from the list"), Ctl::Button("Pick"))),
+        Some(apps) => rows.extend(apps.iter().enumerate().map(|(i, a)| {
+            if app_listed(a, &s.meeting_apps) {
+                item(Key::MeetingPickApp(i), a, Some("already in the list"), Ctl::None)
+            } else {
+                item(Key::MeetingPickApp(i), a, None, Ctl::Button("Add"))
+            }
+        })),
+    }
+    rows
 }
 
 /// A section's content, top to bottom.
@@ -528,6 +564,8 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                     switch(Key::TranslateCaptions, "Translate captions", Some("A second line in the language under Translate into (English by default)"), s.translate_captions),
                 ],
             ),
+            Block::Group(Some("Meeting apps"), meeting_rows(st)),
+            Block::Group(None, vec![switch(Key::OpenMeetingTab, "Open the Meeting tab when a meeting starts", Some("Otherwise captions start on Live and the tab only shows in the row"), s.open_meeting_tab)]),
             Block::Group(
                 Some("Languages"),
                 vec![
@@ -798,6 +836,32 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             st.cmd(Command::WinLang(WinLangCmd::OpenSettings));
             return;
         }
+        Key::MeetingFamily(f) => {
+            let on = f.switch(&mut s.meeting_families);
+            *on = !*on;
+        }
+        Key::MeetingRemove(i) => {
+            if i >= s.meeting_apps.len() {
+                return;
+            }
+            s.meeting_apps.remove(i);
+        }
+        Key::MeetingAddLink => {
+            st.cmd(Command::MeetingAddLink);
+            return;
+        }
+        Key::MeetingPickApps => {
+            st.cmd(Command::MeetingPickApps);
+            return;
+        }
+        Key::MeetingPickApp(i) => {
+            let Some(name) = st.meeting_pick.as_ref().and_then(|a| a.get(i)).cloned() else { return };
+            if !poni_core::meeting_source::add_app(&mut st.settings.meeting_apps, &name) {
+                return;
+            }
+            st.meeting_pick = None;
+        }
+        Key::OpenMeetingTab => s.open_meeting_tab = !s.open_meeting_tab,
     }
     st.cmd(Command::SaveSettings);
 }
@@ -1742,10 +1806,64 @@ mod tests {
                     Key::SettingsFile | Key::DataFolder | Key::ReleaseNotes | Key::LyricsCredit => assert!(opens, "{:?}", it.key),
                     // Windows' language rows ask the app, not the settings file.
                     Key::WinLang(_) | Key::WinLangSettings => assert!(st.cmds.iter().any(|c| matches!(c, Command::WinLang(_))), "{:?}", it.key),
+                    // Paste reads the clipboard and Pick lists running apps: the app does both.
+                    Key::MeetingAddLink => assert!(st.cmds.contains(&Command::MeetingAddLink)),
+                    Key::MeetingPickApps => assert!(st.cmds.contains(&Command::MeetingPickApps)),
                     _ => assert!(saved, "{:?} didn't save", it.key),
                 }
             }
         }
+    }
+
+    #[test]
+    fn meeting_apps_rows_follow_the_drawing() {
+        use poni_core::meeting_source::{Family, MeetingApp, MeetingAppKind};
+        let mut st = state();
+        st.settings.meeting_apps.push(MeetingApp { kind: MeetingAppKind::Host, value: "meeting.tencent.com".into(), label: "Tencent Meeting".into() });
+        let group = blocks(Section::Speech, &st)
+            .into_iter()
+            .find_map(|b| match b {
+                Block::Group(Some("Meeting apps"), items) => Some(items),
+                _ => None,
+            })
+            .expect("a Meeting apps group");
+        let shown: Vec<(&str, &str)> = group.iter().map(|i| (i.label.as_str(), i.sub.as_deref().unwrap_or(""))).collect();
+        assert_eq!(
+            shown,
+            [
+                ("Microsoft Teams", "Desktop app and classic Teams"),
+                ("Zoom", "Zoom.exe"),
+                ("Google Meet", "In a browser window that uses the microphone"),
+                ("Webex", "Desktop app"),
+                ("Slack huddles", "Huddle windows only"),
+                ("Tencent Meeting", "Added from a link: meeting.tencent.com"),
+                ("Add a meeting app or link", "Pick a running app or paste a meeting link"),
+                ("Add a running app", "Its process name is kept; remove it later from the list"),
+            ]
+        );
+        let open = row(Section::Speech, &st, Key::OpenMeetingTab).unwrap();
+        assert_eq!((open.label.as_str(), open.ctl), ("Open the Meeting tab when a meeting starts", Ctl::Switch(Some(true))));
+        assert!(group[..5].iter().all(|i| i.ctl == Ctl::Switch(Some(true))), "all five on by default");
+        apply(&mut st, Key::MeetingFamily(Family::Slack), Act::Toggle);
+        assert!(!st.settings.meeting_families.slack && st.settings.meeting_families.zoom);
+        apply(&mut st, Key::OpenMeetingTab, Act::Toggle);
+        assert!(!st.settings.open_meeting_tab);
+        apply(&mut st, Key::MeetingRemove(0), Act::Press);
+        assert!(st.settings.meeting_apps.is_empty());
+    }
+
+    #[test]
+    fn picking_a_running_app_keeps_its_process_name() {
+        let mut st = state();
+        st.meeting_pick = Some(vec!["ZohoMeeting.exe".into(), "Zoom.exe".into()]);
+        let pick: Vec<Item> = rows(Section::Speech, &st).into_iter().filter(|i| matches!(i.key, Key::MeetingPickApp(_))).collect();
+        assert_eq!(pick[0].ctl, Ctl::Button("Add"));
+        assert_eq!((pick[1].ctl.clone(), pick[1].sub.as_deref()), (Ctl::None, Some("already in the list")));
+        apply(&mut st, Key::MeetingPickApp(0), Act::Press);
+        assert_eq!(st.settings.meeting_apps[0].value, "ZohoMeeting.exe");
+        assert!(st.meeting_pick.is_none(), "the list closes after a pick");
+        let added = row(Section::Speech, &st, Key::MeetingRemove(0)).unwrap();
+        assert_eq!((added.sub.as_deref(), added.ctl), (Some("Added from a running app: ZohoMeeting.exe"), Ctl::Button("Remove")));
     }
 
     #[test]

@@ -158,6 +158,8 @@ pub enum AppEvent {
     Capture(crate::services::capture::CaptureEvent),
     /// The PC started (true) or stopped playing sound (`services::meter`).
     Sound(bool),
+    /// Windows and microphone users changed (`services::meeting_probe`).
+    MeetingSignals(crate::services::meeting_probe::Seen),
     /// A captioned session saved as a meeting (its id), or why not, with its lines back.
     MeetingSaved(Result<String, (String, Vec<poni_core::helper::Line>)>),
     /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.

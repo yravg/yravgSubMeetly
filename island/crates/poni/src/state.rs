@@ -595,6 +595,14 @@ pub struct AppState {
     pub calendar_day: Option<i64>,
     /// The island's own capture of what the PC plays (`services::capture`).
     pub capture: poni_core::capture::CaptureState,
+    /// Where the sound playing now goes: a meeting, media or nothing (PMM-004).
+    pub meeting_source: poni_core::meeting_source::SourceKind,
+    /// The probe's last windows and microphone users.
+    pub meeting_seen: crate::services::meeting_probe::Seen,
+    /// The meeting link joined last, active for 10 minutes (PMM-018).
+    pub joined: poni_core::meeting_source::Joined,
+    /// Running apps offered by Settings › Meeting apps › Pick, while that list is open.
+    pub meeting_pick: Option<Vec<String>>,
     /// What the last caption said about its translation (missing, loading), for the Live page.
     pub caption_hint: Option<poni_core::capture::TranslateHint>,
     /// The engine's models and the download under way (Settings, the Live page).
@@ -681,6 +689,10 @@ impl AppState {
             calendar_past: false,
             calendar_day: None,
             capture: Default::default(),
+            meeting_source: poni_core::meeting_source::SourceKind::None,
+            meeting_seen: Default::default(),
+            joined: Default::default(),
+            meeting_pick: None,
             caption_hint: None,
             models: Default::default(),
             cmds: Vec::new(),

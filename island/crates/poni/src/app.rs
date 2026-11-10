@@ -1823,7 +1823,47 @@ impl App {
         let playing = self.st.media.as_ref().filter(|m| m.is_playing());
         let music = playing.is_some_and(|m| !poni_core::capture::captionable_app(&m.app_id));
         let video = playing.is_some_and(|m| poni_core::capture::captionable_app(&m.app_id));
-        (self.sound_on && !music && !self.st.prayer.adzan) || video || self.st.helper.calendar.as_ref().is_some_and(|c| poni_core::capture::meeting_now(c, self.st.unix))
+        (self.sound_on && !music && !self.st.prayer.adzan)
+            || video
+            || self.st.helper.calendar.as_ref().is_some_and(|c| poni_core::capture::meeting_now(c, self.st.unix))
+            || matches!(self.st.meeting_source, poni_core::meeting_source::SourceKind::Meeting { .. })
+    }
+
+    /// Classify what plays now (PMM-004) from the probe, the media session, the calendar and the
+    /// joined link; log each change. Tab routing reads `st.meeting_source` (later step).
+    fn meeting_source_step(&mut self) {
+        use poni_core::meeting_source::{source_kind, Signals, SourceKind};
+        let playing = self.st.media.as_ref().filter(|m| m.is_playing()).map(|m| m.app_id.clone());
+        if let Some(s) = self.services.as_ref() {
+            s.meeting_probe_active(self.sound_on || playing.is_some());
+        }
+        let sig = Signals {
+            sounding: playing.into_iter().collect(),
+            windows: self.st.meeting_seen.windows.clone(),
+            mic: self.st.meeting_seen.mic.clone(),
+            calendar_meeting: self.st.helper.calendar.as_ref().is_some_and(|c| poni_core::capture::meeting_now(c, self.st.unix)),
+            joined: self.st.joined.active(self.st.now).map(String::from),
+        };
+        let kind = source_kind(&sig, &self.st.settings.meeting_families, &self.st.settings.meeting_apps);
+        if kind != self.st.meeting_source {
+            match &kind {
+                SourceKind::Meeting { label, via } => pinfo!("meeting source: {label} ({via})"),
+                SourceKind::Media => pinfo!("meeting source: media"),
+                SourceKind::None => pinfo!("meeting source: none"),
+            }
+            self.st.meeting_source = kind;
+        }
+    }
+
+    /// A meeting link was joined (Today › Join; later the Meeting tab's pasted link): its host is
+    /// the active meeting for 10 minutes. Returns the host when it is unknown, so the caller can
+    /// offer "Always treat <host> as a meeting".
+    pub fn join_link(&mut self, link: &str) -> Option<String> {
+        let host = poni_core::meeting_source::host_of(link)?;
+        self.st.joined.joined(&host, self.st.now);
+        pinfo!("meeting joined: {host}");
+        self.meeting_source_step();
+        (!poni_core::meeting_source::is_known_host(&host, &self.st.settings.meeting_apps)).then_some(host)
     }
 
     fn auto_captions_step(&mut self) {
@@ -2636,6 +2676,7 @@ impl App {
             AppEvent::Capture(e) => self.on_capture(e),
             AppEvent::Sound(on) => {
                 self.sound_on = on;
+                self.meeting_source_step();
                 self.auto_captions_step();
             }
             AppEvent::MeetingSaved(r) => self.on_meeting_saved(r),
@@ -2709,10 +2750,16 @@ impl App {
             AppEvent::AdzanEnded => self.adzan_ended(),
             AppEvent::Download { id, line } => self.download_line(id, line),
             AppEvent::DownloadEnded { id, ok } => self.download_ended(id, ok),
+            AppEvent::MeetingSignals(seen) => {
+                self.st.meeting_seen = seen;
+                self.meeting_source_step();
+                self.auto_captions_step();
+            }
             AppEvent::Log(s) => pinfo!("{s}"),
         }
         if let Some(before) = media_before {
             self.after_media_change(before, now);
+            self.meeting_source_step();
         }
         if !unseen {
             self.request_frame();
@@ -4391,6 +4438,30 @@ impl App {
                     }
                 }
                 Command::OpenPath(p) => shell::open(&p),
+                Command::MeetingAddLink => {
+                    let text = services::clipboard::read_text(self.hwnd).unwrap_or_default();
+                    match poni_core::meeting_source::add_link(&mut self.st.settings.meeting_apps, &text) {
+                        Some(host) => {
+                            pinfo!("meeting apps: added {host}");
+                            self.st.notify(Icon::Calendar, palette::GREEN, "Added to Meeting apps", format!("Kept: {host}"), 4.0, None);
+                            self.st.cmd(Command::SaveSettings);
+                        }
+                        None => self.st.notify(Icon::Calendar, palette::ORANGE, "No new meeting link copied", "Copy a meeting link first, then Paste link", 5.0, None),
+                    }
+                    if let Some(w) = self.settings_win.as_mut() {
+                        w.view.dirty = true;
+                    }
+                }
+                Command::MeetingPickApps => {
+                    let mut apps: Vec<String> = services::meeting_probe::windows().into_iter().map(|(p, _)| p).collect();
+                    apps.sort_by_key(|a| a.to_ascii_lowercase());
+                    apps.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+                    apps.retain(|a| !a.eq_ignore_ascii_case("explorer.exe") && !a.eq_ignore_ascii_case("yravgSubMeetly.exe"));
+                    self.st.meeting_pick = Some(apps);
+                    if let Some(w) = self.settings_win.as_mut() {
+                        w.view.dirty = true;
+                    }
+                }
                 Command::RevealPath(p) => shell::reveal(&p),
                 Command::DragOut(paths) => deferred.push(Deferred::DragOut(paths)),
                 Command::LoadThumb(p) => {
@@ -4485,10 +4556,16 @@ impl App {
                 Command::Calendar(c) => self.calendar_cmd(c),
                 Command::Captions(on) => self.captions_by_hand(on),
                 Command::PasteTranscript => self.paste_transcript(),
-                Command::JoinMeeting(u) => match poni_core::calendar::teams_app_link(&u).filter(|_| crate::window::url_scheme_registered("msteams")) {
-                    Some(app) => shell::open_teams(&app, &u),
-                    None => shell::open(&u),
-                },
+                Command::JoinMeeting(u) => {
+                    // shortcut: the unknown-host offer has no UI yet (Meeting tab, later step); only logged.
+                    if let Some(host) = self.join_link(&u) {
+                        pinfo!("meeting host not in Meeting apps: {host}");
+                    }
+                    match poni_core::calendar::teams_app_link(&u).filter(|_| crate::window::url_scheme_registered("msteams")) {
+                        Some(app) => shell::open_teams(&app, &u),
+                        None => shell::open(&u),
+                    }
+                }
                 Command::ModelsRefresh => self.refresh_models(),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),

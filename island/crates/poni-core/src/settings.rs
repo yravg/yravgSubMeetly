@@ -146,6 +146,12 @@ pub struct Settings {
     pub auto_captions: bool,
     /// Captions carry a translation into `target_lang` (on by default, English); off: the spoken line only.
     pub translate_captions: bool,
+    /// Meeting apps and hosts the person added (Settings › Meeting apps).
+    pub meeting_apps: Vec<crate::meeting_source::MeetingApp>,
+    /// One switch per built-in meeting family; one switched off counts as media.
+    pub meeting_families: crate::meeting_source::MeetingFamilies,
+    /// Open the Meeting tab when a meeting starts; off: captions start on Live.
+    pub open_meeting_tab: bool,
     pub hud_volume: bool,
     pub hud_power: bool,
     pub hud_bluetooth: bool,
@@ -247,6 +253,9 @@ impl Default for Settings {
             captions_on: false,
             auto_captions: true,
             translate_captions: true,
+            meeting_apps: Vec::new(),
+            meeting_families: Default::default(),
+            open_meeting_tab: true,
             hud_volume: true,
             hud_power: true,
             hud_bluetooth: true,
@@ -380,6 +389,15 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_old_file_gets_the_meeting_defaults() {
+        let s: Settings = serde_json::from_str(r#"{"auto_captions":false}"#).unwrap();
+        assert!(s.meeting_apps.is_empty() && s.open_meeting_tab && s.meeting_families.slack && s.meeting_families.teams);
+        let s: Settings = serde_json::from_str(r#"{"meeting_families":{"slack":false},"meeting_apps":[{"kind":"host","value":"meeting.tencent.com","label":"Tencent Meeting"}]}"#).unwrap();
+        assert!(!s.meeting_families.slack && s.meeting_families.zoom);
+        assert_eq!(s.meeting_apps[0].value, "meeting.tencent.com");
+    }
 
     #[test]
     fn partial_json_fills_defaults() {

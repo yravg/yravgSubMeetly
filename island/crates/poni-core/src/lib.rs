@@ -26,6 +26,7 @@ pub mod lang_prefs;
 pub mod lrclib;
 pub mod lyric_tr;
 pub mod meeting_doc;
+pub mod meeting_source;
 pub mod mediaremote;
 pub mod models;
 pub mod notifications;

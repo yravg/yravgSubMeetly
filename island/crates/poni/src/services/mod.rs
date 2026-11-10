@@ -23,6 +23,7 @@ pub mod imaging;
 pub mod lyric_translate;
 pub mod location;
 pub mod lyrics;
+pub mod meeting_probe;
 pub mod media;
 pub mod meter;
 pub mod models;
@@ -56,6 +57,8 @@ pub struct Services {
     _audio: Option<audio::AudioService>,
     /// Sound on the output, for captions that start by themselves.
     _meter: Option<meter::MeterService>,
+    /// Windows and microphone users, for the meeting source (PMM-004).
+    meeting_probe: Option<meeting_probe::MeetingProbe>,
     _bluetooth: Option<bluetooth::BluetoothService>,
     fullscreen: Option<fullscreen::FullscreenWatcher>,
     pairdrop: Option<pairdrop::PairDropService>,
@@ -90,6 +93,7 @@ impl Services {
         let lyric_tr = started("lyrics translation", lyric_translate::LyricTranslateService::start(sink.clone()));
         let audio = started("audio", audio::AudioService::start(sink.clone()));
         let meter = started("sound meter", meter::MeterService::start(sink.clone()));
+        let meeting_probe = started("meeting probe", meeting_probe::MeetingProbe::start(sink.clone()));
         let bluetooth = started("bluetooth", bluetooth::BluetoothService::start(sink.clone()));
         let fullscreen = started("fullscreen", fullscreen::FullscreenWatcher::start(helper, sink.clone()));
         // Asks nothing until a phone is paired.
@@ -114,6 +118,7 @@ impl Services {
             lyric_tr,
             _audio: audio,
             _meter: meter,
+            meeting_probe,
             _bluetooth: bluetooth,
             fullscreen,
             pairdrop,
@@ -239,6 +244,13 @@ impl Services {
     pub fn watch_top(&self, band: Option<RECT>) {
         if let Some(f) = &self.fullscreen {
             f.watch_top(band);
+        }
+    }
+
+    /// Look for a meeting only while sound or media plays.
+    pub fn meeting_probe_active(&self, on: bool) {
+        if let Some(p) = &self.meeting_probe {
+            p.set_active(on);
         }
     }
 

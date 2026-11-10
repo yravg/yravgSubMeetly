@@ -16,7 +16,7 @@ Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private
 | 3b. Owner sign-off on canvas | waived | owner 2026-11-10: proceed with the build once boards are finished |
 | 4. Build PMM-001 .. PMM-027 | in progress | orchestrator `pmm-lead` (Fable 5.2), checkpoint `.checkpoints/pmm-lead.md`; build steps below |
 | 4.1 PMM-001 rename + PMM-024 register real records | done | island 1.3.0 installed (`island/dist/yravgSubMeetly-Setup-1.3.0.exe`, sha256 9ccad895...b8a7). Tests: poni 291 pass / 6 ignored (`media_tab_reads_media`, `media_section_title`), poni-core 531; `test/register-sync.test.mjs` 9 + `test/register-sync-page.test.mjs` 2. Seen headless on the installed engine: register lists 10 island meetings, pill "Synced with island · just now", no write requests. Not seen on screen: the Media tab label on the pill |
-| 4.2 PMM-004/017/018 classifier + PMM-014 Settings rows | open | |
+| 4.2 PMM-004/017/018 classifier + PMM-014 Settings rows | done, part open | island 1.3.1. Tests: poni 293 pass / 6 ignored, poni-core 544 (`meeting_source` 12 tests incl. `every_family_is_a_meeting`, `a_joined_link_stays_active_for_ten_minutes`; `an_old_file_gets_the_meeting_defaults`; `meeting_apps_rows_follow_the_drawing`, `picking_a_running_app_keeps_its_process_name`). Full `npm test` after step 4.1: 686 / 674 pass / 0 fail / 12 skipped. Open: "Paste a meeting link" and the "Always treat <host> as a meeting" offer have no UI until the Meeting tab (4.5; unknown host is only logged). Differs from P07: no Add dialog (the settings kit has no dialog or text field): "Paste link" reads the clipboard, "Add a running app" › Pick lists apps inline; "Kept: <host>" is a notice. Not seen: a real Teams/Zoom/Meet call, the Settings rows on screen |
 | 4.3 PMM-011/012/013 Aa strip, pop-up language pills | open | |
 | 4.4 PMM-002/003/015 Media caption column | open | |
 | 4.5 PMM-005..009 Meeting tab with live notes | open | |
@@ -47,4 +47,4 @@ Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private
 
 ## Next step
 
-Step 4.2: meeting-source classifier (`poni_core::capture::source_kind`), `settings.meeting_apps`, pasted-link window, Settings rows.
+Step 4.3: Aa quick strip on Live (shared component), language list, pop-up language pills.
