@@ -26,12 +26,13 @@ export const PRD = {
 const st = (id, src, stat, text, gap) => ({ id, src, stat, text, gap });
 
 /* ---------- pill pieces ---------- */
-const TABS = [['Lyrics', 'live'], ['Call', 'meeting'], ['Clipboard', 'minutes'], ['CheckCircle', 'inbox'], ['Calendar', 'today'], ['Clock', 'timer'], ['Volume', 'talk'], ['Cpu', 'engine'], ['Music', 'media'], ['Tray', 'shelf'], ['ListChecks', 'tasks'], ['Timer', 'focus'], ['Gauge', 'system'], ['Script', 'script'], ['Addons', 'addons']];
-const TITLE = { live: 'Live', meeting: 'Meeting', minutes: 'Minutes', media: 'Media', inbox: 'Inbox', today: 'Today' };
+const TABS = [['Lyrics', 'live'], ['Call', 'meeting'], ['Clipboard', 'minutes'], ['CheckCircle', 'inbox'], ['Calendar', 'today'], ['Clock', 'timer'], ['Volume', 'talk'], ['Cpu', 'engine'], ['Music', 'media'], ['Sliders', 'captions'], ['Tray', 'shelf'], ['ListChecks', 'tasks'], ['Timer', 'focus'], ['Gauge', 'system'], ['Script', 'script'], ['Addons', 'addons']];
+const TITLE = { captions: 'Captions', live: 'Live', meeting: 'Meeting', minutes: 'Minutes', media: 'Media', inbox: 'Inbox', today: 'Today' };
 /** Pill header. meeting: hidden | ghost | idle | live. markMeeting wraps the Meeting tab in NEW; markMedia wraps the active Media tab in PARTIAL. */
-export function header({ active = 'live', meeting = 'hidden', media = 'Media', skip = [], markMeeting = false, markMedia = false, clock = '15:51' } = {}) {
+export function header({ active = 'live', meeting = 'hidden', media = 'Media', skip = [], markMeeting = false, markMedia = false, captions = false, markCaptions = false, clock = '15:51' } = {}) {
   const tabs = TABS.map(([icon, id]) => {
     if (skip.includes(id)) return '';
+    if (id === 'captions') { if (!captions) return ''; const el = active === 'captions' ? `<div class="tb on">${ic(icon, 16)}<span>Captions</span></div>` : `<div class="tb">${ic(icon, 16)}</div>`; return markCaptions ? NEW(el, 'display:flex', 'tbw') : el; }
     if (id === 'meeting') {
       if (meeting === 'hidden') return '';
       if (meeting === 'ghost') return '<div class="ghost" title="hidden until a meeting runs"></div>';
@@ -70,15 +71,16 @@ const liveBody = (extra = '', s = '', { list = '' } = {}) => `${GUIDE('Captions 
 const live = ({ aa = false, s = '', list = '', markStrip = false } = {}) => pill(header({ active: 'live', meeting: 'hidden' }), liveBody(aa === false ? '' : AA(aa === 'on'), markStrip ? NEW(s, '', 'sw0') : s, { list }));
 
 const CAP_L = `<div class="p">The tower crane is booked until noon.</div><div class="pt">塔吊中午前已被占用。</div><div class="p">Which slot is free after that?</div><div class="pt">之后哪个时段有空？</div><div class="p">The permit for level 5 is still pending.</div><div class="pt">五层的许可证还在审批中。</div><div class="p">We can't lift before the permit is checked.</div><div class="pt">许可证查清之前不能起吊。</div><div class="p">Chen, can you check it today?</div><div class="pt">陈，你今天能查一下吗？</div><div class="c">So move the crane slot to Thursday morning.</div><div class="tr">所以把吊车时段改到周四上午。</div>`;
-const notesCol = ({ mode = 'ok', selected = true }) => {
+const notesCol = ({ mode = 'ok', selected = true, txt = {} }) => {
+  const T = { sum: 'Crane slot moves to Thursday; the lift waits for the permit check.', dec: 'Move the crane slot to Thursday 08:00', keep: 'Permit check before any lift', act: [['Confirm the lift permit with the yard', 'Chen · Fri'], ['Send the revised plan', 'Alya · Wed']], q: 'Who covers the night watch on Friday?', ...txt };
   const acts = selected ? `<span class="ac"><span title="Keep">${ic('Check', 12)}</span><span title="Edit">${ic('Edit', 12)}</span><span title="Remove">${ic('Close', 12)}</span></span>` : '';
   const sk = '<div class="sk" style="width:92%"></div><div class="sk" style="width:64%"></div>';
   const body = mode === 'refresh'
     ? `<div class="ns"><div class="k s">Summary</div>${sk}</div><div class="ns"><div class="k d">Decisions</div><div class="it"><span class="kp">${ic('Pin', 11)}</span><span class="tx">Permit check before any lift</span></div><div class="sk" style="width:80%"></div></div><div class="ns"><div class="k a">Action items</div>${sk}</div><div class="ns"><div class="k q">Questions</div><div class="sk" style="width:70%"></div></div>`
-    : `<div class="ns"><div class="k s">Summary</div><div class="it"><span class="tx">Crane slot moves to Thursday; the lift waits for the permit check.</span></div></div>
-<div class="ns"><div class="k d">Decisions</div><div class="it${selected ? ' sel' : ''}"><span class="tx">Move the crane slot to Thursday 08:00</span>${acts}</div><div class="it"><span class="kp">${ic('Pin', 11)}</span><span class="tx">Permit check before any lift</span><span class="kp">Kept</span></div></div>
-<div class="ns"><div class="k a">Action items</div><div class="it"><span class="tx">Confirm the lift permit with the yard</span><span class="ow">Chen &middot; Fri</span></div><div class="it"><span class="tx">Send the revised plan</span><span class="ow">Alya &middot; Wed</span></div></div>
-<div class="ns"><div class="k q">Questions</div><div class="it"><span class="tx">Who covers the night watch on Friday?</span></div></div>`;
+    : `<div class="ns"><div class="k s">Summary</div><div class="it"><span class="tx">${T.sum}</span></div></div>
+<div class="ns"><div class="k d">Decisions</div><div class="it${selected ? ' sel' : ''}"><span class="tx">${T.dec}</span>${acts}</div><div class="it"><span class="kp">${ic('Pin', 11)}</span><span class="tx">${T.keep}</span><span class="kp">Kept</span></div></div>
+<div class="ns"><div class="k a">Action items</div>${T.act.map(([t, o]) => `<div class="it"><span class="tx">${t}</span><span class="ow">${o}</span></div>`).join('')}</div>
+<div class="ns"><div class="k q">Questions</div><div class="it"><span class="tx">${T.q}</span></div></div>`;
   const stamp = mode === 'refresh' ? 'Refreshing&hellip;' : mode === 'down' ? 'Paused &middot; last draft 2 min ago' : 'Updated 20 s ago';
   const warn = mode === 'down' ? `<div class="warn">${ic('Gear', 14)}Notes paused: engine not answering<span class="btn util" style="margin-left:auto;height:22px;background:#fff">Try again</span></div>` : '';
   return `<div class="nt"><div class="nh"><span class="cap" style="color:#131B44">Notes so far</span><span class="ai">AI draft</span><span class="up">${stamp}</span></div>${warn}<div style="display:flex;flex-direction:column;gap:7px;${mode === 'down' ? 'opacity:.55' : ''}">${body}</div><div class="pa"><span>Kept and typed notes never get overwritten</span>${NEW('<span class="btn">+ Note</span>', 'display:inline-flex', 'nw')}</div></div>`;
@@ -314,3 +316,5 @@ const P07 = () => {
 };
 
 export const BOARDS = [P01(), P02(), P03(), P04(), P05(), P06(), P07()];
+
+export { pill, AA, GUIDE, notesCol, liveHead, todayLive, note, grp, grpR, kk, before, st, sw };

@@ -7,7 +7,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BOARD_CSS, PILL_CSS, esc, bt, paneCss, ixScript, ixDc, tokenize } from './kit.mjs';
-import { BOARDS, PRD, PRD_FILE } from './boards.mjs';
+import { BOARDS as BOARDS1, PRD, PRD_FILE } from './boards.mjs';
+import { BOARDS2, PRD2 } from './boards2.mjs';
+import { EXTRA_CSS } from './kit2.mjs';
+const BOARDS = [...BOARDS1, ...BOARDS2];
+Object.assign(PRD, PRD2);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const LABEL = { new: 'NEW', partial: 'PARTIAL', built: 'BUILT' };
@@ -47,13 +51,13 @@ const statusRows = Object.entries(PRD).map(([id, [pri, title, status]]) => {
 }).join('');
 const unplaced = Object.keys(PRD).filter((id) => !boardsOf(id).length);
 
-const cover = `<section class="cover" id="cover"><div class="ey"><span class="tier">COVER</span><span>yravgSubMeetly · island 1.2.9 next feature</span></div>
+const cover = `<section class="cover" id="cover"><div class="ey"><span class="tier">COVER</span><span>yravgSubMeetly · island 1.2.9 next features (rounds 1 and 2)</span></div>
 <h1>Media, Meeting and quick caption settings on the pill</h1>
-<p>Design canvas before the build: Music becomes Media and shows captions; a new Meeting tab holds live captions with the minutes so far; Live gets a quick caption strip so language and translation changes no longer need Advanced settings. PRD: ${PRD_FILE}. All meeting names, people and the video on the boards are sample data.</p>
+<p>Design canvas before the build: Music becomes Media and shows captions; a new Meeting tab holds live captions with the minutes so far; Live gets a quick caption strip so language and translation changes no longer need Advanced settings. Round 2 (P08-P12): Live becomes the room (microphone, Meeting layout, offline); an optional Captions tab holds every caption setting; Minutes compiles every tab's records; the register page shows the real records instead of the CPOC demo; captions get interim text and a timeline against today. PRD: ${PRD_FILE}. All meeting names, people and the video on the boards are sample data.</p>
 <div class="tiles"><div class="tile"><b>${BOARDS.length}</b>boards</div><div class="tile"><b>${prdRows}</b>PRD rows</div><div class="tile"><b>${p0Rows}</b>P0 rows</div><div class="tile"><b>${newControls}</b>new controls drawn</div></div>
 <div class="legend"><span class="lg lgn">NEW: does not exist yet</span><span class="lg lgp">PARTIAL: exists, needs change</span><span>Navy notes: what happens on press, hover or when something is missing</span></div>
 <h3>Options chosen</h3>
-<p>Before and After where a real Before exists: P01 and P02 use the real capture of the Music page; P07 uses the real Settings capture. Other boards: "Before: not capturable (the island window is excluded from screen capture); drawn from today's code", with a drawn Before that says so. No reference strips. Light theme first (the island default); Settings stays dark because that window is dark.</p>
+<p>Before and After where a real Before exists: P01 and P02 use the real capture of the Music page; P07 uses the real Settings capture. P11 draws its Before from code and the fixture (the CPOC W35 / W36 demo meetings). Other boards: "Before: not capturable (the island window is excluded from screen capture); drawn from today's code", with a drawn Before that says so. No reference strips. Light theme first (the island default); Settings stays dark because that window is dark.</p>
 <h3>Status of the ${prdRows} PRD rows (PRD status; canvas status is how the board marks the row)</h3>
 <table class="stt"><thead><tr><th>ROW</th><th>P</th><th>REQUIREMENT</th><th>PRD STATUS</th><th>BOARD</th><th>CANVAS</th></tr></thead><tbody>${statusRows}</tbody></table></section>`;
 
@@ -64,7 +68,7 @@ const index = `<section class="index" id="index"><div class="ey"><span class="ti
 const toc = `<nav class="toc"><a href="#cover">Cover and status</a><a href="#index">Story index</a>${BOARDS.map((b) => `<a href="#${b.id}">${b.id} ${esc(b.title)}</a>`).join('')}</nav>`;
 const body = `<div class="page">${toc}<main class="cv">${cover}${index}${BOARDS.map(boardHtml).join('\n')}</main></div>`;
 const FONT = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@500;600&display=swap';
-const css = [BOARD_CSS, PILL_CSS, paneCss(body)].join('\n');
+const css = [BOARD_CSS, PILL_CSS, EXTRA_CSS, paneCss(body)].join('\n');
 const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1640"><title>Pill Media and Meeting canvas</title>
 <link rel="stylesheet" href="${FONT}">
 <style>${css}</style></head><body>${body}${ixScript}</body></html>`;
@@ -120,6 +124,7 @@ if (di > 0) {
 body{margin:0}
 ${BOARD_CSS}
 ${PILL_CSS}
+${EXTRA_CSS}
 ${paneCss(s)}
 </style>
 </helmet>
@@ -136,7 +141,7 @@ ${logic || 'class Component extends DCLogic { renderVals() { return {}; } }'}
   });
   // v3 index: cover and story index on the first row, then boards in rows of 4.
   const byId = Object.fromEntries(out.map((o) => [o.id, o]));
-  const rows = [['cover', 'index'], BOARDS.slice(0, 4).map((b) => b.id), BOARDS.slice(4).map((b) => b.id)];
+  const rows = [['cover', 'index'], BOARDS.slice(0, 4).map((b) => b.id), BOARDS.slice(4, 8).map((b) => b.id), BOARDS.slice(8).map((b) => b.id)];
   const idx = {}; const order = []; const notes = {}; let y = 0;
   rows.forEach((r, ri) => {
     if (ri > 0) notes[`row${ri}`] = { x: 0, y: y - 280, text: r.map((id) => `${id} ${BOARDS.find((x) => x.id === id)?.title || ''}`.trim()).join(' · '), kind: 'title1', maxW: 1640 * r.length + 80 * (r.length - 1) };
