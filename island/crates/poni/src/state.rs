@@ -591,6 +591,8 @@ pub struct AppState {
     pub calendar_page: usize,
     /// Calendar lists meetings that ended this week instead of the coming ones.
     pub calendar_past: bool,
+    /// The day picked on the Today page's month (local day number); None lists the coming week.
+    pub calendar_day: Option<i64>,
     /// The island's own capture of what the PC plays (`services::capture`).
     pub capture: poni_core::capture::CaptureState,
     /// What the last caption said about its translation (missing, loading), for the Live page.
@@ -677,6 +679,7 @@ impl AppState {
             inbox_page: 0,
             calendar_page: 0,
             calendar_past: false,
+            calendar_day: None,
             capture: Default::default(),
             caption_hint: None,
             models: Default::default(),

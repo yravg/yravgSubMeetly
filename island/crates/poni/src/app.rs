@@ -4467,7 +4467,7 @@ impl App {
                 Command::Captions(on) => self.captions_by_hand(on),
                 Command::PasteTranscript => self.paste_transcript(),
                 Command::JoinMeeting(u) => match poni_core::calendar::teams_app_link(&u).filter(|_| crate::window::url_scheme_registered("msteams")) {
-                    Some(app) => shell::open(&app),
+                    Some(app) => shell::open_teams(&app, &u),
                     None => shell::open(&u),
                 },
                 Command::ModelsRefresh => self.refresh_models(),

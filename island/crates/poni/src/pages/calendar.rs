@@ -1,4 +1,6 @@
-//! Calendar page: the meetings of the next week from the calendars the engine
+//! Today page (PageKind::Calendar): a five-week month grid on the left, as
+//! Oyenza Studio draws it (today filled, a dot on each day with a meeting,
+//! a click picks that day), and on the right the meetings of the next week from the calendars the engine
 //! syncs (an Outlook or Google ICS link, or an imported .ics file), grouped by
 //! day. Each meeting has Join (when its invitation holds a meeting link),
 //! Captions (starts the island's own captions and shows Live) and Notes (starts the meeting's notes
@@ -20,7 +22,8 @@ use crate::pages::PageKind;
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::calendar::{self, Calendar, Event, Source, SourceKind};
-use poni_core::geom::{palette, Rect};
+use poni_core::datetime::{civil_from_days, weekday_from_days};
+use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::helper::Link;
 
 /// As tall as the tallest page, so opening the Calendar never moves the island.
@@ -31,13 +34,26 @@ const FOOT_H: f32 = 28.0;
 const SOURCE_ROWS: usize = 4;
 /// How far ahead the page looks (days, today included).
 const DAYS: i64 = 7;
+// The month grid, from Oyenza Studio's Today page (pages/today.rs).
+const CELL_W: f32 = 23.0;
+const GRID_W: f32 = 7.0 * CELL_W;
+const CELL_H: f32 = 26.0;
+const GRID_Y: f32 = 48.0;
+const INITIALS_H: f32 = 16.0;
+const COL_GAP: f32 = 20.0;
+/// Narrower than this, the grid is left out so the meetings keep their room.
+const GRID_FROM_W: f32 = 640.0;
+const GRID_DAYS: i64 = 35;
+const WEEKDAY_LONG: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_LONG: [&str; 12] = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const INITIALS: [&str; 7] = ["M", "T", "W", "T", "F", "S", "S"];
 
 pub fn height(_st: &AppState) -> f32 {
     HEIGHT
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
-    let body = hkit::guide(ui, st, area, PageKind::Calendar, "Your meetings this week. Join, caption or take notes.");
+    let body = hkit::guide(ui, st, area, PageKind::Calendar, "Your meetings. Pick a day, then join, caption or take notes.");
     let accent = st.accent;
     if matches!(st.helper.link, Link::Offline(_)) {
         return hkit::offline(ui, st, body, wid("calendar.retry"));
@@ -63,6 +79,14 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     }
     if st.calendar_manage {
         sources(ui, st, body, &cal);
+    } else if body.w >= GRID_FROM_W {
+        let grid = Rect::new(body.x, body.y, GRID_W, body.h);
+        if let Some(day) = month_grid(ui, st, grid, &cal) {
+            st.calendar_day = (st.calendar_day != Some(day)).then_some(day);
+            st.calendar_page = 0;
+        }
+        let x = grid.right() + COL_GAP;
+        meetings(ui, st, Rect::new(x, body.y, body.right() - x, body.h), &cal);
     } else {
         meetings(ui, st, body, &cal);
     }
@@ -92,10 +116,15 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
     let off = calendar::utc_offset(&st.local, st.unix);
     let now = st.unix;
     let today = calendar::local_day(now, off);
-    let past = st.calendar_past;
-    let list = if past { calendar::past(cal, now, off, calendar::PAST_DAYS) } else { calendar::upcoming(cal, now, off, DAYS) };
+    let pick = st.calendar_day;
+    let past = st.calendar_past && pick.is_none();
+    let list = match pick {
+        Some(d) => on_day(cal, d, off),
+        None if past => calendar::past(cal, now, off, calendar::PAST_DAYS),
+        None => calendar::upcoming(cal, now, off, DAYS),
+    };
     // An earlier meeting sits under the day it started; a running one under today.
-    let day_of = |e: &Event| if past { calendar::local_day(e.span(off).0, off) } else { clipped(e, now, off) };
+    let day_of = |e: &Event| if past || pick.is_some() { calendar::local_day(e.span(off).0, off) } else { clipped(e, now, off) };
     let broken = cal.sources.iter().filter(|s| s.last_error.is_some()).count();
 
     let foot = Rect::new(body.x, body.bottom() - FOOT_H, body.w, FOOT_H);
@@ -103,7 +132,12 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
     let mut open_sources = false;
     let mut refresh = false;
     let mut flip = false;
-    for (n, label) in ["Refresh", "Calendars", if past { "Coming" } else { "Earlier" }].into_iter().enumerate() {
+    let third = match (pick, past) {
+        (Some(_), _) => "This week",
+        (None, true) => "Coming",
+        (None, false) => "Earlier",
+    };
+    for (n, label) in ["Refresh", "Calendars", third].into_iter().enumerate() {
         let w = ui.pill_width(label, false, true);
         let b = Rect::new(right - w, foot.center().y - PILL_SMALL / 2.0, w, PILL_SMALL);
         if ui.pill(wid_n("calendar.foot", n as u64), b, label, None, PillStyle::Utility).clicked {
@@ -116,13 +150,15 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
         right = b.x - PILL_GAP;
     }
     if flip {
-        st.calendar_past = !past;
+        st.calendar_past = pick.is_none() && !past;
+        st.calendar_day = None;
         st.calendar_page = 0;
     }
 
     if list.is_empty() {
         let area = Rect::new(body.x, body.y, body.w, body.h - FOOT_H);
         let (title, line, bad) = match (broken, cal.sources.len()) {
+            (0, _) if pick.is_some() => ("No meetings that day".to_string(), "Pick another day, or This week for the coming ones.".to_string(), false),
             (0, _) if past => ("No earlier meetings".to_string(), "Nothing ended in the last 7 days. Coming shows the next ones.".to_string(), false),
             (0, _) => ("Nothing in the next 7 days".to_string(), "Your calendars have no meetings this week. Refresh asks them again; Earlier shows past ones.".to_string(), false),
             (n, total) => {
@@ -179,7 +215,8 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
                 }
                 Line::Meeting(e) => {
                     let row = Rect::new(body.x, y, body.w, ROW_H);
-                    if let Some(a) = meeting_row(ui, st, row, e, off, slot, past) {
+                    // A meeting that ended has only its notes left.
+                    if let Some(a) = meeting_row(ui, st, row, e, off, slot, past || e.span(off).1 <= now) {
                         act = Some((a, e.id.clone(), e.join_url.clone()));
                     }
                     slot += 1;
@@ -225,6 +262,96 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
     if open_sources {
         st.calendar_manage = true;
     }
+}
+
+/// Meetings that start on local day `day`, earliest first.
+fn on_day(cal: &Calendar, day: i64, off: i64) -> Vec<&Event> {
+    let mut v: Vec<&Event> = cal.events.iter().filter(|e| calendar::local_day(e.span(off).0, off) == day).collect();
+    v.sort_by(|a, b| a.span(off).0.cmp(&b.span(off).0).then_with(|| a.title.cmp(&b.title)));
+    v
+}
+
+/// Ink that reads on `fill` (Oyenza Studio's `ink_on`).
+fn ink_on(fill: Color) -> Color {
+    if fill.luminance() > 0.6 {
+        palette::ON_ACCENT_DARK
+    } else {
+        palette::ON_ACCENT
+    }
+}
+
+/// Today's weekday and date over five weeks from this Monday, ported from
+/// Oyenza Studio's `draw_weeks_grid`: today filled with the accent, the
+/// picked day ringed, a dot under each day with a meeting, a step line where
+/// a month starts. Returns the day clicked.
+fn month_grid(ui: &mut Ui, st: &AppState, r: Rect, cal: &Calendar) -> Option<i64> {
+    let off = calendar::utc_offset(&st.local, st.unix);
+    let today = calendar::local_day(st.unix, off);
+    let (_, month, dnum) = civil_from_days(today);
+    let weekday = WEEKDAY_LONG[weekday_from_days(today) as usize % 7].to_uppercase();
+    ui.c.text(&weekday, Rect::new(r.x, r.y, r.w, 16.0), &TextStyle::caption().weight(Weight::Bold).color(st.accent));
+    let date = format!("{dnum} {}", MONTH_LONG[(month.clamp(1, 12) - 1) as usize]);
+    ui.c.text(&date, Rect::new(r.x, r.y + 16.0, r.w, 24.0), &TextStyle::value());
+
+    let busy: std::collections::HashSet<i64> = cal.events.iter().map(|e| calendar::local_day(e.span(off).0, off)).collect();
+    let initials_st = TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT_FAINT).center();
+    for (col, s) in INITIALS.iter().enumerate() {
+        ui.c.text(s, Rect::new(r.x + col as f32 * CELL_W, r.y + GRID_Y, CELL_W, INITIALS_H), &initials_st);
+    }
+    let top = r.y + GRID_Y + INITIALS_H;
+    let start = today - (i64::from(weekday_from_days(today)) + 6) % 7;
+    let num_st = TextStyle::footnote().tabular().center();
+    let step = Color::white(0.2);
+    let mut clicked = None;
+    for i in 0..GRID_DAYS {
+        let day = start + i;
+        let (row, col) = ((i / 7) as f32, (i % 7) as usize);
+        let cell = Rect::new(r.x + col as f32 * CELL_W, top + row * CELL_H, CELL_W, CELL_H);
+        let num = Rect::new(cell.x, cell.y, cell.w, 20.0);
+        let c = Point::new(num.center().x, num.center().y);
+        let (_, _, d) = civil_from_days(day);
+        let resp = ui.button(wid_n("calendar.date", i as u64), num);
+        if resp.clicked {
+            clicked = Some(day);
+        }
+        let label = d.to_string();
+        if day == today {
+            ui.c.fill_circle(c, 9.5, st.accent);
+            ui.c.text(&label, num, &num_st.weight(Weight::Bold).color(ink_on(st.accent)));
+        } else {
+            if st.calendar_day == Some(day) {
+                ui.c.stroke_circle(c, 9.5, st.accent, 1.5);
+            } else if resp.hovered {
+                ui.c.fill_circle(c, 9.5, palette::SURFACE_HOVER);
+            }
+            let ink = if day < today {
+                Color::white(0.32)
+            } else if col >= 5 {
+                palette::TEXT_DIM
+            } else {
+                Color::white(0.9)
+            };
+            let st_num = if d == 1 { num_st.weight(Weight::Bold) } else { num_st };
+            ui.c.text(&label, num, &st_num.color(ink));
+        }
+        if busy.contains(&day) {
+            ui.c.fill_circle(Point::new(c.x, cell.y + 22.0), 1.5, st.accent);
+        }
+        // Where a month starts: a step line between its 1st and the days before it.
+        if d == 1 && i > 0 {
+            let y = cell.y - 1.5;
+            if row > 0.0 {
+                ui.c.line(Point::new(cell.x, y), Point::new(r.x + GRID_W, y), step, 1.0);
+            }
+            if col > 0 {
+                ui.c.line(Point::new(cell.x, y), Point::new(cell.x, y + CELL_H), step, 1.0);
+                if row < 4.0 {
+                    ui.c.line(Point::new(r.x, y + CELL_H), Point::new(cell.x, y + CELL_H), step, 1.0);
+                }
+            }
+        }
+    }
+    clicked
 }
 
 /// One meeting. Returns 0 (Join), 1 (Captions) or 2 (Notes) when a button was pressed.

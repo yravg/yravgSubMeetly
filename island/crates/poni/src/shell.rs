@@ -239,6 +239,32 @@ pub fn open_app(app_id: &str) {
     });
 }
 
+/// Join a Teams meeting in the Teams app: `app` is the `msteams:/l/...` link
+/// `poni_core::calendar::teams_app_link` built from `web`, the meeting's
+/// https link. `open` refuses every scheme but http(s), so this is the one
+/// path for `msteams:`; if the app link is malformed or the shell cannot
+/// open it, the https link opens in the browser instead.
+pub fn open_teams(app: &str, web: &str) {
+    if !teams_link_ok(app) {
+        crate::pwarn!("teams link refused: {}", for_log(app));
+        return open(web);
+    }
+    let (app, web) = (app.to_string(), web.to_string());
+    run("open-teams", move || {
+        let t = HSTRING::from(app.as_str());
+        let r = unsafe { ShellExecuteW(None, w!("open"), &t, None, None, SW_SHOWNORMAL) };
+        if (r.0 as isize) <= 32 {
+            crate::pwarn!("open failed ({}): {}; opening the web link", r.0 as isize, for_log(&app));
+            open(&web);
+        }
+    });
+}
+
+/// Only a Teams join link, with nothing a command line could split on.
+pub(crate) fn teams_link_ok(s: &str) -> bool {
+    s.len() < 4096 && !s.chars().any(char::is_control) && s.strip_prefix("msteams:/l/").is_some_and(|rest| !rest.is_empty() && web_url_rest(rest).is_ok())
+}
+
 /// Open the Claude app through its own link, `claude://` (asynchronously):
 /// the AI tab's Sign in, used once the app's settings are on this PC, so
 /// the link has the app to go to. It signs Claude Code in.
@@ -469,6 +495,14 @@ fn for_log(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn only_a_teams_join_link_goes_to_the_teams_app() {
+        assert!(teams_link_ok("msteams:/l/meetup-join/19%3ameeting_x%40thread.v2/0?context=%7b%22Tid%22%3a%22a%22%7d"));
+        for bad in ["msteams:/l/", "msteams:/x/meetup-join/1", "https://teams.microsoft.com/l/x", "msteams:/l/a b", "msteams:/l/a\"\" calc", "msteams:/l/a|b", "msteams:/l/a\nb"] {
+            assert!(!teams_link_ok(bad), "{bad}");
+        }
+    }
     use super::*;
 
     #[test]

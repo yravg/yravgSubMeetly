@@ -240,10 +240,16 @@ pub fn teams_app_link(url: &str) -> Option<String> {
 /// How far back the island asks the engine for meetings (Calendar's Earlier list).
 pub const PAST_DAYS: i64 = 7;
 
-/// `GET /calendar` from `PAST_DAYS` ago (the engine's own end: a week ahead).
+/// Days ahead the island asks for: the Today page's five-week month grid.
+pub const AHEAD_DAYS: i64 = 35;
+
+/// `GET /calendar` from `PAST_DAYS` ago to `AHEAD_DAYS` ahead (the engine allows 62 days).
 pub fn window_path(now: i64) -> String {
-    let (y, m, d) = civil_from_days((now - PAST_DAYS * 86_400).div_euclid(86_400));
-    format!("/calendar?from={y:04}-{m:02}-{d:02}T00:00:00Z")
+    let day = |n: i64| {
+        let (y, m, d) = civil_from_days(now.div_euclid(86_400) + n);
+        format!("{y:04}-{m:02}-{d:02}T00:00:00Z")
+    };
+    format!("/calendar?from={}&to={}", day(-PAST_DAYS), day(AHEAD_DAYS + 1))
 }
 
 pub fn upcoming(cal: &Calendar, now: i64, offset: i64, days: i64) -> Vec<&Event> {
@@ -578,7 +584,7 @@ mod tests {
         assert_eq!(v.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(), ["e1"], "all-day events are not meetings");
         assert!(past(&c, T1400 + 901 + 8 * 86_400, tz, 7).is_empty(), "older than a week");
         // Day 20403 is 2025-11-11: a week back is Nov 4.
-        assert_eq!(window_path(86_400 * 20_403 + 5), "/calendar?from=2025-11-04T00:00:00Z");
+        assert_eq!(window_path(86_400 * 20_403 + 5), "/calendar?from=2025-11-04T00:00:00Z&to=2025-12-17T00:00:00Z");
     }
 
     #[test]

@@ -95,7 +95,7 @@ pub const GUIDE_H: f32 = 26.0;
 const NAV_GAP: f32 = 14.0;
 
 /// The meeting pages in the order a meeting goes: the plan, the room, the notes, what is left.
-const STEPS: [(PageKind, &str); 5] = [(PageKind::Calendar, "Calendar"), (PageKind::Live, "Live"), (PageKind::Meeting, "Meeting"), (PageKind::Inbox, "Inbox"), (PageKind::Timer, "Agenda")];
+const STEPS: [(PageKind, &str); 5] = [(PageKind::Calendar, "Today"), (PageKind::Live, "Live"), (PageKind::Meeting, "Minutes"), (PageKind::Inbox, "Inbox"), (PageKind::Timer, "Agenda")];
 
 /// What this page is for (one line, left) and the way to the other meeting
 /// pages (right, the open one marked). The nav is dropped when it would

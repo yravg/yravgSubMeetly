@@ -146,9 +146,9 @@ impl PageKind {
     pub fn title(self) -> &'static str {
         match self {
             PageKind::Live => "Live",
-            PageKind::Meeting => "Meeting",
+            PageKind::Meeting => "Minutes",
             PageKind::Inbox => "Inbox",
-            PageKind::Calendar => "Calendar",
+            PageKind::Calendar => "Today",
             PageKind::Timer => "Agenda timer",
             PageKind::Talk => "Talk time",
             PageKind::Engine => "Engine",

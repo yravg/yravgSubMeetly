@@ -160,7 +160,7 @@ pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &Engin
     let theme = |label: &str, t: Theme| item(label, MenuCmd::SetTheme(t), s.theme == t);
     let fullscreen = |label: &str, hide: bool| item(label, MenuCmd::SetHideFullscreen(hide), s.hide_in_fullscreen == hide);
     let mut items = vec![MenuItem::Info { label: "yravgSubMeetly".into() }];
-    for (label, cmd) in [("Open yravgSubMeetly", MenuCmd::OpenApp), ("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
+    for (label, cmd) in [("Open yravgSubMeetly", MenuCmd::OpenApp), ("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Minutes", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
         items.push(item(label, cmd, false));
     }
     items.push(MenuItem::Separator);
@@ -344,7 +344,7 @@ mod tests {
             .collect();
         assert_eq!(
             labels,
-            ["yravgSubMeetly", "Open yravgSubMeetly", "Open Minutes register", "Live captions", "Meeting", "Inbox", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…"]
+            ["yravgSubMeetly", "Open yravgSubMeetly", "Open Minutes register", "Live captions", "Minutes", "Inbox", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…"]
         );
     }
 

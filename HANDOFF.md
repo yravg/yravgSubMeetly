@@ -521,3 +521,12 @@ Fitur besar; status per langkah ada di `docs/handoff/pill-meetings.md`, rencana 
 - Checks: laptop `npm test` 658 pass / 0 fail / 8 skipped; engine fmt, clippy -D warnings, all tests (-j 1). Shell pages after the last merge: targeted files green on the VPS; full suite not rerun after tide-pages round 2.
 - Install: PowerShell, `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS`, no `/reopen`; start with `explorer.exe` (agent-shell sandbox otherwise hides the model cache).
 - Known: app footer still says v1.1.1 (extension manifest version, not the island version); `yravgSubMeetly.exe` ProductVersion resource reads 0.2.26.
+
+## Island 1.2.7: Join, Today month grid, Minutes (2026-11-10)
+
+- **Join did nothing.** `shell::open` refuses any scheme but http(s); Join handed it `msteams:/l/...`, logged as `open refused (unsupported scheme)` in `poni.log`. New `shell::open_teams(app, web)` accepts only `msteams:/l/` links (`teams_link_ok`, tested) and falls back to the https link.
+- **Today page** (`PageKind::Calendar`, title "Today"): month grid ported from Oyenza Studio `crates/poni/src/pages/today.rs` `draw_weeks_grid` into `pages/calendar.rs` `month_grid`; shown when the page body is at least 640 px wide. A day click sets `AppState::calendar_day`; the list then shows that day, ended meetings keep only Notes. `calendar::window_path` now asks `from` 7 days back `to` 36 days ahead (engine caps 62).
+- **Meeting tab renamed Minutes** (`PageKind::title`, `hkit::STEPS`, tray menu). The meeting page's own pager still says "Meeting 2 / 14".
+- Installed on the laptop: **1.2.7** (`island/dist/yravgSubMeetly-Setup-1.2.7.exe`), island exe built in `E:\cargo-target\sm-calendar\release`, engine copied unchanged from the 1.2.6 install. Tests: poni-core 289, poni 531 pass.
+- Not seen on screen: the island window is left out of screen capture, so the grid and a Join into Teams were not checked by screenshot. Engine verified to return 77 meetings for the 5-week window.
+- `island/crates/poni/build.rs` has an accidental `cargo fmt` reflow from this session (default width), left uncommitted; revert it with `git checkout -- island/crates/poni/build.rs`.
