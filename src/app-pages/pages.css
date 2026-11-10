@@ -70,7 +70,7 @@ html[data-shell] .ls-preview .live-src-box .line { font: 600 var(--text-lg)/1.35
 html[data-shell] .ls-preview .live-tgt-box .line { font: 500 var(--text-md)/1.4 var(--font-ui); color: var(--accent-soft); }
 .ls-preview .line.interim { color: var(--muted); border-left-color: var(--border); font-weight: 500; }
 .ls-preview .error-box { margin-top: var(--space-3); background: var(--danger-bg); border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent); color: var(--text); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4) var(--space-3) 52px; position: relative; }
-.ls-preview .error-box::before { content: '×'; position: absolute; left: var(--space-3); top: var(--space-3); width: 28px; height: 28px; border-radius: 8px; background: var(--danger); color: #fff; display: grid; place-items: center; font: 700 18px/1 var(--font-ui); }
+.ls-preview .error-box::before { content: '×'; position: absolute; left: var(--space-3); top: var(--space-3); width: 28px; height: 28px; border-radius: 8px; background: var(--danger); color: var(--on-accent); display: grid; place-items: center; font: 700 18px/1 var(--font-ui); }
 .ls-preview .error-box .error-title { font-weight: 700; color: var(--text); }
 .ls-preview .error-box .error-hint { color: var(--text2); }
 
@@ -120,9 +120,18 @@ html[data-shell] .ls-preview .live-tgt-box .line { font: 500 var(--text-md)/1.4 
 .fh-list .h-snippet { grid-column: 2 / -1; color: var(--text2); font-size: var(--text-sm); }
 .fh-list .h-actions .mini-btn, .fh-fmt { border-radius: 999px; background: var(--card2); border: 1px solid var(--border); color: var(--text); font: 600 var(--text-xs)/1 var(--font-ui); padding: 8px 14px; cursor: pointer; }
 .fh-list .h-actions .mini-btn:hover, .fh-fmt:hover { border-color: var(--accent-strong); }
-.fh-list .h-actions .h-del { width: 34px; height: 34px; padding: 0; font-size: 0; background: var(--danger-bg) center / 15px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B42318' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13'/%3E%3C/svg%3E"); border-color: transparent; }
-.fh-list #export-mount { margin-top: var(--space-3); }
-.fh-list #export-mount > * { border-radius: var(--radius-lg); background: var(--card2); }
+.fh-list .h-actions .h-del { position: relative; width: 34px; height: 34px; padding: 0; font-size: 0; background: var(--danger-bg); color: var(--fh-del-ink, var(--danger)); border-color: transparent; }
+/* The icon is a mask drawn in the text colour, so dark mode can lift it (3:1 on the tile) instead of a fixed red. */
+.fh-list .h-actions .h-del::before { content: ''; position: absolute; inset: 0; margin: auto; width: 16px; height: 16px; background: currentColor; -webkit-mask: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13'/%3E%3C/svg%3E"); mask: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13'/%3E%3C/svg%3E"); }
+.theme-dark .fh-list .h-del { --fh-del-ink: #FF9C92; }
+@media (prefers-color-scheme: dark) { :root:not(.theme-light) .fh-list .h-del { --fh-del-ink: #FF9C92; } }
+.fh-export { display: block; margin-top: var(--space-3); background: var(--card2); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.fh-export > summary { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); cursor: pointer; list-style: none; }
+.fh-export > summary::-webkit-details-marker { display: none; }
+.fh-export > summary:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; border-radius: var(--radius-lg); }
+.fh-chev { margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .16s var(--ease-out); }
+.fh-export[open] .fh-chev { transform: rotate(-135deg); }
+.fh-export #export-mount { padding: 0 var(--space-4) var(--space-4); }
 .fh-opened .results { border: 0; padding: 0; background: transparent; }
 
 .fh-drop-card { padding: 0; overflow: hidden; }
@@ -154,7 +163,7 @@ html[data-shell] .ls-preview .live-tgt-box .line { font: 500 var(--text-md)/1.4 
 .fh-ready { margin-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
 .fh-ready .btn { align-self: flex-start; border-radius: 999px; padding: 12px 24px; background: var(--pill-bg); border-color: var(--pill-bg); color: var(--pill-fg); font-weight: 700; }
 .fh-ready .btn:disabled { opacity: .5; }
-.fh-export { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.fh-export { display: block; margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .fh-fmt[data-kind='txt'] { background: var(--pill-bg); color: var(--pill-fg); border-color: var(--pill-bg); }
 .fh[data-state='drop'] .fh-run, .fh[data-state='drop'] .fh-ready, .fh[data-state='drop'] .fh-export,
 .fh[data-state='ready'] .fh-run, .fh[data-state='ready'] .fh-export,
@@ -194,3 +203,55 @@ html[data-shell='settings'] .setting-row { background: var(--card); border: 1px 
 html[data-shell='settings'] .set-card[data-pane='helper'] .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--tide-shadow); margin-bottom: var(--space-4); }
 html[data-shell='settings'] .set-dev label { display: flex; flex-direction: column; gap: 2px; }
 html[data-shell='settings'] .set-dev small { color: var(--muted); font-size: var(--text-xs); }
+
+/* ---- A07 round 2: rows as drawn (label + hint left, control right) ---- */
+html[data-shell='settings'] .setting-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-4); align-items: center; }
+html[data-shell='settings'] .setting-row > .set-lbl { grid-column: 1; font-weight: 700; color: var(--text); }
+html[data-shell='settings'] .setting-row > .set-hint { grid-column: 1; color: var(--muted); font-size: var(--text-xs); margin-top: 2px; }
+html[data-shell='settings'] .setting-row > :not(.set-lbl):not(.set-hint) { grid-column: 2; grid-row: 1 / span 2; justify-self: end; max-width: 100%; }
+html[data-shell='settings'] .setting-row > .hint { grid-column: 1 / -1; grid-row: auto; justify-self: stretch; }
+html[data-shell='settings'] .setting-row:not(:has(.set-hint)) > :not(.set-lbl) { grid-row: 1; }
+html[data-shell='settings'] .setting-row select { border-radius: var(--radius-lg); min-width: 200px; }
+/* Theme: the four reskin cards read as one segment of names, like the board */
+html[data-shell='settings'] #reskin-toggle { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--card2); border: 1px solid var(--border); border-radius: 999px; }
+html[data-shell='settings'] #reskin-toggle .reskin-card { flex-direction: row; background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; box-shadow: none; font: 600 var(--text-xs)/1 var(--font-ui); color: var(--text2); }
+html[data-shell='settings'] #reskin-toggle .reskin-card.active { background: var(--pill-bg); color: var(--pill-fg); }
+html[data-shell='settings'] #reskin-toggle .reskin-mock { display: none; }
+/* Accent: swatch + name */
+html[data-shell='settings'] #tcolor-toggle { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--card2); border: 1px solid var(--border); border-radius: 999px; }
+html[data-shell='settings'] #tcolor-toggle .tcolor-sw { width: auto; height: auto; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 0; background: transparent; padding: 7px 12px; font: 600 var(--text-xs)/1 var(--font-ui); color: var(--text2); box-shadow: none; }
+html[data-shell='settings'] #tcolor-toggle .tcolor-sw i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+html[data-shell='settings'] #tcolor-toggle .tcolor-sw.active { background: var(--pill-bg); color: var(--pill-fg); }
+html[data-shell='settings'] #set-density button { border: 0; background: transparent; color: var(--text2); font: 600 var(--text-xs)/1 var(--font-ui); padding: 8px 14px; border-radius: 999px; cursor: pointer; }
+html[data-shell='settings'] #set-density button[aria-pressed='true'] { background: var(--pill-bg); color: var(--pill-fg); }
+html[data-shell='settings'] #set-density { display: inline-flex; gap: 2px; padding: 3px; background: var(--card2); border: 1px solid var(--border); border-radius: 999px; }
+html[data-shell='settings'] .native-device-row .native-device-head .lbl { display: none; }
+html[data-shell='settings'] .reskin-foot { margin-top: var(--space-2); }
+html[data-shell='settings'] [data-pane='engine'] .model-list { margin-bottom: var(--space-3); }
+@media (max-width: 780px) {
+  /* Seven tabs do not fit one line on a phone: wrap them instead of clipping Helper and About. */
+  html[data-shell='settings'] .settings-tabs { flex-wrap: wrap; overflow: visible; gap: 0 var(--space-4); }
+  html[data-shell='settings'] .setting-row { grid-template-columns: minmax(0, 1fr); row-gap: var(--space-2); }
+  html[data-shell='settings'] .setting-row > :not(.set-lbl):not(.set-hint) { grid-column: 1; grid-row: auto; justify-self: start; }
+}
+html[data-shell='settings'] .hg-install > .hg-sec-head { align-items: center; }
+html[data-shell='settings'] .hg-os-tabs { margin-left: auto; }
+html[data-shell='settings'] .helper-guide .hg-cmd code { background: var(--card2); border-radius: var(--radius-lg); }
+html[data-shell='settings'] .hg-diag, html[data-shell='settings'] .hg-install, html[data-shell='settings'] .hg-ts { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); }
+
+/* ---- A02 round 2: needs input, and both lines in the shell page (panel default for Dual line is untouched) ---- */
+html[data-shell='live'] #live-src-box.hidden { display: block !important; }
+.ls[data-needs='true'] #error-box, .ls[data-needs='true'] #pick-hint { display: none !important; }
+.ls-needs { margin-top: var(--space-3); display: flex; gap: var(--space-3); background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--text); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); }
+.ls-needs[hidden] { display: none; }
+.ls-needs p { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+.ls-nic { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--warn-text); color: var(--warn-text); display: grid; place-items: center; font: 700 14px/1 var(--font-ui); }
+.ls-nact { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ls-nact button { border-radius: 999px; font: 700 var(--text-xs)/1 var(--font-ui); padding: 9px 16px; cursor: pointer; }
+.ls-ink { background: var(--pill-bg); color: var(--pill-fg); border: 0; }
+.ls-soft { background: var(--card); color: var(--text); border: 1px solid var(--warn-border); }
+.ls-state[data-state='needs'] { color: var(--warn-text); }
+
+html[data-shell='settings'] .native-device-row { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+html[data-shell='settings'] .native-device-row .native-device-hint { max-width: 46ch; text-align: right; border: 0; padding: 0; }
+html[data-shell='settings'] .setting-row:has(> .native-device-row) { row-gap: 0; }

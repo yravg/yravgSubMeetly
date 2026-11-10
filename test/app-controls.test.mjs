@@ -22,6 +22,7 @@ const RENAMED = {
   'button|Start Task': 'button|Start captions',
   'button|End Task': 'button|Stop captions',
   'button|Load sample data': 'button|Load demo meetings (removable)',
+  'button|Helper compute (CPU / GPU) lives on the Helper tab': 'button|Helper status and install steps live on the Helper tab',
 };
 const has = (found, k) => found.has(k) || found.has(RENAMED[k]);
 let server; let browser; let page;

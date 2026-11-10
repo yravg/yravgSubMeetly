@@ -20,6 +20,7 @@ const STR = {
     staging: 'Reading the file…', ready: 'Ready', readyBody: 'Pick the languages, then start.',
     transcribing: 'Transcribing', windowOf: (i, n) => `window ${i} of ${n}`, minLeft: (m) => (m < 1 ? 'under 1 min left' : `${m} min left`),
     to: 'to', done: 'Done', doneMeta: (dur, n) => `Done · ${dur} of audio${n ? ` · ${n} windows` : ''}`, exportAs: 'Export as',
+    exportTitle: 'Export formats', exportBody: 'SRT · VTT · TXT · MD · CSV · JSON. Defaults for Windows set the line endings.', exportBodyOther: 'SRT · VTT · TXT · MD · CSV · JSON. Defaults for this system set the line endings.',
     opened: 'Opened transcript', noFile: 'No file yet', lines: 'Transcript',
   },
   id: {
@@ -28,6 +29,7 @@ const STR = {
     staging: 'Membaca berkas…', ready: 'Siap', readyBody: 'Pilih bahasa, lalu mulai.',
     transcribing: 'Mentranskripsi', windowOf: (i, n) => `jendela ${i} dari ${n}`, minLeft: (m) => (m < 1 ? 'kurang dari 1 mnt lagi' : `${m} mnt lagi`),
     to: 'ke', done: 'Selesai', doneMeta: (dur, n) => `Selesai · ${dur} audio${n ? ` · ${n} jendela` : ''}`, exportAs: 'Ekspor sebagai',
+    exportTitle: 'Format ekspor', exportBody: 'SRT · VTT · TXT · MD · CSV · JSON. Bawaan Windows mengatur akhir baris.', exportBodyOther: 'SRT · VTT · TXT · MD · CSV · JSON. Bawaan sistem ini mengatur akhir baris.',
     opened: 'Transkrip dibuka', noFile: 'Belum ada berkas', lines: 'Transkrip',
   },
 };
@@ -70,7 +72,12 @@ export function mountFilesLayout(api) {
   if (!isFiles) {
     /* ================= History ================= */
     const list = el('section', 'fh-card fh-list');
-    for (const id of ['history-search', 'history-list', 'export-mount']) if ($(id)) list.append($(id));
+    for (const id of ['history-search', 'history-list']) if ($(id)) list.append($(id));
+    // Export formats: the board's compact card; the full options (tiles, CRLF, BOM, suffix) open from it.
+    const exp = el('details', 'fh-export');
+    exp.innerHTML = `<summary><span class="fh-tile">${svg('up', 18)}</span><span class="fh-jname"><b data-fh="exportTitle"></b><small data-fh="exportBody"></small></span><span class="fh-chev" aria-hidden="true"></span></summary>`;
+    if ($('export-mount')) exp.append($('export-mount'));
+    list.append(exp);
     const opened = el('section', 'fh-card fh-opened');
     opened.hidden = true;
     opened.innerHTML = '<h2 data-fh="opened"></h2>';
@@ -161,11 +168,8 @@ export function mountFilesLayout(api) {
   }
 
   const paint = () => {
-    for (const n of shell.querySelectorAll('[data-fh]')) {
-      const k = n.dataset.fh;
-      if (n.dataset.go) n.textContent = T(k);
-      else n.textContent = T(k);
-    }
+    const win = /windows/i.test(navigator.userAgent);
+    for (const n of shell.querySelectorAll('[data-fh]')) n.textContent = T(n.dataset.fh === 'exportBody' && !win ? 'exportBodyOther' : n.dataset.fh);
     tabs.setAttribute('aria-label', T('sections'));
   };
   paint();

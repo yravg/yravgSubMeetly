@@ -985,7 +985,7 @@ function setSettingsTab(tab) {
     b.classList.toggle('active', on);
     b.setAttribute('aria-selected', String(on));
   });
-  for (const id of ['theme-toggle', 'asr-preset-toggle', 'mirror-toggle', 'device-toggle']) syncPill(id, false);
+  for (const id of ['theme-toggle', 'asr-preset-toggle', 'mirror-toggle', 'device-toggle', 'native-device-toggle']) syncPill(id, false);
   if (next === 'addins') addinsPane?.refresh();
 }
 
@@ -2508,6 +2508,7 @@ function showToast(msg, kind = 'ok') {
 }
 if (typeof window !== 'undefined') window.__ysmToast = showToast;
 if (typeof window !== 'undefined') window.__ysmShowError = (raw) => showError(raw);
+if (typeof window !== 'undefined') window.__ysmShowCaptureError = (raw) => showCaptureError(raw);
 
 async function startWithStream(streamId, captureType) {
   setStatus(t('loadingModels'));
@@ -3661,6 +3662,8 @@ async function init() {
   if (q.get('shell') === '1' && q.get('view') === 'settings') {
     mountSettingsLayout({ lang: () => state.settings.uiLang, hosted: location.protocol === 'chrome-extension:' || isWebHost(), setTab: (tb) => setSettingsTab(tb) });
     if (SETTINGS_TABS.includes(q.get('stab'))) setSettingsTab(q.get('stab'));
+    resyncPills(false); // pills were measured before the rows moved between tabs
+    document.fonts?.ready.then(() => resyncPills(false));
   }
   if (q.get('shell') === '1' && q.get('view') === 'captions') {
     mountLiveLayout({

@@ -14,6 +14,7 @@
 const STR = {
   en: {
     capture: 'Capture', source: 'Source', tab: 'Tab audio', file: 'File', mic: 'Microphone', mode: 'Mode',
+    needsTitle: 'Needs input.', needsBody: 'Choose which tab to capture. Chrome asks you once per session.', chooseTab: 'Choose tab', useFile: 'Use a file instead', needs: 'Needs input',
     livePreview: 'Live preview', idle: 'Idle', starting: 'Starting…', listening: 'Listening', stopped: 'Stopped',
     nothingYet: 'Nothing yet', nothingBody: 'Start a task and the speech appears here, with its translation under it.',
     waiting: 'Listening…', waitingBody: 'Speak or play audio; the first line appears in a moment.',
@@ -25,6 +26,7 @@ const STR = {
   },
   id: {
     capture: 'Tangkap', source: 'Sumber', tab: 'Audio tab', file: 'Berkas', mic: 'Mikrofon', mode: 'Mode',
+    needsTitle: 'Perlu masukan.', needsBody: 'Pilih tab yang ditangkap. Chrome menanyakannya sekali per sesi.', chooseTab: 'Pilih tab', useFile: 'Pakai berkas saja', needs: 'Perlu masukan',
     livePreview: 'Pratinjau langsung', idle: 'Siaga', starting: 'Memulai…', listening: 'Mendengarkan', stopped: 'Berhenti',
     nothingYet: 'Belum ada', nothingBody: 'Mulai tugas dan ucapan muncul di sini, terjemahannya di bawahnya.',
     waiting: 'Mendengarkan…', waitingBody: 'Bicara atau putar audio; baris pertama muncul sebentar lagi.',
@@ -77,6 +79,7 @@ export function mountLiveLayout(api) {
   /* ---- Live preview card ---- */
   const pre = el('section', 'ls-preview');
   pre.innerHTML = `<div class="ls-phead"><span class="ls-eyebrow" data-ls="livePreview"></span><span class="ls-state" id="ls-live-state" aria-live="polite"></span></div>
+    <div class="ls-needs" id="ls-needs" role="status" hidden><span class="ls-nic" aria-hidden="true">!</span><div><p><b data-ls="needsTitle"></b> <span data-ls="needsBody"></span></p><div class="ls-nact"><button type="button" class="ls-ink" data-needs="tab" data-ls="chooseTab"></button><button type="button" class="ls-soft" data-needs="file" data-ls="useFile"></button></div></div></div>
     <div class="ls-empty" id="ls-preview-empty"><b></b><p></p></div>`;
   for (const id of ['error-box', 'live-preview', 'off-results']) if ($(id)) pre.append($(id));
 
@@ -142,18 +145,28 @@ export function mountLiveLayout(api) {
   const so = new MutationObserver(paintSurface);
   for (const n of [$('surface-toggle'), $('surface-engine-hint')]) if (n) so.observe(n, { attributes: true, subtree: true, attributeFilter: ['class'] });
 
+  /* ---- Needs input: Chrome wants the user to pick a tab (the panel shows #pick-hint); the buttons drive the panel's own controls ---- */
+  $('ls-needs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-needs]'); if (!b) return;
+    if (b.dataset.needs === 'tab') $('btn-pick')?.click();
+    else { src = 'file'; if (!isOffline()) modeBtn('offline')?.click(); $('pick-hint')?.classList.add('hidden'); paintSource(); paintPreview(); }
+  });
+
   /* ---- Preview: empty / waiting / state pill with clock ---- */
   function paintPreview() {
     const r = api.running();
     // Only the visible preview counts: the hidden boxes can hold placeholder lines (lab) until a session clears them.
     const lines = $('live-preview')?.classList.contains('hidden') ? 0 : document.querySelectorAll('#live-tgt-lines .line, #live-src-lines .line').length;
-    const failed = $('error-box') && !$('error-box').classList.contains('hidden');
+    const needs = !r.on && !!$('pick-hint') && !$('pick-hint').classList.contains('hidden') && !isOffline();
+    $('ls-needs').hidden = !needs;
+    shell.dataset.needs = String(needs);
+    const failed = !needs && $('error-box') && !$('error-box').classList.contains('hidden');
     const startingNow = $('start-steps') && !$('start-steps').classList.contains('hidden') && !r.on;
     const st = $('ls-live-state');
-    st.dataset.state = failed ? 'error' : r.on ? 'listening' : startingNow ? 'starting' : 'idle';
-    st.textContent = r.on ? `${T('listening')} · ${clock(Date.now() - (r.startedAt || Date.now()))}` : startingNow ? T('starting') : failed ? '' : lines ? T('stopped') : T('idle');
+    st.dataset.state = needs ? 'needs' : failed ? 'error' : r.on ? 'listening' : startingNow ? 'starting' : 'idle';
+    st.textContent = r.on ? `${T('listening')} · ${clock(Date.now() - (r.startedAt || Date.now()))}` : needs ? T('needs') : startingNow ? T('starting') : failed ? '' : lines ? T('stopped') : T('idle');
     const empty = $('ls-preview-empty');
-    empty.hidden = failed || lines > 0;
+    empty.hidden = failed || needs || lines > 0;
     empty.querySelector('b').textContent = r.on ? T('waiting') : T('nothingYet');
     empty.querySelector('p').textContent = r.on ? T('waitingBody') : T('nothingBody');
   }
