@@ -27,6 +27,7 @@ pub mod media;
 pub mod motion;
 pub mod music;
 pub mod notice;
+pub mod quick_captions;
 pub mod shape;
 pub mod status;
 

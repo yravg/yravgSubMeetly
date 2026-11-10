@@ -362,6 +362,8 @@ pub struct PageUiState {
     pub tab_hover: Option<(usize, f64)>,
     /// The header's Menu: whether its list is open, the row and the keyboard ring ([`crate::pages::menu`]).
     pub menu: crate::pages::menu::MenuUi,
+    /// The quick caption strip's keyboard ring and its open language list ([`crate::pill::quick_captions`]).
+    pub quick: crate::pill::quick_captions::QuickUi,
     /// The module the System page shows under its strip.
     pub system_module: poni_core::sysmon::Module,
     /// The last System reading had a GPU (keeps its chip while the next one is on its way).

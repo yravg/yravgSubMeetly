@@ -1136,6 +1136,9 @@ impl App {
                         // The prayer countdown's OK, the same way.
                         self.input.pressed_id = None;
                         self.prayer_countdown_ok();
+                    } else if self.input.pressed_id.is_some_and(|id| crate::pill::quick_captions::notice_press(&mut self.st, id)) {
+                        // "Captions on"'s language pills and their list, the same way.
+                        self.input.pressed_id = None;
                     } else {
                         // Opens when the button comes up (`open_from_press`),
                         // unless the pointer moves sideways first: then it
@@ -3472,6 +3475,10 @@ impl App {
         if let Some(n) = &self.st.notice {
             if !self.expanded && now >= n.until {
                 self.st.notice = None;
+                // Its language list goes with it, and the keyboard goes back.
+                if std::mem::take(&mut self.st.ui.quick).notice && self.input.focused == Some(wid(crate::pill::quick_captions::KB_ID)) {
+                    self.blur_text();
+                }
             }
         }
         // A new version's notice (or "Updated to") waits for the island to be

@@ -152,6 +152,8 @@ pub struct Settings {
     pub meeting_families: crate::meeting_source::MeetingFamilies,
     /// Open the Meeting tab when a meeting starts; off: captions start on Live.
     pub open_meeting_tab: bool,
+    /// The pill's quick caption strip ("Aa") is shown.
+    pub quick_captions_open: bool,
     pub hud_volume: bool,
     pub hud_power: bool,
     pub hud_bluetooth: bool,
@@ -256,6 +258,7 @@ impl Default for Settings {
             meeting_apps: Vec::new(),
             meeting_families: Default::default(),
             open_meeting_tab: true,
+            quick_captions_open: false,
             hud_volume: true,
             hud_power: true,
             hud_bluetooth: true,
@@ -394,6 +397,7 @@ mod tests {
     fn an_old_file_gets_the_meeting_defaults() {
         let s: Settings = serde_json::from_str(r#"{"auto_captions":false}"#).unwrap();
         assert!(s.meeting_apps.is_empty() && s.open_meeting_tab && s.meeting_families.slack && s.meeting_families.teams);
+        assert!(!s.quick_captions_open, "the pill's caption strip starts hidden");
         let s: Settings = serde_json::from_str(r#"{"meeting_families":{"slack":false},"meeting_apps":[{"kind":"host","value":"meeting.tencent.com","label":"Tencent Meeting"}]}"#).unwrap();
         assert!(!s.meeting_families.slack && s.meeting_families.zoom);
         assert_eq!(s.meeting_apps[0].value, "meeting.tencent.com");

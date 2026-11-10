@@ -13,12 +13,15 @@
 //! The five states are `PageState`: normal, empty (nothing to follow, or
 //! stopped), error (helper offline), locked (an issued meeting) and needs
 //! input (items wait on a person; a pill opens the Meeting page).
+//! "Aa" (every state) shows the quick caption strip at the bottom
+//! (`pill::quick_captions`, PMM-011): the page grows by its height.
 
 use super::hkit;
 use crate::commands::Command;
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
 use crate::pages::PageKind;
+use crate::pill::quick_captions;
 use crate::state::AppState;
 use crate::ui::{wid, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Rect};
@@ -29,12 +32,13 @@ use poni_core::models::Kind;
 const HEAD_H: f32 = 34.0;
 const HEIGHT: f32 = 168.0;
 
-pub fn height(_st: &AppState) -> f32 {
-    HEIGHT + hkit::GUIDE_H
+pub fn height(st: &AppState) -> f32 {
+    HEIGHT + hkit::GUIDE_H + quick_captions::extra_height(st)
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let area = hkit::guide(ui, st, area, PageKind::Live, "Live captions of the meeting now, line by line.");
+    let (area, strip) = quick_captions::split(st, area);
     let state = st.helper.live_state();
     match state {
         PageState::Error => {
@@ -42,6 +46,13 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         }
         PageState::Empty => empty(ui, st, area),
         _ => lines(ui, st, area, state),
+    }
+    // The header row has "Aa"; the other states put it in the top right corner.
+    if matches!(state, PageState::Error | PageState::Empty) {
+        quick_captions::aa_button(ui, st, area.right(), area.y + PILL_SMALL / 2.0);
+    }
+    if let Some(r) = strip {
+        quick_captions::strip(ui, st, r, area);
     }
 }
 
@@ -130,7 +141,7 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     let head = Rect::new(area.x, area.y, area.w, HEAD_H);
     let cy = head.center().y;
 
-    // Right to left: Unfollow, Hold, then the "waiting" pill.
+    // Right to left: Stop captions, Unfollow, Hold, Aa, then the "waiting" pill.
     let mut right = head.right();
     if !locked {
         let on = st.capture.running();
@@ -155,6 +166,7 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
         }
         right = b.x - PILL_GAP;
     }
+    right = quick_captions::aa_button(ui, st, right, cy) - PILL_GAP;
     if state == PageState::Needs {
         let label = format!("{waiting} wait on you");
         let w = ui.pill_width(&label, false, true);

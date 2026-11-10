@@ -8,10 +8,15 @@
 //! between. What the notice does is Classic's, to the widget: the same
 //! inline actions, the check once one is done, and the same widget ids in
 //! the same order, since the app acts on them at mouse-down.
+//!
+//! "Captions on" (PMM-013, board P06) also carries the spoken language and,
+//! while translating, the target as two small pills; each opens the language
+//! list of `quick_captions` under the capsule, which grows to hold it.
 
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
 use crate::island::Geom;
+use crate::pill::quick_captions as qc;
 use crate::state::{AppState, InlineAction, Notice};
 use crate::ui::{wid, PillStyle, Ui, PILL_SMALL};
 use poni_core::geom::{palette, Color, Point, Rect};
@@ -24,6 +29,14 @@ const H: f32 = 48.0;
 /// room than Classic does.
 const MIN_W: f32 = 200.0;
 const MAX_W: f32 = 372.0;
+/// "Captions on" with its language pills: as wide as the board's capsule.
+const CAPTIONS_MAX_W: f32 = 450.0;
+/// The language pills: smaller than the action pill, so all fits the cap.
+const LANG_H: f32 = 24.0;
+const LANG_PAD: f32 = 9.0;
+const ARROW_W: f32 = 18.0;
+/// Room under the language list in the grown capsule.
+const LIST_MARGIN: f32 = 8.0;
 /// The disc, concentric with the left end (inset 8 at r 24), and its glyph.
 const DISC: f32 = 32.0;
 const GLYPH: f32 = 16.0;
@@ -64,31 +77,54 @@ fn key(n: &Notice) -> u64 {
 }
 
 /// Whole even DIPs, so the centred body's edges stay on whole DIPs.
-fn fit(content: f32) -> f32 {
-    ((content.clamp(MIN_W, MAX_W) / 2.0).ceil() * 2.0).min(MAX_W)
+fn fit(content: f32, max: f32) -> f32 {
+    ((content.clamp(MIN_W, max) / 2.0).ceil() * 2.0).min(max)
+}
+
+type Langs = Option<(String, Option<String>)>;
+
+/// "Captions on"'s language pills (spoken, target while translating); None for other notices.
+fn langs(st: &AppState, n: &Notice) -> Langs {
+    (n.inline == Some(InlineAction::Translate)).then(|| qc::notice_langs(&st.settings))
+}
+
+/// What the width depends on besides the notice: its language pills.
+fn langs_key(l: &Langs) -> u64 {
+    l.as_ref().map_or(0, |l| wid(&format!("{l:?}")).rotate_left(7))
+}
+
+/// The language list open under "Captions on", if any.
+fn open_list(st: &AppState, l: &Langs) -> Option<qc::Which> {
+    st.ui.quick.list.filter(|_| l.is_some() && st.ui.quick.notice)
 }
 
 pub fn geom(st: &AppState) -> Option<Geom> {
-    let w = match st.notice.as_ref() {
-        Some(n) => {
-            let (k, w) = FIT.with(|f| f.get());
-            if k == key(n) {
-                w
-            } else {
-                guess_width(n)
-            }
+    let Some(n) = st.notice.as_ref() else { return Some(Geom::new(MIN_W, H, H / 2.0)) };
+    let l = langs(st, n);
+    let (k, w) = FIT.with(|f| f.get());
+    let w = if k == key(n) ^ langs_key(&l) { w } else { guess_width(n, l.as_ref()) };
+    Some(match open_list(st, &l) {
+        Some(which) => {
+            let (lw, lh) = qc::list_size(which);
+            Geom::new(w.max(lw + 2.0 * LIST_MARGIN), H + lh + LIST_MARGIN, H / 2.0)
         }
-        None => MIN_W,
-    };
-    Some(Geom::new(w, H, H / 2.0))
+        None => Geom::new(w, H, H / 2.0),
+    })
 }
 
 /// The width before the words have been measured (a new notice's first
 /// frame; the next frame has the measured one while the morph runs).
-fn guess_width(n: &Notice) -> f32 {
+fn guess_width(n: &Notice, langs: Option<&(String, Option<String>)>) -> f32 {
     let words = guess(&format!("{} {}", n.title, n.title_dim), 13.0 * 1.05).max(guess(&n.subtitle, 12.0));
     let tail = if n.inline.is_some() { ACT_GAP + ACT_MIN_W + ACT_INSET } else { TEXT_END };
-    fit(TEXT_X + words + tail)
+    match langs {
+        Some((a, b)) => {
+            let pill = |t: &str| guess(t, 11.0 * 1.05) + 2.0 * LANG_PAD;
+            let pills = pill(a) + b.as_deref().map_or(0.0, |b| ARROW_W + pill(b)) + ACT_GAP;
+            fit(TEXT_X + guess("Original language only", 12.0) + tail + pills, CAPTIONS_MAX_W)
+        }
+        None => fit(TEXT_X + words + tail, MAX_W),
+    }
 }
 
 /// About what the UI font's letters take at `size`, erring wide (also how
@@ -134,16 +170,23 @@ fn ink_on(fill: Color) -> Color {
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, body: Rect) -> bool {
-    let st = &*st;
-    match st.notice.as_ref() {
+    match st.notice.clone() {
         Some(n) => {
             LAST.with(|l| {
                 let mut l = l.borrow_mut();
-                if l.as_ref() != Some(n) {
+                if l.as_ref() != Some(&n) {
                     *l = Some(n.clone());
                 }
             });
-            draw_notice(ui, st, n, body);
+            let lay = draw_notice(ui, st, &n, body);
+            let l = langs(st, &n);
+            if let Some(which) = open_list(st, &l) {
+                let (lw, lh) = qc::list_size(which);
+                qc::list(ui, st, Rect::new(lay.center().x - lw / 2.0, lay.bottom(), lw, lh));
+            }
+            if l.is_some() {
+                qc::keyboard(ui, st, false, true);
+            }
         }
         // The notice just left and this is its fade (no input reaches it).
         None => LAST.with(|l| {
@@ -155,7 +198,26 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, body: Rect) -> bool {
     true
 }
 
-fn draw_notice(ui: &mut Ui, st: &AppState, n: &Notice, body: Rect) {
+/// Draws `n`; returns the capsule's row (the list, when open, goes under it).
+fn draw_notice(ui: &mut Ui, st: &AppState, n: &Notice, body: Rect) -> Rect {
+    let langs = langs(st, n);
+    let lang_st = TextStyle::caption().weight(Weight::Semibold);
+    // (label, width, id) of each language pill, spoken first.
+    let mut pills: Vec<(String, f32, &str)> = Vec::new();
+    if let Some((a, b)) = &langs {
+        for (t, id) in std::iter::once((a, qc::NOTICE_SPOKEN)).chain(b.as_ref().map(|b| (b, qc::NOTICE_INTO))) {
+            let w = (ui.c.measure(t, &lang_st, 200.0).0 + 2.0 * LANG_PAD).ceil();
+            pills.push((t.clone(), w, id));
+        }
+    }
+    let arrows = pills.len().saturating_sub(1) as f32 * ARROW_W;
+    let pills_w = if pills.is_empty() { 0.0 } else { pills.iter().map(|p| p.1).sum::<f32>() + arrows + ACT_GAP };
+    // The pills name the languages, so the line under the title only says whether it translates.
+    let subtitle = match &langs {
+        Some((_, Some(_))) => "Translating",
+        Some((_, None)) => "Original language only",
+        None => n.subtitle.as_str(),
+    };
     let act = n.inline.map(|a| {
         let (label, icon, color) = crate::activities::inline_look(st, n, a);
         (a, label, icon, color, ui.pill_width(label, icon.is_some(), true).max(if icon.is_some() { ACT_MIN_W } else { 0.0 }))
@@ -165,12 +227,12 @@ fn draw_notice(ui: &mut Ui, st: &AppState, n: &Notice, body: Rect) {
     // trim). A change at rest (Show put the sum in place) asks for one more
     // frame, which follows the new width.
     let (title_st, sub_st) = (title_style(), subtitle_style());
-    let k = key(n);
+    let k = key(n) ^ langs_key(&langs);
     let (fk, mut fw) = FIT.with(|f| f.get());
     if fk != k {
-        let words = crate::activities::notice_title_width(ui, n, &title_st).max(ui.c.measure(&n.subtitle, &sub_st, 2000.0).0);
-        let tail = act.as_ref().map_or(TEXT_END, |&(.., w)| ACT_GAP + w + ACT_INSET);
-        fw = fit(TEXT_X + words.ceil() + 1.0 + tail);
+        let words = crate::activities::notice_title_width(ui, n, &title_st).max(ui.c.measure(subtitle, &sub_st, 2000.0).0);
+        let tail = act.as_ref().map_or(TEXT_END, |&(.., w)| ACT_GAP + w + ACT_INSET) + pills_w;
+        fw = fit(TEXT_X + words.ceil() + 1.0 + tail, if langs.is_some() { CAPTIONS_MAX_W } else { MAX_W });
         FIT.with(|f| f.set((k, fw)));
         ui.request_repaint();
     }
@@ -180,7 +242,9 @@ fn draw_notice(ui: &mut Ui, st: &AppState, n: &Notice, body: Rect) {
     // squeezing the words into ever-changing ellipses. A wider or taller
     // outline (a notch, a lift, a longer notice before it) takes the ends
     // and the middle with it, so the disc and the pill stay concentric.
-    let (w, h) = (body.w.max(fw), body.h.clamp(H, H + 8.0));
+    // With the list open the capsule's row keeps its height; the list fills the rest.
+    let list = open_list(st, &langs);
+    let (w, h) = (body.w.max(fw), if list.is_some() { H } else { body.h.clamp(H, H + 8.0) });
     let lay = Rect::new(body.center().x - w / 2.0, body.y, w, h);
     let cy = lay.center().y;
     let c = Point::new(lay.x + h / 2.0, cy);
@@ -190,15 +254,39 @@ fn draw_notice(ui: &mut Ui, st: &AppState, n: &Notice, body: Rect) {
     let inset = h / 2.0 - PILL_SMALL / 2.0;
     let act = act.map(|(a, label, icon, color, w)| (a, label, icon, color, Rect::new(lay.right() - inset - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL)));
     let tx = lay.x + TEXT_X;
-    let text_right = act.as_ref().map_or(lay.right() - TEXT_END, |(.., r)| r.x - ACT_GAP);
+    let mut text_right = act.as_ref().map_or(lay.right() - TEXT_END, |(.., r)| r.x - ACT_GAP);
+    // The language pills, right to left from the action pill, an arrow between them.
+    let mut lang_rects = vec![Rect::new(0.0, 0.0, 0.0, 0.0); pills.len()];
+    for (i, (_, pw, _)) in pills.iter().enumerate().rev() {
+        let r = Rect::new(text_right - pw, cy - LANG_H / 2.0, *pw, LANG_H);
+        lang_rects[i] = r;
+        text_right = r.x - if i > 0 { ARROW_W } else { ACT_GAP };
+    }
     let tw = (text_right - tx).max(0.0);
     // Baselines about 22 and 37 DIP down the 48, as the spec has them.
     crate::activities::notice_title(ui, n, Rect::new(tx, cy - 17.0, tw, 20.0), title_st);
-    ui.c.text(&n.subtitle, Rect::new(tx, cy, tw, 16.0), &sub_st);
+    ui.c.text(subtitle, Rect::new(tx, cy, tw, 16.0), &sub_st);
 
     // The whole notice is a button (handled on mouse-down by the app); the
     // inline pill is registered after it so it wins the hit test.
     ui.button(wid("notice"), body);
+    // Pressed at mouse-down by the app (`quick_captions::notice_press`), as the action pill is.
+    for (i, ((label, _, id), r)) in pills.iter().zip(&lang_rects).enumerate() {
+        if i > 0 {
+            ui.c.text("\u{2192}", Rect::new(r.x - ARROW_W, r.y, ARROW_W, r.h), &lang_st.color(palette::TEXT_DIM).center());
+        }
+        let resp = ui.button(wid(id), *r);
+        let open = list == Some(if *id == qc::NOTICE_SPOKEN { qc::Which::Spoken } else { qc::Which::Into });
+        let fill = if open {
+            st.accent.with_alpha(0.22)
+        } else if resp.hovered {
+            palette::SURFACE_HOVER
+        } else {
+            palette::SURFACE
+        };
+        ui.c.fill_rrect(*r, r.h / 2.0, fill);
+        ui.c.text(label, *r, &lang_st.color(if open { st.accent } else { palette::TEXT }).center());
+    }
     if let Some((a, label, icon, color, r)) = act {
         if inline_done(st, n, a) {
             ui.c.fill_rrect(r, r.h / 2.0, color.with_alpha(0.20));
@@ -208,6 +296,7 @@ fn draw_notice(ui: &mut Ui, st: &AppState, n: &Notice, body: Rect) {
             ui.pill(wid("notice.act"), r, label, icon, style);
         }
     }
+    lay
 }
 
 #[cfg(test)]
@@ -230,10 +319,11 @@ mod tests {
 
     #[test]
     fn width_stays_between_its_bounds_on_even_dips() {
-        assert_eq!(fit(10.0), MIN_W);
-        assert_eq!(fit(1000.0), MAX_W);
-        assert_eq!(fit(251.2), 252.0);
-        assert_eq!(fit(253.0), 254.0);
+        assert_eq!(fit(10.0, MAX_W), MIN_W);
+        assert_eq!(fit(1000.0, MAX_W), MAX_W);
+        assert_eq!(fit(1000.0, CAPTIONS_MAX_W), CAPTIONS_MAX_W);
+        assert_eq!(fit(251.2, MAX_W), 252.0);
+        assert_eq!(fit(253.0, MAX_W), 254.0);
     }
 
     #[test]
@@ -241,7 +331,7 @@ mod tests {
         let long = money("Amount and sender hidden", Some("Rp 1.250.000 \u{b7} Gaji Oktober"));
         let short = money("Amount and sender hidden", Some("Rp 9"));
         assert_eq!(key(&long), key(&short));
-        assert_eq!(guess_width(&long), guess_width(&short));
+        assert_eq!(guess_width(&long, None), guess_width(&short, None));
         // Once shown, the words are new and the width follows them.
         assert_ne!(key(&long), key(&money("Rp 1.250.000 \u{b7} Gaji Oktober", None)));
     }
