@@ -2235,7 +2235,14 @@ mod tests {
             draft_translation(false, false, false, "de", "id"),
             (SourceOnly, "off")
         );
-        assert_eq!((target_lang(Some("none")).as_str(), target_lang(Some("xx")).as_str(), target_lang(None).as_str()), ("none", "en", "en"));
+        assert_eq!(
+            (
+                target_lang(Some("none")).as_str(),
+                target_lang(Some("xx")).as_str(),
+                target_lang(None).as_str()
+            ),
+            ("none", "en", "en")
+        );
         // The island asked for the spoken line only.
         assert_eq!(
             draft_translation(true, true, true, "de", "none"),
