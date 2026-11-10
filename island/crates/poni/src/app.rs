@@ -455,6 +455,8 @@ pub struct App {
     /// False when the file existed but couldn't be read: never overwrite it.
     settings_writable: bool,
     store_writable: bool,
+    /// Captions that start by themselves with a video or a meeting.
+    auto_captions: poni_core::capture::Auto,
     /// The current press started as a double-click (its click is ignored).
     dbl_press: bool,
     /// Pending high surrogate from WM_CHAR.
@@ -661,6 +663,7 @@ impl App {
             saved_settings,
             settings_writable,
             store_writable,
+            auto_captions: Default::default(),
             dbl_press: false,
             high_surrogate: None,
             wheel_acc: 0.0,
@@ -1785,6 +1788,29 @@ impl App {
         self.request_frame();
     }
 
+    /// Start or Stop pressed by the person: the automatic captions leave that choice alone.
+    fn captions_by_hand(&mut self, on: bool) {
+        let wanted = self.captions_wanted();
+        self.auto_captions.manual(on, wanted);
+        self.set_captions(on);
+    }
+
+    /// A video plays (not a music app) or a calendar meeting with a join link runs now.
+    fn captions_wanted(&self) -> bool {
+        let video = self.st.media.as_ref().is_some_and(|m| m.is_playing() && poni_core::capture::captionable_app(&m.app_id));
+        video || self.st.helper.calendar.as_ref().is_some_and(|c| poni_core::capture::meeting_now(c, self.st.unix))
+    }
+
+    fn auto_captions_step(&mut self) {
+        use poni_core::capture::AutoStep;
+        let wanted = self.captions_wanted();
+        match self.auto_captions.step(self.st.settings.auto_captions, wanted, self.st.capture.running(), self.st.now) {
+            AutoStep::Start => self.set_captions(true),
+            AutoStep::Stop => self.set_captions(false),
+            AutoStep::Nothing => {}
+        }
+    }
+
     /// What names a meeting that no calendar event does. shortcut: no calendar hook yet; when the
     /// Calendar page lands, return the running event's title here.
     fn running_event_title(&self) -> Option<String> {
@@ -2241,8 +2267,8 @@ impl App {
                 }
                 crate::services::engine::open_when_ready("/app/setup-extension.html");
             }
-            StartCaptions => self.set_captions(true),
-            StopCaptions => self.set_captions(false),
+            StartCaptions => self.captions_by_hand(true),
+            StopCaptions => self.captions_by_hand(false),
             OpenCaptionsPanel => shell::open_in_chrome(&format!("chrome-extension://{}/sidepanel.html", crate::services::engine::EXTENSION_ID)),
             Quit => {
                 self.quit(0);
@@ -2311,6 +2337,7 @@ impl App {
                         self.st.lyrics = LyricsState::default();
                     }
                 }
+                self.auto_captions_step();
             }
             AppEvent::MediaTimeline { track_key, timeline } => {
                 if let Some(m) = self.st.media.as_mut() {
@@ -2318,6 +2345,7 @@ impl App {
                         m.timeline = timeline;
                     }
                 }
+                self.auto_captions_step();
             }
             AppEvent::MediaArt { track_key, art } => {
                 if let Some(m) = self.st.media.as_mut() {
@@ -2499,8 +2527,14 @@ impl App {
             }
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::Calendar(r) => {
+                // A fresh calendar ends the "Reading your calendar" note; an error notice stays.
+                if self.st.helper_notice.as_ref().is_some_and(|n| n.0.starts_with("Reading your calendar")) {
+                    self.st.helper_notice = None;
+                }
                 self.st.helper.apply_calendar(r);
                 self.calendar_heads_up();
+                // The calendar answers every minute: also the clock that stops captions after a video.
+                self.auto_captions_step();
             }
             AppEvent::CalendarNotes(Ok(_)) => {
                 // The note is first in the list now: the Meeting page reads it.
@@ -3966,7 +4000,11 @@ impl App {
         use poni_core::calendar::{self as cal, Req};
         let req = match c {
             CalendarCmd::PasteLink => match services::clipboard::read_text(self.hwnd).as_deref().and_then(cal::looks_like_link) {
-                Some(u) => Req::Link(u.to_string()),
+                Some(u) => {
+                    // The engine reads the whole calendar before it answers; say so instead of looking idle.
+                    self.st.helper_notice = Some(("Reading your calendar. A large one can take up to a minute.".into(), self.st.now + 60.0, false));
+                    Req::Link(u.to_string())
+                }
                 None => {
                     self.st.helper_notice = Some(("Copy your calendar link first, then press Paste link.".into(), self.st.now + 5.0, true));
                     return;
@@ -4339,7 +4377,7 @@ impl App {
                     }
                 }
                 Command::Calendar(c) => self.calendar_cmd(c),
-                Command::Captions(on) => self.set_captions(on),
+                Command::Captions(on) => self.captions_by_hand(on),
                 Command::ModelsRefresh => self.refresh_models(),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),

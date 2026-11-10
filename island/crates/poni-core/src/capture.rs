@@ -259,6 +259,79 @@ impl CaptureState {
     }
 }
 
+/// The playing app is worth captioning: anything but a music player (a browser, Teams, a video
+/// player). shortcut: matched by name; a music app named otherwise gets captioned, add it here.
+pub fn captionable_app(app_id: &str) -> bool {
+    let a = app_id.to_ascii_lowercase();
+    !["music", "spotify", "itunes", "foobar", "aimp", "winamp", "tidal", "deezer"].iter().any(|m| a.contains(m))
+}
+
+/// Is a timed calendar meeting with a join link running at `unix`?
+pub fn meeting_now(cal: &crate::calendar::Calendar, unix: i64) -> bool {
+    cal.events.iter().any(|e| !e.all_day && e.join_url.is_some() && e.start <= unix && unix < e.end)
+}
+
+/// After the reason ends, auto-started captions run this long before they stop (a pause between
+/// videos, a meeting that overruns).
+pub const AUTO_STOP_S: f64 = 90.0;
+
+/// What [`Auto::step`] asks the island to do.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AutoStep {
+    Start,
+    Stop,
+    Nothing,
+}
+
+/// Captions that start by themselves (Settings: `auto_captions`). Captions it started stop once
+/// the reason is gone for [`AUTO_STOP_S`]; captions the person started are never stopped by it,
+/// and a Stop the person presses holds until the reason ends.
+#[derive(Clone, Debug, Default)]
+pub struct Auto {
+    started: bool,
+    held: bool,
+    idle_since: Option<f64>,
+}
+
+impl Auto {
+    pub fn step(&mut self, enabled: bool, wanted: bool, running: bool, now: f64) -> AutoStep {
+        if !running && self.started {
+            // It failed to start or was stopped elsewhere: no retry loop until the reason ends.
+            self.started = false;
+            self.held = true;
+        }
+        if !enabled {
+            return AutoStep::Nothing;
+        }
+        if wanted {
+            self.idle_since = None;
+            if !running && !self.held {
+                self.started = true;
+                return AutoStep::Start;
+            }
+            return AutoStep::Nothing;
+        }
+        self.held = false;
+        if !self.started {
+            return AutoStep::Nothing;
+        }
+        let since = *self.idle_since.get_or_insert(now);
+        if now - since >= AUTO_STOP_S {
+            self.started = false;
+            self.idle_since = None;
+            return AutoStep::Stop;
+        }
+        AutoStep::Nothing
+    }
+
+    /// The person pressed Start (`on`) or Stop.
+    pub fn manual(&mut self, on: bool, wanted: bool) {
+        self.started = false;
+        self.idle_since = None;
+        self.held = !on && wanted;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -403,5 +476,60 @@ mod tests {
         assert_eq!(lang_name("ja"), "Japanese");
         assert_eq!(lang_name("auto"), "Auto-detect");
         assert_eq!(lang_name("xx"), "xx");
+    }
+
+    #[test]
+    fn auto_captions_start_with_a_video_and_stop_a_while_after_it() {
+        let mut a = Auto::default();
+        assert_eq!(a.step(true, false, false, 0.0), AutoStep::Nothing);
+        assert_eq!(a.step(false, true, false, 0.0), AutoStep::Nothing, "setting off");
+        assert_eq!(a.step(true, true, false, 1.0), AutoStep::Start);
+        assert_eq!(a.step(true, true, true, 2.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, false, true, 10.0), AutoStep::Nothing, "a pause is not the end");
+        assert_eq!(a.step(true, true, true, 50.0), AutoStep::Nothing, "the next video resets the wait");
+        assert_eq!(a.step(true, false, true, 60.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, false, true, 60.0 + AUTO_STOP_S), AutoStep::Stop);
+        assert_eq!(a.step(true, false, false, 200.0), AutoStep::Nothing);
+        // A start that failed is not retried on every media event.
+        assert_eq!(a.step(true, true, false, 300.0), AutoStep::Start);
+        assert_eq!(a.step(true, true, false, 301.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, false, false, 302.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, true, false, 303.0), AutoStep::Start);
+    }
+
+    #[test]
+    fn auto_captions_leave_the_persons_own_start_and_stop_alone() {
+        let mut a = Auto::default();
+        a.manual(true, false);
+        assert_eq!(a.step(true, false, true, 0.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, false, true, 500.0), AutoStep::Nothing, "a manual start is never auto-stopped");
+        // Stop pressed during a video: no restart until that video is over.
+        a.manual(false, true);
+        assert_eq!(a.step(true, true, false, 600.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, false, false, 601.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, true, false, 602.0), AutoStep::Start);
+    }
+
+    #[test]
+    fn music_players_are_not_captioned_and_meetings_need_a_join_link() {
+        assert!(captionable_app("Chrome") && captionable_app("MSTeams_8wekyb3d8bbwe!MSTeams"));
+        assert!(!captionable_app("Spotify.exe") && !captionable_app("Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic"));
+        let ev = |join: bool, all_day: bool| crate::calendar::Event {
+            id: "e".into(),
+            title: "Standup".into(),
+            start: 100,
+            end: 200,
+            all_day,
+            location: None,
+            organizer: None,
+            attendees: 0,
+            join_url: join.then(|| "https://teams.microsoft.com/l/x".into()),
+            recurring: false,
+        };
+        let cal = |e| crate::calendar::Calendar { sources: vec![], events: vec![e] };
+        assert!(meeting_now(&cal(ev(true, false)), 150));
+        assert!(!meeting_now(&cal(ev(true, false)), 200));
+        assert!(!meeting_now(&cal(ev(false, false)), 150));
+        assert!(!meeting_now(&cal(ev(true, true)), 150));
     }
 }

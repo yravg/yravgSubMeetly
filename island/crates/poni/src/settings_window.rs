@@ -272,6 +272,7 @@ pub enum Key {
     MediaActivity,
     LyricsOffset,
     Captions,
+    AutoCaptions,
     SpokenLang,
     TargetLang,
     LyricsTranslate,
@@ -520,7 +521,10 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         Section::Speech => vec![
             Block::Group(
                 Some("Captions"),
-                vec![switch(Key::Captions, "Caption what this PC plays", Some("The engine writes what it hears on the island, in the language it hears"), st.capture.running())],
+                vec![
+                    switch(Key::Captions, "Caption what this PC plays", Some("The engine writes what it hears on the island, in the language it hears"), st.capture.running()),
+                    switch(Key::AutoCaptions, "Start captions by themselves", Some("While a video plays (not a music app) or a calendar meeting runs; they stop after it ends"), s.auto_captions),
+                ],
             ),
             Block::Group(
                 Some("Languages"),
@@ -701,6 +705,7 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             st.cmd(Command::Captions(!on));
             return;
         }
+        Key::AutoCaptions => s.auto_captions = !s.auto_captions,
         Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
         Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
         Key::LyricsTranslate => s.lyrics_translate = !s.lyrics_translate,

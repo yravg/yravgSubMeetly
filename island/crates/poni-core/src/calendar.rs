@@ -307,8 +307,15 @@ fn reason(code: u16, reply: &str) -> String {
         .unwrap_or_else(|| format!("The engine said {code}."))
 }
 
+/// How long a request that makes the engine read a calendar link waits. Above the engine's own
+/// fetch limit (60 s), so its sentence ("did not answer in time") arrives instead of a socket error.
+pub const LINK_WAIT: std::time::Duration = std::time::Duration::from_secs(75);
+
 fn call(port: u16, method: &str, path: &str, body: Option<&str>) -> Result<String, String> {
-    let (code, reply) = helper::request(port, method, path, body)?;
+    // Adding or refreshing a link reads it over the network; everything else is local and quick.
+    let wait = if method == "POST" { LINK_WAIT } else { std::time::Duration::from_secs(4) };
+    let (code, reply) = helper::request_bytes(port, method, path, "application/json", body.unwrap_or("").as_bytes(), wait)
+        .map_err(|e| if e.contains("os error") { "The engine is not answering. Is it running?".to_string() } else { e })?;
     if code == 200 {
         Ok(reply)
     } else if code == 404 && path == "/calendar" {

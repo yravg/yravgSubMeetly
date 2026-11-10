@@ -27,7 +27,8 @@ use crate::state::now_epoch_secs;
 /// Links are re-read this often (seconds).
 pub const REFRESH_SECS: i64 = 900;
 const MAX_BODY: u64 = 5 * 1024 * 1024;
-const FETCH_TIMEOUT: Duration = Duration::from_secs(20);
+// Big Outlook calendars (400+ KB) on a slow line took 20 s and more to arrive.
+const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_SOURCES: usize = 8;
 const MAX_URL: usize = 2048;
 const DAY: i64 = 86_400;

@@ -141,6 +141,9 @@ pub struct Settings {
     pub target_lang: String,
     /// Live captions from what the PC plays were on when the island last ran.
     pub captions_on: bool,
+    /// Captions start by themselves while a video plays or a calendar meeting runs, and stop after
+    /// it ends ([`crate::capture::Auto`]).
+    pub auto_captions: bool,
     pub hud_volume: bool,
     pub hud_power: bool,
     pub hud_bluetooth: bool,
@@ -240,6 +243,7 @@ impl Default for Settings {
             source_lang: "auto".into(),
             target_lang: "en".into(),
             captions_on: false,
+            auto_captions: true,
             hud_volume: true,
             hud_power: true,
             hud_bluetooth: true,
