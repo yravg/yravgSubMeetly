@@ -531,3 +531,9 @@ Fitur besar; status per langkah ada di `docs/handoff/pill-meetings.md`, rencana 
 - Not seen on screen: the island window is left out of screen capture, so the grid and a Join into Teams were not checked by screenshot. Engine verified to return 77 meetings for the 5-week window.
 - `island/crates/poni/build.rs` has an accidental `cargo fmt` reflow from this session (default width), left uncommitted; revert it with `git checkout -- island/crates/poni/build.rs`.
 - **1.2.8 (same day):** grid never showed in 1.2.7: `Settings::expanded_width` is 620, body about 590, below the 640 threshold. `GRID_FROM_W` now 480; rows narrower than 520 (`TIME_COLUMN_FROM_W`) drop the time column and lead the subtitle with the time. Installed `island/dist/yravgSubMeetly-Setup-1.2.8.exe`.
+
+## Island 1.2.9: caption settings while captions run (2026-11-10)
+
+- Spoken language, Translate into and Translate captions changed in Settings (or the pop-up's Translate pill) now reach running captions from their next 4 s window: `CaptureService::set_langs` (shared languages read before each `/draft`), `Services::capture_langs`, `App::retune_captions`. Before: Translate captions did nothing until a restart; each language +/- stopped and reopened the WASAPI device (up to 800 ms on the UI thread). Commit 6ea3ea3, installed `island/dist/yravgSubMeetly-Setup-1.2.9.exe` (sha256 ba184be5…ef2f). poni tests 289 pass.
+- Clippy `-D warnings` fails on the current stable toolchain (1.99) with 9 pre-existing lints in poni-core (`is_multiple_of`, `as_chunks`), not from this change.
+- Next big feature: Media / Meeting tabs with live minutes and quick caption settings on the pill. PRD `docs/roadmap/pill-media-meeting.md`, handoff `docs/handoff/pill-media-meeting.md`; canvas in progress before any build.
