@@ -85,9 +85,12 @@ html[data-reskin="tide"] #empty-state .empty { text-align: center; }
    ========================================================================== */
 :root[data-reskin="tide"][data-theme="coretax"] {
   --t-action: #0A0F0C; --t-decision: #0E9F6E; --t-metric: #2563EB; --t-risk: #C0362C; --t-question: #7C3AED; --t-info: #64748B;
+  --shadow-scroll: 0 6px 10px -8px rgba(10, 15, 12, 0.35);
 }
 :root[data-reskin="tide"]:not([data-theme="coretax"]) {
   --t-action: #E8F2EC; --t-decision: #34D399; --t-metric: #60A5FA; --t-risk: #F87171; --t-question: #A78BFA; --t-info: #94A3B8;
+  --shadow-scroll: 0 6px 10px -8px rgba(0, 0, 0, 0.7);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 /* Type: pill with an ink word and an 8 px hue dot. */
@@ -97,8 +100,7 @@ html[data-reskin="tide"] .av { width: 28px; height: 28px; font-size: 10.5px; }
 
 /* Sticky header: the column row stays under the toolbar; its shadow fades in after 4 px of scroll. */
 html[data-reskin="tide"] thead th { font-size: 12px; letter-spacing: 0.04em; padding: 9px 12px; background: var(--card); box-shadow: none; transition: box-shadow 120ms ease; }
-html[data-reskin="tide"] #pane[data-scrolled="true"] thead th { box-shadow: 0 6px 10px -8px rgba(10, 15, 12, 0.35); }
-html[data-reskin="tide"]:not([data-theme="coretax"]) #pane[data-scrolled="true"] thead th { box-shadow: 0 6px 10px -8px rgba(0, 0, 0, 0.7); }
+html[data-reskin="tide"] #pane[data-scrolled="true"] thead th { box-shadow: var(--shadow-scroll); }
 
 /* Density: Review / Reading / Compact. Reading is the board's default. */
 html[data-reskin="tide"] .reg-tb:not([hidden]) { display: flex; justify-content: flex-end; align-items: center; padding: 8px 20px; border-bottom: 1px solid var(--border); background: var(--bg); }
@@ -117,7 +119,7 @@ html[data-reskin="tide"][data-row-density="compact"] .av { width: 22px; height: 
 html[data-reskin="tide"] tbody td.c-item { position: relative; }
 html[data-reskin="tide"] tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--tide-green); }
 html[data-reskin="tide"] tbody tr:hover td { background: var(--card2); }
-html[data-reskin="tide"] .row-act { display: flex; gap: 6px; padding: 4px; position: absolute; right: 8px; bottom: 6px; z-index: 2; border-radius: 999px; background: var(--card); box-shadow: var(--shadow-float, 0 8px 24px rgba(0, 0, 0, 0.25)), inset 0 0 0 1px var(--border); opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
+html[data-reskin="tide"] .row-act { display: flex; gap: 6px; padding: 4px; position: absolute; right: 8px; bottom: 6px; z-index: 2; border-radius: 999px; background: var(--card); box-shadow: var(--shadow-float), inset 0 0 0 1px var(--border); opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
 html[data-reskin="tide"] tbody tr:hover .row-act,
 html[data-reskin="tide"] tbody tr:focus-within .row-act { opacity: 1; pointer-events: auto; }
 html[data-reskin="tide"] .row-act button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--card2); color: var(--text); font: 600 13px var(--font-ui); cursor: pointer; }
