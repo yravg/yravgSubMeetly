@@ -43,6 +43,7 @@ Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private
 
 - Rust on this laptop: default toolchain is `stable-x86_64-pc-windows-gnu` (fails: `dlltool.exe` not found). Set `$env:RUSTUP_TOOLCHAIN='stable-x86_64-pc-windows-msvc'`.
 - JS tests: `python3` must be a real `.exe` (Node `spawn` does not run `.cmd`): prepend a folder holding a copy of `python.exe` named `python3.exe` and set `PYTHONHOME=C:\Program Files\Python311`. `npm` from Git Bash is broken (stale kimi shim): run `npm` from PowerShell.
+- Engine tests: the stale `engine-rs/target/debug` engine was deleted (owner 2026-11-11). Set `SUBMEETLY_ENGINE_BIN` to a fresh engine (a release build on D:, or a copy of the installed `submeetly-engine.exe`), else the engine tests skip.
 - PMM-024 limits (comment `shortcut:` in `src/lib/engine-sync.js`): a meeting deleted on the engine side stays in the browser copy; a local edit made while the engine was down is overwritten at the next start. The Source fact shows the raw value for sources without a label (`calendar`).
 
 ## Next step
