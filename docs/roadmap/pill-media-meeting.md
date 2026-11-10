@@ -57,6 +57,8 @@ Status words: `missing`, `partial`, `done`. Priority P0 (must, this round), P1 (
 | PMM-013 | P1 | "Captions on" pop-up gets languages | The pop-up shows "Auto-detect → Chinese" as two small pills that open the list (PMM-012), beside Translate / Don't translate. | missing |
 | PMM-014 | P1 | Settings window follows | Advanced settings › Captions and languages gets "Meeting apps" (switch per app family: Teams, Zoom, Meet, Webex, Slack) and "Open the Meeting tab when a meeting starts". | missing |
 | PMM-015 | P1 | Media sessions not saved as meetings | A media (non-meeting) session is kept as a transcript (History on the Minutes page, type "Video") instead of a new meeting in the register; "Save as meeting" turns it into one. | missing (open question Q2) |
+| PMM-017 | P0 | Meeting apps are a list the person extends | Advanced settings › Captions and languages › Meeting apps lists the built-in families (Teams, Zoom, Google Meet, Webex, Slack) and an **Add** row: pick a running app (its process name is kept) or paste a meeting link or web address (e.g. a Tencent Meeting / VooV link; its host, `meeting.tencent.com`, is kept). Kept in `settings.meeting_apps` (`{kind: app|host, value, label}`), each removable. The classifier (PMM-004) reads built-ins plus this list; no code change needed to add a service. | missing |
+| PMM-018 | P0 | Join from a pasted link records under Meeting | A meeting link pasted on the Meeting tab ("Paste a meeting link", or Today › a calendar row's Join) opens it (app scheme when installed, else the browser) and marks that meeting active for the island: captions that start in the next 10 minutes while its app/browser plays sound go to the Meeting tab with the link's host as title until a better title is known. Unknown hosts are added to Meeting apps after a one-tap "Always treat <host> as a meeting". | missing |
 | PMM-016 | P2 | Speaker names in meetings | When the meeting app exposes nothing, lines stay speaker-less; Teams transcript paste (exists) adds names after. Live speaker names need a separate study. | missing |
 
 ## Order of build (after canvas sign-off)
@@ -70,8 +72,8 @@ Status words: `missing`, `partial`, `done`. Priority P0 (must, this round), P1 (
 
 Each step: failing test first, `cargo test -p poni -p poni-core`, version bump, installer, install on the laptop, CHANGELOG line, handoff update.
 
-## Open questions (owner)
+## Owner answers (2026-11-10)
 
-- Q1: Meeting app list for PMM-004: Teams, Zoom, Google Meet (browser), Webex, Slack huddle. Add others? (default: these five)
-- Q2: Media sessions (YouTube etc.): keep saving them as meetings like today, or keep them as transcripts only (PMM-015)? (default in canvas: transcripts, with "Save as meeting")
-- Q3: Live minutes refresh: every 60 s / 12 lines uses the local engine (Qwen / heuristic); fine on battery? (default: yes, paused when on battery saver)
+- Q1 meeting apps: Teams, Zoom, Google Meet, Webex, Slack; **easy to add later**, also by giving a meeting link (e.g. Tencent Meeting) so it records under Meeting → PMM-017, PMM-018.
+- Q2 media sessions: kept as transcripts with "Save as meeting" (PMM-015 confirmed).
+- Q3 live minutes refresh every 60 s / 12 lines on the local engine, paused on battery saver (confirmed).

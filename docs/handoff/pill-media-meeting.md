@@ -2,7 +2,7 @@
 
 Roadmap / PRD: `docs/roadmap/pill-media-meeting.md` (PMM-001 to PMM-016).
 Canvas generator: `docs/design/pill-media-meeting-canvas/`.
-Claude Design canvas: (not published yet)
+Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private; created, boards not yet published)
 
 ## Status
 
@@ -11,7 +11,8 @@ Claude Design canvas: (not published yet)
 | 0. Caption settings apply to running captions (pre-work) | done | island 1.2.9, commit 6ea3ea3, installed on the laptop |
 | 1. PRD | done | `docs/roadmap/pill-media-meeting.md` |
 | 2. Canvas (boards P01-P07) | in progress | worker `pmm-canvas` (Sonnet), checkpoint `.checkpoints/pmm-canvas.md` |
-| 3. Owner sign-off on canvas + Q1-Q3 | open | owner |
+| 3. Owner answers Q1-Q3 | done | 2026-11-10: all defaults accepted; Q1 extended -> PMM-017/018 |
+| 3b. Owner sign-off on canvas | open | owner |
 | 4. Build PMM-001 .. PMM-015 | open | blocked on step 3 |
 
 ## Decisions
