@@ -143,10 +143,10 @@ export function minutesHtml(c) {
   const list = [...meetings].sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.start || '').localeCompare(String(a.start || '')));
   const sel = `<select data-mn="meeting" aria-label="${esc(t.meeting)}" title="${esc(t.meeting)}">${list.map((m) => `<option value="${esc(m.id)}"${m.id === meeting.id ? ' selected' : ''}>${esc(`${m.title} · ${m.date}${m.start ? ` ${m.start}` : ''}`)}</option>`).join('')}</select>`;
   const doBtn = (k, label, icon, cls = 'btn') => `<button type="button" class="${cls}" data-do="${DO[k]}">${icon ? ic(icon, 16) : ''}${esc(label)}</button>`;
-  const bar = `<div class="mn-bar">${sel}${doBtn('draft', t.draft, '')}${doBtn('library', t.library, 'book')}${doBtn('training', t.training, 'sparkle')}<span class="grow"></span>${doBtn('add', t.add, 'plus')}${doBtn('export', t.exportB, 'export')}${doBtn('amend', t.amend, '')}${doBtn('issue', t.issue, '', 'pill-b')}</div>`;
+  const bar = `<div class="mn-bar">${sel}${doBtn('draft', t.draft, '')}${doBtn('library', t.library, 'book')}${doBtn('training', t.training, '')}<span class="grow"></span>${doBtn('add', t.add, '')}${doBtn('export', t.exportB, 'export')}${doBtn('amend', t.amend, '')}${doBtn('issue', t.issue, '', 'pill-b')}</div>`;
   const d = density();
   const pop = ui.layoutOpen ? `<div class="mn-pop" role="dialog" aria-label="${esc(t.layout)}"><b>${esc(t.layout)}</b><span class="mn-k">${esc(t.density)}</span><div class="mn-seg" role="group">${['review', 'reading', 'compact'].map((k) => `<button type="button" data-density="${k}" aria-pressed="${k === d}">${esc(t[k])}</button>`).join('')}</div><div class="mn-pops"><button type="button" class="btn sm" data-layout="float">${esc(t.float)}</button><button type="button" class="btn sm" data-layout="rail">${esc(t.rail)}</button><button type="button" class="btn sm" data-layout="expand-dock">${esc(t.dock)}</button><button type="button" class="btn sm" data-layout="hide">${esc(t.hide)}</button></div><button type="button" class="btn sm full" data-layout="reset">${esc(t.reset)}</button><small class="mut">${esc(t.layoutNote)}</small></div>` : '';
-  const tools = `<div class="mn-tools"><div class="mn-open"><span>${esc(t.openRegister)}</span>${openLinks}</div><button type="button" class="btn sm" data-mn="collapse" aria-pressed="${ui.collapsed}">${ic(ui.collapsed ? 'down' : 'up', 14)}${esc(ui.collapsed ? t.expand : t.collapse)}</button><div class="mn-lay"><button type="button" class="btn sm" data-mn="layout" aria-expanded="${ui.layoutOpen}">${esc(t.layout)}</button>${pop}</div></div>`;
+  const tools = `<div class="mn-tools"><div class="mn-open"><span>${esc(t.openRegister)}</span>${openLinks}</div><button type="button" class="btn sm" data-mn="collapse" aria-pressed="${ui.collapsed}">${esc(ui.collapsed ? t.expand : t.collapse)}</button><div class="mn-lay"><button type="button" class="btn sm" data-mn="layout" aria-expanded="${ui.layoutOpen}">${esc(t.layout)}</button>${pop}</div></div>`;
 
   const parts = [['items', counts.all], ...['decision', 'action', 'question', 'risk', 'metric', 'info'].filter((k) => counts[k]).map((k) => [k, counts[k]])];
   const sum = `<div class="mn-sum">${parts.map(([k, n]) => esc(t[k](n))).join(' · ')}</div>`;
@@ -168,8 +168,8 @@ export function minutesHtml(c) {
   }
   const srcName = meeting.title || '';
   const srcLine = `<div class="mn-src">${ic('info', 16)}<b>${esc(t.source)}</b><span>${esc(low ? t.srcLine(srcName, low) : t.srcClean(srcName))}</span><span class="grow"></span>${low ? `<button type="button" class="pill-b sm" data-mn="review-low">${esc(t.lowN(low))}</button>` : ''}</div>`;
-  const head2 = ui.collapsed ? '' : `${sum}${chips}`;
-  return `<div class="mn" data-dens="${d}"><div class="mn-top"><nav class="mn-crumb"><a href="#today">${esc(t.back)}</a><span aria-hidden="true">›</span><span>${esc(t.crumb)}</span></nav>${tools}</div>${bar}<section class="mn-card">${head2}<div class="mn-fbar">${tabs}${filters}</div>${body}${srcLine}</section></div>`;
+  const head2 = ui.collapsed ? '' : sum;
+  return `<div class="mn" data-dens="${d}"><div class="mn-top"><nav class="mn-crumb"><a href="#today">${esc(t.back)}</a><span aria-hidden="true">›</span><span>${esc(t.crumb)}</span></nav>${tools}</div>${bar}<section class="mn-card">${head2}${ui.collapsed ? `<div class="mn-crow">${filters}</div>` : `<div class="mn-crow">${chips}${filters}</div>`}${tabs}${body}${srcLine}</section></div>`;
 }
 
 /* ---------------------------------------------------------------- perilaku */
