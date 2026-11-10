@@ -1857,6 +1857,10 @@ function wireTideRegister() {
   let saved = null;
   try { saved = localStorage.getItem(LS_ROW_DENSITY); } catch { /* storage blocked */ }
   setRowDensity(saved, false);
+  // A04a: the breadcrumb gets its own line above the title so the toolbar fits at 1440. The home link stays in the toolbar.
+  const trail = $('#crumb-trail');
+  const wrap = $('.mtitle-wrap');
+  if (trail && wrap) { trail.classList.add('crumb-line'); wrap.prepend(trail); }
   $('#reg-density').addEventListener('click', (e) => {
     const b = e.target.closest('[data-row-density]');
     if (b) setRowDensity(b.dataset.rowDensity);

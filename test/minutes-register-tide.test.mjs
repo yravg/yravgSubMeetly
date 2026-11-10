@@ -204,4 +204,17 @@ test('a meeting with no items shows Tide asleep, "No items yet", Draft options a
   assert.equal(await page.$('#reg-tb:not([hidden])'), null, 'density control hides with no rows');
 });
 
+test('breadcrumb sits on its own line in the meeting header at 1440 and 1024; the Minutes home link stays in the toolbar', async () => {
+  for (const w of [1440, 1024]) {
+    await open('?skin=tide', w);
+    const r = await page.evaluate(() => {
+      const t = document.querySelector('#crumb-trail');
+      const full = [...t.querySelectorAll('span:not(.sep)')].every((e) => e.scrollWidth <= e.clientWidth + 1);
+      return { inHeader: !!t.closest('#top-panel'), home: !!document.querySelector('.appbar #crumb-home'), visible: t.getBoundingClientRect().width > 0, full, text: t.textContent };
+    });
+    assert.ok(r.inHeader && r.home && r.visible, `${w}: ${JSON.stringify(r)}`);
+    assert.ok(r.full, `${w}: crumbs are not truncated (${r.text})`);
+  }
+});
+
 test('no page errors', () => { assert.deepEqual(pageErrors, []); });
