@@ -208,13 +208,14 @@ test('A06: delapan fitur, Island dengan sakelar nyata, add-in terpasang di halam
   await page.waitForSelector('.tiles');
   assert.equal(await page.$eval('#page', (p) => p.dataset.route), 'all', 'All features: halamannya sendiri (A06)');
   assert.equal(await page.$$eval('.tiles .tile2', (l) => l.length), 8);
-  assert.equal((await page.$$('.tiles [data-act="island"]')).length, 0, 'satu sakelar Island saja: di bilah atas');
+  assert.equal(await page.$$eval('.tiles .tile2 .sw-chip input', (l) => l.length), 4, 'sakelar nyata: Island + tiga add-in; fitur bawaan tanpa sakelar palsu');
   const before = await page.evaluate(() => chrome.storage.local.get('captionSurface'));
   await page.click('#island-chip'); await wait(300);
   const afterOn = await page.evaluate(() => chrome.storage.local.get('captionSurface'));
   assert.notEqual(afterOn.captionSurface, before.captionSurface || 'overlay');
   assert.equal(await page.$eval('#island-switch', (i) => i.checked), afterOn.captionSurface === 'both');
-  assert.equal(await page.$eval('[data-island-state]', (e) => e.textContent), 'On', 'kartu menunjukkan status sakelar');
+  assert.equal(await page.$eval('[data-feat-state="island"]', (e) => e.textContent), 'On', 'kartu menunjukkan status sakelar');
+  assert.equal(await page.$eval('[data-feat="island"]', (i) => i.checked), true, 'sakelar kartu ikut bilah atas');
   await page.click('#island-chip'); await wait(300);
   assert.ok((await page.$eval('#addins-pane iframe', (f) => f.getAttribute('src'))).includes('stab=addins'));
 });

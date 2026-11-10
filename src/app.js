@@ -54,20 +54,21 @@ const STR = {
     caughtUp: 'All caught up: nothing overdue and yesterday is issued.',
     registerStyle: 'Style', openRegister: 'Open register', classic: 'Classic ↗', openWindow: 'Open Minutes window ↗', windowOpen: 'Minutes window is open · Focus',
     minutesHint: 'Classic and Modern are the same register; edits show in both.', modern: 'Modern ↗',
-    dev: 'Developer', devArea: 'Developer area', devAreaBody: 'Lab tools: test pages, mock helper, guides, CC0 samples. Off unless you build or test the extension.',
+    dev: 'Developer', devBanner: 'On in the lab. Off in the extension unless Settings › Developer is on.', devArea: 'Developer area', devAreaBody: 'Lab tools: test pages, mock helper, guides, CC0 samples. Off unless you build or test the extension.',
     lockedLab: 'Needs the lab server', lockedLabBody: 'The Developer area shows the local lab. Start it with ./scripts/start-lab.sh, then reload.',
     installed: 'Installed add-ins', builtIn: 'Built in', open: 'Open',
-    fRecap: 'Recap email', fRecapD: 'Builds a plain-text recap and opens it as a mail draft. Nothing is sent for you.',
-    fGlossary: 'Glossary', fGlossaryD: 'Per-series terms fixed in captions and in the minutes draft.',
-    fDue: 'Due dates to calendar', fDueD: 'Saves open actions with a due date as one .ics file.',
-    islandOn: 'On', islandOff: 'Off', fIsland: 'Island', fIslandD: 'Caption pill under the notch, beside or instead of the page overlay.',
-    fPerf: 'Performance', fPerfD: 'Speed of each stage: p50, p95 and real-time factor.',
-    fLibrary: 'Library', fLibraryD: 'Sample transcripts in weekly series to try the register.',
-    fTraining: 'Training', fTrainingD: 'Guided tours and quizzes with XP and levels.',
-    fExport: 'Export', fExportD: 'Minutes as MD, TXT or DOCX; captions as TXT, SRT or VTT.',
+    fRecap: 'Recap email', fRecapD: 'Draft a recap after each meeting.',
+    fGlossary: 'Glossary', fGlossaryD: 'Keep names and terms spelled right.',
+    fDue: 'Due dates to calendar', fDueD: 'Send due dates to your calendar.',
+    islandOn: 'On', islandOff: 'Off', needsTrust: 'Review first', featSwitch: (n) => `${n} on or off`, fIsland: 'Island', fIslandD: 'Captions in a pill under the notch.',
+    fPerf: 'Performance', fPerfD: 'Speed and quality of each engine.',
+    fLibrary: 'Library', fLibraryD: 'Sample transcripts to try things on.',
+    fTraining: 'Training', fTrainingD: 'Short tours of the register.',
+    fExport: 'Export', fExportD: 'SRT, VTT, TXT, MD, CSV, JSON.',
     addinNote: 'Add-ins turn on in the list below after you review and trust them.',
     lastSynced: (t) => `last synced ${t}`, yours: (n) => `${n} yours`, yourName: 'Your name', nameHint: 'Shown in the greeting and the sidebar. Stays on this device.', save: 'Save', clear: 'Clear', setName: 'Set your name', seriesSub: (n, chair) => `${n} meeting${n === 1 ? '' : 's'}${chair ? ` · chair ${chair}` : ''}`, noMeetings: 'No meetings yet',
     askTide: 'Ask Tide…', askBar: 'Ask Tide about your meetings…', send: 'Send', chips: ['Recap last meeting', 'What did I promise?', 'Open actions', 'Translate a file'],
+    plansSub: 'Free covers everything on this computer. Pay only when you want cloud answers.', tagFree: 'To start capturing', tagPro: 'Let the cloud help when you want it', tagAgent: 'Just ask, and Tide does the follow-up', topUp: 'Top up', nCredits: (n) => `${n} credits`, bonus: (n) => `+${n}%`,
     plans: 'Plans', planFree: 'Free', planPro: 'Pro', planAgent: 'Agent', perMonth: '/ month', comingSoon: 'Coming soon', current: 'What you have now', beta: 'Beta',
     freeList: ['Unlimited Ask Tide with the local model', 'Register-only answers', '50 starter credits for cloud answers (14 days)', 'Captions, minutes, Island and add-ins'],
     proList: ['Everything in Free', '400 credits every month for cloud answers', 'Unlimited file transcription', 'Shared register'],
@@ -102,20 +103,21 @@ const STR = {
     caughtUp: 'Semua beres: tidak ada yang lewat tenggat dan notulen kemarin sudah terbit.',
     registerStyle: 'Gaya', openRegister: 'Buka register', classic: 'Klasik ↗', openWindow: 'Buka jendela Notulen ↗', windowOpen: 'Jendela Notulen terbuka · Fokus',
     minutesHint: 'Klasik dan Modern adalah register yang sama; suntingan tampil di keduanya.', modern: 'Modern ↗',
-    dev: 'Developer', devArea: 'Area developer', devAreaBody: 'Alat lab: halaman uji, mock helper, panduan, sampel CC0. Mati kecuali Anda membangun atau menguji ekstensi.',
+    dev: 'Developer', devBanner: 'Nyala di lab. Mati di ekstensi kecuali Pengaturan › Developer dinyalakan.', devArea: 'Area developer', devAreaBody: 'Alat lab: halaman uji, mock helper, panduan, sampel CC0. Mati kecuali Anda membangun atau menguji ekstensi.',
     lockedLab: 'Perlu server lab', lockedLabBody: 'Area developer menampilkan lab lokal. Jalankan ./scripts/start-lab.sh, lalu muat ulang.',
     installed: 'Add-in terpasang', builtIn: 'Bawaan', open: 'Buka',
-    fRecap: 'Email rekap', fRecapD: 'Menyusun rekap teks biasa dan membukanya sebagai draf email. Tidak ada yang dikirim otomatis.',
-    fGlossary: 'Glosarium', fGlossaryD: 'Istilah per seri yang diperbaiki di teks dan draf notulen.',
-    fDue: 'Tenggat ke kalender', fDueD: 'Menyimpan tindak lanjut bertenggat sebagai satu berkas .ics.',
-    islandOn: 'Nyala', islandOff: 'Mati', fIsland: 'Island', fIslandD: 'Pil teks di bawah notch, di samping atau menggantikan overlay halaman.',
-    fPerf: 'Kinerja', fPerfD: 'Kecepatan tiap tahap: p50, p95 dan faktor waktu nyata.',
-    fLibrary: 'Library', fLibraryD: 'Transkrip contoh dalam seri mingguan untuk mencoba register.',
-    fTraining: 'Training', fTrainingD: 'Tur terpandu dan kuis dengan XP dan level.',
-    fExport: 'Ekspor', fExportD: 'Notulen sebagai MD, TXT atau DOCX; teks sebagai TXT, SRT atau VTT.',
+    fRecap: 'Email rekap', fRecapD: 'Susun rekap setelah tiap rapat.',
+    fGlossary: 'Glosarium', fGlossaryD: 'Jaga nama dan istilah tetap benar.',
+    fDue: 'Tenggat ke kalender', fDueD: 'Kirim tenggat ke kalender Anda.',
+    islandOn: 'Nyala', islandOff: 'Mati', needsTrust: 'Tinjau dulu', featSwitch: (n) => `${n} nyala atau mati`, fIsland: 'Island', fIslandD: 'Teks dalam pil di bawah notch.',
+    fPerf: 'Kinerja', fPerfD: 'Kecepatan dan mutu tiap mesin.',
+    fLibrary: 'Library', fLibraryD: 'Transkrip contoh untuk mencoba.',
+    fTraining: 'Training', fTrainingD: 'Tur singkat register.',
+    fExport: 'Ekspor', fExportD: 'SRT, VTT, TXT, MD, CSV, JSON.',
     addinNote: 'Add-in menyala di daftar bawah setelah Anda meninjau dan mempercayainya.',
     lastSynced: (t) => `sinkron terakhir ${t}`, yours: (n) => `${n} milik Anda`, yourName: 'Nama Anda', nameHint: 'Tampil di sapaan dan sidebar. Tetap di perangkat ini.', save: 'Simpan', clear: 'Hapus', setName: 'Isi nama Anda', seriesSub: (n, chair) => `${n} rapat${chair ? ` · ketua ${chair}` : ''}`, noMeetings: 'Belum ada rapat',
     askTide: 'Tanya Tide…', askBar: 'Tanyakan rapat Anda ke Tide…', send: 'Kirim', chips: ['Ringkas rapat terakhir', 'Apa yang saya janjikan?', 'Tindak lanjut terbuka', 'Terjemahkan berkas'],
+    plansSub: 'Gratis mencakup semuanya di komputer ini. Bayar hanya bila Anda ingin jawaban awan.', tagFree: 'Untuk mulai merekam', tagPro: 'Biarkan awan membantu saat Anda mau', tagAgent: 'Cukup minta, Tide menindaklanjuti', topUp: 'Isi ulang', nCredits: (n) => `${n} kredit`, bonus: (n) => `+${n}%`,
     plans: 'Paket', planFree: 'Gratis', planPro: 'Pro', planAgent: 'Agent', perMonth: '/ bulan', comingSoon: 'Segera hadir', current: 'Yang Anda pakai sekarang', beta: 'Beta',
     freeList: ['Tanya Tide tanpa batas dengan model lokal', 'Jawaban dari register', '50 kredit awal untuk jawaban awan (14 hari)', 'Teks, notulen, Island dan add-in'],
     proList: ['Semua di Gratis', '400 kredit tiap bulan untuk jawaban awan', 'Transkripsi berkas tanpa batas', 'Register bersama'],
@@ -172,7 +174,7 @@ const ALIAS = { glossary: 'notes' }; // the notes panel (where the Glossary add-
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
 
-const state = { userName: '', syncedAt: '', setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
+const state = { trusted: {}, removed: [], userName: '', syncedAt: '', setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* privat */ } },
@@ -362,15 +364,17 @@ function minutesPage(params) {
 function addinsPage() {
   const tile = (icn, name, desc, right) => `<div class="cd tile2"><span class="tl">${ic(icn, 20)}</span><b>${esc(name)}</b><p>${esc(desc)}</p><div class="ft">${right}</div></div>`;
   const open = (href) => `<span class="grow"></span><a class="btn sm" href="${href}">${esc(T('open'))}</a>`;
-  const addinOpen = `<span class="mut small">${esc(T('installed'))}</span>${open('#addins?pane=addins')}`;
   const builtIn = (href) => `<span class="mut small">${esc(T('builtIn'))}</span>${open(href)}`;
-  // One switch only: the top bar owns it; the tile shows its state and opens the settings.
-  const island = `<span class="chip sm" data-island-state>${esc(T($('#island-switch').checked ? 'islandOn' : 'islandOff'))}</span>${open('#island')}`;
-  return `<section class="addins-sec"><h2>${esc(T('all'))}</h2></section><div class="tiles">
-    ${tile('mail', T('fRecap'), T('fRecapD'), addinOpen)}
-    ${tile('book', T('fGlossary'), T('fGlossaryD'), addinOpen)}
-    ${tile('cal', T('fDue'), T('fDueD'), addinOpen)}
-    ${tile('island', T('fIsland'), T('fIslandD'), island)}
+  // Sakelar nyata: Island = captionSurface (sama dengan bilah atas); add-in = sudah dipercaya (ysmAddinTrust). Menyalakan add-in
+  // yang belum dipercaya membuka tinjauan manifest; add-in tak boleh jalan sebelum ditinjau.
+  const sw = (id, on, name, label) => `<label class="sw-chip bare"><input type="checkbox" role="switch" data-act="feat" data-feat="${id}"${on ? ' checked' : ''} aria-label="${esc(T('featSwitch', name))}" /></label><span class="mut small" data-feat-state="${id}">${esc(label ?? T(on ? 'islandOn' : 'islandOff'))}</span>`;
+  const addin = (id, name) => { const on = !!state.trusted[id] && !state.removed.includes(id); return sw(id, on, name) + open('#addins'); };
+  const islandOn = $('#island-switch').checked;
+  return `<div class="tiles">
+    ${tile('mail', T('fRecap'), T('fRecapD'), addin('recap-email', T('fRecap')))}
+    ${tile('book', T('fGlossary'), T('fGlossaryD'), addin('glossary', T('fGlossary')))}
+    ${tile('cal', T('fDue'), T('fDueD'), addin('due-to-calendar', T('fDue')))}
+    ${tile('island', T('fIsland'), T('fIslandD'), sw('island', islandOn, T('fIsland')) + open('#island'))}
     ${tile('perf', T('fPerf'), T('fPerfD'), builtIn('#perf'))}
     ${tile('book', T('fLibrary'), T('fLibraryD'), builtIn('#minutes'))}
     ${tile('sparkle', T('fTraining'), T('fTrainingD'), builtIn('#minutes'))}
@@ -384,19 +388,21 @@ function addinsPage() {
 function devPage() {
   // Lab: lab yang sudah ada (test/app.html) — setiap alat lab tetap di tempatnya.
   const src = HOSTED ? 'http://127.0.0.1:8799/app.html' : '/app.html';
-  return `${HOSTED ? lockedCard(T('lockedLab'), T('lockedLabBody')) : ''}<iframe class="frame panel dev" title="${esc(T('devArea'))}" src="${src}"></iframe>`;
+  return `<div class="callout warn">${ic('dev', 20)}<div><b>${esc(T('devArea'))}.</b> ${esc(T('devBanner'))}</div></div>${HOSTED ? lockedCard(T('lockedLab'), T('lockedLabBody')) : ''}<iframe class="frame panel dev" title="${esc(T('devArea'))}" src="${src}"></iframe>`;
 }
 
 /* ---------- Plans (A10): belum ada server akun ---------- */
 function plansPage() {
-  const card = (name, price, list, cur) => `<div class="cd plan${cur ? ' cur' : ''}"><b>${esc(name)}</b><div class="price"><span>${esc(price)}</span>${price === '$0.00' ? '' : `<small>${esc(T('perMonth'))}</small>`}</div>
+  const card = (name, price, tag, list, cur) => `<div class="cd plan${cur ? ' cur' : ''}"><b>${esc(name)}</b><div class="price"><span>${esc(price)}</span><small>${esc(T('perMonth'))}</small></div><p class="mut">${esc(tag)}</p>
     <ul>${list.map((x, i) => `<li>${ic('check', 16)}<span>${esc(x)}${name === T('planAgent') && i === list.length - 1 ? ` <em class="chip sm">${esc(T('beta'))}</em>` : ''}</span></li>`).join('')}</ul>
     <button type="button" class="${cur ? 'btn' : 'pill-b'} full" disabled>${esc(cur ? T('current') : T('comingSoon'))}</button></div>`;
   const packs = [[25000, 250], [50000, 525], [100000, 1100], [250000, 2750]];
   const rp = (n) => new Intl.NumberFormat('id-ID').format(n);
-  return `${lockedCard(T('noServerTitle'), T('noServerBody'))}
-    <div class="plans">${card(T('planFree'), '$0.00', T('freeList'), true)}${card(T('planPro'), '$4.99', T('proList'))}${card(T('planAgent'), '$9.99', T('agentList'))}</div>
-    <section class="cd"><h3>${esc(T('topUpTitle'))}</h3><div class="packs">${packs.map(([p, c]) => `<div class="pack"><b>${rp(c)}</b><small>Rp${rp(p)}</small></div>`).join('')}</div><p class="mut">${esc(T('creditRate'))}</p></section>`;
+  // Bonus terhadap tarif dasar 1 kredit = Rp100; tombol mati sampai server akun ada.
+  const pack = ([p, c]) => { const bonus = Math.round((c / (p / 100) - 1) * 100); return `<div class="pack"><b>Rp${rp(p)}</b><small>${esc(T('nCredits', rp(c)))}</small>${bonus ? `<em class="chip sm ok">${esc(T('bonus', bonus))}</em>` : '<em class="gap"></em>'}<button type="button" class="btn sm full" disabled>${esc(T('topUp'))}</button></div>`; };
+  return `<p class="mut plans-sub">${esc(T('plansSub'))}</p>${lockedCard(T('noServerTitle'), T('noServerBody'))}
+    <div class="plans">${card(T('planFree'), '$0.00', T('tagFree'), T('freeList'), true)}${card(T('planPro'), '$4.99', T('tagPro'), T('proList'))}${card(T('planAgent'), '$9.99', T('tagAgent'), T('agentList'))}</div>
+    <section class="cd"><div class="row"><h3>${esc(T('topUpTitle'))}</h3><span class="grow"></span><small class="mut">${esc(T('creditRate'))}</small></div><div class="packs">${packs.map(pack).join('')}</div></section>`;
 }
 
 /* ---------- Settings: Developer switch (extension) ---------- */
@@ -467,6 +473,16 @@ function setSheet(open) {
   $('#btn-menu').setAttribute('aria-expanded', String(open));
 }
 
+async function onFeatureSwitch(box) {
+  const id = box.dataset.feat;
+  if (id === 'island') { $('#island-switch').click(); return; }
+  if (box.checked) { box.checked = false; location.hash = '#addins'; return; } // enabling needs the manifest review
+  const got = await globalThis.chrome?.storage?.local.get('ysmAddinTrust');
+  const trusted = { ...(got?.ysmAddinTrust || {}) };
+  delete trusted[id];
+  await globalThis.chrome?.storage?.local.set({ ysmAddinTrust: trusted });
+}
+
 function wire() {
   for (const el of document.querySelectorAll('[data-t]')) el.textContent = T(el.dataset.t);
   for (const el of document.querySelectorAll('.ic-slot')) el.innerHTML = ic(el.dataset.ic, 18);
@@ -516,6 +532,7 @@ function wire() {
   document.addEventListener('click', (e) => { for (const d of document.querySelectorAll('.reg-menu[open]')) if (!d.contains(e.target)) d.open = false; });
   $('#page').addEventListener('change', (e) => {
     if (e.target.matches('[data-act="owner"]')) { state.owner = e.target.value; lastRoute = null; render(); }
+    else if (e.target.matches('[data-act="feat"]')) onFeatureSwitch(e.target);
     else if (e.target.matches('[data-act="dev"]')) { state.developer = e.target.checked; globalThis.chrome?.storage?.local.set({ ysmDeveloper: state.developer }); paintNav(parseHash().route); }
   });
   $('#page').addEventListener('keydown', (e) => {
@@ -533,6 +550,12 @@ function wire() {
 async function refreshWin() {
   const open = await isMinutesWindowOpen(globalThis.chrome).catch(() => false);
   if (open !== state.minutesWin) { state.minutesWin = open; render(); }
+}
+
+async function loadTrust() {
+  const got = (await globalThis.chrome?.storage?.local.get(['ysmAddinTrust', 'ysmAddinRemoved'])) || {};
+  state.trusted = got.ysmAddinTrust && typeof got.ysmAddinTrust === 'object' ? got.ysmAddinTrust : {};
+  state.removed = Array.isArray(got.ysmAddinRemoved) ? got.ysmAddinRemoved : [];
 }
 
 async function loadRegister() {
@@ -561,7 +584,11 @@ async function pollHelper() {
 }
 
 function paintIslandState() {
-  for (const el of document.querySelectorAll('[data-island-state]')) el.textContent = T($('#island-switch').checked ? 'islandOn' : 'islandOff');
+  const on = $('#island-switch').checked;
+  const box = document.querySelector('[data-feat="island"]');
+  if (box) box.checked = on;
+  const lab = document.querySelector('[data-feat-state="island"]');
+  if (lab) lab.textContent = T(on ? 'islandOn' : 'islandOff');
 }
 async function syncIsland() {
   let { captionSurface } = (await globalThis.chrome?.storage?.local.get('captionSurface')) || {};
@@ -586,6 +613,7 @@ async function boot() {
   if (HOSTED) state.developer = !!(await globalThis.chrome?.storage?.local.get('ysmDeveloper'))?.ysmDeveloper;
   const stored = (await globalThis.chrome?.storage?.local.get(['settings', 'ysmUserName'])) || {};
   state.userName = String(stored.ysmUserName || '').trim();
+  await loadTrust();
   applyTheme(stored.settings);
   ask = mountAskTide({ lang: LANG, showCredits: state.showPlans, getMeetings: async () => state.meetings || listMeetings(), onSaved: () => loadRegister() });
   wire();
@@ -595,6 +623,7 @@ async function boot() {
   globalThis.chrome?.storage?.onChanged?.addListener((ch) => {
     if ('captionSurface' in ch) syncIsland();
     if ('settings' in ch) applyTheme(ch.settings.newValue);
+    if ('ysmAddinTrust' in ch || 'ysmAddinRemoved' in ch) loadTrust().then(() => { if (parseHash().route === 'all') { lastRoute = null; render(); } });
     if ('ysmUserName' in ch) { state.userName = String(ch.ysmUserName.newValue || ''); paintUser(); if (parseHash().route === 'today') { lastRoute = null; render(); } }
     if (WIN_ID_KEY in ch) refreshWin();
   });

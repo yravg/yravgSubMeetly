@@ -57,3 +57,23 @@
 .name-pop { width: 280px; gap: 10px; }
 .name-pop input { height: 40px; border: 0; border-radius: var(--radius-md); padding: 0 12px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); }
 .name-pop .row { justify-content: flex-end; }
+
+.callout.warn { background: var(--warn-bg); color: var(--warn-text); align-items: center; }
+.callout.warn b { font-weight: var(--font-bold); }
+.callout.warn div { font-size: var(--text-md); color: var(--text); }
+
+/* Rail ikon (1024): kaki sidebar tinggal avatar; teks pengguna dan pengalih seri disembunyikan seperti .hide-rail lain. */
+@media (max-width: 1100px) and (min-width: 641px) {
+  .sb-foot .who, .sb .series { display: none; }
+}
+
+/* Plans (A10) */
+.plans-sub { font-size: var(--text-md); }
+.plan > p { font-size: var(--text-md); }
+.pack { gap: 4px; padding: 14px 16px; }
+.pack b { font: 600 22px var(--font-display); }
+.pack small { color: var(--muted); }
+.pack .chip { align-self: flex-start; }
+.pack .gap { height: 28px; }
+.pack .btn { margin-top: 6px; }
+.packs + .mut { display: none; }

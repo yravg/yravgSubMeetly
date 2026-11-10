@@ -114,4 +114,22 @@ test('hero: pemandangan, jam sinkron helper; tanpa gulir mendatar di 1440, 1024,
   await page.setViewport({ width: 1440, height: 1000 });
 });
 
+test('A06: sakelar add-in mengikuti kepercayaan nyata; mematikan mencabutnya, menyalakan membuka tinjauan', async () => {
+  await page.evaluate(() => { location.hash = '#all'; });
+  await page.waitForSelector('.tiles .tile2');
+  const sw = (id) => page.$eval(`[data-feat="${id}"]`, (i) => i.checked);
+  assert.equal(await sw('glossary'), false, 'belum dipercaya: mati');
+  assert.equal(await page.$eval('.tiles .tile2:nth-child(1) p', (p) => p.textContent), 'Draft a recap after each meeting.');
+  await page.evaluate(() => chrome.storage.local.set({ ysmAddinTrust: { glossary: 'h1' } }));
+  await page.waitForFunction(() => document.querySelector('[data-feat="glossary"]')?.checked === true);
+  assert.equal(await page.$eval('[data-feat-state="glossary"]', (e) => e.textContent), 'On');
+  await page.click('[data-feat="glossary"]');
+  await page.waitForFunction(() => document.querySelector('[data-feat="glossary"]')?.checked === false);
+  assert.deepEqual((await page.evaluate(() => chrome.storage.local.get('ysmAddinTrust'))).ysmAddinTrust, {}, 'kepercayaan dicabut');
+  await page.click('[data-feat="glossary"]');
+  await page.waitForFunction(() => location.hash === '#addins');
+  assert.equal(await page.$eval('[data-feat="glossary"]', (i) => i.checked).catch(() => false), false, 'tidak menyala tanpa tinjauan');
+  await page.evaluate(() => { location.hash = '#today'; });
+});
+
 test('tanpa galat halaman', () => assert.deepEqual(pageErrors, []));
