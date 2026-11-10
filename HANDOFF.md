@@ -513,3 +513,11 @@ Fitur besar; status per langkah ada di `docs/handoff/pill-meetings.md`, rencana 
 - `engine: norm_lang` mengubah `tgt=none` jadi `en`; kini `target_lang` menjaga `none`.
 - Belum diklik di layar: pager, Paste transcript dengan salinan Teams asli, pop-up "Captions on", daftar Earlier, Join → Teams.
 
+
+## Island 1.2.6: Tide shell as drawn (2026-11-10, lead + four VPS Sonnet workers)
+
+- Installed on the owner's laptop: **1.2.6** (`island/dist/yravgSubMeetly-Setup-1.2.6.exe`, 32.5 MB, sha256 86052de7…9708), built from adebbe7 + version bump; release cache `E:\cargo-target\rel-e`, TMP/TEMP on `E:\orca\tmp\rusttmp` (C: full: the linker fails with LNK1102 out of memory when the page file cannot grow).
+- Content: canvas boards A01-A10 built as drawn (Today, Live captions, Minutes native page, Modern register rest, History and Files, Settings and Helper, All features with native add-in rows, Developer area, Plans, states), light by default, side panel default Tide, engine `POST /ask` (seen streaming a real Qwen answer on this laptop). Status per step and what still differs: `docs/handoff/tide-shell.md`; per-board reports in the VPS worktrees `/home/user/dev/yravgSubMeetly/wt/tide-*/.ref/REPORT.md`.
+- Checks: laptop `npm test` 658 pass / 0 fail / 8 skipped; engine fmt, clippy -D warnings, all tests (-j 1). Shell pages after the last merge: targeted files green on the VPS; full suite not rerun after tide-pages round 2.
+- Install: PowerShell, `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS`, no `/reopen`; start with `explorer.exe` (agent-shell sandbox otherwise hides the model cache).
+- Known: app footer still says v1.1.1 (extension manifest version, not the island version); `yravgSubMeetly.exe` ProductVersion resource reads 0.2.26.
