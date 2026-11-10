@@ -217,4 +217,62 @@ test('breadcrumb sits on its own line in the meeting header at 1440 and 1024; th
   }
 });
 
+test('?view= and ?do= from the shell page: the register opens on that view and runs that action', async () => {
+  await open('?skin=tide');
+  const id = await page.evaluate(() => JSON.parse(localStorage.getItem('minutesRegister')).meetings[0].id);
+  await page.goto(`${ORIGIN}/dist/minutes.html?skin=tide&lang=en&meeting=${encodeURIComponent(id)}&view=topic`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#tabs [data-view="topic"][aria-selected="true"]', { timeout: 6000 });
+  await page.goto(`${ORIGIN}/dist/minutes.html?skin=tide&lang=en&meeting=${encodeURIComponent(id)}&do=add`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => !document.querySelector('#drawer').hidden, { timeout: 6000 });
+  await page.goto(`${ORIGIN}/dist/minutes.html?skin=tide&lang=en&meeting=${encodeURIComponent(id)}&do=library`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => { const o = document.querySelector('.lt-overlay'); return o && !o.hidden && getComputedStyle(o).display !== 'none'; }, { timeout: 6000 });
+});
+
+test('wordmark: Tide mark tile + yravg in ink + SubMeetly in green-ink, no black pill', async () => {
+  await open('?skin=tide');
+  const r = await page.evaluate(() => {
+    const pill = document.querySelector('.brand-pill'); const b = document.querySelector('.brand');
+    return { bg: getComputedStyle(pill).backgroundColor, img: getComputedStyle(b, '::before').backgroundImage, text: b.textContent.replace(/\s+/g, '') };
+  });
+  assert.equal(r.text, 'yravgSubMeetly');
+  assert.equal(r.bg, 'rgba(0, 0, 0, 0)', 'no filled pill');
+  assert.match(r.img, /tide-mark/);
+});
+
+test('Needs review only / Group / Mine sit in the toolbar above the table and still work', async () => {
+  await open('?skin=tide');
+  const inTb = await page.evaluate(() => ['#btn-review-only', '#group-by', '#btn-mine'].map((s) => !!document.querySelector(`#reg-tb ${s}`)));
+  assert.deepEqual(inTb, [true, true, true]);
+  const all = await page.$$eval('tbody tr[data-ref]', (r) => r.length);
+  await page.click('#reg-tb #btn-review-only');
+  const narrowed = await page.$$eval('tbody tr[data-ref]', (r) => r.length);
+  assert.ok(narrowed > 0 && narrowed < all, `${narrowed} < ${all}`);
+  await page.click('#reg-tb #btn-review-only');
+  await page.select('#reg-tb #group-by', 'topic');
+  assert.ok(await page.$('tbody tr.ghead'));
+  await page.select('#reg-tb #group-by', 'none');
+});
+
+test('carry-forward marker is ↺', async () => {
+  await open('?skin=tide');
+  assert.equal(await page.$eval('tbody .carry', (e) => e.textContent.trim()), '↺');
+});
+
+test('390 px: the navigator starts as a rail and does not cover the table', async () => {
+  await page.setViewport({ width: 390, height: 900 });
+  await page.goto(`${ORIGIN}/dist/minutes.html?skin=tide&lang=en`, { waitUntil: 'networkidle0' });
+  await page.evaluate(() => { localStorage.removeItem('ysmMinutesLayout'); });
+  await page.reload({ waitUntil: 'networkidle0' });
+  if (await page.$('#btn-load-sample')) await page.evaluate(() => document.querySelector('#btn-load-sample').click());
+  await page.waitForSelector('tbody tr[data-ref]');
+  const r = await page.evaluate(() => {
+    const row = document.querySelector('tbody tr[data-ref] .c-item').getBoundingClientRect();
+    const hit = document.elementFromPoint(row.x + 10, row.y + 10);
+    const nav = document.querySelector('[data-panel="left"]');
+    return { hitInPane: !!hit?.closest('#pane'), navVisible: nav && getComputedStyle(nav).display !== 'none' && nav.getBoundingClientRect().width > 0 };
+  });
+  assert.equal(r.hitInPane, true, 'the first table row is reachable, not covered');
+  assert.equal(r.navVisible, false, 'docked navigator hidden; its rail opens it');
+});
+
 test('no page errors', () => { assert.deepEqual(pageErrors, []); });
