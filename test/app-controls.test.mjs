@@ -26,6 +26,7 @@ const RENAMED = {
   'button|ReviewWide detail, sources below': 'button|Review',
   'button|ReadingHeader open, no side panels': 'button|Reading',
   'button|CompactRails only, dense rows': 'button|Compact',
+  'button|Helper compute (CPU / GPU) lives on the Helper tab': 'button|Helper status and install steps live on the Helper tab',
 };
 const has = (found, k) => found.has(k) || found.has(RENAMED[k]);
 let server; let browser; let page;

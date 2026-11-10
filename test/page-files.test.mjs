@@ -134,4 +134,47 @@ test('Files: finished job offers TXT SRT VTT MD CSV JSON and each one exports', 
   }
 });
 
+test('R2 History: the page title is History', async () => {
+  await page.evaluate(() => { location.hash = '#history'; });
+  await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'history');
+  assert.equal(await page.$eval('#page-title', (h) => h.textContent), 'History');
+  frame = await (await page.waitForSelector('#page iframe.panel')).contentFrame();
+  await frame.waitForSelector('#fh-shell');
+  await wait(600);
+});
+
+test('R2 History: Export formats is a compact card; the options sit behind a disclosure', async () => {
+  const card = '#fh-shell .fh-list details.fh-export';
+  assert.match(await text(`${card} > summary`), /Export formats/);
+  assert.match(await text(`${card} > summary`), /SRT · VTT · TXT · MD · CSV · JSON/);
+  assert.equal(await frame.$eval(card, (d) => d.open), false);
+  const h = await frame.$eval(`${card} > summary`, (e) => e.getBoundingClientRect().height);
+  const whole = await frame.$eval(card, (e) => e.getBoundingClientRect().height);
+  assert.ok(whole <= h + 4, `closed: the card is only its summary (${whole}px vs ${h}px), the options are not shown`);
+  assert.ok(h <= 90, `the closed card is compact (${h}px)`);
+  await frame.click(`${card} > summary`);
+  await frame.waitForFunction((c) => document.querySelector(c).getBoundingClientRect().height > 150, {}, card);
+  assert.ok(await frame.$('#export-mount input[type="checkbox"]'), 'CRLF / BOM / suffix options are inside the disclosure');
+  await frame.click(`${card} > summary`);
+});
+
+const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+const rgb = (css) => css.match(/[\d.]+/g).slice(0, 3).map(Number);
+
+test('R2 History: the delete icon has >= 3:1 against its tile, light and dark', async () => {
+  const out = {};
+  for (const scheme of ['light', 'dark']) {
+    await frame.evaluate((c) => { document.documentElement.classList.remove('theme-light', 'theme-dark'); document.documentElement.classList.add(`theme-${c}`); }, scheme);
+    await wait(300);
+    const c = await frame.$eval('#history-list .h-item .h-del', (b) => ({ icon: getComputedStyle(b).color, tile: getComputedStyle(b).backgroundColor, mask: getComputedStyle(b, '::before').webkitMaskImage || getComputedStyle(b, '::before').maskImage }));
+    assert.notEqual(c.mask, 'none', 'the icon is a mask drawn in the text colour');
+    out[scheme] = ratio(rgb(c.icon), rgb(c.tile));
+    assert.ok(out[scheme] >= 3, `${scheme}: delete icon ${c.icon} on ${c.tile} = ${out[scheme].toFixed(2)}:1`);
+  }
+  assert.notEqual(out.light, out.dark, 'dark mode really used its own colours');
+  console.log('delete icon contrast', JSON.stringify(out));
+  await frame.evaluate(() => document.documentElement.classList.remove('theme-light', 'theme-dark'));
+});
+
 test('no page errors', () => { assert.deepEqual(pageErrors, []); });

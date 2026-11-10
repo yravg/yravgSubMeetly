@@ -125,4 +125,39 @@ test('error state is a plain red callout with Retry, no mascot', async () => {
   assert.ok(await frame.$eval('#live-shell .ls-preview #error-box', () => true).catch(() => false), 'error shows inside the preview card');
 });
 
+test('R2 needs-input state: yellow callout with Choose tab and Use a file instead; Start words unchanged', async () => {
+  assert.equal(await frame.$eval('#btn-start', (b) => b.textContent.trim()), 'Start captions');
+  assert.equal(await frame.$eval('#btn-stop', (b) => b.textContent.trim()), 'Stop captions');
+  await frame.evaluate(() => window.__ysmShowCaptureError('The extension has not been invoked for this page (activeTab)'));
+  await frame.waitForFunction(() => document.getElementById('ls-needs') && !document.getElementById('ls-needs').hidden);
+  assert.match(await text('#ls-needs'), /Needs input\./);
+  assert.match(await text('#ls-needs'), /Choose which tab to capture/);
+  assert.deepEqual(await frame.$$eval('#ls-needs button', (b) => b.map((x) => x.textContent.trim())), ['Choose tab', 'Use a file instead']);
+  assert.equal(await visible('#error-box'), false, 'the red error box stays hidden while the needs callout is up');
+  assert.equal(await frame.$eval('#ls-live-state', (e) => e.dataset.state), 'needs');
+  // The callout is yellow-family (warn tokens), not red.
+  const bg = await frame.$eval('#ls-needs', (e) => getComputedStyle(e).backgroundColor);
+  const [r, g, b] = bg.match(/\d+/g).map(Number);
+  assert.ok(r > g && g > b && r > 200, `warn background, got ${bg}`);
+  // Use a file instead moves the Source to File (Mode offline) and clears the callout.
+  await frame.click('#ls-needs button[data-needs="file"]');
+  await frame.waitForFunction(() => document.querySelector('#ls-source [data-src="file"]').getAttribute('aria-checked') === 'true');
+  await frame.waitForFunction(() => document.getElementById('ls-needs').hidden === true);
+  await frame.click('#ls-source button[data-src="tab"]');
+});
+
+test('R2 listening shows the source line and its translation without turning Dual line on', async () => {
+  assert.equal(await frame.$eval('#dual-line-main', (c) => c.checked), false, 'the panel default stays off');
+  await frame.click('#btn-start');
+  await frame.waitForFunction(() => document.getElementById('btn-stop').disabled === false, { timeout: 60_000 });
+  await frame.evaluate(() => chrome.runtime.sendMessage({ target: 'panel', type: 'subtitle', data: { source: 'Drill evakuasi dipindah ke Jumat', translation: 'The evacuation drill moves to Friday', t0: 1, t1: 4, dir: { src: 'id', tgt: 'en' } } }));
+  await frame.waitForFunction(() => document.getElementById('live-tgt-lines').textContent.includes('Friday'));
+  assert.equal(await visible('#live-src-box'), true);
+  assert.equal(await visible('#live-tgt-box'), true);
+  assert.match(await text('#live-src-lines'), /Drill evakuasi/);
+  assert.equal(await frame.$eval('#dual-line-main', (c) => c.checked), false);
+  await frame.click('#btn-stop');
+  await frame.waitForFunction(() => document.getElementById('btn-stop').disabled === true);
+});
+
 test('no page errors', () => { assert.deepEqual(pageErrors, []); });
