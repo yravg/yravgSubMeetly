@@ -198,6 +198,23 @@ pub fn chat_prompt(system: &str, user: &str) -> String {
     )
 }
 
+/// Qwen2.5 chat template for a system prompt and a conversation (`user` / `assistant` turns).
+pub fn chat_prompt_turns(system: &str, turns: &[(String, String)]) -> String {
+    let mut prompt = format!("<|im_start|>system\n{system}<|im_end|>\n");
+    for (role, content) in turns {
+        prompt.push_str(&format!("<|im_start|>{role}\n{content}<|im_end|>\n"));
+    }
+    prompt.push_str("<|im_start|>assistant\n");
+    prompt
+}
+
+/// The part of `decoded` not yet sent. A token can end mid-character; that tail is held
+/// back (it decodes to U+FFFD) until the next token completes it.
+pub fn fresh_piece(decoded: &str, sent: usize) -> &str {
+    let ready = decoded.strip_suffix('\u{FFFD}').unwrap_or(decoded);
+    ready.get(sent..).unwrap_or("")
+}
+
 /// First line of the trimmed output, like the oracle.
 pub fn first_line(out: &str) -> String {
     out.trim()
@@ -246,7 +263,45 @@ impl Translator {
 
     /// Greedy generation (MLX `generate` default is temperature 0).
     pub fn generate(&mut self, system: &str, user: &str, max_tokens: usize) -> Result<String> {
-        let prompt = chat_prompt(system, user);
+        let mut text = String::new();
+        self.run(&chat_prompt(system, user), max_tokens, &mut |decoded| {
+            text = decoded.to_string();
+            true
+        })?;
+        Ok(text)
+    }
+
+    /// Greedy chat answer, piece by piece. `on_piece` returns false to stop (client gone).
+    pub fn chat_stream(
+        &mut self,
+        system: &str,
+        turns: &[(String, String)],
+        max_tokens: usize,
+        on_piece: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<()> {
+        let mut sent = 0;
+        self.run(
+            &chat_prompt_turns(system, turns),
+            max_tokens,
+            &mut |decoded| {
+                let piece = fresh_piece(decoded, sent);
+                if piece.is_empty() {
+                    return true;
+                }
+                sent += piece.len();
+                on_piece(piece)
+            },
+        )
+    }
+
+    /// Generates until a stop token, `max_tokens`, or `seen` returns false; `seen` gets the
+    /// whole answer decoded so far after each token.
+    fn run(
+        &mut self,
+        prompt: &str,
+        max_tokens: usize,
+        seen: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<()> {
         let ids = self
             .tokenizer
             .encode(prompt, false)
@@ -272,10 +327,15 @@ impl Translator {
             }
             out.push(next);
             input = vec![next];
+            let decoded = self
+                .tokenizer
+                .decode(&out, true)
+                .map_err(|e| anyhow!("{e}"))?;
+            if !seen(&decoded) {
+                return Ok(());
+            }
         }
-        self.tokenizer
-            .decode(&out, true)
-            .map_err(|e| anyhow!("{e}"))
+        Ok(())
     }
 
     pub fn translate(&mut self, text: &str, src: &str, tgt: &str, fast: bool) -> Result<String> {
@@ -319,6 +379,31 @@ mod tests {
         let clipped = clip_fast_text(&long);
         assert!(clipped.len() <= 120 && clipped.ends_with("word"));
         assert_eq!(first_line("  Halo dunia\nnote: x "), "Halo dunia");
+    }
+
+    #[test]
+    fn a_chat_prompt_keeps_the_turns_in_order_and_ends_open_for_the_answer() {
+        let turns = vec![
+            ("user".to_string(), "Hi".to_string()),
+            ("assistant".to_string(), "Hello".to_string()),
+            ("user".to_string(), "Open actions?".to_string()),
+        ];
+        assert_eq!(
+            chat_prompt_turns("You are Tide.", &turns),
+            "<|im_start|>system\nYou are Tide.<|im_end|>\n<|im_start|>user\nHi<|im_end|>\n\
+             <|im_start|>assistant\nHello<|im_end|>\n<|im_start|>user\nOpen actions?<|im_end|>\n\
+             <|im_start|>assistant\n"
+        );
+    }
+
+    #[test]
+    fn a_half_decoded_character_waits_for_its_last_byte() {
+        assert_eq!(fresh_piece("You own 4", 0), "You own 4");
+        assert_eq!(fresh_piece("You own 4 open", 9), " open");
+        // "é" cut after its first byte decodes to U+FFFD: nothing new yet.
+        assert_eq!(fresh_piece("caf\u{FFFD}", 3), "");
+        assert_eq!(fresh_piece("café", 3), "é");
+        assert_eq!(fresh_piece("abc", 9), "");
     }
 
     #[test]

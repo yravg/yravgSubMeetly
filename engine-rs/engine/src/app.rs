@@ -28,7 +28,7 @@ use crate::models::{
 use crate::notes::{
     export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
 };
-use crate::protocol::{Request, Response};
+use crate::protocol::{AskReply, Request, Response};
 use crate::state::{now_epoch_secs, now_utc_iso};
 use crate::translate::norm_lang;
 use crate::whisper::Task;
@@ -41,6 +41,9 @@ const UI_SURFACES: [&str; 3] = ["overlay", "island", "both"];
 const TARGET_LANGS: [&str; 11] = [
     "en", "zh", "de", "fr", "es", "ru", "it", "id", "vi", "ja", "ko",
 ];
+/// Turns of the conversation the model sees, and the longest answer it gives.
+const ASK_HISTORY: usize = 6;
+const ASK_MAX_TOKENS: usize = 512;
 const NO_TRANSLATE: &str = "no translation model (set TRANSLATE=on)";
 const CUDA_WARNING: &str = "CUDA tidak terdeteksi — helper akan jatuh ke CPU saat start";
 
@@ -382,42 +385,7 @@ impl App {
                 // The oracle answers any exception in these routes with 500.
                 match self.ml_route(request, path) {
                     Ok(response) => response,
-                    // The model's folder is away: say which, so the UI can ask to reconnect it.
-                    Err(error) if error.downcast_ref::<ModelDirUnavailable>().is_some() => {
-                        let away = error
-                            .downcast_ref::<ModelDirUnavailable>()
-                            .expect("checked");
-                        self.json_response(
-                            request,
-                            503,
-                            json!({
-                                "error": format!("Error: {error:#}"),
-                                "code": "model-dir-unavailable",
-                                "id": away.id,
-                                "dir": away.dir.to_string_lossy(),
-                                "reason": away.reason,
-                            }),
-                        )
-                    }
-                    // Only POST /models/pull downloads: a route that needs a model that is not
-                    // on disk answers at once, so a caption loop never waits on a download.
-                    Err(error) if error.downcast_ref::<ModelNotDownloaded>().is_some() => {
-                        let missing = error.downcast_ref::<ModelNotDownloaded>().expect("checked");
-                        self.json_response(
-                            request,
-                            409,
-                            json!({
-                                "error": missing.to_string(),
-                                "code": "model-not-downloaded",
-                                "id": missing.id,
-                            }),
-                        )
-                    }
-                    Err(error) => self.json_response(
-                        request,
-                        500,
-                        json!({ "error": format!("Error: {error:#}") }),
-                    ),
+                    Err(error) => self.ml_error_response(request, &error),
                 }
             }
             _ => {
@@ -428,6 +396,120 @@ impl App {
                 }
                 self.json_response(request, 404, json!({ "error": "not found" }))
             }
+        }
+    }
+
+    /// The JSON answer for a route whose model is away, not downloaded, or that failed.
+    fn ml_error_response(&self, request: &Request, error: &anyhow::Error) -> Response {
+        // The model's folder is away: say which, so the UI can ask to reconnect it.
+        if let Some(away) = error.downcast_ref::<ModelDirUnavailable>() {
+            return self.json_response(
+                request,
+                503,
+                json!({
+                    "error": format!("Error: {error:#}"),
+                    "code": "model-dir-unavailable",
+                    "id": away.id,
+                    "dir": away.dir.to_string_lossy(),
+                    "reason": away.reason,
+                }),
+            );
+        }
+        // Only POST /models/pull downloads: a route that needs a model that is not
+        // on disk answers at once, so a caption loop never waits on a download.
+        if let Some(missing) = error.downcast_ref::<ModelNotDownloaded>() {
+            return self.json_response(
+                request,
+                409,
+                json!({
+                    "error": missing.to_string(),
+                    "code": "model-not-downloaded",
+                    "id": missing.id,
+                }),
+            );
+        }
+        self.json_response(
+            request,
+            500,
+            json!({ "error": format!("Error: {error:#}") }),
+        )
+    }
+
+    /// `POST /ask` (Ask Tide, local mode): `{question, grounding, history?}` answered by the
+    /// local Qwen model as Server-Sent Events `{delta}` ... `{done}` or `{error}`.
+    pub fn handle_ask<'a>(&'a self, request: &Request) -> AskReply<'a> {
+        let plain = |response| AskReply::Reply(response);
+        if let Some(denied) = self.local_only(request) {
+            return plain(denied);
+        }
+        if request.method != "POST" || request.path() != "/ask" {
+            return plain(self.json_response(request, 404, json!({ "error": "not found" })));
+        }
+        let Some(payload) = parse_body(&request.body) else {
+            return plain(self.json_response(
+                request,
+                400,
+                json!({ "error": "invalid JSON body" }),
+            ));
+        };
+        let question = payload
+            .get("question")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or("");
+        if question.is_empty() {
+            return plain(self.json_response(
+                request,
+                400,
+                json!({ "error": "question is required" }),
+            ));
+        }
+        if !self.ml.translate_available() {
+            return plain(self.json_response(request, 501, json!({ "error": NO_TRANSLATE })));
+        }
+        if let Err(error) = self.ml.require_translate() {
+            return plain(self.ml_error_response(request, &error));
+        }
+        let mut turns = Vec::new();
+        for turn in payload
+            .get("history")
+            .and_then(Value::as_array)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+        {
+            let role = turn.get("role").and_then(Value::as_str).unwrap_or("");
+            let content = turn.get("content").and_then(Value::as_str).unwrap_or("");
+            if matches!(role, "user" | "assistant") && !content.is_empty() {
+                turns.push((role.to_string(), content.to_string()));
+            }
+        }
+        let skip = turns.len().saturating_sub(ASK_HISTORY);
+        turns.drain(..skip);
+        turns.push(("user".to_string(), question.to_string()));
+        let grounding = payload
+            .get("grounding")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let mut headers = self.cors_headers(request);
+        headers.push((
+            "Content-Type".into(),
+            "text/event-stream; charset=utf-8".into(),
+        ));
+        headers.push(("Cache-Control".into(), "no-cache".into()));
+        AskReply::Stream {
+            headers,
+            run: Box::new(move |emit| {
+                let result = self.ml.with_translator(|mt| {
+                    mt.chat_stream(&grounding, &turns, ASK_MAX_TOKENS, &mut |piece| {
+                        emit(&json!({ "delta": piece }))
+                    })
+                });
+                match result {
+                    Ok(()) => emit(&json!({ "done": true })),
+                    Err(error) => emit(&json!({ "error": format!("{error:#}") })),
+                };
+            }),
         }
     }
 
