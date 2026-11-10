@@ -162,44 +162,32 @@ test('Start captions di sidebar benar-benar memulai (bukan hanya membuka Live)',
   await page.evaluate(() => { location.hash = '#today'; });
 });
 
-test('A04: Minutes memasang register Modern yang mengikuti tema shell, menu gaya dan jendela Minutes', async () => {
+test('A04: Minutes digambar langsung (tanpa iframe); tautan Open register; Klasik = jendela Minutes', async () => {
   await page.evaluate(() => { location.hash = '#minutes?meeting=Y1'; });
-  await page.waitForSelector('#page iframe.reg');
-  const r = await page.evaluate(() => ({ frame: document.querySelector('#page iframe.reg').getAttribute('src'), classic: document.querySelector('.reg-list a[data-register="classic"]').getAttribute('href'), primary: document.querySelector('.tool > .btn.primary')?.dataset.act }));
-  assert.equal(r.frame, 'minutes.html?lang=en&skin=tide&follow=system&meeting=Y1');
-  assert.equal(r.classic, 'minutes.html?lang=en&meeting=Y1', 'tautan Klasik membuka halaman sendiri tanpa follow');
-  assert.equal(r.primary, 'win', 'satu tombol utama: buka di jendela');
+  await page.waitForSelector('#page .mn');
+  assert.equal(await page.$('#page iframe'), null, 'tanpa iframe register');
+  const r = await page.evaluate(() => ({ modern: document.querySelector('.mn-open a[data-register="modern"]').getAttribute('href'), classic: document.querySelector('.mn-open a[data-register="classic"]').getAttribute('href'), row: document.querySelector('.mn-row')?.dataset.ref }));
+  assert.equal(r.modern, 'minutes.html?lang=en&skin=tide&meeting=Y1');
+  assert.equal(r.classic, 'minutes.html?lang=en&meeting=Y1', 'tautan Klasik membuka halaman sendiri tanpa skin');
+  assert.equal(r.row, 'A2', 'butir rapat Y1 tampil');
   const n = (await browser.pages()).length;
-  await page.click('[data-act="win"]');
-  await page.waitForFunction((k) => true, {}, n);
-  await wait(800);
+  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
   assert.equal((await browser.pages()).length, n + 1, 'jendela Minutes terbuka (lab: window.open bernama)');
-  await page.click('[data-act="win"]'); await wait(800);
+  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
   assert.equal((await browser.pages()).length, n + 1, 'klik kedua tidak membuka jendela lain');
+  for (const p of (await browser.pages()).slice(n)) await p.close();
 });
 
-test('A04: Modern bawaan; Klasik lewat menu Style; pilihan diingat dan tampil lebih dulu', async () => {
-  await page.evaluate(() => { location.hash = '#minutes'; });
-  await page.waitForSelector('#page iframe.reg');
-  assert.deepEqual(await page.$$eval('.reg-list a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
-  const frame = await (await page.$('#page iframe.reg')).contentFrame();
-  await frame.waitForFunction(() => document.documentElement.dataset.reskin === 'tide' && getComputedStyle(document.body).fontFamily.includes('Plus Jakarta Sans'));
+test('A04: Modern bawaan; pilihan Open register diingat dan tampil lebih dulu', async () => {
+  await page.evaluate(() => { localStorage.removeItem('ysmShellRegister'); location.hash = '#minutes'; });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForSelector('#page .mn');
+  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
   const n = (await browser.pages()).length;
-  await page.click('.reg-menu summary');
-  await page.click('.reg-list a[data-register="classic"]');
-  await page.waitForFunction(() => !document.querySelector('#page iframe.reg')?.getAttribute('src').includes('skin=tide'));
-  await wait(1500);
-  const tab = (await browser.pages()).slice(n)[0];
-  assert.ok(tab, 'Klasik membuka tab sendiri');
-  assert.ok(new URL(tab.url()).searchParams.get('skin') === null && tab.url().includes('minutes.html?lang=en'), 'Klasik: tanpa skin=tide');
-  await tab.close();
-  assert.deepEqual(await page.$$eval('.reg-list a', (l) => l.map((a) => a.dataset.register)), ['classic', 'modern']);
-  // Klasik tanpa lapisan Tide (TIDE-024).
-  const cf = await (await page.$('#page iframe.reg')).contentFrame();
-  await cf.waitForFunction(() => document.readyState === 'complete');
-  assert.equal(await cf.evaluate(() => document.documentElement.dataset.reskin || null), null);
-  await page.click('.reg-menu summary');
-  await page.click('.reg-list a[data-register="modern"]'); await wait(1200);
+  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
+  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['classic', 'modern']);
+  await page.click('.mn-open a[data-register="modern"]'); await wait(900);
+  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
   for (const p of (await browser.pages()).slice(n)) await p.close();
 });
 

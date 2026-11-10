@@ -217,4 +217,15 @@ test('breadcrumb sits on its own line in the meeting header at 1440 and 1024; th
   }
 });
 
+test('?view= and ?do= from the shell page: the register opens on that view and runs that action', async () => {
+  await open('?skin=tide');
+  const id = await page.evaluate(() => JSON.parse(localStorage.getItem('minutesRegister')).meetings[0].id);
+  await page.goto(`${ORIGIN}/dist/minutes.html?skin=tide&lang=en&meeting=${encodeURIComponent(id)}&view=topic`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#tabs [data-view="topic"][aria-selected="true"]', { timeout: 6000 });
+  await page.goto(`${ORIGIN}/dist/minutes.html?skin=tide&lang=en&meeting=${encodeURIComponent(id)}&do=add`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => !document.querySelector('#drawer').hidden, { timeout: 6000 });
+  await page.goto(`${ORIGIN}/dist/minutes.html?skin=tide&lang=en&meeting=${encodeURIComponent(id)}&do=library`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => { const o = document.querySelector('.lt-overlay'); return o && !o.hidden && getComputedStyle(o).display !== 'none'; }, { timeout: 6000 });
+});
+
 test('no page errors', () => { assert.deepEqual(pageErrors, []); });

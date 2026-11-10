@@ -18,6 +18,7 @@ import { TYPE_COLOR } from './lib/notes-schema.js';
 import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minutes-window.js';
 import { mountAskTide } from './ask-tide.js';
 import { heroHtml, heroPose } from './app-pages/home.js';
+import { minutesHtml, mountMinutes } from './app-pages/minutes.js';
 import { migrateUiDefaults } from './lib/ui-defaults.js';
 
 const IS_EXT = location.protocol === 'chrome-extension:';
@@ -350,14 +351,8 @@ function todayPage() {
 // embed: the iframe follows the shell's light/dark scheme (minutes-dock.js reads follow=system); a window of its own keeps its stored theme.
 const registerSrc = (kind, meeting, embed) => `minutes.html?lang=${LANG}${kind === 'modern' ? '&skin=tide' : ''}${embed ? '&follow=system' : ''}${meeting ? `&meeting=${encodeURIComponent(meeting)}` : ''}`;
 function minutesPage(params) {
-  const meeting = params.get('meeting');
-  // Pilihan terakhir tampil lebih dulu dan menentukan register yang dimuat di bawah.
-  const kinds = state.register === 'modern' ? ['modern', 'classic'] : ['classic', 'modern'];
-  const links = kinds.map((k) => `<a href="${esc(registerSrc(k, meeting))}" target="_blank" rel="noopener" role="menuitemradio" aria-checked="${k === state.register}" data-register="${k}">${esc(T(k))}</a>`).join('');
-  return `<div class="tool"><button type="button" class="btn primary" data-act="win" aria-live="polite">${state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'))}</button>
-    <details class="reg-menu"><summary class="btn sm">${esc(T('registerStyle'))}: ${esc(T(state.register).replace(' ↗', ''))}</summary><div class="reg-list" role="menu">${links}</div></details>
-    <span class="mut hint">${esc(T('minutesHint'))}</span></div>
-    <iframe class="frame reg" title="${esc(T('minutes'))}" src="${esc(registerSrc(state.register, meeting, true))}"></iframe>`;
+  if (state.error) return errorCard(state.error);
+  return minutesHtml({ lang: LANG, esc, ic, tide, meetings: state.meetings, series: state.series, register: state.register, me: state.userName, meetingParam: params.get('meeting'), registerSrc: (kind, x = {}) => `${registerSrc(kind, x.meeting)}${x.do ? `&do=${x.do}` : ''}${x.view ? `&view=${x.view}` : ''}` });
 }
 
 /* ---------- Add-ins + all features (A06) ---------- */
@@ -436,11 +431,6 @@ function render() {
   page.dataset.route = route;
   // Bingkai panel tidak dimuat ulang saat hanya data beranda yang berubah.
   if (route === lastRoute && !['today', 'minutes', 'all', 'plans'].includes(route)) return;
-  if (route === 'minutes' && lastRoute === 'minutes' && page.querySelector('iframe.reg')) {
-    const btn = page.querySelector('[data-act="win"]');
-    if (btn) btn.innerHTML = state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'));
-    return;
-  }
   lastRoute = route;
   page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'all' ? addinsPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage(params) : route === 'plans' ? plansPage() : panelPage(route);
   }
@@ -527,7 +517,12 @@ function wire() {
     else if (act === 'chip') ask.open(T('chips')[Number(e.target.closest('[data-act]').dataset.i)]);
     else if (act === 'askgo') { const q = $('[data-act="askbar"]').value; ask.open(q.trim() || undefined); }
     else if (act === 'win') { await openMinutesWindow(globalThis.chrome, registerSrc(state.register)); refreshWin(); }
-    else if (e.target.closest('[data-register]')) { state.register = e.target.closest('[data-register]').dataset.register; store.set('ysmShellRegister', state.register); lastRoute = null; render(); }
+    else if (e.target.closest('[data-register]')) {
+      state.register = e.target.closest('[data-register]').dataset.register; store.set('ysmShellRegister', state.register);
+      // Classic opens as the Minutes window (A04c); Modern as its own tab.
+      if (state.register === 'classic') { e.preventDefault(); await openMinutesWindow(globalThis.chrome, e.target.closest('a').getAttribute('href')); refreshWin(); }
+      lastRoute = null; render();
+    }
   });
   document.addEventListener('click', (e) => { for (const d of document.querySelectorAll('.reg-menu[open]')) if (!d.contains(e.target)) d.open = false; });
   $('#page').addEventListener('change', (e) => {
@@ -617,6 +612,7 @@ async function boot() {
   applyTheme(stored.settings);
   ask = mountAskTide({ lang: LANG, showCredits: state.showPlans, getMeetings: async () => state.meetings || listMeetings(), onSaved: () => loadRegister() });
   wire();
+  mountMinutes($('#page'), { lang: LANG, getMe: () => state.userName, setMe: (n) => saveName(n), rerender: () => { lastRoute = null; render(); }, reload: () => loadRegister(), registerSrc: (kind, x = {}) => `${registerSrc(kind, x.meeting)}${x.do ? `&do=${x.do}` : ''}${x.view ? `&view=${x.view}` : ''}`, getRegister: () => state.register, openRegister: (url) => window.open(url, '_blank') });
   paintHelper();
   render();
   await syncIsland();

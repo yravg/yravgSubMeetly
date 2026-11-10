@@ -1870,6 +1870,18 @@ function wireTideRegister() {
   pane.addEventListener('scroll', () => { pane.dataset.scrolled = String(pane.scrollTop > 4); }, { passive: true });
 }
 
+/** From the shell's Minutes page: ?view=<tab> opens that view, ?do=<action> presses that button. */
+function runUrlIntent() {
+  const q = new URLSearchParams(location.search);
+  const view = q.get('view');
+  if (view) $(`#tabs [data-view="${CSS.escape(view)}"]`)?.click();
+  const act = q.get('do');
+  const id = { add: 'btn-add-item', export: 'btn-export', issue: 'btn-issue', amend: 'btn-amend', draft: 'btn-draft', library: 'btn-library', training: 'btn-training' }[act];
+  if (!id) return;
+  if (id === 'btn-library' || id === 'btn-training') document.getElementById('btn-learn')?.click();
+  document.getElementById(id)?.click();
+}
+
 async function boot() {
   document.querySelector(`.langsw button[data-lang="${state.lang}"]`)?.setAttribute('aria-pressed', 'true');
   document.querySelector(`.langsw button[data-lang="${state.lang === 'en' ? 'id' : 'en'}"]`)?.setAttribute('aria-pressed', 'false');
@@ -1882,6 +1894,7 @@ async function boot() {
   window.addEventListener('resize', () => resyncPills(false));
   await reloadAll(false);
   paint();
+  runUrlIntent();
   // Engine-hosted app window: mirror the register to the engine so island pages see it.
   startEngineSync({ lang: () => state.lang, onError: () => toast(T('engineSyncFail'), true) });
 }
