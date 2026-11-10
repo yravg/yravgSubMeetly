@@ -725,7 +725,8 @@ impl App {
             self.try_add_tray();
             services::power::register_session(self.helper);
             if self.st.settings.captions_on {
-                self.set_captions(true, Source::Pc);
+                let source = Source::parse(&self.st.settings.captions_source);
+                self.set_captions(true, source);
             }
             if !crate::autostart::packaged() {
                 self.updater = Some(crate::updates::Updater::start(paths::data_dir().join("update.json"), &mut self.st, crate::updates::unix_now()));
@@ -1774,12 +1775,15 @@ impl App {
     }
 
     /// Captions from `source` (what the PC plays, the room's microphone, or both) on (true) or off,
-    /// in the languages of Settings. On or off is remembered (`captions_on`): the next start of the
-    /// island picks it up again (from what the PC plays).
+    /// in the languages of Settings. On or off and the source are remembered (`captions_on`,
+    /// `captions_source`): the next start of the island picks them up again.
     fn set_captions(&mut self, on: bool, source: Source) {
         let sink = self.sink.clone();
         let (src, tgt) = self.caption_langs();
         self.st.settings.captions_on = on;
+        if on {
+            self.st.settings.captions_source = source.key().to_string();
+        }
         self.save_settings();
         self.st.caption_hint = None;
         let Some(svc) = self.services.as_mut() else { return };
@@ -1818,7 +1822,8 @@ impl App {
             self.st.caption_hint = None;
             self.request_frame();
         } else {
-            self.set_captions(true, Source::Pc);
+            let source = Source::parse(&self.st.settings.captions_source);
+            self.set_captions(true, source);
         }
         self.captions_notice();
     }

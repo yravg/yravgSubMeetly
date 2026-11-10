@@ -139,8 +139,11 @@ pub struct Settings {
     pub source_lang: String,
     /// Language captions and lyrics are translated into.
     pub target_lang: String,
-    /// Live captions from what the PC plays were on when the island last ran.
+    /// Live captions were on when the island last ran.
     pub captions_on: bool,
+    /// What those captions listened to (`capture::Source::key`): the next start reopens the same
+    /// source. `pc` for an old file, which only knew what the PC plays.
+    pub captions_source: String,
     /// Captions start by themselves while a video plays or a calendar meeting runs, and stop after
     /// it ends ([`crate::capture::Auto`]).
     pub auto_captions: bool,
@@ -257,6 +260,7 @@ impl Default for Settings {
             source_lang: "auto".into(),
             target_lang: "en".into(),
             captions_on: false,
+            captions_source: "pc".into(),
             auto_captions: true,
             translate_captions: true,
             live_source: "room".into(),
@@ -405,6 +409,9 @@ mod tests {
         assert!(s.meeting_apps.is_empty() && s.open_meeting_tab && s.meeting_families.slack && s.meeting_families.teams);
         assert!(!s.quick_captions_open, "the pill's caption strip starts hidden");
         assert_eq!((s.live_source.as_str(), s.mic_device.as_str()), ("room", ""), "Live starts on the room, Windows' default mic");
+        assert_eq!(s.captions_source, "pc", "captions on from an old file restart on what the PC plays");
+        let s: Settings = serde_json::from_str(r#"{"captions_on":true,"captions_source":"both"}"#).unwrap();
+        assert_eq!(crate::capture::Source::parse(&s.captions_source), crate::capture::Source::Both, "a restart reopens the source that ran");
         let s: Settings = serde_json::from_str(r#"{"meeting_families":{"slack":false},"meeting_apps":[{"kind":"host","value":"meeting.tencent.com","label":"Tencent Meeting"}]}"#).unwrap();
         assert!(!s.meeting_families.slack && s.meeting_families.zoom);
         assert_eq!(s.meeting_apps[0].value, "meeting.tencent.com");
