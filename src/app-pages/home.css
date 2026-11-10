@@ -1,0 +1,59 @@
+/* ==========================================================================
+   home.css — beranda Today (papan A01): hero dengan pemandangan, kartu sambutan/kosong
+   ringkas, kolom "this week" tanpa bingkai, kartu rail. Dimuat setelah app.css.
+   ========================================================================== */
+.hero { min-height: 372px; padding: 34px 40px 30px; gap: 6px; }
+.hero-bg { overflow: hidden; border-radius: inherit; background: linear-gradient(180deg, var(--tide-sky-1) 0%, var(--tide-sky-2) 62%, var(--tide-mint) 100%); }
+/* Pemandangan menempel di kanan dengan tinggi penuh dan rasio tetap, jadi matahari tidak terpotong di hero lebar. */
+.hero-bg .harbour { position: absolute; right: 0; top: 0; height: 100%; width: auto; aspect-ratio: 1000 / 470; display: block; }
+.hero-bg::after { content: ''; position: absolute; inset: 0; height: auto; opacity: 1; background: linear-gradient(90deg, color-mix(in srgb, var(--card) 96%, transparent) 0%, color-mix(in srgb, var(--card) 90%, transparent) 40%, transparent 64%); }
+.hero h2 { animation: hero-rise 240ms var(--ease-out) both; }
+@keyframes hero-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.hero .sub { margin-bottom: 30px; }
+.hero .askbar { margin-top: auto; }
+.peek { animation: peek-up 240ms var(--ease-spring) both; }
+@keyframes peek-up { from { transform: translateY(6px); } to { transform: none; } }
+
+/* Kartu sambutan / kosong: ringkas, di bawah hero, tanpa maskot kedua. */
+.st.band { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; row-gap: 4px; align-items: center; text-align: left; padding: 18px 22px; border-radius: var(--radius-xl); background: var(--card); box-shadow: var(--tide-shadow), inset 0 0 0 1px var(--border); }
+.st.band h3 { grid-column: 1; }
+.st.band p { grid-column: 1; max-width: 640px; }
+.st.band .setup { grid-column: 1; margin: 6px 0 0; max-width: 460px; }
+.st.band .setup li > a, .st.band .setup li > .small { margin-left: auto; }
+.st.band .st-act { grid-column: 2; grid-row: 1 / span 4; margin: 0; align-self: center; }
+
+/* "This week": kolom polos seperti papan, kartu hanya di rail. */
+.cd.week { background: none; box-shadow: none; padding: 4px 0 0; }
+.week .kpi { font-size: 44px; }
+.week .tl { box-shadow: none; }
+.week .tl.decision { color: var(--accent-soft); }
+.week .tl.action { background: var(--pill-bg); color: var(--pill-fg); }
+.week .tl.question { color: var(--text2); }
+.week .tl.risk { background: var(--danger-bg); color: var(--danger); }
+.week .bar { height: 8px; }
+.week .over { justify-content: flex-start; margin-top: 14px; }
+.week .over .o-main { font-weight: var(--font-bold); }
+.week .over small { margin-left: auto; color: var(--danger); font-weight: var(--font-medium); display: inline; }
+.week .over.ok small { color: var(--muted); }
+.week .over:not(.ok) .o-main { color: var(--danger); }
+@media (max-width: 640px) { .hero-bg .harbour { top: auto; bottom: 0; height: 250px; } .week .over { flex-wrap: wrap; } .week .over small { margin-left: 30px; } .st.band { grid-template-columns: minmax(0, 1fr); } .st.band .st-act { grid-column: 1; grid-row: auto; } .hero { min-height: 0; } .hero .askbar { margin-top: 64px; } }
+
+/* Rail */
+.rail1 .pill-b { height: 48px; margin-top: 6px; }
+.mrow small.ser { display: block; }
+
+/* Sidebar: pengalih seri dengan baris ketua, kaki dengan pengguna */
+.series { position: relative; }
+.series .series-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.series .series-txt b { font-size: var(--text-md); font-weight: var(--font-bold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.series .series-txt small { font-size: var(--text-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.series select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.series:focus-within { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+.series .updown { color: var(--muted); flex: none; }
+.sb-foot .av.sm { width: 32px; height: 32px; border: 0; cursor: pointer; background: var(--accent); }
+.sb-foot .who { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; }
+.sb-foot small { display: flex; align-items: center; gap: 6px; }
+.sb-foot small span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name-pop { width: 280px; gap: 10px; }
+.name-pop input { height: 40px; border: 0; border-radius: var(--radius-md); padding: 0 12px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); }
+.name-pop .row { justify-content: flex-end; }

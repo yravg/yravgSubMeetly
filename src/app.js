@@ -17,6 +17,8 @@ import { LOCAL_HELPER_ORIGIN } from './lib/native-protocol.js';
 import { TYPE_COLOR } from './lib/notes-schema.js';
 import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minutes-window.js';
 import { mountAskTide } from './ask-tide.js';
+import { heroHtml, heroPose } from './app-pages/home.js';
+import { migrateUiDefaults } from './lib/ui-defaults.js';
 
 const IS_EXT = location.protocol === 'chrome-extension:';
 // Engine-hosted (Windows app window): src/web-host.js installed a chrome stand-in, panels are sidepanel.html.
@@ -26,7 +28,7 @@ const HOSTED = IS_EXT || WEB;
 /* ---------- strings ---------- */
 const STR = {
   en: {
-    meetings: 'Meetings', features: 'Features', today: 'Today', live: 'Live captions', minutes: 'Minutes', history: 'Transcripts', notes: 'Notes', files: 'Files',
+    meetings: 'Meetings', features: 'Features', today: 'Today', live: 'Live captions', minutes: 'Minutes', history: 'History', notes: 'Notes and glossary', glossary: 'Glossary', all: 'All features', files: 'Files',
     addins: 'Add-ins', island: 'Island', perf: 'Performance', settings: 'Settings', helper: 'Helper',
     startCaptions: 'Start captions', thisDevice: 'This device', allSeries: 'All series', series: 'Meeting series',
     notices: 'Notices', noNotices: 'Nothing needs you right now.', openMenu: 'Open menu', closeMenu: 'Close menu',
@@ -40,7 +42,7 @@ const STR = {
     overdue: (n) => `${n} overdue`, overdueFirst: (ref, due, more) => `${ref} was due ${due}${more ? ` · ${more} more` : ''}`, noOverdue: 'Nothing overdue',
     ydayTitle: 'Yesterday’s minutes are still open', ydayBody: 'Issue them so owners get their actions.', issueMinutes: 'Issue minutes',
     todayCard: (n, hm) => `${n} meeting${n === 1 ? '' : 's'} · ${hm}`, todayNone: 'No meetings yet today.', checkIssue: 'Check them, then issue the minutes.',
-    issued: 'Issued', draft: 'Draft',
+    issued: 'Done', draft: 'Draft',
     helperLive: 'Live', helperOff: 'Offline', engine: 'Engine', device: 'Device', model: 'Model', nativeHelper: 'Native helper',
     helperPill: (d) => `Helper · ${d}`, helperPillOff: 'Helper offline', helperChecking: 'Checking helper…',
     lockedHelper: 'Needs the helper', lockedHelperBody: 'Start the Native Helper to see the engine, device and model here.', openHelper: 'Open Helper',
@@ -52,7 +54,7 @@ const STR = {
     caughtUp: 'All caught up: nothing overdue and yesterday is issued.',
     registerStyle: 'Style', openRegister: 'Open register', classic: 'Classic ↗', openWindow: 'Open Minutes window ↗', windowOpen: 'Minutes window is open · Focus',
     minutesHint: 'Classic and Modern are the same register; edits show in both.', modern: 'Modern ↗',
-    all: 'All features', dev: 'Developer', devArea: 'Developer area', devAreaBody: 'Lab tools: test pages, mock helper, guides, CC0 samples. Off unless you build or test the extension.',
+    dev: 'Developer', devArea: 'Developer area', devAreaBody: 'Lab tools: test pages, mock helper, guides, CC0 samples. Off unless you build or test the extension.',
     lockedLab: 'Needs the lab server', lockedLabBody: 'The Developer area shows the local lab. Start it with ./scripts/start-lab.sh, then reload.',
     installed: 'Installed add-ins', builtIn: 'Built in', open: 'Open',
     fRecap: 'Recap email', fRecapD: 'Builds a plain-text recap and opens it as a mail draft. Nothing is sent for you.',
@@ -64,6 +66,7 @@ const STR = {
     fTraining: 'Training', fTrainingD: 'Guided tours and quizzes with XP and levels.',
     fExport: 'Export', fExportD: 'Minutes as MD, TXT or DOCX; captions as TXT, SRT or VTT.',
     addinNote: 'Add-ins turn on in the list below after you review and trust them.',
+    lastSynced: (t) => `last synced ${t}`, yours: (n) => `${n} yours`, yourName: 'Your name', nameHint: 'Shown in the greeting and the sidebar. Stays on this device.', save: 'Save', clear: 'Clear', setName: 'Set your name', seriesSub: (n, chair) => `${n} meeting${n === 1 ? '' : 's'}${chair ? ` · chair ${chair}` : ''}`, noMeetings: 'No meetings yet',
     askTide: 'Ask Tide…', askBar: 'Ask Tide about your meetings…', send: 'Send', chips: ['Recap last meeting', 'What did I promise?', 'Open actions', 'Translate a file'],
     plans: 'Plans', planFree: 'Free', planPro: 'Pro', planAgent: 'Agent', perMonth: '/ month', comingSoon: 'Coming soon', current: 'What you have now', beta: 'Beta',
     freeList: ['Unlimited Ask Tide with the local model', 'Register-only answers', '50 starter credits for cloud answers (14 days)', 'Captions, minutes, Island and add-ins'],
@@ -73,7 +76,7 @@ const STR = {
     noServerTitle: 'No server yet', noServerBody: 'Plans and credits need the account server, which is not built yet. Local and Register-only answers are free and work now.',
   },
   id: {
-    meetings: 'Rapat', features: 'Fitur', today: 'Hari ini', live: 'Teks langsung', minutes: 'Notulen', history: 'Transkrip', notes: 'Catatan', files: 'Berkas',
+    meetings: 'Rapat', features: 'Fitur', today: 'Hari ini', live: 'Teks langsung', minutes: 'Notulen', history: 'Riwayat', notes: 'Catatan dan glosarium', glossary: 'Glosarium', all: 'Semua fitur', files: 'Berkas',
     addins: 'Add-in', island: 'Island', perf: 'Kinerja', settings: 'Pengaturan', helper: 'Helper',
     startCaptions: 'Mulai teks', thisDevice: 'Perangkat ini', allSeries: 'Semua seri', series: 'Seri rapat',
     notices: 'Pemberitahuan', noNotices: 'Tidak ada yang menunggu Anda.', openMenu: 'Buka menu', closeMenu: 'Tutup menu',
@@ -87,7 +90,7 @@ const STR = {
     overdue: (n) => `${n} lewat tenggat`, overdueFirst: (ref, due, more) => `${ref} jatuh tempo ${due}${more ? ` · ${more} lagi` : ''}`, noOverdue: 'Tidak ada yang lewat tenggat',
     ydayTitle: 'Notulen kemarin belum diterbitkan', ydayBody: 'Terbitkan supaya pemilik menerima tindak lanjutnya.', issueMinutes: 'Terbitkan notulen',
     todayCard: (n, hm) => `${n} rapat · ${hm}`, todayNone: 'Belum ada rapat hari ini.', checkIssue: 'Periksa, lalu terbitkan notulennya.',
-    issued: 'Terbit', draft: 'Draf',
+    issued: 'Selesai', draft: 'Draf',
     helperLive: 'Aktif', helperOff: 'Mati', engine: 'Mesin', device: 'Perangkat', model: 'Model', nativeHelper: 'Native helper',
     helperPill: (d) => `Helper · ${d}`, helperPillOff: 'Helper mati', helperChecking: 'Memeriksa helper…',
     lockedHelper: 'Perlu helper', lockedHelperBody: 'Jalankan Native Helper untuk melihat mesin, perangkat dan model di sini.', openHelper: 'Buka Helper',
@@ -99,7 +102,7 @@ const STR = {
     caughtUp: 'Semua beres: tidak ada yang lewat tenggat dan notulen kemarin sudah terbit.',
     registerStyle: 'Gaya', openRegister: 'Buka register', classic: 'Klasik ↗', openWindow: 'Buka jendela Notulen ↗', windowOpen: 'Jendela Notulen terbuka · Fokus',
     minutesHint: 'Klasik dan Modern adalah register yang sama; suntingan tampil di keduanya.', modern: 'Modern ↗',
-    all: 'Semua fitur', dev: 'Developer', devArea: 'Area developer', devAreaBody: 'Alat lab: halaman uji, mock helper, panduan, sampel CC0. Mati kecuali Anda membangun atau menguji ekstensi.',
+    dev: 'Developer', devArea: 'Area developer', devAreaBody: 'Alat lab: halaman uji, mock helper, panduan, sampel CC0. Mati kecuali Anda membangun atau menguji ekstensi.',
     lockedLab: 'Perlu server lab', lockedLabBody: 'Area developer menampilkan lab lokal. Jalankan ./scripts/start-lab.sh, lalu muat ulang.',
     installed: 'Add-in terpasang', builtIn: 'Bawaan', open: 'Buka',
     fRecap: 'Email rekap', fRecapD: 'Menyusun rekap teks biasa dan membukanya sebagai draf email. Tidak ada yang dikirim otomatis.',
@@ -111,6 +114,7 @@ const STR = {
     fTraining: 'Training', fTrainingD: 'Tur terpandu dan kuis dengan XP dan level.',
     fExport: 'Ekspor', fExportD: 'Notulen sebagai MD, TXT atau DOCX; teks sebagai TXT, SRT atau VTT.',
     addinNote: 'Add-in menyala di daftar bawah setelah Anda meninjau dan mempercayainya.',
+    lastSynced: (t) => `sinkron terakhir ${t}`, yours: (n) => `${n} milik Anda`, yourName: 'Nama Anda', nameHint: 'Tampil di sapaan dan sidebar. Tetap di perangkat ini.', save: 'Simpan', clear: 'Hapus', setName: 'Isi nama Anda', seriesSub: (n, chair) => `${n} rapat${chair ? ` · ketua ${chair}` : ''}`, noMeetings: 'Belum ada rapat',
     askTide: 'Tanya Tide…', askBar: 'Tanyakan rapat Anda ke Tide…', send: 'Kirim', chips: ['Ringkas rapat terakhir', 'Apa yang saya janjikan?', 'Tindak lanjut terbuka', 'Terjemahkan berkas'],
     plans: 'Paket', planFree: 'Gratis', planPro: 'Pro', planAgent: 'Agent', perMonth: '/ bulan', comingSoon: 'Segera hadir', current: 'Yang Anda pakai sekarang', beta: 'Beta',
     freeList: ['Tanya Tide tanpa batas dengan model lokal', 'Jawaban dari register', '50 kredit awal untuk jawaban awan (14 hari)', 'Teks, notulen, Island dan add-in'],
@@ -152,20 +156,23 @@ const P = {
   export: '<path d="M12 15V4M8 8l4-4 4 4M5 14v5.5h14V14"/>',
   send: '<path d="M12 19V5M6 11l6-6 6 6"/>', globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17M12 3.5c-3 3.2-3 13.8 0 17"/>', list: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
 };
+P.glossary = P.book;
+P.updown = '<path d="m8 9 4-4 4 4M8 15l4 4 4-4"/>';
 const ic = (n, s = 18) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const $ = (s) => document.querySelector(s);
 
 /* ---------- routes ---------- */
-const MEETING_ROUTES = ['today', 'live', 'minutes', 'notes', 'history', 'files'];
-const FEATURE_ROUTES = ['addins', 'island', 'perf', 'settings'];
+const MEETING_ROUTES = ['today', 'live', 'minutes', 'history', 'files'];
+const FEATURE_ROUTES = ['addins', 'glossary', 'island', 'perf', 'all', 'settings'];
+const TILE_COUNT = 8; // tiles on All features (A06)
 // Old links keep working. #glossary used to open meeting notes, where the Glossary add-in panel lives once trusted.
-const ALIAS = { glossary: 'notes', all: 'addins' }; // All features became a section of Add-ins
+const ALIAS = { glossary: 'notes' }; // the notes panel (where the Glossary add-in lives) opens from the Glossary entry
 // Halaman yang masih memasang panel samping: view (+ tab Pengaturan).
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
 
-const state = { setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
+const state = { userName: '', syncedAt: '', setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* privat */ } },
@@ -186,7 +193,7 @@ const lockedCard = (title, body, action = '') => `<div class="callout locked">${
 
 /* ---------- sidebar ---------- */
 function paintNav(route) {
-  const item = (r) => `<a href="#${r}" class="${r === route ? 'on' : ''}"${r === route ? ' aria-current="page"' : ''} data-route="${r}" aria-label="${esc(T(r))}" title="${esc(T(r))}">${ic(r, 20)}<span class="hide-rail">${esc(T(r))}</span>${r === 'minutes' && seriesMeetings()[0]?.items.length ? `<span class="n hide-rail">${seriesMeetings()[0].items.length}</span>` : ''}</a>`;
+  const item = (r) => { const on = r === route || (r === 'glossary' && route === 'notes'); const count = r === 'minutes' ? seriesMeetings()[0]?.items.length : r === 'all' ? TILE_COUNT : 0; return `<a href="#${r}" class="${on ? 'on' : ''}${r === 'dev' ? ' dv' : ''}"${on ? ' aria-current="page"' : ''} data-route="${r}" aria-label="${esc(T(r))}" title="${esc(T(r))}">${ic(r, 20)}<span class="hide-rail">${esc(T(r))}</span>${count ? `<span class="n hide-rail">${count}</span>` : r === 'dev' ? `<span class="n hide-rail">lab</span>` : ''}</a>`; };
   $('#nav-meetings').innerHTML = MEETING_ROUTES.map(item).join('');
   $('#nav-features').innerHTML = FEATURE_ROUTES.map(item).join('') + (state.developer ? item('dev') : '');
 }
@@ -199,6 +206,11 @@ function paintSeries() {
   sel.setAttribute('aria-label', T('series'));
   const label = state.series ? seen.get(state.series) || '' : T('allSeries');
   $('#series-av').textContent = label.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  // Baris kedua: jumlah rapat dan ketua rapat terbaru di seri itu (data register, bukan contoh).
+  const inSeries = (state.series ? (state.meetings || []).filter((m) => m.seriesId === state.series) : state.meetings || []);
+  const chair = [...inSeries].sort((a, b) => String(b.date).localeCompare(String(a.date))).find((m) => m.chair)?.chair || '';
+  $('#series-name').textContent = label;
+  $('#series-sub').textContent = inSeries.length ? T('seriesSub', inSeries.length, state.series ? chair : '') : T('noMeetings');
 }
 
 function paintHelper() {
@@ -207,7 +219,46 @@ function paintHelper() {
   const dev = h?.device ? String(h.device).toUpperCase() : 'CPU';
   for (const el of [$('#helper-dot'), $('#foot-dot')]) el.className = `dot ${h === undefined ? 'wait' : on ? 'ok' : 'off'}`;
   $('#helper-pill-text').textContent = h === undefined ? T('helperChecking') : on ? T('helperPill', dev) : T('helperPillOff');
-  $('#foot-helper').textContent = h === undefined ? T('helperChecking') : on ? `${T('helperPill', dev)} · ${h.model || ''}` : T('helperPillOff');
+  $('#foot-helper').textContent = h === undefined ? T('helperChecking') : on ? `${T('helperPill', dev)} · ${T('lastSynced', state.syncedAt)}` : T('helperPillOff');
+  paintUser();
+}
+
+/* ---------- theme (terang bawaan) + nama pengguna ---------- */
+// Tema dibaca dari pengaturan yang sama dengan panel samping (chrome.storage.local.settings.theme):
+// terang bawaan, gelap bila dipilih gelap, ikut sistem hanya bila "Auto" dipilih sendiri.
+function applyTheme(settings) {
+  const theme = migrateUiDefaults(settings).theme;
+  const cl = document.documentElement.classList;
+  cl.remove('theme-light', 'theme-dark');
+  if (theme === 'light') cl.add('theme-light'); else if (theme === 'dark') cl.add('theme-dark');
+}
+const initials = (n) => String(n).trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+function paintUser() {
+  const n = state.userName;
+  $('#foot-av').textContent = n ? initials(n) : '?';
+  $('#foot-av').setAttribute('aria-label', n || T('setName'));
+  $('#foot-name').textContent = n || T('setName');
+}
+function toggleNamePop(force) {
+  const pop = $('#name-pop');
+  const open = force ?? pop.hidden;
+  pop.hidden = !open;
+  $('#foot-av').setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  pop.setAttribute('aria-label', T('yourName'));
+  pop.innerHTML = `<h3>${esc(T('yourName'))}</h3><input type="text" data-act="name-input" maxlength="40" value="${esc(state.userName)}" aria-label="${esc(T('yourName'))}" /><p class="mut">${esc(T('nameHint'))}</p><div class="row"><button type="button" class="btn sm" data-act="name-clear">${esc(T('clear'))}</button><button type="button" class="pill-b sm" data-act="name-save">${esc(T('save'))}</button></div>`;
+  const r = $('#foot-av').getBoundingClientRect();
+  pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - 296))}px`;
+  pop.style.bottom = `${innerHeight - r.top + 8}px`;
+  pop.style.top = 'auto';
+  pop.querySelector('input').focus();
+}
+function saveName(v) {
+  state.userName = String(v || '').trim().slice(0, 40);
+  globalThis.chrome?.storage?.local.set({ ysmUserName: state.userName });
+  paintUser();
+  toggleNamePop(false);
+  if (parseHash().route === 'today') { lastRoute = null; render(); }
 }
 
 /* ---------- notices (bell) ---------- */
@@ -241,6 +292,9 @@ function toggleBell(force) {
 }
 
 /* ---------- Today (A01) ---------- */
+// Seri tak punya judul sendiri: judul rapat terbarunya. Baris rapat hanya menyebutnya bila ada lebih dari satu seri.
+const seriesLabel = (id) => ((state.meetings || []).filter((m) => m.seriesId === id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]?.title) || '';
+const multiSeries = () => new Set((state.meetings || []).map((m) => m.seriesId)).size > 1;
 const seriesMeetings = () => (state.series ? state.meetings.filter((m) => m.seriesId === state.series) : state.meetings) || [];
 
 // First-run checklist: engine and speech model are read from the engine (GET /models); the test caption is the one action left.
@@ -254,24 +308,16 @@ function todayPage() {
   if (state.error) return errorCard(state.error);
   if (!state.meetings) return stateCard({ pose: 'compass', title: T('loading'), body: '', cls: 'loading' });
   const now = new Date();
-  const t = computeToday(seriesMeetings(), { now, owner: state.owner || null });
+  const t = computeToday(seriesMeetings(), { now, owner: state.owner || null, me: state.userName });
   const welcome = !state.welcomed;
   const caughtUp = !t.empty && !t.yesterdayOpen && !t.overdue.count;
-  // Satu maskot per layar: sambutan (wave) > kosong (sleep) > beres (celebrate) > biasa (shell).
-  const pose = welcome ? 'wave' : t.empty ? 'sleep' : caughtUp ? 'celebrate' : 'shell';
+  // Satu maskot per layar, di bilah tanya: sambutan (wave) > kosong (sleep) > beres (celebrate) > biasa (shell).
+  const pose = heroPose({ welcome, empty: t.empty, caughtUp });
   const eye = `<button type="button" class="icon-b eye" data-act="eye" aria-pressed="${state.hideNumbers}" aria-label="${esc(T(state.hideNumbers ? 'showNumbers' : 'hideNumbers'))}" title="${esc(T(state.hideNumbers ? 'showNumbers' : 'hideNumbers'))}">${ic(state.hideNumbers ? 'eyeOff' : 'eye', 18)}</button>`;
-  const hero = `<section class="hero${state.hideNumbers ? ' masked' : ''}">
-    <div class="hero-bg" aria-hidden="true"></div>
-    ${welcome || t.empty || pose === 'shell' ? '' : tide(pose, 'hero-art')}
-    <h2>${esc(T(greetingKey(now)))}</h2>
-    <div class="dateline">${esc(T('todayLine', fmtDate(now)))} ${eye}</div>
-    <div class="bignum"><b>${num(hm(t.minutesToday))}</b><span>${esc(T('captured'))}</span></div>
-    <div class="sub">${num(T('nMeetings', t.meetingsToday.length))}${caughtUp ? ` · ${esc(T('caughtUp'))}` : ''}</div>
-    ${welcome || t.empty ? '' : `<div class="askbar">${pose === 'shell' ? `<span class="peek">${tide('shell', 'peek-art')}</span>` : ''}${ic('sparkle', 20)}<input type="text" data-act="askbar" placeholder="${esc(T('askBar'))}" aria-label="${esc(T('askBar'))}" /><button type="button" class="send" data-act="askgo" aria-label="${esc(T('send'))}">${ic('send', 20)}</button></div>
-    <div class="chips">${T('chips').map((c, i) => `<button type="button" class="chip" data-act="chip" data-i="${i}">${ic(['chat', 'flag', 'list', 'globe'][i], 18)}${esc(c)}</button>`).join('')}</div>`}
-    ${welcome ? stateCard({ pose: 'wave', title: T('welcomeTitle'), body: T('welcomeBody'), actions: `${setupList()}<button type="button" class="pill-b" data-act="welcomed">${esc(T('gotIt'))}</button>`, cls: 'in-hero' }) : ''}
-    ${!welcome && t.empty ? stateCard({ pose: 'sleep', title: T('emptyTitle'), body: T('emptyBody'), actions: `<a class="pill-b" href="#live" data-start>${ic('play', 16)}${esc(T('startCaptions'))}</a><a class="btn" href="#minutes">${esc(T('openMinutes'))}</a>`, cls: 'in-hero' }) : ''}
-  </section>`;
+  const hero = heroHtml({ T, ic, esc, tide, num, hm, fmtDate, now, t, state, greetKey: greetingKey(now), pose, caughtUp, eye, synced: state.syncedAt });
+  // Sambutan dan kosong tidak menggantikan hero: kartu ringkas di bawahnya.
+  const band = welcome ? stateCard({ title: T('welcomeTitle'), body: T('welcomeBody'), actions: `<button type="button" class="pill-b" data-act="welcomed">${esc(T('gotIt'))}</button>`, cls: 'band' }).replace('</p>', `</p>${setupList()}`)
+    : t.empty ? stateCard({ title: T('emptyTitle'), body: T('emptyBody'), actions: `<a class="pill-b" href="#live" data-start>${ic('play', 16)}${esc(T('startCaptions'))}</a><a class="btn" href="#minutes">${esc(T('openMinutes'))}</a>`, cls: 'band' }) : '';
 
   const total = t.week.items;
   const types = [['decision', 'check'], ['action', 'flag'], ['question', 'chat'], ['risk', 'bolt']];
@@ -279,21 +325,23 @@ function todayPage() {
     : t.week.delta < 0 ? `<div class="delta down">${ic('down', 16)}${esc(T('fewerThan', -t.week.delta))}</div>` : `<div class="delta">${esc(T('sameAs'))}</div>`;
   const ownerSel = `<label class="sel">${esc(T('owner'))}: <select data-act="owner"><option value="">${esc(T('everyone'))}</option>${t.week.owners.map((o) => `<option${o === state.owner ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
   const filtered = types.reduce((s, [k]) => s + t.week.byType[k], 0) || 1;
-  const bars = types.map(([k, icn]) => `<div class="brow"><span class="tl" style="--c:${TYPE_COLOR[k]}">${ic(icn, 18)}</span><span class="nm">${esc(T(k))}<small>${esc(T('ofItems', t.week.byType[k], total))}</small></span><span class="v">${num(t.week.byType[k])}</span><span class="bar"><i style="width:${Math.round((t.week.byType[k] / filtered) * 100)}%;--c:${TYPE_COLOR[k]}"></i></span></div>`).join('');
+  const barColor = { decision: 'var(--tide-emerald)', action: 'var(--text)', question: TYPE_COLOR.question, risk: TYPE_COLOR.risk };
+  const yours = state.userName ? t.week.yoursAction : 0;
+  const bars = types.map(([k, icn]) => `<div class="brow"><span class="tl ${k}">${ic(icn, 18)}</span><span class="nm">${esc(T(k))}<small>${esc(T('ofItems', t.week.byType[k], total))}${k === 'action' && yours ? ` · ${esc(T('yours', yours))}` : ''}</small></span><span class="v">${num(t.week.byType[k])}</span><span class="bar"><i style="width:${Math.round((t.week.byType[k] / filtered) * 100)}%;--c:${barColor[k]}"></i></span></div>`).join('');
   const over = t.overdue.count
-    ? `<a class="over" href="#minutes?meeting=${encodeURIComponent(t.overdue.first.meetingId)}">${ic('cal', 20)}<span>${esc(T('overdue', t.overdue.count))}<small>${esc(T('overdueFirst', t.overdue.first.ref, fmtShort(t.overdue.first.due), t.overdue.count - 1))}</small></span></a>`
-    : `<div class="over ok">${ic('check', 20)}<span>${esc(T('noOverdue'))}</span></div>`;
+    ? `<a class="over" href="#minutes?meeting=${encodeURIComponent(t.overdue.first.meetingId)}">${ic('cal', 20)}<span class="o-main">${esc(T('overdue', t.overdue.count))}</span><small>${esc(T('overdueFirst', t.overdue.first.ref, fmtShort(t.overdue.first.due), t.overdue.count - 1))}</small></a>`
+    : `<div class="over ok">${ic('check', 20)}<span class="o-main">${esc(T('noOverdue'))}</span></div>`;
   const week = `<section class="cd week"><div class="wih">${esc(T('itemsWeek'))}</div><div class="kpi">${num(total)}</div>${delta}
     <div class="wih row"><span>${esc(T('whereWent'))}</span><span class="grow"></span>${ownerSel}</div><div class="bars">${bars}</div>${over}</section>`;
 
   const ydayCard = t.yesterdayOpen ? `<section class="cd rail1"><span class="eyebrow">${esc(fmtShort(t.yesterdayOpen.date))} · ${esc(t.yesterdayOpen.title)}</span><h3>${esc(T('ydayTitle'))}</h3><p>${esc(T('ydayBody'))}</p><a class="pill-b full" href="#minutes?meeting=${encodeURIComponent(t.yesterdayOpen.id)}">${esc(T('issueMinutes'))}</a></section>` : '';
-  const rows = t.meetingsToday.map((m) => `<a class="mrow" href="#minutes?meeting=${encodeURIComponent(m.id)}"><span class="t">${esc(m.start || '—')}</span><span><b>${esc(m.title)}</b><small>${esc(hm(m.minutes))}</small></span><span class="chip sm ${m.status === 'issued' ? 'ok' : 'warn'}">${esc(T(m.status))}</span></a>`).join('');
+  const rows = t.meetingsToday.map((m) => `<a class="mrow" href="#minutes?meeting=${encodeURIComponent(m.id)}"><span class="t">${esc(m.start || '—')}</span><span><b>${esc(m.title)}</b><small>${esc([multiSeries() ? seriesLabel(m.seriesId) : '', hm(m.minutes)].filter(Boolean).join(' · '))}</small></span><span class="chip sm ${m.status === 'issued' ? 'ok' : 'warn'}">${esc(T(m.status))}</span></a>`).join('');
   const todayCard = `<section class="cd"><span class="eyebrow">${esc(T('today'))} · ${esc(fmtShort(now))}</span><h3>${t.meetingsToday.length ? esc(T('todayCard', t.meetingsToday.length, hm(t.minutesToday))) : esc(T('todayNone'))}</h3>${rows}${t.meetingsToday.some((m) => m.status === 'draft') ? `<small class="mut">${esc(T('checkIssue'))}</small>` : ''}</section>`;
   const h = state.health;
   const helperCard = h ? `<section class="cd"><div class="row"><h3>${esc(T('helper'))}</h3><span class="grow"></span><span class="chip sm ok"><span class="dot ok"></span>${esc(T('helperLive'))}</span></div>
       <div class="kv"><span>${esc(T('engine'))}</span><b>${esc(h.engine_label || h.engine || T('nativeHelper'))}</b></div><div class="kv"><span>${esc(T('device'))}</span><b>${esc(String(h.device || 'cpu').toUpperCase())}</b></div><div class="kv"><span>${esc(T('model'))}</span><b>${esc(h.model || '—')}</b></div></section>`
     : h === null ? `<section class="cd">${lockedCard(T('lockedHelper'), T('lockedHelperBody'), `<a class="btn" href="#helper">${esc(T('openHelper'))}</a>`)}</section>` : '';
-  return `${hero}<div class="cols">${week}<div class="rail">${ydayCard}${todayCard}${helperCard}</div></div>`;
+  return `${hero}${band}<div class="cols">${week}<div class="rail">${ydayCard}${todayCard}${helperCard}</div></div>`;
 }
 
 /* ---------- Minutes (A04) ---------- */
@@ -367,7 +415,7 @@ function panelPage(route) {
 function parseHash() {
   const [r0, q] = location.hash.replace(/^#/, '').split('?');
   const r = ALIAS[r0] || r0;
-  const route = [...MEETING_ROUTES, ...FEATURE_ROUTES, 'helper', ...(state.showPlans ? ['plans'] : []), ...(state.developer ? ['dev'] : [])].includes(r) ? r : 'today';
+  const route = [...MEETING_ROUTES, ...FEATURE_ROUTES, 'notes', 'helper', ...(state.showPlans ? ['plans'] : []), ...(state.developer ? ['dev'] : [])].includes(r) ? r : 'today';
   return { route, params: new URLSearchParams(q || '') };
 }
 
@@ -381,16 +429,15 @@ function render() {
   const page = $('#page');
   page.dataset.route = route;
   // Bingkai panel tidak dimuat ulang saat hanya data beranda yang berubah.
-  if (route === lastRoute && !['today', 'minutes', 'addins', 'plans'].includes(route)) return;
+  if (route === lastRoute && !['today', 'minutes', 'all', 'plans'].includes(route)) return;
   if (route === 'minutes' && lastRoute === 'minutes' && page.querySelector('iframe.reg')) {
     const btn = page.querySelector('[data-act="win"]');
     if (btn) btn.innerHTML = state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'));
     return;
   }
   lastRoute = route;
-  page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'addins' ? addinsPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage(params) : route === 'plans' ? plansPage() : panelPage(route);
-  if (route === 'addins' && params.get('pane') === 'addins') $('#addins-pane')?.scrollIntoView({ block: 'start' });
-}
+  page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'all' ? addinsPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage(params) : route === 'plans' ? plansPage() : panelPage(route);
+  }
 
 /* ---------- start captions (one action everywhere: sidebar, Today, ⇧S) ---------- */
 // Opens Live, then presses the panel's own Start button (same origin, so its document is reachable).
@@ -437,13 +484,21 @@ function wire() {
 
   window.addEventListener('hashchange', () => { setSheet(false); toggleBell(false); render(); $('#page').focus({ preventScroll: true }); });
   $('#btn-bell').addEventListener('click', (e) => { e.stopPropagation(); toggleBell(); });
+  for (const id of ['#foot-av', '#foot-who']) $(id).addEventListener('click', (e) => { e.stopPropagation(); toggleNamePop(); });
+  $('#name-pop').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'name-save') saveName($('#name-pop input').value); else if (act === 'name-clear') saveName('');
+  });
+  $('#name-pop').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveName($('#name-pop input').value); } });
+  document.addEventListener('click', (e) => { if (!$('#name-pop').hidden && !e.target.closest('#name-pop')) toggleNamePop(false); });
   document.addEventListener('click', (e) => { if (!$('#bell-pop').hidden && !e.target.closest('#bell-pop')) toggleBell(false); });
   $('#btn-menu').addEventListener('click', () => setSheet(true));
   $('#btn-sb-close').addEventListener('click', () => setSheet(false));
   $('#scrim').addEventListener('click', () => setSheet(false));
   $('#series-select').addEventListener('change', (e) => { state.series = e.target.value; state.owner = ''; store.set('ysmShellSeries', state.series); paintSeries(); lastRoute = null; render(); });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { toggleBell(false); setSheet(false); }
+    if (e.key === 'Escape') { toggleBell(false); toggleNamePop(false); setSheet(false); }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
     if (!typing && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); startCaptions(); }
     if (!typing && e.key === '/' && !e.metaKey && !e.ctrlKey && $('.ask-ov')?.hidden !== false) { e.preventDefault(); ask.open(); }
@@ -498,6 +553,7 @@ async function pollHelper() {
   // Windows window: the engine that served this page is the helper (it may not be on 17865).
   const origin = WEB ? location.origin : LOCAL_HELPER_ORIGIN;
   state.health = await nativeHealth(origin);
+  if (state.health) state.syncedAt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date());
   if (!state.welcomed) { const m = state.health ? await nativeGetModels(origin) : null; state.setup = { asr: Array.isArray(m?.catalog) ? m.catalog.some((x) => x.kind === 'asr' && x.downloaded) : null }; }
   paintHelper();
   paintBell();
@@ -528,6 +584,9 @@ async function boot() {
   state.showPlans = store.get('ysmShowPlans', false) === true;
   state.register = store.get('ysmShellRegister', 'modern') === 'classic' ? 'classic' : 'modern';
   if (HOSTED) state.developer = !!(await globalThis.chrome?.storage?.local.get('ysmDeveloper'))?.ysmDeveloper;
+  const stored = (await globalThis.chrome?.storage?.local.get(['settings', 'ysmUserName'])) || {};
+  state.userName = String(stored.ysmUserName || '').trim();
+  applyTheme(stored.settings);
   ask = mountAskTide({ lang: LANG, showCredits: state.showPlans, getMeetings: async () => state.meetings || listMeetings(), onSaved: () => loadRegister() });
   wire();
   paintHelper();
@@ -535,6 +594,8 @@ async function boot() {
   await syncIsland();
   globalThis.chrome?.storage?.onChanged?.addListener((ch) => {
     if ('captionSurface' in ch) syncIsland();
+    if ('settings' in ch) applyTheme(ch.settings.newValue);
+    if ('ysmUserName' in ch) { state.userName = String(ch.ysmUserName.newValue || ''); paintUser(); if (parseHash().route === 'today') { lastRoute = null; render(); } }
     if (WIN_ID_KEY in ch) refreshWin();
   });
   window.addEventListener('storage', (e) => { if (e.key === 'minutesRegister') loadRegister(); });

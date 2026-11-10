@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="tokens.css" />
 <link rel="stylesheet" href="theme-tide.css" />
 <link rel="stylesheet" href="app.css" />
+<link rel="stylesheet" href="app-pages/home.css" />
 </head>
 <body>
 <!-- TIDE-002..005, 008, 014 (papan A01, A04, A09). Kerangka; app.js mengisi halaman. -->
@@ -21,6 +22,8 @@
     </div>
     <label class="series hide-rail">
       <span class="av" id="series-av" aria-hidden="true"></span>
+      <span class="series-txt"><b id="series-name"></b><small id="series-sub"></small></span>
+      <span class="ic-slot updown" data-ic="updown" aria-hidden="true"></span>
       <select id="series-select"></select>
     </label>
     <button type="button" class="askf" id="ask-field"></button>
@@ -31,8 +34,8 @@
     <div class="push"></div>
     <a class="pill-b full" id="btn-start" href="#live"><span class="ic-slot" data-ic="play"></span><span class="hide-rail" data-t="startCaptions"></span><kbd class="hide-rail">⇧S</kbd></a>
     <div class="sb-foot">
-      <span class="dot" id="foot-dot"></span>
-      <span class="hide-rail"><b data-t="thisDevice"></b><small id="foot-helper"></small></span>
+      <button type="button" class="av sm" id="foot-av" aria-haspopup="dialog" aria-expanded="false"></button>
+      <button type="button" class="who hide-rail" id="foot-who" aria-haspopup="dialog"><b id="foot-name"></b><small><span class="dot" id="foot-dot"></span><span id="foot-helper"></span></small></button>
       <a class="plk hide-rail" id="plans-link" href="#plans"></a>
     </div>
   </aside>
@@ -49,6 +52,7 @@
   </main>
 </div>
 <div class="pop" id="bell-pop" role="dialog" hidden></div>
+<div class="pop name-pop" id="name-pop" role="dialog" hidden></div>
 <script src="web-host.js"></script>
 <script type="module" src="app.js"></script>
 </body>

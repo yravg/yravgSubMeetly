@@ -60,20 +60,24 @@ before(async () => {
 after(async () => { await browser?.close(); server?.kill('SIGTERM'); });
 
 const mascots = () => page.$$eval('img.tide-art', (l) => l.map((i) => i.src.split('/').pop()));
+// Hero utuh di setiap keadaan: bilah tanya dengan tombol kirim, empat chip, pemandangan.
+const heroParts = () => page.evaluate(() => ({ ask: !!document.querySelector('.hero .askbar input'), send: !!document.querySelector('.hero .askbar .send'), chips: document.querySelectorAll('.hero .chips .chip').length, scene: !!document.querySelector('.hero .hero-bg svg.harbour'), peek: !!document.querySelector('.hero .askbar .peek img') }));
 
-test('A09: sambutan pertama (wave) lalu kosong (sleep), satu maskot per layar', async () => {
+test('A09: sambutan pertama (wave) lalu kosong (sleep): hero tetap utuh, satu maskot di bilah tanya', async () => {
   assert.deepEqual(await mascots(), ['tide-wave.webp']);
+  assert.deepEqual(await heroParts(), { ask: true, send: true, chips: 4, scene: true, peek: true }, 'sambutan: hero tidak digantikan kartu');
+  assert.equal(await page.$eval('.hero h2', (h) => h.textContent), 'Good evening.'.replace('evening', await page.$eval('.hero h2', (h) => h.textContent.match(/morning|afternoon|evening/)[0])), 'tanpa nama: sapaan polos');
   // First run: a real setup list (engine, speech model, test caption), each with a way forward.
-  const steps = await page.$$eval('.hero ol.setup li', (l) => l.map((li) => ({ text: li.textContent.trim(), link: li.querySelector('a')?.getAttribute('href') || '' })));
+  const steps = await page.$$eval('.st.band ol.setup li', (l) => l.map((li) => ({ text: li.textContent.trim(), link: li.querySelector('a')?.getAttribute('href') || '' })));
   assert.ok(steps.length >= 2 && steps.length <= 3, JSON.stringify(steps));
   assert.equal(steps.at(-1).link, '#live');
   assert.match(steps.at(-1).text, /test caption/i);
   await page.click('[data-act="welcomed"]');
-  await page.waitForSelector('.st.in-hero');
+  await page.waitForSelector('.st.band');
   assert.deepEqual(await mascots(), ['tide-sleep.webp']);
-  const txt = await page.$eval('.hero', (h) => h.textContent);
-  assert.match(txt, /No meetings yet/);
-  assert.ok(await page.$('.hero a.pill-b[href="#live"]'), 'kosong menawarkan Start captions');
+  assert.deepEqual(await heroParts(), { ask: true, send: true, chips: 4, scene: true, peek: true }, 'kosong: hero tetap utuh');
+  assert.match(await page.$eval('.st.band', (h) => h.textContent), /No meetings yet/);
+  assert.ok(await page.$('.st.band a.pill-b[href="#live"]'), 'kosong menawarkan Start captions');
 });
 
 test('A01: angka dari register, satu maskot, kartu kemarin dan rapat hari ini', async () => {
@@ -96,6 +100,7 @@ test('A01: angka dari register, satu maskot, kartu kemarin dan rapat hari ini', 
   assert.match(r.over, /1 overdue/);
   assert.match(r.helper, /Helper/);
   assert.deepEqual(await mascots(), ['tide-shell.webp']);
+  assert.deepEqual(await heroParts(), { ask: true, send: true, chips: 4, scene: true, peek: true }, 'terisi: hero utuh');
   assert.equal(await page.$eval('.rail1 a.pill-b', (a) => a.getAttribute('href')), '#minutes?meeting=Y1');
 });
 
@@ -126,19 +131,20 @@ test('⇧S membuka Live captions; setiap rute nav memasang halamannya', async ()
   await page.keyboard.down('Shift'); await page.keyboard.press('S'); await page.keyboard.up('Shift');
   await page.waitForFunction(() => location.hash === '#live');
   const routes = await page.$$eval('#nav-meetings a, #nav-features a', (l) => l.map((a) => a.dataset.route));
-  assert.deepEqual(routes, ['today', 'live', 'minutes', 'notes', 'history', 'files', 'addins', 'island', 'perf', 'settings', 'dev'], 'lab: Developer tampil');
-  const expect = { live: 'view=captions', history: 'view=history', files: 'view=files', addins: 'stab=addins', notes: 'view=notes', island: 'stab=output', perf: 'view=perf', settings: 'view=settings' };
+  assert.deepEqual(routes, ['today', 'live', 'minutes', 'history', 'files', 'addins', 'glossary', 'island', 'perf', 'all', 'settings', 'dev'], 'urutan papan A01; lab: Developer tampil');
+  const expect = { live: 'view=captions', history: 'view=history', files: 'view=files', addins: 'stab=addins', notes: 'view=notes', island: 'stab=output', perf: 'view=perf', settings: 'view=settings', all: 'stab=addins' };
   for (const [route, frag] of Object.entries(expect)) {
     await page.evaluate((r) => { location.hash = `#${r}`; }, route);
     await page.waitForFunction((r) => document.querySelector('#page').dataset.route === r, {}, route);
     const src = await page.$eval('#page iframe.panel', (f) => f.getAttribute('src'));
     assert.ok(src.includes(frag), `${route} → ${src}`);
   }
-  // Tautan lama #glossary membuka catatan rapat (tempat panel Glosarium hidup), berlabel Notes; History berlabel Transcripts.
+  // Glossary membuka catatan rapat (tempat panel Glosarium hidup).
   await page.evaluate(() => { location.hash = '#glossary'; });
   await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'notes');
-  assert.equal(await page.$eval('#page-title', (h) => h.textContent), 'Notes');
-  assert.equal(await page.$eval('#nav-meetings [data-route="history"]', (a) => a.textContent.trim()), 'Transcripts');
+  assert.equal(await page.$eval('#page-title', (h) => h.textContent), 'Notes and glossary');
+  assert.equal(await page.$eval('#nav-features [data-route="glossary"]', (a) => a.classList.contains('on')), true, 'Glossary menyala di sidebar');
+  assert.equal(await page.$eval('#nav-meetings [data-route="history"]', (a) => a.textContent.trim()), 'History');
   // Lab: Live menyebut keadaan terkunci "Needs the extension".
   await page.evaluate(() => { location.hash = '#live'; });
   await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'live');
@@ -198,9 +204,9 @@ test('A04: Modern bawaan; Klasik lewat menu Style; pilihan diingat dan tampil le
 });
 
 test('A06: delapan fitur, Island dengan sakelar nyata, add-in terpasang di halaman yang sama', async () => {
-  await page.evaluate(() => { location.hash = '#all'; }); // alias of #addins
+  await page.evaluate(() => { location.hash = '#all'; });
   await page.waitForSelector('.tiles');
-  assert.equal(await page.$eval('#page', (p) => p.dataset.route), 'addins', '#all is an alias of Add-ins');
+  assert.equal(await page.$eval('#page', (p) => p.dataset.route), 'all', 'All features: halamannya sendiri (A06)');
   assert.equal(await page.$$eval('.tiles .tile2', (l) => l.length), 8);
   assert.equal((await page.$$('.tiles [data-act="island"]')).length, 0, 'satu sakelar Island saja: di bilah atas');
   const before = await page.evaluate(() => chrome.storage.local.get('captionSurface'));
