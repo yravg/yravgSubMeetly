@@ -163,7 +163,9 @@ const FEATURE_ROUTES = ['addins', 'island', 'perf', 'settings'];
 const ALIAS = { glossary: 'notes', all: 'addins' }; // All features became a section of Add-ins
 // Halaman yang masih memasang panel samping: view (+ tab Pengaturan).
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
-const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&lang=${LANG}`;
+// Pages whose panel document lays itself out as a board page (src/app-pages/*-layout.js).
+const SHELLED = new Set(['live']);
+const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&shell=1&lang=${LANG}`;
 
 const state = { setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
 const store = {
@@ -359,8 +361,7 @@ function settingsPage(params) {
 
 /* ---------- panel-backed pages ---------- */
 function panelPage(route) {
-  const lock = route !== 'live' || IS_EXT ? '' : WEB ? lockedCard(T('noOverlay'), T('noOverlayBody')) : lockedCard(T('lockedExt'), T('lockedExtBody'));
-  return `${lock}<iframe class="frame panel" title="${esc(T(route))}" src="${esc(panelUrl(PANEL[route]))}"></iframe>`;
+  return `<iframe class="frame panel${SHELLED.has(route) ? ' shell' : ''}" title="${esc(T(route))}" src="${esc(panelUrl(PANEL[route]))}"></iframe>`;
 }
 
 /* ---------- router ---------- */

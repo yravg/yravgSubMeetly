@@ -142,7 +142,9 @@ test('⇧S membuka Live captions; setiap rute nav memasang halamannya', async ()
   // Lab: Live menyebut keadaan terkunci "Needs the extension".
   await page.evaluate(() => { location.hash = '#live'; });
   await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'live');
-  assert.match(await page.$eval('#page', (p) => p.textContent), /Needs the extension/);
+  const liveFrame = await (await page.waitForSelector('#page iframe.panel')).contentFrame();
+  await liveFrame.waitForSelector('#ls-env-note');
+  assert.match(await liveFrame.$eval('#ls-env-note', (n) => n.textContent), /Needs the extension/);
 });
 
 test('Start captions di sidebar benar-benar memulai (bukan hanya membuka Live)', async () => {

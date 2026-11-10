@@ -46,6 +46,7 @@ import { makeT as makeNotesT } from './lib/notes-i18n.js';
 import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js';
 import { makeResizable } from './lib/resizable.js';
 import { mountPerfPanel } from './perf-panel.js';
+import { mountLiveLayout } from './app-pages/live-layout.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
 import { detectOs } from './lib/helper-status.js';
@@ -118,6 +119,7 @@ function applyI18n() {
   // The notes ticker (notes-panel.js) and the Minutes Register read the UI
   // language from <html lang>, so keep it in sync with the setting.
   document.documentElement.lang = state.settings.uiLang || 'en';
+  window.__ysmLiveRepaint?.();
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
@@ -2502,6 +2504,7 @@ function showToast(msg, kind = 'ok') {
   }, 5000);
 }
 if (typeof window !== 'undefined') window.__ysmToast = showToast;
+if (typeof window !== 'undefined') window.__ysmShowError = (raw) => showError(raw);
 
 async function startWithStream(streamId, captureType) {
   setStatus(t('loadingModels'));
@@ -2595,9 +2598,40 @@ async function onStart() {
   }
 }
 
+// Microphone source (board A02): the lab and the app window hand the stream to the pipeline in-page;
+// the extension asks for mic permission here (a visible page can prompt) and offscreen opens the mic itself.
+let micSource = false;
+async function startFromMic() {
+  setStatus(t('loadingModels'));
+  clearLivePreview();
+  $('live-preview').classList.remove('hidden');
+  const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+  if (!isLabHarness()) {
+    for (const track of mic.getTracks()) track.stop();
+    await startWithStream(null, 'mic');
+    return;
+  }
+  releaseLabCapture();
+  const t0 = performance.now();
+  window.__ysmCaptureStream = mic;
+  window.__ysmLabClock = () => (performance.now() - t0) / 1000;
+  state.currentTab = { id: 1, title: t('micTitle'), url: '', favIconUrl: '' };
+  await startWithStream(null, 'media');
+}
+
 async function startOnce() {
   if (state.mode === 'realtime') {
     persistLastConfig();
+    if (micSource) {
+      try {
+        hideError();
+        await startFromMic();
+      } catch (e) {
+        releaseLabCapture();
+        showCaptureError(e?.name === 'NotAllowedError' ? t('micDenied') : String(e?.message || e));
+      }
+      return;
+    }
     if (isLabHarness()) {
       try {
         setStatus(t('loadingModels'));
@@ -3598,6 +3632,17 @@ async function init() {
   } else if (q.get('view')) {
     jumpTo(q.get('view'));
     if (q.get('view') === 'settings' && SETTINGS_TABS.includes(q.get('stab'))) setSettingsTab(q.get('stab'));
+  }
+  if (q.get('shell') === '1') document.documentElement.dataset.shell = q.get('view') || 'captions';
+  if (q.get('shell') === '1' && q.get('view') === 'captions') {
+    mountLiveLayout({
+      lang: () => state.settings.uiLang,
+      env: location.protocol === 'chrome-extension:' ? 'ext' : isWebHost() ? 'web' : 'lab',
+      running: () => ({ on: state.mode === 'realtime' ? state.running : state.offlineRunning, startedAt: state.startedAt }),
+      setMic: (on) => { micSource = !!on; },
+    });
+    resyncPills(false); // the sliding pills were measured before the toggles moved into the cards
+    document.fonts?.ready.then(() => resyncPills(false));
   }
 }
 
