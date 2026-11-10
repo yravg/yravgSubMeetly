@@ -41,8 +41,10 @@ const CELL_H: f32 = 26.0;
 const GRID_Y: f32 = 48.0;
 const INITIALS_H: f32 = 16.0;
 const COL_GAP: f32 = 20.0;
-/// Narrower than this, the grid is left out so the meetings keep their room.
-const GRID_FROM_W: f32 = 640.0;
+/// Narrower than this, the grid is left out (Oyenza Studio's `COMPACT_BELOW`).
+const GRID_FROM_W: f32 = 480.0;
+/// Rows narrower than this put the time under the title instead of a column of its own.
+const TIME_COLUMN_FROM_W: f32 = 520.0;
 const GRID_DAYS: i64 = 35;
 const WEEKDAY_LONG: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_LONG: [&str; 12] = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -379,9 +381,14 @@ fn meeting_row(ui: &mut Ui, st: &AppState, row: Rect, e: &Event, off: i64, slot:
     }
     let when = calendar::range_label(e, off, st.settings.use_24h);
     let wst = TextStyle::footnote().weight(if on { Weight::Semibold } else { Weight::Regular }).color(if on { accent } else { palette::TEXT_DIM });
-    let when_w = if e.all_day { 52.0 } else if st.settings.use_24h { 100.0 } else { 148.0 };
-    ui.c.text(&when, Rect::new(row.x + 8.0, cy - 9.0, when_w, 18.0), &wst);
-    let tx = row.x + 8.0 + when_w + 6.0;
+    let column = row.w >= TIME_COLUMN_FROM_W;
+    let tx = if column {
+        let when_w = if e.all_day { 52.0 } else if st.settings.use_24h { 100.0 } else { 148.0 };
+        ui.c.text(&when, Rect::new(row.x + 8.0, cy - 9.0, when_w, 18.0), &wst);
+        row.x + 8.0 + when_w + 6.0
+    } else {
+        row.x + 8.0
+    };
     let tw = (right - tx - 4.0).max(0.0);
     let mut sub: Vec<String> = Vec::new();
     if let Some(l) = &e.location {
@@ -392,6 +399,9 @@ fn meeting_row(ui: &mut Ui, st: &AppState, row: Rect, e: &Event, off: i64, slot:
     }
     if e.recurring {
         sub.push("repeats".into());
+    }
+    if !column {
+        sub.insert(0, when);
     }
     if on {
         sub.insert(0, "Now".into());
