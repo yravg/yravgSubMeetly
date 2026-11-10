@@ -420,6 +420,10 @@ function checkIcon(size = 13) {
    Views
    ========================================================================== */
 function viewTable(rows) {
+  if (!rows.length && IS_TIDE && !activeMeeting()?.items.length) {
+    // Modern A04a-empty: the meeting has no items at all (not just none that match the filters).
+    return `<div class="empty empty-items"><h3>${esc(T('emptyItemsTitle'))}</h3><p>${esc(T('emptyItemsBody'))}</p><div class="empty-act"><button type="button" class="btn" data-empty-act="draft">${esc(T('emptyDraft'))}</button><button type="button" class="btn" data-empty-act="add"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>${esc(T('addItem'))}</button></div></div>`;
+  }
   if (!rows.length) return `<p class="empty">${esc(T('msgEmpty'))}</p>`;
   const th = (k, cls, label) => {
     const active = state.sort.key === k;
@@ -1724,6 +1728,8 @@ function wireEvents() {
   $('#pane').addEventListener('click', (e) => {
     const act = e.target.closest('.row-act [data-act]');
     if (act) { e.stopPropagation(); rowAction(act); return; }
+    const emptyAct = e.target.closest('[data-empty-act]');
+    if (emptyAct) { document.querySelector(emptyAct.dataset.emptyAct === 'add' ? '#btn-add-item' : '#btn-draft')?.click(); return; }
     if (e.target.closest('#btn-save-summary')) { doSaveSummary(); return; }
     const play = e.target.closest('[data-play]');
     if (play) { e.stopPropagation(); toast(`${T('msgSeeking')} ${play.dataset.play}`); return; }

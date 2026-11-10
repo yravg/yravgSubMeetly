@@ -181,4 +181,27 @@ test('empty register in Modern: Tide asleep', async () => {
   assert.match(bg, /tide-sleep/);
 });
 
+test('a meeting with no items shows Tide asleep, "No items yet", Draft options and Add item; the band stays at zero', async () => {
+  await open('?skin=tide');
+  await page.evaluate(async () => {
+    const env = JSON.parse(localStorage.getItem('minutesRegister'));
+    for (const m of env.meetings) m.items = [];
+    localStorage.setItem('minutesRegister', JSON.stringify(env));
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForSelector('#pane .empty.empty-items');
+  const r = await page.evaluate(() => {
+    const e = document.querySelector('#pane .empty.empty-items');
+    const img = getComputedStyle(e, '::before').backgroundImage;
+    return { h: e.querySelector('h3')?.textContent.trim(), btns: [...e.querySelectorAll('button')].map((b) => b.textContent.trim()), img, band: document.querySelector('#sum-total, .sum-total, .sum-count')?.textContent.trim() };
+  });
+  assert.equal(r.h, 'No items yet');
+  assert.deepEqual(r.btns, ['Draft options', 'Add item']);
+  assert.match(r.img, /tide-sleep/);
+  // Add item here opens the same editor as the toolbar button.
+  await page.click('#pane .empty-items [data-empty-act="add"]');
+  await page.waitForFunction(() => !document.querySelector('#drawer').hidden, { timeout: 4000 });
+  assert.equal(await page.$('#reg-tb:not([hidden])'), null, 'density control hides with no rows');
+});
+
 test('no page errors', () => { assert.deepEqual(pageErrors, []); });

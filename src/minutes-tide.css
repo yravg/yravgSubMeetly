@@ -145,3 +145,10 @@ html[data-reskin="tide"] .rev[data-r="edited"] { background: var(--card2); color
 html[data-reskin="tide"] .rev[data-r="ai"] { background: color-mix(in srgb, var(--warn-text) 14%, transparent); color: var(--warn-text); }
 html[data-reskin="tide"] .rev[data-r="ai"].low { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 html[data-reskin="tide"] .srcrow .conf i { background: var(--tide-green); }
+
+/* A04a-empty: a meeting with no items. Tide sleeps, two actions, the summary band stays at zero. */
+html[data-reskin="tide"] #pane .empty-items { padding: 36px 20px 28px; color: var(--muted); }
+html[data-reskin="tide"] #pane .empty-items::before { content: ''; display: block; width: 120px; height: 120px; margin: 0 auto 12px; background: url('tide/tide-sleep.webp') center / contain no-repeat; }
+html[data-reskin="tide"] #pane .empty-items h3 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+html[data-reskin="tide"] #pane .empty-items p { max-width: 46ch; margin: 0 auto; font-size: 13.5px; line-height: 1.5; }
+html[data-reskin="tide"] #pane .empty-items .empty-act { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
