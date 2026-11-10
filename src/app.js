@@ -18,6 +18,7 @@ import { TYPE_COLOR } from './lib/notes-schema.js';
 import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minutes-window.js';
 import { mountAskTide } from './ask-tide.js';
 import { heroHtml, heroPose } from './app-pages/home.js';
+import { developerHtml, wireDeveloper } from './app-pages/developer.js';
 import { migrateUiDefaults } from './lib/ui-defaults.js';
 
 const IS_EXT = location.protocol === 'chrome-extension:';
@@ -386,6 +387,7 @@ function addinsPage() {
 
 /* ---------- Developer (A08) ---------- */
 function devPage() {
+  if (!HOSTED) return `<div class="callout warn">${ic('dev', 20)}<div><b>${esc(T('devArea'))}.</b> ${esc(T('devBanner'))}</div></div>${developerHtml()}`; // lab: native page (A08)
   // Lab: lab yang sudah ada (test/app.html) — setiap alat lab tetap di tempatnya.
   const src = HOSTED ? 'http://127.0.0.1:8799/app.html' : '/app.html';
   return `<div class="callout warn">${ic('dev', 20)}<div><b>${esc(T('devArea'))}.</b> ${esc(T('devBanner'))}</div></div>${HOSTED ? lockedCard(T('lockedLab'), T('lockedLabBody')) : ''}<iframe class="frame panel dev" title="${esc(T('devArea'))}" src="${src}"></iframe>`;
@@ -426,6 +428,7 @@ function parseHash() {
 }
 
 let lastRoute = null;
+let devCleanup = null; // timers and listeners of the native Developer page
 function render() {
   const { route, params } = parseHash();
   document.title = `${T(route)} · yravgSubMeetly`;
@@ -441,8 +444,10 @@ function render() {
     if (btn) btn.innerHTML = state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'));
     return;
   }
+  devCleanup?.(); devCleanup = null;
   lastRoute = route;
   page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'all' ? addinsPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage(params) : route === 'plans' ? plansPage() : panelPage(route);
+  if (route === 'dev' && !HOSTED) devCleanup = wireDeveloper(page);
   }
 
 /* ---------- start captions (one action everywhere: sidebar, Today, ⇧S) ---------- */

@@ -103,14 +103,17 @@ before(async () => {
     await st.evaluate((x) => document.querySelector(`[data-stab="${x}"]`)?.click(), t); await wait(400);
     add(await dump(st));
   }
-  // Area Developer = lab lama, tiap tab labnya.
+  // Area Developer asli (A08): kendali lab di halaman itu sendiri, tiap tab; menu "All test pages" dibuka;
+  // lalu panel produksi yang dipasangnya (tampilan bottom-nav lama).
   await route('#dev');
-  const lab = await frameOf('iframe.dev', 2500);
-  add(await dump(lab));
-  for (const t of ['pages', 'mock', 'guides', 'panel']) {
-    await lab.evaluate((x) => document.querySelector(`#ltabs [data-ltab="${x}"]`)?.click(), t); await wait(700);
-    add(await dump(lab));
+  const lab = await frameOf('#dv-frame', 2500);
+  for (const t of ['panel', 'pages', 'mock', 'guides']) {
+    await page.evaluate((x) => document.querySelector(`#dv-tabs [data-dtab="${x}"]`)?.click(), t); await wait(700);
+    add(await dump(page));
   }
+  await page.evaluate(() => { document.getElementById('dv-pages-menu').open = true; }); await wait(300);
+  add(await dump(page));
+  await page.evaluate(() => { document.getElementById('dv-pages-menu').open = false; });
   for (const v of ['captions', 'notes', 'history', 'helper', 'settings']) {
     await lab.evaluate((x) => document.querySelector(`.bottom-nav-item[data-view="${x}"], #view-tabs [data-view="${x}"]`)?.click(), v); await wait(600);
     add(await dump(lab));

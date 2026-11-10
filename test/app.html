@@ -419,6 +419,8 @@
     <script src="/dist/content.js"></script>
     <script type="module">
       import { tile } from '/src/lib/colour-icons.js';
+      import { PAGES, DEV, MODE_NOTE } from '/src/app-pages/lab-pages.js';
+      import { logTableHtml, parseFixture, overlayLogHtml } from '/src/app-pages/lab-mock.js';
       import '/dist/offscreen.js';
       window.__browserOffscreenLoaded = true;
       const $ = (id) => document.getElementById(id);
@@ -432,38 +434,9 @@
       });
 
       // Satu paragraf pengembang, dipakai overlay dan tab Guides (kata demi kata dari banner lama).
-      const DEV =
-        '<b>Browser tab · on-device Whisper</b> — Same pipeline as the extension (<code>offscreen.js</code> → <code>ai-worker.js</code> → ASR/MT). ' +
-        '<b>Realtime:</b> Start loops a CC0/demo clip via <code>captureStream</code>; Pick uses <code>getDisplayMedia</code> (share a tab + audio). ' +
-        'Overlay injection and <code>tabCapture</code> still need the Chrome extension. ' +
-        'Offline → CC0 test samples for 10–30s public-domain clips per language.';
       document.querySelectorAll('[data-dev]').forEach((p) => { p.innerHTML = DEV; });
 
       // ---- Daftar halaman uji: satu sumber untuk menu dan grid tab Test pages ----
-      const PAGES = [
-        ['Guides and register', 'docs', [
-          ['Panduan pengguna — ekstensi', '/guide.html', 'Pasang, subtitel langsung, berkas, ekspor, notulen, helper.', 1],
-          ['Panduan pengguna — macOS', '/guide.html?doc=USER-GUIDE-MACOS.md', 'Audio sistem, overlay layar penuh, dikte global, izin macOS.', 1],
-          ['Panduan pengguna — Windows & Linux', '/guide.html?doc=USER-GUIDE-WINLINUX.md', 'Native Helper faster-whisper, installer host per OS, GPU CUDA, ekspor CRLF/BOM.', 1],
-          ['Minutes Register (full tab)', '/src/minutes.html', 'Typed register, provenance drawer, series view and the issued-MoM document.', 1]]],
-        ['Tools', 'pages', [
-          ['Translation Lab', '/lab.html', 'Media player + automated zh↔en / ja↔en benchmark against the native helper.'],
-          ['Offline Studio (transcription / export)', '/studio.html', 'File transcription, dual-line translation and the SRT/VTT/TXT export panel.'],
-          ['Model manager (mock)', '/models.html', 'ASR + translation model sizes, download states and actions — preview only.'],
-          ['Session history (samples)', '/history.html', 'Saved sessions list, transcript preview and per-session export — sample data.'],
-          ['Helper status (mock)', '/helper-status.html', 'Native Helper cards for macOS / Windows / Linux with sample states.'],
-          ['Helper install guide & troubleshooting (harness)', '/helper-guide.html', 'Per-OS install steps, live diagnostics and ranked troubleshooting — the panel inside the Native Helper card.'],
-          ['Meeting notes ticker (harness)', '/notes-panel.html', 'Side-panel notes ticker on the v2 register.']]],
-        ['Release QA', 'perf', [
-          ['Phase 1 release verification', '/verify.html', 'Status dashboard for the 26 baseline sub-features before smoke, E2E and the lab are wired up.'],
-          ['Smoke & E2E test report', '/qa-report.html', 'Summary of scripts/smoke.mjs and scripts/e2e.mjs (tabCapture, --pick, --native).'],
-          ['Model performance benchmark lab', '/bench.html', 'Whisper / Voxtral / Opus-MT / native MLX comparison (last-bench.json).'],
-          ['Release defect list', '/defects.html', 'Phase 1 release gate: must-fix defects vs accepted limitations (DRM, MKV, single tab, etc.).']]],
-        ['Extension harnesses', 'helper', [
-          ['Audio test page', '/audio-page.html', 'Looping tab audio for extension e2e / dev-browser.'],
-          ['Overlay test', '/overlay-test.html', ''], ['Panel test', '/panel-test.html', ''], ['Offscreen test', '/offscreen-test.html', '']]],
-        ['More', 'register', [['Test page index', '/', ''], ['CC0 sample credits', '/samples/ATTRIBUTION.md', '']]],
-      ];
       const row = ([n, href, d, pri]) =>
         `<a class="pgr${pri ? ' pri' : ''}" href="${href}"><b>${esc(n)}</b>${d ? `<span class="pd">${esc(d)}</span>` : ''}<span class="href">${esc(href)}</span></a>`;
       $('pages-grid').innerHTML = PAGES.map(
@@ -518,24 +491,7 @@
 
       // ---- Mock helper: kendali + log permintaan ----
       const M = () => window.__labMock;
-      const MODE_NOTE = {
-        passthrough: 'Requests to 127.0.0.1:17865 go to the real helper if one is running.',
-        offline: 'Every request fails like a helper that is not running. Use it to see the fallback to the browser engine.',
-        fixture: 'Answers /health and /engine/device from the fixtures below, no network.',
-      };
-      function renderLog() {
-        const rows = M().helper.log;
-        $('mock-log').innerHTML = rows.length
-          ? `<table class="ltbl"><tr><th>Time</th><th>Method</th><th>Path</th><th>Result</th><th>Delay</th></tr>${rows
-              .slice(-50)
-              .map((r) => {
-                const ok = String(r.result).startsWith('2') || r.result === '…';
-                const t = r.time ? new Date(r.time).toLocaleTimeString('en-GB') : '';
-                return `<tr class="${ok ? '' : 'bad'}"><td class="dim">${esc(t)}</td><td>${esc(r.method)}</td><td>${esc(r.path)}</td><td>${esc(r.result ?? '')}</td><td>${esc(r.delayMs ?? 0)} ms</td></tr>`;
-              })
-              .join('')}</table>`
-          : '<div class="lempty">No requests yet.</div>';
-      }
+      function renderLog() { $('mock-log').innerHTML = logTableHtml(M().helper.log, esc); }
       function renderRails() {
         const h = M().helper;
         $('rail-mode').textContent = h.mode;
@@ -566,24 +522,13 @@
       $('mock-log-clear').addEventListener('click', () => { M().helper.log.length = 0; renderLog(); });
       for (const [key, id] of [['health', 'mock-health'], ['device', 'mock-device']]) {
         $(id).addEventListener('input', (e) => {
-          try {
-            const v = JSON.parse(e.target.value);
-            if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('must be a JSON object');
-            M().helper[key] = v;
-            e.target.classList.remove('bad');
-            $(`${id}-err`).textContent = '';
-          } catch (err) {
-            e.target.classList.add('bad');
-            $(`${id}-err`).textContent = `Not applied: ${err.message}`;
-          }
+          const r = parseFixture(e.target.value);
+          if (r.ok) M().helper[key] = r.value;
+          e.target.classList.toggle('bad', !r.ok);
+          $(`${id}-err`).textContent = r.ok ? '' : `Not applied: ${r.error}`;
         });
       }
-      function renderOverlay() {
-        const log = M().content.log.slice(-6);
-        $('overlay-log').innerHTML = log.length
-          ? log.map((m) => `<span>${esc(m.type)}: ${esc(m.data?.source || m.data?.text || m.data?.translation || '')}</span>`).join('')
-          : '<span>No overlay messages yet.</span>';
-      }
+      function renderOverlay() { $('overlay-log').innerHTML = overlayLogHtml(M().content.log, esc); }
       window.addEventListener('labmock:log', () => {
         renderOverlay();
         if (!$('ltab-mock').hidden) renderLog();
