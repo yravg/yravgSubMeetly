@@ -377,3 +377,22 @@ fn caption_surface_is_stored_only_when_valid_and_survives_other_prefs() {
     assert_eq!(post("{}").status, 400);
     let _ = fs::remove_dir_all(state);
 }
+
+#[test]
+fn tide_reskin_is_mirrored_and_unknown_reskins_are_ignored() {
+    let (app, state) = app_with_state();
+    let post = |body: &str| {
+        let mut r = request("POST", "/ui-prefs", None, "127.0.0.1:17865", true);
+        r.body = body.as_bytes().to_vec();
+        app.handle(&r)
+    };
+    let reskin = || {
+        let r = app.handle(&request("GET", "/ui-prefs", None, "127.0.0.1:17865", true));
+        r.body.clone().expect("json body")["prefs"]["reskin"].clone()
+    };
+    assert_eq!(post(r#"{"reskin":"tide"}"#).status, 200);
+    assert_eq!(reskin(), "tide");
+    assert_eq!(post(r#"{"reskin":"nope"}"#).status, 200);
+    assert_eq!(reskin(), "tide");
+    let _ = fs::remove_dir_all(state);
+}
