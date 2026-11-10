@@ -58,6 +58,7 @@ import { tile as colourTile } from './lib/colour-icons.js';
 import { renderFeatureMap } from './lib/feature-map.js';
 import { mountAddinsPane, glossaryCaption } from './addins-ui.js';
 import { markedHtml } from './lib/glossary.js';
+import { migrateUiDefaults, shouldAdoptRemote, DEFAULT_RESKIN, DEFAULT_THEME } from './lib/ui-defaults.js';
 import { springProgress, slidingNumber, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -82,8 +83,8 @@ const state = {
     nativeDevice: 'auto', // helper compute: 'auto' | 'cpu' | 'cuda' (Win/Linux faster-whisper)
     tabRows: 'one', // 'one' = hanya bar bawah, 'two' = baris Captions/Notes di atas juga
     translationColour: 'indigo', // indigo | navy | teal | neutral | bronze — warna baris terjemahan langsung
-    theme: 'auto', // 'auto' | 'light' | 'dark'
-    reskin: 'yraverage', // 'yraverage' | 'coretax' | 'modern' — pola interaksi lokal
+    theme: DEFAULT_THEME, // 'auto' | 'light' | 'dark' (bawaan terang, lihat lib/ui-defaults.js)
+    reskin: DEFAULT_RESKIN, // 'yraverage' | 'coretax' | 'modern' | 'tide' — bawaan Tide
     // Two-way (consecutive) interpreting is opt-in; 'simultaneous' is the
     // historical one-way srcLang → tgtLang path.
     interpreter: { mode: 'simultaneous', a: 'ja', b: 'en' },
@@ -1464,7 +1465,7 @@ function paintTiles() {
 // ---------------------------------------------------------------------------
 // theme: auto (ikut sistem) | light | dark — disimpan di chrome.storage.local
 function applyTheme() {
-  const theme = state.settings.theme || 'auto';
+  const theme = state.settings.theme || DEFAULT_THEME;
   document.documentElement.classList.remove('theme-light', 'theme-dark');
   if (theme === 'light') document.documentElement.classList.add('theme-light');
   else if (theme === 'dark') document.documentElement.classList.add('theme-dark');
@@ -1475,8 +1476,9 @@ function applyTheme() {
 }
 
 async function setTheme(theme) {
-  const next = ['auto', 'light', 'dark'].includes(theme) ? theme : 'auto';
+  const next = ['auto', 'light', 'dark'].includes(theme) ? theme : DEFAULT_THEME;
   state.settings.theme = next;
+  state.settings.themeExplicit = true;
   await saveSettings();
   applyTheme();
   pushUiPrefs();
@@ -1516,7 +1518,7 @@ const RESKINS = ['yraverage', 'coretax', 'modern', 'tide'];
 function applyReskin() {
   const reskin = RESKINS.includes(state.settings.reskin)
     ? state.settings.reskin
-    : 'yraverage';
+    : DEFAULT_RESKIN;
   document.documentElement.dataset.reskin = reskin;
   document.querySelectorAll('#reskin-toggle button').forEach((b) => {
     const active = b.dataset.reskin === reskin;
@@ -1526,8 +1528,9 @@ function applyReskin() {
 }
 
 async function setReskin(reskin) {
-  const next = RESKINS.includes(reskin) ? reskin : 'yraverage';
+  const next = RESKINS.includes(reskin) ? reskin : DEFAULT_RESKIN;
   state.settings.reskin = next;
+  state.settings.reskinExplicit = true;
   await saveSettings();
   applyReskin();
   pushUiPrefs();
@@ -1568,13 +1571,14 @@ async function pullUiPrefs() {
       persistLastConfig();
     }
   }
-  if (['auto', 'light', 'dark'].includes(res.prefs?.theme) && res.prefs.theme !== state.settings.theme) {
+  if (['auto', 'light', 'dark'].includes(res.prefs?.theme) && res.prefs.theme !== state.settings.theme && shouldAdoptRemote('theme', res.prefs.theme, state.settings)) {
     state.settings.theme = res.prefs.theme;
     changed = true;
   }
   if (
     RESKINS.includes(res.prefs?.reskin) &&
-    res.prefs.reskin !== state.settings.reskin
+    res.prefs.reskin !== state.settings.reskin &&
+    shouldAdoptRemote('reskin', res.prefs.reskin, state.settings)
   ) {
     state.settings.reskin = res.prefs.reskin;
     changed = true;
@@ -1606,13 +1610,8 @@ async function loadSettings() {
   }
   renderUiLangToggle();
   renderEngineToggle();
-  if (!['auto', 'light', 'dark'].includes(state.settings.theme)) {
-    state.settings.theme = 'auto';
-  }
+  Object.assign(state.settings, migrateUiDefaults(state.settings));
   applyTheme();
-  if (!RESKINS.includes(state.settings.reskin)) {
-    state.settings.reskin = 'yraverage';
-  }
   applyReskin();
   if (!['one', 'two'].includes(state.settings.tabRows)) state.settings.tabRows = 'one';
   applyTabRows();
@@ -3213,7 +3212,7 @@ function wire() {
     if (area && area !== 'local') return;
     applyExternalSettings(changes.settings?.newValue);
   });
-  $('btn-reskin-reset')?.addEventListener('click', () => setReskin('yraverage'));
+  $('btn-reskin-reset')?.addEventListener('click', () => setReskin(DEFAULT_RESKIN));
   $('src-lang').addEventListener('change', (e) => {
     state.srcLang = e.target.value;
     renderInterpreterUi();

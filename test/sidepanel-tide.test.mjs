@@ -42,13 +42,37 @@ before(async () => {
 
 after(async () => { await browser?.close(); server?.kill('SIGTERM'); });
 
-test('pilihan Tide ada di Reskin, dipasang di :root dan tersimpan', async () => {
+test('pengguna baru: Tide dan terang tanpa memilih apa pun, tetap terang walau sistem gelap', async () => {
   assert.equal(await page.$$eval('#reskin-toggle [data-reskin]', (l) => l.length), 4);
-  await page.evaluate(() => document.querySelector('#reskin-toggle [data-reskin="tide"]').click());
-  await page.waitForFunction(() => document.documentElement.dataset.reskin === 'tide');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.reskin), 'tide');
   assert.equal(await page.$eval('#reskin-toggle [data-reskin="tide"]', (b) => b.getAttribute('aria-checked')), 'true');
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains('theme-light')), true);
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+  await wait(200);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).color), 'rgb(10, 15, 12)', 'terang dulu: sistem gelap tidak menggelapkan bawaan');
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
+});
+
+test('pengguna lama di bawaan lama (Yraverage + otomatis tersimpan) pindah ke Tide terang', async () => {
+  await page.evaluate(() => chrome.storage.local.set({ settings: { reskin: 'yraverage', theme: 'auto' } }));
   await page.reload({ waitUntil: 'networkidle0' });
   await page.waitForFunction(() => document.documentElement.dataset.reskin === 'tide');
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains('theme-light')), true);
+});
+
+test('pilihan eksplisit bertahan: Klasik dan gelap tidak dipindah', async () => {
+  await page.evaluate(() => document.querySelector('.bottom-nav-item[data-view="settings"]').click());
+  await wait(300);
+  await page.evaluate(() => { document.querySelector('#reskin-toggle [data-reskin="yraverage"]').click(); document.querySelector('#theme-toggle [data-theme="dark"]').click(); });
+  await page.waitForFunction(() => document.documentElement.dataset.reskin === 'yraverage' && document.documentElement.classList.contains('theme-dark'));
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => document.documentElement.dataset.reskin === 'yraverage');
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains('theme-dark')), true);
+  await page.evaluate(() => document.querySelector('.bottom-nav-item[data-view="settings"]').click());
+  await wait(300);
+  await page.evaluate(() => { document.querySelector('#reskin-toggle [data-reskin="tide"]').click(); document.querySelector('#theme-toggle [data-theme="light"]').click(); });
+  await page.waitForFunction(() => document.documentElement.dataset.reskin === 'tide');
+  await page.reload({ waitUntil: 'networkidle0' });
 });
 
 test('terang sistem: token Tide menang atas tema terang panel', async () => {
@@ -57,7 +81,9 @@ test('terang sistem: token Tide menang atas tema terang panel', async () => {
   assert.match(r.font, /Plus Jakarta Sans/);
 });
 
-test('gelap: token Tide gelap', async () => {
+test('gelap: dengan "Otomatis" yang dipilih sendiri, sistem gelap memberi token Tide gelap', async () => {
+  await page.evaluate(() => chrome.storage.local.set({ settings: { reskin: 'tide', reskinExplicit: true, theme: 'auto', themeExplicit: true } }));
+  await page.reload({ waitUntil: 'networkidle0' });
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
   await wait(200);
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).color), 'rgb(232, 242, 236)');
