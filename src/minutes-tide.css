@@ -8,11 +8,11 @@
    (data-theme="coretax"). Di sini hanya warnanya yang diganti ke token Tide:
    lime menggantikan emas, pil tinta untuk aksi utama, green-ink untuk hijau
    yang dibaca. Selektor html[data-reskin][data-theme] (0,2,1) mengalahkan
-   cakupan theme-tide.css (0,1,0 dan 0,2,0).
+   cakupan theme-tide.css; blok token di bawah memakai :root (0,3,0) dan dimuat sesudah theme-tide.css.
    ========================================================================== */
 
 /* ---- Gelap: struktur gelap bawaan, warna Tide gelap -------------------- */
-html[data-reskin="tide"]:not([data-theme="coretax"]) {
+:root[data-reskin="tide"]:not([data-theme="coretax"]) {
   --bg: #0B1310; --bg-deep: #08100D; --card: #111C18; --card2: #12241B; --card3: #1A2E25;
   --border: #24372F; --grid: rgba(232, 242, 236, 0.06); --row-hover: rgba(232, 242, 236, 0.04); --row-sel: rgba(74, 222, 128, 0.12);
   --text: #E8F2EC; --text2: #C9D8CF; --muted: #A3B5AB; --muted2: #8FA299;
@@ -22,7 +22,7 @@ html[data-reskin="tide"]:not([data-theme="coretax"]) {
 }
 
 /* ---- Terang: struktur terang yang ada, warna Tide ---------------------- */
-html[data-reskin="tide"][data-theme="coretax"] {
+:root[data-reskin="tide"][data-theme="coretax"] {
   --bg: #FFFFFF; --bg-deep: #F3FBF6; --card: #FFFFFF; --card2: #F3FBF6; --card3: #E9F7EE;
   --border: #DCE8E1; --grid: rgba(10, 15, 12, 0.06); --row-hover: rgba(14, 122, 71, 0.05); --row-sel: rgba(182, 243, 92, 0.28);
   --text: #0A0F0C; --text2: #33443A; --muted: #4B5A52; --muted2: #5B6B62;
