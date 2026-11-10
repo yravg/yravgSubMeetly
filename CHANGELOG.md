@@ -1,6 +1,7 @@
 # Riwayat rilis
 
 ## Unreleased — feat/notes-v2
+- **Side panel: Tide reskin (TIDE-012).** Settings > Reskin has a fourth choice, Tide (yravg brand tokens, Plus Jakarta Sans, light and dark); Tide art shows only on the empty History state. The default stays Yraverage. The engine's `/ui-prefs` now keeps `reskin: "tide"` instead of dropping it, so the choice is shared like the other reskins.
 - **Island 1.2.3.** Translation answers in the chosen language: Qwen2.5-0.5B read the terse prompt as "translate to English" for non-English sources (Indonesian, Chinese, Japanese, Arabic, Russian, Thai, Vietnamese came back in English); the prompt now says to always answer in the target language. 0.5B Indonesian is in the right language but often wrong in meaning; pick Qwen2.5 1.5B or 3B under Settings > Models for usable Indonesian. Settings > Models shows "Default folder · N GB free · <short path>" and "Set by WHISPER_MODEL" first instead of cutting them off.
 - **Start captions runs once:** a double click or the app shell's retry no longer opens a second share picker.
 - **Island 1.2.2** (installer `yravgSubMeetly-Setup-1.2.2.exe`) carries everything above since 1.2.1.
