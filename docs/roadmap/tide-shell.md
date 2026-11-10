@@ -34,6 +34,12 @@ by default in the extension and on in the lab.
 | 2026-11-09 | Ask Tide follows Solvarium's chat (E:/devSchedule/Solvarium, solvarium-chat) with OpenRouter or a local model; credits the same as Solvarium; monthly plans shaped like oyenza.com (Free / Pro $4.99 / Agent $9.99) | owner message + pricing screenshot |
 | 2026-11-09 | Local model stays the default; OpenRouter is opt-in and labelled (lead proposal, keeps the on-device promise) | lead, owner may overrule |
 | 2026-11-09 | yravgBuds docs say Tide covers SubMeetly too (yravgBuds branch `docs/tide-submeetly` 34bf106, not pushed) | same |
+| 2026-11-10 | Build every board as drawn on canvas v7: A02 Live captions, A05 History and Files, A07 Settings and Helper become shell pages (no embedded side panel); all controls kept | owner: "I agree with all you recommend … refer to latest canvas" |
+| 2026-11-10 | Side panel default reskin becomes Tide (Yraverage Klasik, Coretax, Modern stay as choices) | same |
+| 2026-11-10 | Modern register gets the A04a rest: sticky header, density Review / Reading / Compact, row hover Accept / Edit / Owner, sentence-case Source chips; theme labels read "Tide dark" / "Tide light" | same |
+| 2026-11-10 | Ask Tide Local answers through a new engine `/ask` route (Qwen, streamed); OpenRouter model ids checked against the live OpenRouter model list; export card built (extension opens the file with chrome.downloads) | same |
+| 2026-11-10 | A01 keeps the board's "Items this week" | same (board is the spec) |
+| 2026-11-10 | Ship: one Island installer with the new engine and dist once E: has space again | same |
 
 ## Constraints
 
@@ -93,8 +99,13 @@ Status words: `missing`, `partial`, `done`. Today everything is `missing` unless
 | T6 | Pages in the shell (TIDE-006, 008..011, 013) | Every control from the Before dump present (control-count test) |
 | T7 | Ask Tide (TIDE-007) | Local answers only; write guard tested |
 | T8 | Side panel tokens (TIDE-012), responsive + dark (TIDE-015) | Slop scan, contrast, views |
+| T9 | Shell pages as drawn (A02, A05, A07 + Helper) | Each page matches its board render (`docs/design/tide-shell-canvas/renders/A0x*.png`) at 1440/1024/390 light and dark; app-controls test still reaches every control |
+| T10 | Modern register rest (A04a) | Sticky header, density, hover actions, chips, theme labels; tests; matches A04a renders |
+| T11 | Ask Tide complete (A03, A03b) | Engine `/ask` streams a grounded answer (contract test); Local mode answers in app.html; export card; model ids verified |
+| T12 | Parity sweep A01, A06, A08, A09, A10 + side panel Tide default | Every listed board matches its render; side panel opens on Tide for new users |
+| T13 | Ship | main merged, `npm test` + Rust gate green, Island installer built with new engine + dist, CHANGELOG |
 
-Order: T1, T2, T3 before any code. T4 first in build. T5 before T6. T7 after T6. T8 last.
+Order: T1, T2, T3 before any code. T4 first in build. T5 before T6. T7 after T6. T8 after T7. T9, T10, T11 in parallel (separate VPS worktrees), then T12, then T13.
 
 ## Open questions
 
