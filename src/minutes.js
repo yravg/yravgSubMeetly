@@ -347,7 +347,7 @@ function cellType(it) {
   return `<span class="type" data-type="${it.type}"><i></i>${esc(T(it.type))}</span>`;
 }
 function cellRef(it) {
-  return `<span class="ref">${esc(it.ref)}${it.carriedFrom ? ` <span class="carry" title="${esc(it.carriedFrom)}">↩</span>` : ''}</span>`;
+  return `<span class="ref">${esc(it.ref)}${it.carriedFrom ? ` <span class="carry" title="${esc(it.carriedFrom)}">${IS_TIDE ? '↺' : '↩'}</span>` : ''}</span>`;
 }
 function cellOwner(it) {
   if (!it.owner) return `<span class="owner none"><span class="nm">${esc(T('noOwner'))}</span></span>`;
@@ -1297,7 +1297,7 @@ function paint() {
     : viewCarry();
   if (state.view === 'table' || state.view === 'topic') pane.insertAdjacentHTML('beforeend', crossSearchHtml());
 
-  $('#reg-tb').hidden = state.view !== 'table' || !rows.length;
+  $('#reg-tb').hidden = state.view !== 'table' || !m.items.length;
   $('#q').value = state.q;
   paintFooter(rows);
   paintDrawer();
@@ -1857,6 +1857,10 @@ function wireTideRegister() {
   let saved = null;
   try { saved = localStorage.getItem(LS_ROW_DENSITY); } catch { /* storage blocked */ }
   setRowDensity(saved, false);
+  // A04a: Needs review only / Group / Mine move from the navigator into the toolbar above the table (same elements, same handlers).
+  const tb = $('#reg-tb');
+  const moved = [$('#btn-review-only'), $('#group-by')?.closest('.grpsel'), $('#btn-mine')].filter(Boolean);
+  if (tb && moved.length) tb.prepend(...moved);
   // A04a: the breadcrumb gets its own line above the title so the toolbar fits at 1440. The home link stays in the toolbar.
   const trail = $('#crumb-trail');
   const wrap = $('.mtitle-wrap');
