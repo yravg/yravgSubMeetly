@@ -19,6 +19,7 @@ import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minute
 import { mountAskTide } from './ask-tide.js';
 import { heroHtml, heroPose } from './app-pages/home.js';
 import { developerHtml, wireDeveloper } from './app-pages/developer.js';
+import { mountInstalled } from './app-pages/addins-list.js';
 import { migrateUiDefaults } from './lib/ui-defaults.js';
 
 const IS_EXT = location.protocol === 'chrome-extension:';
@@ -381,8 +382,7 @@ function addinsPage() {
     ${tile('sparkle', T('fTraining'), T('fTrainingD'), builtIn('#minutes'))}
     ${tile('export', T('fExport'), T('fExportD'), builtIn('#history'))}
   </div>
-  <section class="addins-sec" id="addins-pane"><h2>${esc(T('installed'))}</h2><p class="mut">${esc(T('addinNote'))}</p>
-  <iframe class="frame panel" title="${esc(T('installed'))}" src="${esc(panelUrl(PANEL.addins))}"></iframe></section>`;
+  <section class="addins-sec" id="addins-pane" aria-label="${esc(T('installed'))}"><h2>${esc(T('installed'))}</h2><p class="mut">${esc(T('addinNote'))}</p><div id="addins-rows"></div></section>`;
 }
 
 /* ---------- Developer (A08) ---------- */
@@ -428,7 +428,7 @@ function parseHash() {
 }
 
 let lastRoute = null;
-let devCleanup = null; // timers and listeners of the native Developer page
+let devCleanup = null; // timers and listeners of the native pages (Developer, All features rows)
 function render() {
   const { route, params } = parseHash();
   document.title = `${T(route)} · yravgSubMeetly`;
@@ -448,6 +448,7 @@ function render() {
   lastRoute = route;
   page.innerHTML = route === 'today' ? todayPage() : route === 'minutes' ? minutesPage(params) : route === 'all' ? addinsPage() : route === 'dev' ? devPage() : route === 'settings' ? settingsPage(params) : route === 'plans' ? plansPage() : panelPage(route);
   if (route === 'dev' && !HOSTED) devCleanup = wireDeveloper(page);
+  if (route === 'all') { const m = mountInstalled($('#addins-rows'), { getMeetings: async () => state.meetings || listMeetings(), lang: () => LANG }); devCleanup = () => m.dispose(); }
   }
 
 /* ---------- start captions (one action everywhere: sidebar, Today, ⇧S) ---------- */
@@ -557,6 +558,16 @@ async function refreshWin() {
   if (open !== state.minutesWin) { state.minutesWin = open; render(); }
 }
 
+function paintFeatureSwitches() {
+  for (const box of document.querySelectorAll('[data-feat]')) {
+    const id = box.dataset.feat;
+    if (id === 'island') continue;
+    const on = !!state.trusted[id] && !state.removed.includes(id);
+    box.checked = on;
+    const lab = document.querySelector(`[data-feat-state="${id}"]`);
+    if (lab) lab.textContent = T(on ? 'islandOn' : 'islandOff');
+  }
+}
 async function loadTrust() {
   const got = (await globalThis.chrome?.storage?.local.get(['ysmAddinTrust', 'ysmAddinRemoved'])) || {};
   state.trusted = got.ysmAddinTrust && typeof got.ysmAddinTrust === 'object' ? got.ysmAddinTrust : {};
@@ -628,7 +639,7 @@ async function boot() {
   globalThis.chrome?.storage?.onChanged?.addListener((ch) => {
     if ('captionSurface' in ch) syncIsland();
     if ('settings' in ch) applyTheme(ch.settings.newValue);
-    if ('ysmAddinTrust' in ch || 'ysmAddinRemoved' in ch) loadTrust().then(() => { if (parseHash().route === 'all') { lastRoute = null; render(); } });
+    if ('ysmAddinTrust' in ch || 'ysmAddinRemoved' in ch) loadTrust().then(paintFeatureSwitches);
     if ('ysmUserName' in ch) { state.userName = String(ch.ysmUserName.newValue || ''); paintUser(); if (parseHash().route === 'today') { lastRoute = null; render(); } }
     if (WIN_ID_KEY in ch) refreshWin();
   });
