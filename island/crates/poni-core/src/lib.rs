@@ -48,6 +48,7 @@ pub mod svgpath;
 pub mod sysmon;
 pub mod timeline;
 pub mod todo;
+pub mod transcript_paste;
 pub mod ttml;
 pub mod update;
 pub mod urlenc;

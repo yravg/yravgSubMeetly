@@ -220,6 +220,32 @@ pub fn local_day(t: i64, offset: i64) -> i64 {
 
 /// Events that have not ended, starting before the local midnight `days`
 /// days after today's, earliest first.
+/// Meetings that ended in the last `days` days, the latest first (Calendar's Earlier list).
+pub fn past(cal: &Calendar, now: i64, offset: i64, days: i64) -> Vec<&Event> {
+    let since = now - days * 86_400;
+    let mut v: Vec<&Event> = cal.events.iter().filter(|e| !e.all_day && e.span(offset).1 <= now && e.span(offset).1 > since).collect();
+    v.sort_by(|a, b| b.span(offset).0.cmp(&a.span(offset).0).then_with(|| a.title.cmp(&b.title)));
+    v
+}
+
+/// A Teams meeting link as the Teams app's own link (`msteams:/l/meetup-join/...`), so Join opens
+/// the app instead of a browser tab. None for anything that is not a Teams join link.
+pub fn teams_app_link(url: &str) -> Option<String> {
+    let rest = url.strip_prefix("https://")?;
+    let (host, path) = rest.split_once('/')?;
+    let host = host.to_ascii_lowercase();
+    (matches!(host.as_str(), "teams.microsoft.com" | "teams.live.com") && path.starts_with("l/")).then(|| format!("msteams:/{path}"))
+}
+
+/// How far back the island asks the engine for meetings (Calendar's Earlier list).
+pub const PAST_DAYS: i64 = 7;
+
+/// `GET /calendar` from `PAST_DAYS` ago (the engine's own end: a week ahead).
+pub fn window_path(now: i64) -> String {
+    let (y, m, d) = civil_from_days((now - PAST_DAYS * 86_400).div_euclid(86_400));
+    format!("/calendar?from={y:04}-{m:02}-{d:02}T00:00:00Z")
+}
+
 pub fn upcoming(cal: &Calendar, now: i64, offset: i64, days: i64) -> Vec<&Event> {
     let horizon = (local_day(now, offset) + days) * 86_400 - offset;
     let mut v: Vec<&Event> = cal
@@ -241,6 +267,7 @@ pub fn day_label(day: i64, today: i64) -> String {
     match day - today {
         0 => "Today".into(),
         1 => "Tomorrow".into(),
+        -1 => "Yesterday".into(),
         _ => {
             let (y, m, d) = civil_from_days(day);
             fmt_date_short(&LocalDateTime {
@@ -318,7 +345,7 @@ fn call(port: u16, method: &str, path: &str, body: Option<&str>) -> Result<Strin
         .map_err(|e| if e.contains("os error") { "The engine is not answering. Is it running?".to_string() } else { e })?;
     if code == 200 {
         Ok(reply)
-    } else if code == 404 && path == "/calendar" {
+    } else if code == 404 && path.starts_with("/calendar?") {
         // shortcut: an engine older than the calendar answers 404 for everything under it; say so, do not retry.
         Err("This engine has no calendar yet. Update the engine.".into())
     } else {
@@ -328,7 +355,8 @@ fn call(port: u16, method: &str, path: &str, body: Option<&str>) -> Result<Strin
 
 /// `GET /calendar` (the engine's default window: yesterday to a week ahead).
 pub fn fetch(port: u16) -> Result<Calendar, String> {
-    parse_calendar(&call(port, "GET", "/calendar", None)?)
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
+    parse_calendar(&call(port, "GET", &window_path(now), None)?)
         .ok_or_else(|| "The calendar answer could not be read.".into())
 }
 
@@ -371,7 +399,7 @@ pub fn refresh(port: u16) -> Result<(), String> {
 
 /// `POST /calendar/notes` makes (or finds) the meeting's note; posting it
 /// back to `/notes` moves it to the front, where the Meeting page reads.
-/// Returns the note's title.
+/// Returns the note's id.
 pub fn open_notes(port: u16, event_id: &str, tz_minutes: i64) -> Result<String, String> {
     let reply = call(
         port,
@@ -386,7 +414,8 @@ pub fn open_notes(port: u16, event_id: &str, tz_minutes: i64) -> Result<String, 
         .filter(|n| n.is_object())
         .ok_or("The engine made no note.")?;
     helper::post_note(port, &json!({ "note": note }).to_string())?;
-    Ok(text(note, "title").unwrap_or_else(|| "Meeting".into()))
+    // The id, so the Meeting page shows this meeting.
+    Ok(text(note, "id").unwrap_or_default())
 }
 
 /// What a page can ask the engine to do with the calendar.
@@ -534,6 +563,25 @@ mod tests {
     }
 
     #[test]
+    fn teams_links_open_in_the_teams_app() {
+        assert_eq!(teams_app_link("https://teams.microsoft.com/l/meetup-join/19%3ameeting_x%40thread.v2/0?context=%7b%7d").as_deref(), Some("msteams:/l/meetup-join/19%3ameeting_x%40thread.v2/0?context=%7b%7d"));
+        assert_eq!(teams_app_link("https://zoom.us/j/123"), None);
+        assert_eq!(teams_app_link("https://teams.microsoft.com/"), None);
+    }
+
+    #[test]
+    fn past_lists_what_ended_latest_first_and_the_window_starts_a_week_back() {
+        let c = parse_calendar(BODY).unwrap();
+        let tz = 7 * 3600;
+        assert!(past(&c, T1400 + 300, tz, 7).is_empty(), "the standup is still on");
+        let v = past(&c, T1400 + 901, tz, 7);
+        assert_eq!(v.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(), ["e1"], "all-day events are not meetings");
+        assert!(past(&c, T1400 + 901 + 8 * 86_400, tz, 7).is_empty(), "older than a week");
+        // Day 20403 is 2025-11-11: a week back is Nov 4.
+        assert_eq!(window_path(86_400 * 20_403 + 5), "/calendar?from=2025-11-04T00:00:00Z");
+    }
+
+    #[test]
     fn upcoming_lists_what_has_not_ended_in_order() {
         let c = parse_calendar(BODY).unwrap();
         let tz = 7 * 3600;
@@ -581,6 +629,7 @@ mod tests {
             ("Today", "Tomorrow")
         );
         assert_eq!(day_label(today + 2, today), "Wed 11 Nov");
+        assert_eq!(day_label(today - 1, today), "Yesterday");
     }
 
     #[test]

@@ -156,6 +156,8 @@ pub enum AppEvent {
     Engine(poni_core::engine_link::EngineInfo),
     /// System-audio captions: a state change, or words heard (`services::capture`).
     Capture(crate::services::capture::CaptureEvent),
+    /// The PC started (true) or stopped playing sound (`services::meter`).
+    Sound(bool),
     /// A captioned session saved as a meeting (its id), or why not, with its lines back.
     MeetingSaved(Result<String, (String, Vec<poni_core::helper::Line>)>),
     /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.

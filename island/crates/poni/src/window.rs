@@ -209,6 +209,16 @@ fn set_capture_excluded(hwnd: HWND, on: bool) -> bool {
     visual().map_or(true, set) && island
 }
 
+/// Is `scheme:` registered (an app installed for it), so opening it does not end in
+/// Windows' "get an app" prompt?
+pub fn url_scheme_registered(scheme: &str) -> bool {
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CLASSES_ROOT, RRF_RT_REG_SZ};
+    let key: Vec<u16> = scheme.encode_utf16().chain(std::iter::once(0)).collect();
+    let mut size = 0u32;
+    let r = unsafe { RegGetValueW(HKEY_CLASSES_ROOT, windows::core::PCWSTR(key.as_ptr()), w!("URL Protocol"), RRF_RT_REG_SZ, None, None, Some(&mut size)) };
+    r.is_ok()
+}
+
 /// Windows' build number (19041 = Windows 10 version 2004, the first that can
 /// leave a window out of capture instead of blacking it out).
 pub fn windows_build() -> Option<u32> {

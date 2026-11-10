@@ -500,7 +500,16 @@ Sisa tahap: **4** dokumentasi lewat generator (`docs/`), lalu rebuild bundel.
 
 - **Paste link kalender gagal diam-diam.** Tautan ICS Outlook pemilik (450 KB, 187 VEVENT) butuh 20–46 dtk di jaringan ini. Engine memutus setelah 20 dtk ("did not answer in time"), island setelah 4 dtk (`os error 10060`, hanya tercatat di `poni.log`). Kini `FETCH_TIMEOUT` engine 60 dtk, `calendar::call` island menunggu 75 dtk untuk POST (`LINK_WAIT`), dan pil menulis "Reading your calendar…" selama menunggu. Parse-nya sendiri 17 ms — bukan masalah. Tautan pemilik sudah ditambahkan ke engine terpasang (16 acara minggu ini, semuanya punya join link).
 - **Caption tidak muncul** karena memang tidak pernah dinyalakan: `captions_on` tidak ada di `settings.json`, dan `poni.log` tak punya satu pun baris capture. Engine sendiri sehat (`/draft` dengan ucapan SAPI → teks benar, 18 dtk dingin). Baru: `Settings.auto_captions` (default true) + `poni_core::capture::Auto` — caption mulai saat media non-musik diputar (`captionable_app`) atau rapat kalender ber-join-link sedang berjalan (`meeting_now`), berhenti 90 dtk setelah alasannya hilang. Start/Stop manual tidak diganggu; start yang gagal tidak diulang terus. Baris Settings › Speech "Start captions by themselves".
-- **Disk C: penuh** (32 KB bebas saat mulai, 1,5 GB setelah sesi lain beres-beres). Build rilis tetap di `C:\cargo-targetel122`; tes debug di `E:\cargo-target\sm-calendar*`.
+- **Disk C: penuh** (32 KB bebas saat mulai, 1,5 GB setelah sesi lain beres-beres). Build rilis tetap di `C:\cargo-target
+el122`; tes debug di `E:\cargo-target\sm-calendar*`.
 - `engine-rs/engine/tests/zz_local_ics.rs` berisi satu baris komentar — sisa repro; hapus (penghapusan diblokir hook di sesi ini).
 - Terpasang di laptop: **1.2.4** (`island/dist/yravgSubMeetly-Setup-1.2.4.exe`, sha256 9fb1b3f2…f259). Belum dilihat di layar: caption otomatis saat YouTube diputar, pesan "Reading your calendar".
+
+## Island 1.2.5: rapat di pil tanpa Chrome (2026-11-10)
+
+Fitur besar; status per langkah ada di `docs/handoff/pill-meetings.md`, rencana + 50 skenario di `docs/roadmap/pill-meetings.md`.
+- Terpasang di laptop: **1.2.5** (`island/dist/yravgSubMeetly-Setup-1.2.5.exe`, sha256 bc1e4ff7…f0f1). Diverifikasi langsung: `/draft?tgt=none` → `translation:""`, `translateState:"off"`; `/calendar?from=` 7 hari lalu → 30 acara.
+- **Jebakan:** menjalankan installer `/reopen` dari shell sesi agen membuat island + engine mewarisi sandbox shell itu → engine tidak bisa membaca `~/.cache/huggingface` (`/models` cached = [], `/draft` 409 `model-not-downloaded`). Pasang tanpa `/reopen`, lalu buka lewat `explorer.exe <path exe>`. Dari Git Bash, argumen `/VERYSILENT` diubah jadi `C:/Program Files/Git/VERYSILENT` (wizard muncul dan menunggu) — jalankan dari PowerShell.
+- `engine: norm_lang` mengubah `tgt=none` jadi `en`; kini `target_lang` menjaga `none`.
+- Belum diklik di layar: pager, Paste transcript dengan salinan Teams asli, pop-up "Captions on", daftar Earlier, Join → Teams.
 

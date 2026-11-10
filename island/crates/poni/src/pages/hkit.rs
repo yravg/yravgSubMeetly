@@ -5,7 +5,7 @@
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
 use crate::pages::PageKind;
-use crate::ui::{wid_n, PillStyle, Ui, PILL_SMALL};
+use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Color, Point, Rect};
 use crate::commands::Command;
 use crate::state::AppState;
@@ -140,3 +140,33 @@ pub fn translation_color(ui: &Ui, pick: poni_core::settings::TranslationColor) -
         palette::CYAN
     }
 }
+
+/// How many pages `n` rows fill at `per` a page (at least 1).
+pub fn pages(n: usize, per: usize) -> usize {
+    n.div_ceil(per.max(1)).max(1)
+}
+
+/// "‹  2 / 3  ›" ending at `right`, centred on `cy`; `label` (e.g. "Meeting") goes before the
+/// numbers when given. Returns the step pressed (-1 / +1) and the x where it starts.
+pub fn pager(ui: &mut Ui, right: f32, cy: f32, id: &str, at: usize, of: usize, label: &str) -> (Option<i32>, f32) {
+    let mut step = None;
+    let mut x = right;
+    let next = ui.pill_width("\u{203a}", false, true);
+    let b = Rect::new(x - next, cy - PILL_SMALL / 2.0, next, PILL_SMALL);
+    if at < of && ui.pill(wid(&format!("{id}.next")), b, "\u{203a}", None, PillStyle::Utility).clicked {
+        step = Some(1);
+    }
+    x = b.x - PILL_GAP;
+    let text = if label.is_empty() { format!("{at} / {of}") } else { format!("{label} {at} / {of}") };
+    let st = TextStyle::footnote().color(palette::TEXT_DIM);
+    let w = ui.c.measure(&text, &st, 200.0).0.ceil();
+    ui.c.text(&text, Rect::new(x - w, cy - 9.0, w, 18.0), &st);
+    x -= w + PILL_GAP;
+    let prev = ui.pill_width("\u{2039}", false, true);
+    let b = Rect::new(x - prev, cy - PILL_SMALL / 2.0, prev, PILL_SMALL);
+    if at > 1 && ui.pill(wid(&format!("{id}.prev")), b, "\u{2039}", None, PillStyle::Utility).clicked {
+        step = Some(-1);
+    }
+    (step, b.x)
+}
+

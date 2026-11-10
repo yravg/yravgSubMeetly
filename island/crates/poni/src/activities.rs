@@ -805,8 +805,8 @@ fn inline_done(st: &AppState, a: InlineAction) -> bool {
         InlineAction::StopAdzan => !st.prayer.adzan,
         // Done once clicked: the app puts the check in the notice's icon.
         InlineAction::WhatsNew => st.notice.as_ref().is_some_and(|n| n.icon == Icon::Check),
-        // Hide and Open take the notice away at once.
-        InlineAction::Hide | InlineAction::Open => false,
+        // Hide and Open take the notice away at once; Translate flips back and forth.
+        InlineAction::Hide | InlineAction::Open | InlineAction::Translate => false,
     }
 }
 
@@ -857,6 +857,7 @@ pub(crate) fn inline_look(st: &AppState, n: &Notice, a: InlineAction) -> (&'stat
         // Another app's notification: open that app.
         InlineAction::Open => ("Open", Some(Icon::Open), n.color),
         InlineAction::Hide => ("Hide", None, palette::TEXT_DIM),
+        InlineAction::Translate => (if st.settings.translate_captions { "Don't translate" } else { "Translate" }, None, palette::TEXT_DIM),
     }
 }
 

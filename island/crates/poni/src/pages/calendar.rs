@@ -1,7 +1,7 @@
 //! Calendar page: the meetings of the next week from the calendars the engine
 //! syncs (an Outlook or Google ICS link, or an imported .ics file), grouped by
 //! day. Each meeting has Join (when its invitation holds a meeting link),
-//! Captions (opens the captions panel) and Notes (starts the meeting's notes
+//! Captions (starts the island's own captions and shows Live) and Notes (starts the meeting's notes
 //! in the register and opens the Meeting page). The meeting that is on now is
 //! tinted.
 //!
@@ -92,30 +92,39 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
     let off = calendar::utc_offset(&st.local, st.unix);
     let now = st.unix;
     let today = calendar::local_day(now, off);
-    let list = calendar::upcoming(cal, now, off, DAYS);
+    let past = st.calendar_past;
+    let list = if past { calendar::past(cal, now, off, calendar::PAST_DAYS) } else { calendar::upcoming(cal, now, off, DAYS) };
+    // An earlier meeting sits under the day it started; a running one under today.
+    let day_of = |e: &Event| if past { calendar::local_day(e.span(off).0, off) } else { clipped(e, now, off) };
     let broken = cal.sources.iter().filter(|s| s.last_error.is_some()).count();
 
     let foot = Rect::new(body.x, body.bottom() - FOOT_H, body.w, FOOT_H);
     let mut right = foot.right();
     let mut open_sources = false;
     let mut refresh = false;
-    for (n, label) in ["Refresh", "Calendars"].into_iter().enumerate() {
+    let mut flip = false;
+    for (n, label) in ["Refresh", "Calendars", if past { "Coming" } else { "Earlier" }].into_iter().enumerate() {
         let w = ui.pill_width(label, false, true);
         let b = Rect::new(right - w, foot.center().y - PILL_SMALL / 2.0, w, PILL_SMALL);
         if ui.pill(wid_n("calendar.foot", n as u64), b, label, None, PillStyle::Utility).clicked {
-            if n == 0 {
-                refresh = true;
-            } else {
-                open_sources = true;
+            match n {
+                0 => refresh = true,
+                1 => open_sources = true,
+                _ => flip = true,
             }
         }
         right = b.x - PILL_GAP;
+    }
+    if flip {
+        st.calendar_past = !past;
+        st.calendar_page = 0;
     }
 
     if list.is_empty() {
         let area = Rect::new(body.x, body.y, body.w, body.h - FOOT_H);
         let (title, line, bad) = match (broken, cal.sources.len()) {
-            (0, _) => ("Nothing in the next 7 days".to_string(), "Your calendars have no meetings this week. Refresh asks them again.".to_string(), false),
+            (0, _) if past => ("No earlier meetings".to_string(), "Nothing ended in the last 7 days. Coming shows the next ones.".to_string(), false),
+            (0, _) => ("Nothing in the next 7 days".to_string(), "Your calendars have no meetings this week. Refresh asks them again; Earlier shows past ones.".to_string(), false),
             (n, total) => {
                 let first = cal.sources.iter().find_map(|s| s.last_error.clone()).unwrap_or_default();
                 (if n == total { "Calendar did not sync".into() } else { "A calendar did not sync".into() }, first, true)
@@ -125,11 +134,28 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
     } else {
         let mut lines: Vec<Line> = Vec::new();
         let mut shown = 0;
-        let mut used = 0.0;
         let room = body.h - FOOT_H - 4.0;
+        // Where each page starts: as many rows as fit, a day heading before each new day.
+        let mut starts = vec![0usize];
+        let (mut used, mut day) = (0.0, i64::MIN);
+        for (i, e) in list.iter().enumerate() {
+            let d = day_of(e);
+            let need = ROW_H + if d != day || used == 0.0 { DAY_H } else { 0.0 };
+            if used + need > room && used > 0.0 {
+                starts.push(i);
+                used = ROW_H + DAY_H;
+            } else {
+                used += need;
+            }
+            day = d;
+        }
+        let pages = starts.len();
+        st.calendar_page = st.calendar_page.min(pages - 1);
+        let first = starts[st.calendar_page];
+        let mut used = 0.0;
         let mut day = i64::MIN;
-        for e in &list {
-            let d = clipped(e, now, off);
+        for e in &list[first..] {
+            let d = day_of(e);
             let need = ROW_H + if d != day { DAY_H } else { 0.0 };
             if used + need > room {
                 break;
@@ -153,7 +179,7 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
                 }
                 Line::Meeting(e) => {
                     let row = Rect::new(body.x, y, body.w, ROW_H);
-                    if let Some(a) = meeting_row(ui, st, row, e, off, slot) {
+                    if let Some(a) = meeting_row(ui, st, row, e, off, slot, past) {
                         act = Some((a, e.id.clone(), e.join_url.clone()));
                     }
                     slot += 1;
@@ -163,18 +189,29 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
         }
         if let Some((a, id, url)) = act {
             match (a, url) {
-                (0, Some(u)) => st.cmd(Command::OpenUrl(u)),
-                (1, _) => st.cmd(Command::Menu(if st.engine.ext_seen { crate::tray::MenuCmd::OpenCaptionsPanel } else { crate::tray::MenuCmd::SetupExtension })),
+                (0, Some(u)) => st.cmd(Command::JoinMeeting(u)),
+                // The island captions what the PC plays itself: no browser, no extension.
+                (1, _) => {
+                    if !st.capture.running() {
+                        st.cmd(Command::Captions(true));
+                    }
+                    st.page = PageKind::Live;
+                }
                 (2, _) => st.cmd(Command::Calendar(CalendarCmd::Notes(id))),
                 _ => {}
             }
         }
-        let more = list.len() - shown;
-        let note = match (more, broken) {
-            (0, 0) => None,
-            (m, 0) => Some(format!("+{m} more this week")),
-            (0, n) => Some(format!("{n} calendar{} did not sync. Open Calendars.", if n == 1 { "" } else { "s" })),
-            (m, n) => Some(format!("+{m} more \u{b7} {n} calendar{} did not sync", if n == 1 { "" } else { "s" })),
+        let _ = shown;
+        if pages > 1 {
+            let (step, x) = hkit::pager(ui, right - PILL_GAP, foot.center().y, "calendar.pages", st.calendar_page + 1, pages, "");
+            if let Some(d) = step {
+                st.calendar_page = (st.calendar_page as i32 + d).clamp(0, pages as i32 - 1) as usize;
+            }
+            right = x - PILL_GAP;
+        }
+        let note = match broken {
+            0 => None,
+            n => Some(format!("{n} calendar{} did not sync. Open Calendars.", if n == 1 { "" } else { "s" })),
         };
         if let Some(n) = note {
             let tone = if broken > 0 { palette::ORANGE } else { palette::TEXT_FAINT };
@@ -191,7 +228,7 @@ fn meetings(ui: &mut Ui, st: &mut AppState, body: Rect, cal: &Calendar) {
 }
 
 /// One meeting. Returns 0 (Join), 1 (Captions) or 2 (Notes) when a button was pressed.
-fn meeting_row(ui: &mut Ui, st: &AppState, row: Rect, e: &Event, off: i64, slot: u64) -> Option<u8> {
+fn meeting_row(ui: &mut Ui, st: &AppState, row: Rect, e: &Event, off: i64, slot: u64, past: bool) -> Option<u8> {
     let accent = st.accent;
     let on = e.is_now(st.unix, off);
     if on {
@@ -201,7 +238,8 @@ fn meeting_row(ui: &mut Ui, st: &AppState, row: Rect, e: &Event, off: i64, slot:
     let mut hit = None;
     let mut right = row.right() - 4.0;
     for (n, label) in [(2u8, "Notes"), (1, "Captions"), (0, "Join")] {
-        if n == 0 && e.join_url.is_none() {
+        // A meeting that ended has only its notes left to open.
+        if (n == 0 && e.join_url.is_none()) || (past && n != 2) {
             continue;
         }
         let w = ui.pill_width(label, false, true);

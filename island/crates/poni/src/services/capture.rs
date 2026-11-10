@@ -95,6 +95,17 @@ pub fn save_meeting(port: u16, m: Meeting) -> Result<String, (String, Vec<helper
     }
 }
 
+/// Save pasted lines as a meeting, poured into `base` (a meeting started from Calendar) when given.
+pub fn save_pasted(port: u16, m: Meeting, base: Option<serde_json::Value>, speakers: Vec<String>) -> Result<String, (String, Vec<helper::Line>)> {
+    use poni_core::meeting_doc::{generate_body, generated_note, meeting_doc, with_base};
+    let draft = helper::request_bytes(port, "POST", "/notes/generate", "application/json", generate_body(&m.title, &m.lines).as_bytes(), Duration::from_secs(30)).ok().filter(|(c, _)| *c == 200).and_then(|(_, b)| generated_note(&b));
+    let Some(doc) = meeting_doc(&m.id, &m.title, &m.date, &m.start, &m.locale, &m.lines, draft.as_ref()) else { return Err(("The paste held no lines.".into(), Vec::new())) };
+    let doc = with_base(doc, base.as_ref(), &speakers);
+    let id = doc.get("id").and_then(|v| v.as_str()).unwrap_or(&m.id).to_string();
+    // Pasted lines are not captions: on failure nothing is handed back to the next Stop.
+    helper::post_note(port, &doc.to_string()).map(|()| id).map_err(|e| (e, Vec::new()))
+}
+
 pub enum CaptureEvent {
     /// The state changed (only sent on a change).
     State(CaptureState),

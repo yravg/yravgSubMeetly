@@ -76,7 +76,7 @@ fn empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
     } else if running {
         ("Listening to this PC", "Play a video or join a meeting. Its captions show up here and in the island, and are saved as a meeting when you stop.".to_string(), false, Some("Stop captions"), Go::Captions(false))
     } else {
-        ("Nothing to follow", "Start captions to caption whatever this PC plays, or record in the extension or the Mac app.".to_string(), false, Some("Start captions"), Go::Captions(true))
+        ("Nothing to follow", "Start captions to caption whatever this PC plays: videos, Teams, Zoom. They also start by themselves when a video or a calendar meeting begins.".to_string(), false, Some("Start captions"), Go::Captions(true))
     };
     if hkit::message(ui, area, st.accent, Icon::Lyrics, title, &line, bad, label.map(|l| (l, wid("live.start")))) {
         match go {

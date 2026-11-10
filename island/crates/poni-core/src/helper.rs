@@ -350,10 +350,15 @@ pub fn current(notes: &[Note]) -> Option<&Note> {
 }
 
 pub fn meeting_state(link: &Link, notes: &[Note]) -> PageState {
+    note_state(link, current(notes))
+}
+
+/// The Meeting page's state for the meeting it shows (the chosen one, else the newest).
+pub fn note_state(link: &Link, note: Option<&Note>) -> PageState {
     if !matches!(link, Link::Online) {
         return PageState::Error;
     }
-    match current(notes) {
+    match note {
         None => PageState::Empty,
         Some(n) if n.items.is_empty() => PageState::Empty,
         Some(n) if n.issued => PageState::Locked,
@@ -708,11 +713,13 @@ pub struct View {
     /// The island itself is capturing the PC's audio (`capture`): its line shows
     /// in the pill whatever the extension's caption surface says.
     pub capturing: bool,
+    /// The meeting the person chose on the Meeting page (its id); None follows the newest.
+    pub selected: Option<String>,
 }
 
 impl Default for View {
     fn default() -> Self {
-        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), held: None, calendar: None, calendar_err: None, capturing: false }
+        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), held: None, calendar: None, calendar_err: None, capturing: false, selected: None }
     }
 }
 
@@ -749,8 +756,30 @@ impl View {
         }
     }
 
+    /// The meeting the pages show: the chosen one while it exists, else the newest.
     pub fn note(&self) -> Option<&Note> {
-        current(&self.snap.notes)
+        self.selected.as_ref().and_then(|id| self.snap.notes.iter().find(|n| &n.id == id)).or_else(|| current(&self.snap.notes))
+    }
+
+    /// Where the shown meeting sits, newest first: (1-based position, how many).
+    pub fn position(&self) -> (usize, usize) {
+        let at = self.note().and_then(|n| self.snap.notes.iter().position(|m| m.id == n.id)).map_or(0, |i| i + 1);
+        (at, self.snap.notes.len())
+    }
+
+    /// Show the meeting `step` places older (+) or newer (-), stopping at the ends.
+    pub fn select_step(&mut self, step: i32) {
+        let n = self.snap.notes.len();
+        if n == 0 {
+            return;
+        }
+        let at = self.position().0.max(1) as i64 - 1;
+        let to = (at + step as i64).clamp(0, n as i64 - 1) as usize;
+        self.selected = Some(self.snap.notes[to].id.clone());
+    }
+
+    pub fn select(&mut self, id: &str) {
+        self.selected = Some(id.to_string());
     }
 
     /// Pause on the current line, or let go.
@@ -1220,5 +1249,23 @@ mod tests {
         assert_eq!(v.calendar_err.as_deref(), Some("down"));
         v.apply_calendar(Ok(crate::calendar::Calendar::default()));
         assert!(v.calendar_err.is_none());
+    }
+
+    #[test]
+    fn the_person_can_step_through_every_meeting_and_a_gone_one_falls_back() {
+        let mk = |id: &str| parse_note(&json!({ "id": id, "title": id, "date": "2026-11-10" })).unwrap();
+        let mut v = View::default();
+        v.snap.notes = vec![mk("c"), mk("b"), mk("a")];
+        assert_eq!((v.note().unwrap().id.as_str(), v.position()), ("c", (1, 3)));
+        v.select_step(1);
+        assert_eq!((v.note().unwrap().id.as_str(), v.position()), ("b", (2, 3)));
+        v.select_step(5);
+        assert_eq!(v.position(), (3, 3), "stops at the oldest");
+        v.select_step(-9);
+        assert_eq!(v.position(), (1, 3), "stops at the newest");
+        v.select("b");
+        v.snap.notes.retain(|n| n.id != "b");
+        assert_eq!(v.note().unwrap().id, "c", "a deleted meeting falls back to the newest");
+        assert_eq!(note_state(&Link::Online, v.note()), PageState::Empty);
     }
 }

@@ -165,6 +165,8 @@ pub enum InlineAction {
     WhatsNew,
     /// Open the app a notification came from (the notice's `OpenApp`).
     Open,
+    /// Captions just started: translate them or not (the label says what a press does).
+    Translate,
 }
 
 /// What a click on the Music page's Japanese-readings line does
@@ -583,6 +585,12 @@ pub struct AppState {
     pub calendar_confirm: Option<String>,
     /// The meeting the pill last announced ("Standup in 5 min"), so it speaks once per meeting.
     pub calendar_pinged: Option<String>,
+    /// Which page of rows the Meeting, Inbox and Calendar pages show (0 = first).
+    pub meeting_page: usize,
+    pub inbox_page: usize,
+    pub calendar_page: usize,
+    /// Calendar lists meetings that ended this week instead of the coming ones.
+    pub calendar_past: bool,
     /// The island's own capture of what the PC plays (`services::capture`).
     pub capture: poni_core::capture::CaptureState,
     /// What the last caption said about its translation (missing, loading), for the Live page.
@@ -665,6 +673,10 @@ impl AppState {
             calendar_manage: false,
             calendar_confirm: None,
             calendar_pinged: None,
+            meeting_page: 0,
+            inbox_page: 0,
+            calendar_page: 0,
+            calendar_past: false,
             capture: Default::default(),
             caption_hint: None,
             models: Default::default(),

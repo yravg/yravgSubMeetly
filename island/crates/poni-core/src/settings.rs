@@ -144,6 +144,8 @@ pub struct Settings {
     /// Captions start by themselves while a video plays or a calendar meeting runs, and stop after
     /// it ends ([`crate::capture::Auto`]).
     pub auto_captions: bool,
+    /// Captions carry a translation into `target_lang` (on by default, English); off: the spoken line only.
+    pub translate_captions: bool,
     pub hud_volume: bool,
     pub hud_power: bool,
     pub hud_bluetooth: bool,
@@ -244,6 +246,7 @@ impl Default for Settings {
             target_lang: "en".into(),
             captions_on: false,
             auto_captions: true,
+            translate_captions: true,
             hud_volume: true,
             hud_power: true,
             hud_bluetooth: true,

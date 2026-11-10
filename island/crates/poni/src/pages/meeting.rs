@@ -18,7 +18,7 @@ use poni_core::helper::{self, Decision, Item, Kind, PageState, Review, Status};
 const HEAD_H: f32 = 30.0;
 const ROW_H: f32 = 36.0;
 pub const MAX_ROWS: usize = 5;
-const FOOT_H: f32 = 16.0;
+const FOOT_H: f32 = 28.0;
 
 pub fn height(_st: &AppState) -> f32 {
     HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H + hkit::GUIDE_H
@@ -50,36 +50,54 @@ fn verb(d: Decision) -> &'static str {
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
-    let area = hkit::guide(ui, st, area, PageKind::Meeting, "Decisions, actions and questions from the latest meeting.");
+    let area = hkit::guide(ui, st, area, PageKind::Meeting, "Decisions, actions and questions of any meeting. Paste reads a copied transcript.");
     let accent = st.accent;
-    let state = helper::meeting_state(&st.helper.link, &st.helper.snap.notes);
-    match state {
-        PageState::Error => {
-            hkit::offline(ui, st, area, wid("meeting.retry"));
-            return;
-        }
-        PageState::Empty => {
-            // A note from Calendar's Notes button exists but holds no items yet: say so, with its name.
-            let started = st.helper.note().map(|n| (n.title.clone(), n.transcript.len()));
-            let (title, line) = match &started {
-                // Saved when captions stopped: its lines are kept, the draft just found nothing to decide.
-                Some((t, n)) if *n > 0 => (t.as_str(), format!("Saved from captions: {n} lines. No decisions or actions found in them.")),
-                Some((t, _)) => (t.as_str(), "Notes started from Calendar. Start captions during the meeting; when you stop, the draft decisions and actions land here.".to_string()),
-                None => ("No decisions yet", "A meeting lands here when you stop captions. Pick a meeting in Calendar to start its notes. Items that wait on you get buttons.".to_string()),
-            };
-            if hkit::message(ui, area, accent, Icon::Clipboard, title, &line, false, Some(("Open Calendar", wid("meeting.calendar")))) {
-                st.cmd(Command::SetPage(PageKind::Calendar));
-            }
-            return;
-        }
-        _ => {}
+    let state = helper::note_state(&st.helper.link, st.helper.note());
+    if state == PageState::Error {
+        hkit::offline(ui, st, area, wid("meeting.retry"));
+        return;
     }
-    let Some(note) = st.helper.note() else { return };
+    let Some(note) = st.helper.note().cloned() else {
+        let line = "Captions save a meeting when they stop. Or copy a transcript (Teams, read.ai, .vtt) and press Paste transcript.";
+        if hkit::message(ui, area, accent, Icon::Clipboard, "No meetings yet", line, false, Some(("Paste transcript", wid("meeting.paste.empty")))) {
+            st.cmd(Command::PasteTranscript);
+        }
+        return;
+    };
     let locked = state == PageState::Locked;
-    let (title, waiting) = (note.title.clone(), note.waiting());
+    let waiting = note.waiting();
 
+    // Head: the meeting's title, and which of all meetings it is.
     let head = Rect::new(area.x, area.y, area.w, HEAD_H);
     let cy = head.center().y;
+    let (at, of) = st.helper.position();
+    let (step, px) = hkit::pager(ui, head.right(), cy, "meeting.pick", at, of, "Meeting");
+    if let Some(d) = step {
+        st.helper.select_step(d);
+        st.meeting_page = 0;
+    }
+    let title = if note.date.is_empty() { note.title.clone() } else { format!("{} \u{b7} {}", note.title, note.date) };
+    ui.c.text(&title, Rect::new(head.x, cy - 11.0, (px - head.x - 10.0).max(0.0), 22.0), &TextStyle::headline());
+
+    // Foot: what the meeting waits on (or the last press), Paste, and the item pages.
+    let foot = Rect::new(area.x, area.bottom() - FOOT_H, area.w, FOOT_H);
+    let fy = foot.center().y;
+    let per = MAX_ROWS;
+    let pages = hkit::pages(note.items.len(), per);
+    st.meeting_page = st.meeting_page.min(pages - 1);
+    let mut right = foot.right();
+    if pages > 1 {
+        let (step, x) = hkit::pager(ui, right, fy, "meeting.items", st.meeting_page + 1, pages, "Items");
+        if let Some(d) = step {
+            st.meeting_page = (st.meeting_page as i32 + d).clamp(0, pages as i32 - 1) as usize;
+        }
+        right = x - PILL_GAP * 2.0;
+    }
+    let w = ui.pill_width("Paste transcript", false, true);
+    let b = Rect::new(right - w, fy - PILL_SMALL / 2.0, w, PILL_SMALL);
+    if ui.pill(wid("meeting.paste"), b, "Paste transcript", None, PillStyle::Utility).clicked {
+        st.cmd(Command::PasteTranscript);
+    }
     let toast = st.helper_notice.as_ref().filter(|(_, until, _)| *until > ui.now).map(|(m, _, bad)| (m.clone(), *bad));
     let status = match (&toast, locked, waiting) {
         (Some((t, _)), _, _) => t.clone(),
@@ -88,16 +106,25 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         (None, false, n) => format!("{n} wait on you"),
     };
     let tone = if let Some((_, bad)) = &toast { if *bad { palette::ORANGE } else { palette::GREEN } } else if waiting > 0 && !locked { palette::ORANGE } else { palette::TEXT_DIM };
-    let sst = TextStyle::footnote().weight(Weight::Semibold).color(tone).right();
-    let sw = ui.c.measure(&status, &sst, 260.0).0.ceil();
-    ui.c.text(&status, Rect::new(head.right() - sw, cy - 9.0, sw, 18.0), &sst);
-    ui.c.text(&title, Rect::new(head.x, cy - 11.0, (head.w - sw - 12.0).max(0.0), 22.0), &TextStyle::headline());
+    ui.c.text(&status, Rect::new(foot.x, fy - 9.0, (b.x - foot.x - 10.0).max(0.0), 18.0), &TextStyle::footnote().weight(Weight::Semibold).color(tone));
+
+    if note.items.is_empty() {
+        let body = Rect::new(area.x, head.bottom(), area.w, foot.y - head.bottom());
+        let n = note.transcript.len();
+        let line = if n > 0 {
+            format!("{n} transcript lines. No decisions or actions found in them.")
+        } else {
+            "Nothing here yet. Start captions during the meeting, or copy its transcript and press Paste transcript.".to_string()
+        };
+        hkit::message(ui, body, accent, Icon::Clipboard, "No items", &line, false, None);
+        return;
+    }
 
     // Waiting items first, then the rest, in the register's order.
     let mut order: Vec<usize> = (0..note.items.len()).collect();
     order.sort_by_key(|&i| !note.items[i].waits());
     let mut done: Option<(String, Decision)> = None;
-    for (slot, &idx) in order.iter().take(MAX_ROWS).enumerate() {
+    for (slot, &idx) in order.iter().skip(st.meeting_page * per).take(per).enumerate() {
         let item = &note.items[idx];
         let row = Rect::new(area.x, head.bottom() + 4.0 + slot as f32 * ROW_H, area.w, ROW_H);
         let rcy = row.center().y;
@@ -128,10 +155,6 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         let dim = locked || !item.waits();
         let tst = TextStyle::body().color(if dim { palette::TEXT_DIM } else { palette::TEXT });
         ui.c.text(&item.text, Rect::new(tx, rcy - 10.0, (right - tx - 6.0).max(0.0), 20.0), &tst);
-    }
-    if note.items.len() > MAX_ROWS {
-        let more = format!("+{} more in the register", note.items.len() - MAX_ROWS);
-        ui.c.text(&more, Rect::new(area.x, area.bottom() - FOOT_H, area.w, FOOT_H), &TextStyle::caption().color(palette::TEXT_FAINT));
     }
 
     if let Some((rf, d)) = done {

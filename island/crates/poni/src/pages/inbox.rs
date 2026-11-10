@@ -17,7 +17,7 @@ use poni_core::helper::{self, Decision, PageState};
 const HEAD_H: f32 = 26.0;
 const ROW_H: f32 = 36.0;
 pub const MAX_ROWS: usize = 5;
-const FOOT_H: f32 = 16.0;
+const FOOT_H: f32 = 28.0;
 
 pub fn height(_st: &AppState) -> f32 {
     HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H + hkit::GUIDE_H
@@ -50,8 +50,12 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let head = format!("{} open", rows.len());
     ui.c.text(&head, Rect::new(area.x, area.y, area.w, HEAD_H), &TextStyle::headline());
 
+    let pages = hkit::pages(rows.len(), MAX_ROWS);
+    st.inbox_page = st.inbox_page.min(pages - 1);
+    let first = st.inbox_page * MAX_ROWS;
     let mut done: Option<(String, String, Decision)> = None;
-    for (slot, r) in rows.iter().take(MAX_ROWS).enumerate() {
+    let mut open: Option<String> = None;
+    for (slot, r) in rows.iter().skip(first).take(MAX_ROWS).enumerate() {
         let row = Rect::new(area.x, area.y + HEAD_H + 4.0 + slot as f32 * ROW_H, area.w, ROW_H);
         let cy = row.center().y;
         let mut right = row.right();
@@ -63,6 +67,10 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
                 done = Some((r.note.id.clone(), r.item.rf.clone(), d));
             }
             right = b.x - PILL_GAP;
+        }
+        // The words open the item's meeting; the area stops where the pills start.
+        if ui.button(wid_n("inbox.open", slot as u64), Rect::new(row.x, row.y, (right - row.x).max(0.0), row.h)).clicked {
+            open = Some(r.note.id.clone());
         }
         let chip = hkit::kind_chip(ui, row.x, cy - 8.0, r.item.kind);
         let tx = row.x + chip + 8.0;
@@ -77,14 +85,24 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         }
         ui.c.text(&from, Rect::new(tx, cy + 2.0, w, 16.0), &TextStyle::caption().weight(Weight::Regular).color(palette::TEXT_DIM));
     }
-    let foot = match (rows.len() > MAX_ROWS, locked) {
-        (true, 0) => Some(format!("+{} more in the register", rows.len() - MAX_ROWS)),
-        (true, n) => Some(format!("+{} more in the register \u{b7} {n} in issued meetings (read-only)", rows.len() - MAX_ROWS)),
-        (false, 0) => None,
-        (false, n) => Some(format!("{n} more in issued meetings (read-only)")),
+    let foot = Rect::new(area.x, area.bottom() - FOOT_H, area.w, FOOT_H);
+    let mut right = foot.right();
+    if pages > 1 {
+        let (step, x) = hkit::pager(ui, right, foot.center().y, "inbox.pages", st.inbox_page + 1, pages, "");
+        if let Some(d) = step {
+            st.inbox_page = (st.inbox_page as i32 + d).clamp(0, pages as i32 - 1) as usize;
+        }
+        right = x - PILL_GAP;
+    }
+    let line = match locked {
+        0 => "Tap an item to open its meeting".to_string(),
+        n => format!("{n} more in issued meetings (read-only) \u{b7} tap an item to open its meeting"),
     };
-    if let Some(f) = foot {
-        ui.c.text(&f, Rect::new(area.x, area.bottom() - FOOT_H, area.w, FOOT_H), &TextStyle::caption().color(palette::TEXT_FAINT));
+    ui.c.text(&line, Rect::new(foot.x, foot.center().y - 8.0, (right - foot.x - 8.0).max(0.0), 16.0), &TextStyle::caption().color(palette::TEXT_FAINT));
+    if let Some(id) = open {
+        st.helper.select(&id);
+        st.meeting_page = 0;
+        st.cmd(Command::SetPage(PageKind::Meeting));
     }
 
     if let Some((note_id, rf, d)) = done {

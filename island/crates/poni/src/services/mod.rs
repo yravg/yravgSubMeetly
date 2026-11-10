@@ -24,6 +24,7 @@ pub mod lyric_translate;
 pub mod location;
 pub mod lyrics;
 pub mod media;
+pub mod meter;
 pub mod models;
 pub mod pairdrop;
 pub mod phonedrop;
@@ -53,6 +54,8 @@ pub struct Services {
     lyrics: Option<lyrics::LyricsService>,
     lyric_tr: Option<lyric_translate::LyricTranslateService>,
     _audio: Option<audio::AudioService>,
+    /// Sound on the output, for captions that start by themselves.
+    _meter: Option<meter::MeterService>,
     _bluetooth: Option<bluetooth::BluetoothService>,
     fullscreen: Option<fullscreen::FullscreenWatcher>,
     pairdrop: Option<pairdrop::PairDropService>,
@@ -86,6 +89,7 @@ impl Services {
         let lyrics = started("lyrics", lyrics::LyricsService::start(sink.clone()));
         let lyric_tr = started("lyrics translation", lyric_translate::LyricTranslateService::start(sink.clone()));
         let audio = started("audio", audio::AudioService::start(sink.clone()));
+        let meter = started("sound meter", meter::MeterService::start(sink.clone()));
         let bluetooth = started("bluetooth", bluetooth::BluetoothService::start(sink.clone()));
         let fullscreen = started("fullscreen", fullscreen::FullscreenWatcher::start(helper, sink.clone()));
         // Asks nothing until a phone is paired.
@@ -109,6 +113,7 @@ impl Services {
             lyrics,
             lyric_tr,
             _audio: audio,
+            _meter: meter,
             _bluetooth: bluetooth,
             fullscreen,
             pairdrop,

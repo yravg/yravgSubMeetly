@@ -139,6 +139,10 @@ pub enum Command {
     Calendar(CalendarCmd),
     /// Start (true) or stop (false) captions from what the PC plays.
     Captions(bool),
+    /// Read a transcript from the clipboard and save it as a meeting (Meeting page).
+    PasteTranscript,
+    /// Open a meeting's join link: the Teams app when it is installed, else the browser.
+    JoinMeeting(String),
     /// Ask the engine which models it has.
     ModelsRefresh,
     /// Download this model.

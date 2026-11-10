@@ -454,7 +454,7 @@ impl App {
         };
         let lang = |code: &str| (!code.is_empty() && code != "auto").then(|| code.to_string());
         let src = norm_lang(q.get("src").map(String::as_str), "auto");
-        let tgt = norm_lang(q.get("tgt").map(String::as_str), "en");
+        let tgt = target_lang(q.get("tgt").map(String::as_str));
         let accurate = self.load_engine_mode() == "accurate";
         let started = std::time::Instant::now();
         let ms = || started.elapsed().as_millis() as u64;
@@ -1891,6 +1891,15 @@ enum DraftMt {
 /// `downloaded`: it is on disk; `loaded`: it is in memory. A caption never waits for a
 /// download or a load: it gets the source (or Whisper's English) now, and
 /// `translateState` says why ("off", "missing", "loading", or "ready").
+/// The `tgt` of a request: a known language (else English), or `none` (the island's captions
+/// without translation), which `norm_lang` would otherwise turn into English.
+fn target_lang(raw: Option<&str>) -> String {
+    match raw.map(str::trim) {
+        Some("none") => "none".into(),
+        other => norm_lang(other, "en"),
+    }
+}
+
 fn draft_translation(
     chosen: bool,
     downloaded: bool,
@@ -1898,6 +1907,10 @@ fn draft_translation(
     src: &str,
     tgt: &str,
 ) -> (DraftMt, &'static str) {
+    // The island's "translate captions" off: the spoken line only.
+    if tgt == "none" {
+        return (DraftMt::SourceOnly, "off");
+    }
     let state = match (chosen, downloaded, loaded) {
         (false, ..) => "off",
         (true, false, _) => "missing",
@@ -2138,6 +2151,12 @@ mod tests {
         );
         assert_eq!(
             draft_translation(false, false, false, "de", "id"),
+            (SourceOnly, "off")
+        );
+        assert_eq!((target_lang(Some("none")).as_str(), target_lang(Some("xx")).as_str(), target_lang(None).as_str()), ("none", "en", "en"));
+        // The island asked for the spoken line only.
+        assert_eq!(
+            draft_translation(true, true, true, "de", "none"),
             (SourceOnly, "off")
         );
         // English speech to English needs no translation.

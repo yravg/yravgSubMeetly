@@ -71,9 +71,62 @@ pub fn meeting_doc(id: &str, title: &str, date: &str, start: &str, locale: &str,
     }))
 }
 
+/// A meeting document built from pasted lines (`doc`), poured into the meeting it belongs to
+/// (`base`, one started from Calendar's Notes: its title, date, attendees and calendar fields
+/// stay). The people who spoke join the attendees.
+pub fn with_base(doc: Value, base: Option<&Value>, speakers: &[String]) -> Value {
+    let mut out = base.filter(|b| b.is_object()).cloned().unwrap_or_else(|| json!({}));
+    let Value::Object(fresh) = doc else { return out };
+    let keep = ["id", "title", "date"];
+    let o = out.as_object_mut().expect("object");
+    for (k, v) in fresh {
+        if k == "meeting" {
+            let m = o.entry("meeting").or_insert_with(|| json!({}));
+            if let (Some(m), Value::Object(new)) = (m.as_object_mut(), v) {
+                for (mk, mv) in new {
+                    m.entry(mk).or_insert(mv);
+                }
+            }
+        } else if !(keep.contains(&k.as_str()) && o.contains_key(&k)) {
+            o.insert(k, v);
+        }
+    }
+    o.insert("source".into(), json!("paste"));
+    let m = o.entry("meeting").or_insert_with(|| json!({}));
+    if let Some(m) = m.as_object_mut() {
+        let list = m.entry("attendees").or_insert_with(|| json!([]));
+        if let Some(a) = list.as_array_mut() {
+            for s in speakers {
+                let known = a.iter().any(|x| x.as_str().or_else(|| x.get("name").and_then(Value::as_str)).is_some_and(|n| n.eq_ignore_ascii_case(s)));
+                if !known {
+                    a.push(json!(s));
+                }
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_paste_fills_the_calendar_meeting_and_adds_who_spoke() {
+        let base = json!({ "id": "CAL-1", "title": "Bun4 EP weekly meeting", "date": "2026-11-11", "meeting": { "start": "2026-11-11T10:00", "attendees": ["Riza Putra"] } });
+        let lines = [line(3.0, "Riza Putra: we agreed", ""), line(9.0, "Alya: I will send it", "")];
+        let doc = meeting_doc("MOM-PASTE-x", "Meeting 2026-11-10 12:00", "2026-11-10", "2026-11-10T12:00", "en", &lines, None).unwrap();
+        let out = with_base(doc, Some(&base), &["Riza Putra".into(), "Alya".into()]);
+        assert_eq!((out["id"].as_str(), out["title"].as_str(), out["date"].as_str()), (Some("CAL-1"), Some("Bun4 EP weekly meeting"), Some("2026-11-11")));
+        assert_eq!(out["meeting"]["start"], "2026-11-11T10:00", "the calendar's start stays");
+        assert_eq!(out["meeting"]["attendees"], json!(["Riza Putra", "Alya"]));
+        assert_eq!(out["transcript"].as_array().map(Vec::len), Some(2));
+        assert_eq!(out["source"], "paste");
+        // No base: the pasted document as it is.
+        let doc = meeting_doc("MOM-PASTE-x", "T", "2026-11-10", "2026-11-10T12:00", "en", &lines, None).unwrap();
+        let out = with_base(doc, None, &[]);
+        assert_eq!(out["id"], "MOM-PASTE-x");
+    }
 
     fn line(t0: f64, source: &str, translation: &str) -> Line {
         Line { t0, t1: t0 + 4.0, source: source.into(), translation: translation.into() }

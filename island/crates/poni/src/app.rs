@@ -457,6 +457,8 @@ pub struct App {
     store_writable: bool,
     /// Captions that start by themselves with a video or a meeting.
     auto_captions: poni_core::capture::Auto,
+    /// The PC plays sound now (`services::meter`).
+    sound_on: bool,
     /// The current press started as a double-click (its click is ignored).
     dbl_press: bool,
     /// Pending high surrogate from WM_CHAR.
@@ -664,6 +666,7 @@ impl App {
             settings_writable,
             store_writable,
             auto_captions: Default::default(),
+            sound_on: false,
             dbl_press: false,
             high_surrogate: None,
             wheel_acc: 0.0,
@@ -1767,7 +1770,8 @@ impl App {
     /// is remembered (`captions_on`): the next start of the island picks it up again.
     fn set_captions(&mut self, on: bool) {
         let sink = self.sink.clone();
-        let (src, tgt) = (self.st.settings.source_lang.clone(), self.st.settings.target_lang.clone());
+        let s = &self.st.settings;
+        let (src, tgt) = (s.source_lang.clone(), poni_core::capture::caption_target(s.translate_captions, &s.target_lang).to_string());
         self.st.settings.captions_on = on;
         self.save_settings();
         self.st.caption_hint = None;
@@ -1795,26 +1799,76 @@ impl App {
         self.set_captions(on);
     }
 
-    /// A video plays (not a music app) or a calendar meeting with a join link runs now.
+    /// The PC plays sound that is not a music app (a call, a video, a meeting), a video plays, or a
+    /// calendar meeting with a join link runs now.
     fn captions_wanted(&self) -> bool {
-        let video = self.st.media.as_ref().is_some_and(|m| m.is_playing() && poni_core::capture::captionable_app(&m.app_id));
-        video || self.st.helper.calendar.as_ref().is_some_and(|c| poni_core::capture::meeting_now(c, self.st.unix))
+        let playing = self.st.media.as_ref().filter(|m| m.is_playing());
+        let music = playing.is_some_and(|m| !poni_core::capture::captionable_app(&m.app_id));
+        let video = playing.is_some_and(|m| poni_core::capture::captionable_app(&m.app_id));
+        (self.sound_on && !music && !self.st.prayer.adzan) || video || self.st.helper.calendar.as_ref().is_some_and(|c| poni_core::capture::meeting_now(c, self.st.unix))
     }
 
     fn auto_captions_step(&mut self) {
         use poni_core::capture::AutoStep;
         let wanted = self.captions_wanted();
         match self.auto_captions.step(self.st.settings.auto_captions, wanted, self.st.capture.running(), self.st.now) {
-            AutoStep::Start => self.set_captions(true),
+            AutoStep::Start => {
+                self.set_captions(true);
+                if self.st.capture.running() {
+                    self.captions_notice();
+                }
+            }
             AutoStep::Stop => self.set_captions(false),
             AutoStep::Nothing => {}
         }
     }
 
+    /// The clipboard's transcript becomes a meeting: into the shown one when it was started from
+    /// Calendar and is still empty, else a new one (the same text twice is the same meeting).
+    fn paste_transcript(&mut self) {
+        use poni_core::transcript_paste as tp;
+        let text = services::clipboard::read_text(self.hwnd).unwrap_or_default();
+        if !tp::looks_like_transcript(&text) {
+            self.st.helper_notice = Some(("Copy a transcript first (Teams, read.ai, or a .vtt / .srt file's text), then press Paste.".into(), self.st.now + 7.0, true));
+            return;
+        }
+        let p = tp::parse(&text);
+        if p.lines.is_empty() {
+            self.st.helper_notice = Some(("No lines found in what you copied.".into(), self.st.now + 6.0, true));
+            return;
+        }
+        let base = self.st.helper.note().filter(|n| n.transcript.is_empty() && n.items.is_empty() && !n.issued).map(|n| n.raw.clone());
+        let t = clock::local_now();
+        let digest = poni_core::sha256::hex(&poni_core::sha256::sha256(text.trim().as_bytes()));
+        let m = services::capture::Meeting {
+            id: format!("MOM-PASTE-{}", &digest[..12]),
+            title: format!("Pasted transcript {}", poni_core::meeting_doc::start_stamp(&t).replace('T', " ")),
+            date: t.day_key(),
+            start: poni_core::meeting_doc::start_stamp(&t),
+            locale: self.st.settings.source_lang.clone(),
+            lines: p.lines,
+        };
+        let cut = if p.dropped > 0 { format!(" (the first {} left out)", p.dropped) } else { String::new() };
+        self.st.helper_notice = Some((format!("Drafting minutes from {} lines{cut}\u{2026}", m.lines.len()), self.st.now + 30.0, false));
+        self.set_page(PageKind::Meeting);
+        let (sink, port, speakers) = (self.sink.clone(), poni_core::helper::configured_port(), p.speakers);
+        std::thread::spawn(move || sink.send(AppEvent::MeetingSaved(services::capture::save_pasted(port, m, base, speakers))));
+    }
+
+    /// "Captions on", with the one question that matters then: translate or not (Translate pill).
+    fn captions_notice(&mut self) {
+        let s = &self.st.settings;
+        let sub = if s.translate_captions { format!("Translating into {}", poni_core::capture::lang_name(&s.target_lang)) } else { "Original language only".to_string() };
+        let accent = self.st.accent;
+        self.st.notify(Icon::Lyrics, accent, "Captions on", sub, 8.0, Some(NoticeAction::OpenPage(PageKind::Live)));
+        self.st.set_notice_inline(InlineAction::Translate);
+    }
+
     /// What names a meeting that no calendar event does. shortcut: no calendar hook yet; when the
     /// Calendar page lands, return the running event's title here.
     fn running_event_title(&self) -> Option<String> {
-        None
+        let cal = self.st.helper.calendar.as_ref()?;
+        cal.events.iter().find(|e| !e.all_day && e.start <= self.st.unix && self.st.unix < e.end).map(|e| e.title.clone())
     }
 
     /// Captions stopped: what they heard becomes a meeting in the engine. `wait`: on quit, answer
@@ -1850,6 +1904,12 @@ impl App {
         match r {
             Ok(id) => {
                 pinfo!("meeting {id} saved");
+                // The new meeting is the one shown, from its first item.
+                self.st.helper.select(&id);
+                self.st.meeting_page = 0;
+                if self.st.helper_notice.as_ref().is_some_and(|n| n.0.starts_with("Drafting minutes")) {
+                    self.st.helper_notice = None;
+                }
                 if let Some(s) = self.services.as_ref() {
                     s.helper_poll();
                 }
@@ -1858,6 +1918,14 @@ impl App {
             }
             Err((e, lines)) => {
                 pwarn!("meeting not saved: {e}");
+                if self.st.helper_notice.as_ref().is_some_and(|n| n.0.starts_with("Drafting minutes")) {
+                    self.st.helper_notice = None;
+                }
+                if lines.is_empty() {
+                    // A paste: nothing to keep for a Stop; the clipboard still has it.
+                    self.st.notify(Icon::Lyrics, palette::ORANGE, "Transcript not saved", format!("{e} Press Paste transcript again."), 8.0, None);
+                    return;
+                }
                 // The lines wait for the next Stop rather than being lost.
                 if let Some(s) = self.services.as_ref() {
                     s.restore_session(lines);
@@ -2536,13 +2604,21 @@ impl App {
                 // The calendar answers every minute: also the clock that stops captions after a video.
                 self.auto_captions_step();
             }
-            AppEvent::CalendarNotes(Ok(_)) => {
-                // The note is first in the list now: the Meeting page reads it.
+            AppEvent::CalendarNotes(Ok(id)) => {
+                // That meeting is the one shown, whether it was just made or already there.
+                if !id.is_empty() {
+                    self.st.helper.select(&id);
+                }
+                self.st.meeting_page = 0;
                 self.set_page(PageKind::Meeting);
                 self.request_frame();
             }
             AppEvent::CalendarNotes(Err(e)) => self.st.helper_notice = Some((e, now + 6.0, true)),
             AppEvent::Capture(e) => self.on_capture(e),
+            AppEvent::Sound(on) => {
+                self.sound_on = on;
+                self.auto_captions_step();
+            }
             AppEvent::MeetingSaved(r) => self.on_meeting_saved(r),
             AppEvent::Models(r) => {
                 let was = self.st.models.moving();
@@ -3948,6 +4024,17 @@ impl App {
             }
             return;
         }
+        if a == InlineAction::Translate {
+            // Flip translation for the running captions and say what they do now; the notice stays.
+            self.st.settings.translate_captions = !self.st.settings.translate_captions;
+            if self.st.capture.running() {
+                self.set_captions(true);
+            } else {
+                self.save_settings();
+            }
+            self.captions_notice();
+            return;
+        }
         if a == InlineAction::StopAdzan {
             self.adzan.stop();
             self.st.prayer.adzan = false;
@@ -3985,7 +4072,7 @@ impl App {
         }
         match a {
             InlineAction::StartFocus => st.pomodoro.start(st.now),
-            InlineAction::ShowAmount | InlineAction::StopAdzan | InlineAction::Hide | InlineAction::WhatsNew | InlineAction::Open => {}
+            InlineAction::ShowAmount | InlineAction::StopAdzan | InlineAction::Hide | InlineAction::WhatsNew | InlineAction::Open | InlineAction::Translate => {}
         }
         let until = st.now + INLINE_DONE_S;
         if let Some(n) = st.notice.as_mut() {
@@ -4378,6 +4465,11 @@ impl App {
                 }
                 Command::Calendar(c) => self.calendar_cmd(c),
                 Command::Captions(on) => self.captions_by_hand(on),
+                Command::PasteTranscript => self.paste_transcript(),
+                Command::JoinMeeting(u) => match poni_core::calendar::teams_app_link(&u).filter(|_| crate::window::url_scheme_registered("msteams")) {
+                    Some(app) => shell::open(&app),
+                    None => shell::open(&u),
+                },
                 Command::ModelsRefresh => self.refresh_models(),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),

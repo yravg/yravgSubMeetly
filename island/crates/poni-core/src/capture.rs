@@ -181,7 +181,19 @@ pub const SPEECH_MISSING: &str = "The speech model is not downloaded yet. Downlo
 /// Does captioning `src` into `tgt` run through the translation model? English never does: the
 /// engine falls back to Whisper's own translation.
 pub fn needs_translation_model(src: &str, tgt: &str) -> bool {
-    tgt != "en" && src != tgt
+    tgt != "en" && tgt != NO_TRANSLATION && src != tgt
+}
+
+/// The `tgt` of a `/draft` that wants the spoken line only (Settings: translate captions off).
+pub const NO_TRANSLATION: &str = "none";
+
+/// The target captions are sent with: the chosen language, or [`NO_TRANSLATION`].
+pub fn caption_target(translate: bool, target_lang: &str) -> &str {
+    if translate {
+        target_lang
+    } else {
+        NO_TRANSLATION
+    }
 }
 
 /// `translateState` of a `/draft` answer: why a caption has, or has not, its translation.
@@ -269,6 +281,39 @@ pub fn captionable_app(app_id: &str) -> bool {
 /// Is a timed calendar meeting with a join link running at `unix`?
 pub fn meeting_now(cal: &crate::calendar::Calendar, unix: i64) -> bool {
     cal.events.iter().any(|e| !e.all_day && e.join_url.is_some() && e.start <= unix && unix < e.end)
+}
+
+/// Sound on the PC's output: on after [`SOUND_ON_S`] of sound, off after [`SOUND_OFF_S`] of quiet.
+/// Short blips (a notification chime) never turn it on; a pause in speech never turns it off.
+pub const SOUND_PEAK: f32 = 0.01;
+pub const SOUND_ON_S: f64 = 2.0;
+pub const SOUND_OFF_S: f64 = 20.0;
+
+#[derive(Clone, Debug, Default)]
+pub struct SoundGate {
+    on: bool,
+    loud: f64,
+    quiet: f64,
+}
+
+impl SoundGate {
+    /// One meter reading (`peak` 0..1) after `dt` seconds. `Some` when on/off changes.
+    pub fn step(&mut self, peak: f32, dt: f64) -> Option<bool> {
+        if peak >= SOUND_PEAK {
+            self.loud += dt;
+            self.quiet = 0.0;
+        } else {
+            self.quiet += dt;
+            if self.quiet >= 3.0 {
+                self.loud = 0.0; // blips far apart do not add up
+            }
+        }
+        let next = if self.on { self.quiet < SOUND_OFF_S } else { self.loud >= SOUND_ON_S };
+        (next != self.on).then(|| {
+            self.on = next;
+            next
+        })
+    }
 }
 
 /// After the reason ends, auto-started captions run this long before they stop (a pause between
@@ -531,5 +576,30 @@ mod tests {
         assert!(!meeting_now(&cal(ev(true, false)), 200));
         assert!(!meeting_now(&cal(ev(false, false)), 150));
         assert!(!meeting_now(&cal(ev(true, true)), 150));
+    }
+
+    #[test]
+    fn sound_turns_on_after_two_seconds_and_off_after_twenty_quiet() {
+        let mut g = SoundGate::default();
+        assert_eq!(g.step(0.5, 0.5), None, "a chime is not sound");
+        for _ in 0..10 {
+            assert_eq!(g.step(0.0, 0.5), None);
+        }
+        assert_eq!(g.step(0.5, 0.5), None, "the old blip was forgotten");
+        assert_eq!(g.step(0.2, 0.5), None);
+        assert_eq!(g.step(0.2, 0.5), None);
+        assert_eq!(g.step(0.2, 0.5), Some(true));
+        for _ in 0..39 {
+            assert_eq!(g.step(0.0, 0.5), None, "a pause in speech keeps it on");
+        }
+        assert_eq!(g.step(0.0, 0.5), Some(false));
+    }
+
+    #[test]
+    fn captions_without_translation_ask_for_none() {
+        assert_eq!(caption_target(true, "en"), "en");
+        assert_eq!(caption_target(false, "en"), NO_TRANSLATION);
+        assert!(!needs_translation_model("auto", NO_TRANSLATION));
+        assert!(translation_hint(Some(TranslateState::Missing), "auto", NO_TRANSLATION).is_none());
     }
 }
