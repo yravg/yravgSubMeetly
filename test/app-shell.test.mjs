@@ -132,7 +132,7 @@ test('⇧S membuka Live captions; setiap rute nav memasang halamannya', async ()
   await page.waitForFunction(() => location.hash === '#live');
   const routes = await page.$$eval('#nav-meetings a, #nav-features a', (l) => l.map((a) => a.dataset.route));
   assert.deepEqual(routes, ['today', 'live', 'minutes', 'history', 'files', 'addins', 'glossary', 'island', 'perf', 'all', 'settings', 'dev'], 'urutan papan A01; lab: Developer tampil');
-  const expect = { live: 'view=captions', history: 'view=history', files: 'view=files', addins: 'stab=addins', notes: 'view=notes', island: 'stab=output', perf: 'view=perf', settings: 'view=settings', all: 'stab=addins' };
+  const expect = { live: 'view=captions', history: 'view=history', files: 'view=files', addins: 'stab=addins', notes: 'view=notes', island: 'stab=output', perf: 'view=perf', settings: 'view=settings' };
   for (const [route, frag] of Object.entries(expect)) {
     await page.evaluate((r) => { location.hash = `#${r}`; }, route);
     await page.waitForFunction((r) => document.querySelector('#page').dataset.route === r, {}, route);
@@ -207,14 +207,16 @@ test('A06: delapan fitur, Island dengan sakelar nyata, add-in terpasang di halam
   assert.equal(await page.$eval('[data-feat-state="island"]', (e) => e.textContent), 'On', 'kartu menunjukkan status sakelar');
   assert.equal(await page.$eval('[data-feat="island"]', (i) => i.checked), true, 'sakelar kartu ikut bilah atas');
   await page.click('#island-chip'); await wait(300);
-  assert.ok((await page.$eval('#addins-pane iframe', (f) => f.getAttribute('src'))).includes('stab=addins'));
+  assert.equal(await page.$('#addins-pane iframe'), null, 'add-in terpasang: baris asli, bukan bingkai');
+  await page.waitForSelector('#addins-rows .ia-row');
+  assert.equal(await page.$$eval('#addins-rows .ia-row', (l) => l.length), 5);
 });
 
-test('A08: area Developer (lab) memasang lab yang ada', async () => {
+test('A08: area Developer (lab) = halaman asli dengan panel terpasang (bukan bingkai lab); rincian di test/developer-area.test.mjs', async () => {
   await page.evaluate(() => { location.hash = '#dev'; });
-  const f = await (await page.waitForSelector('#page iframe.dev')).contentFrame();
-  await f.waitForSelector('#ltabs', { timeout: 20000 });
-  assert.equal(await page.$eval('#page iframe.dev', (x) => x.getAttribute('src')), '/app.html');
+  await page.waitForSelector('#dv-tabs');
+  assert.equal(await page.$('#page iframe.dev'), null);
+  assert.equal(await page.$eval('#dv-frame', (x) => x.getAttribute('src')), '/panel-test.html');
 });
 
 test('390 px: sidebar jadi lembar lewat tombol menu; tanpa gulir mendatar', async () => {
