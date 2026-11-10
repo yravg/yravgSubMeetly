@@ -36,3 +36,16 @@ pub struct Response {
     /// CORS headers, already decided from the request Origin.
     pub headers: Vec<(String, String)>,
 }
+
+/// Runs a streamed answer: calls the sink once per event and stops when it returns false
+/// (the client went away).
+pub type SseRun<'a> = Box<dyn FnOnce(&mut dyn FnMut(&Value) -> bool) + Send + 'a>;
+
+/// What `App::handle_ask` decided: a plain JSON reply, or a Server-Sent Events stream.
+pub enum AskReply<'a> {
+    Reply(Response),
+    Stream {
+        headers: Vec<(String, String)>,
+        run: SseRun<'a>,
+    },
+}

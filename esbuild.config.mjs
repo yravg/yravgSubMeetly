@@ -54,10 +54,13 @@ const statics = [
   ['src/app.html', 'app.html'],
   ['src/app.css', 'app.css'],
   ['src/minutes-tide.css', 'minutes-tide.css'],
+  ['src/app-pages/pages.css', 'pages.css'],
 ];
 for (const [from, to] of statics) {
   await copyFile(path.join(root, from), path.join(dist, to));
 }
+// App shell page styles (src/app-pages/*.css → dist/app-pages/); the page scripts are bundled from app.js.
+await cp(path.join(root, 'src/app-pages'), path.join(dist, 'app-pages'), { recursive: true, filter: (s) => !s.endsWith('.js') });
 await cp(path.join(root, 'icons'), path.join(dist, 'icons'), { recursive: true });
 // Fredoka + Plus Jakarta Sans (SIL OFL 1.1) for theme-tide.css, with their licences.
 await cp(path.join(root, 'src/fonts'), path.join(dist, 'fonts'), { recursive: true });

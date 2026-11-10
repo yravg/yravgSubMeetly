@@ -97,10 +97,11 @@ test('Local: jawaban dialirkan dari helper /ask, dengan grounding dan sumber', a
   await page.waitForFunction(() => /You have 2 open actions/.test(document.querySelector('.ask-body').textContent));
   const html = await page.$eval('.a-txt', (t) => t.innerHTML);
   assert.match(html, /<b>2<\/b>/, 'angka kunci tebal');
-  assert.match(await dialogText(), /Local model · Qwen 2\.5/);
+  assert.match(await dialogText(), /Local model · Qwen · 0 credits/, 'Plans menyala (A03b): sumber menyebut 0 kredit');
   const body = asked.at(-1);
   assert.equal(body.provider, 'local');
-  assert.match(body.messages[0].content, /^You are Tide[\s\S]*REGISTER[\s\S]*A1 \[action\] Fix the gate/);
+  assert.equal(body.question, 'How many open actions?');
+  assert.match(body.grounding, /^You are Tide[\s\S]*REGISTER[\s\S]*A1 \[action\] Fix the gate/);
 });
 
 test('Local tanpa rute /ask: dikatakan jelas, lalu jawaban dari register', async () => {
@@ -160,6 +161,129 @@ test('A10 Paket: tiga kartu, tombol Coming soon, paket isi ulang, belum ada serv
   assert.equal(r.packs, 4);
   assert.match(r.page, /No server yet/);
   assert.match(r.page, /1 credit = Rp100/);
+});
+
+async function openAskFresh() {
+  await page.evaluate(() => document.body.focus());
+  if (await page.$eval('.ask-ov', (o) => o.hidden)) await page.keyboard.press('/');
+  await page.waitForSelector('.ask-ov:not([hidden])');
+  await page.click('[data-ask="new"]');
+}
+const exportCard = () => page.$eval('.ask-card.export', (c) => ({ text: c.textContent.replace(/\s+/g, ' ').trim(), hasOpen: !!c.querySelector('[data-act="open-file"]'), file: c.querySelector('.fn')?.textContent || null }));
+
+test('Ekspor di lab (tanpa chrome.downloads): kartu "Done · N rows" + nama berkas, tanpa tautan Open yang mati', async () => {
+  await page.evaluate(() => {
+    window.__dl = [];
+    HTMLAnchorElement.prototype.click = function () { fetch(this.href).then((r) => r.text()).then((t) => window.__dl.push({ name: this.download, text: t })); };
+  });
+  await openAskFresh();
+  await page.type('.ask-comp textarea', 'Export open actions to Markdown');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.ask-card.export');
+  const c = await exportCard();
+  assert.match(c.text, /Export to Markdown/);
+  assert.match(c.text, /Done · 1 row/, 'A1 sudah closed oleh tes pertama: sisa A2');
+  assert.equal(c.hasOpen, false, 'halaman web tidak bisa membuka berkas: tidak ada tombol Open');
+  assert.match(c.file, /^open-actions-\d{4}-\d{2}-\d{2}\.md$/);
+  await page.waitForFunction(() => window.__dl.length === 1);
+  const dl = await page.evaluate(() => window.__dl[0]);
+  assert.equal(dl.name, c.file);
+  assert.match(dl.text, /^# Open actions\n[\s\S]*\| A2 \| Order helmets \| Lars \|/);
+  assert.doesNotMatch(dl.text, /Fix the gate/, 'A1 closed tidak ikut');
+  const turn = await page.$eval('.a-turn', (t) => t.textContent);
+  assert.doesNotMatch(turn, /From your register|Looked at/, 'kartu adalah jawabannya, seperti di papan');
+});
+
+test('Ekspor di ekstensi: chrome.downloads.download lalu Open memanggil chrome.downloads.show(id)', async () => {
+  await page.evaluate(() => {
+    window.__saved = []; window.__shown = [];
+    chrome.permissions = { contains: async () => true, request: async () => true };
+    chrome.downloads = { download: async (o) => { window.__saved.push(o); return 7; }, show: (id) => window.__shown.push(id) };
+  });
+  await page.click('[data-ask="new"]');
+  await page.type('.ask-comp textarea', 'Export open actions to Markdown');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.ask-card.export [data-act="open-file"]');
+  const saved = await page.evaluate(() => window.__saved);
+  assert.equal(saved.length, 1);
+  assert.match(saved[0].filename, /^open-actions-.*\.md$/);
+  assert.equal(saved[0].saveAs, false);
+  assert.deepEqual(await page.evaluate(() => window.__shown), [], 'belum dibuka sebelum Open ditekan');
+  await page.click('.ask-card.export [data-act="open-file"]');
+  assert.deepEqual(await page.evaluate(() => window.__shown), [7]);
+  assert.equal((await exportCard()).file, null, 'dengan Open, nama berkas tidak dobel');
+  await page.evaluate(() => { delete chrome.downloads; delete chrome.permissions; });
+});
+
+test('Ekspor tanpa baris: jawaban teks, tanpa kartu dan tanpa unduhan', async () => {
+  await page.evaluate(() => { window.__dl = []; });
+  await page.click('[data-ask="new"]');
+  await page.type('.ask-comp textarea', 'Export risks');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => /nothing to export/i.test(document.querySelector('.ask-body').textContent));
+  assert.equal(await page.$('.ask-card.export'), null);
+  assert.equal(await page.evaluate(() => window.__dl.length), 0);
+  await page.keyboard.press('Escape');
+});
+
+test('Papan A03: bubble hitam, baris langkah dengan mata, kartu daftar dengan ubin + label status, kartu aksi berbingkai hijau', async () => {
+  await page.evaluate((env) => localStorage.setItem('minutesRegister', JSON.stringify(env)), ENV); // A1 kembali terbuka dan terlambat
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForSelector('#ask-field');
+  await openAskFresh();
+  await page.click('.ask-model'); await page.click('.ask-pick [data-prov="register"]');
+  await page.type('.ask-comp textarea', 'Open actions');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.ask-card.list');
+  const r = await page.evaluate(() => {
+    const q = (s) => document.querySelector(s);
+    const rows = [...document.querySelectorAll('.ask-card.list .lrow')].map((x) => ({ tile: !!x.querySelector('.tl2'), late: !!x.querySelector('.tl2.late'), label: x.querySelector('.r').textContent }));
+    return { step: !!q('.steps.one svg'), title: q('.ask-card.list .lh b').textContent, total: q('.ask-card.list .lh strong').textContent, foot: q('.ask-card.list .ft').textContent, rows, action: getComputedStyle(q('.ask-card.action')).boxShadow, h: q('.ask-card.action .h').textContent, cancelFlex: getComputedStyle(q('.ask-card.action .btn')).flexGrow };
+  });
+  assert.equal(r.step, true, 'satu langkah: teks sendiri dengan ikon mata, tanpa chevron');
+  assert.equal(r.title, 'Open actions');
+  assert.equal(r.total, '2');
+  assert.match(r.foot, /2 items in 1 meeting/);
+  assert.deepEqual(r.rows.map((x) => [x.tile, x.late, x.label]), [[true, true, 'Overdue'], [true, false, 'Due ' + new Date(Date.now() + 4 * 864e5).toLocaleDateString('en-US', { weekday: 'short' })]]);
+  assert.match(r.action, /rgb/, 'bingkai hijau 1,5 px');
+  assert.match(r.h, /Mark as done/);
+  assert.equal(r.cancelFlex, '1');
+});
+
+test('Picker model: grup "On this computer" + "Cloud · OpenRouter", radio, petunjuk biaya; tiga id OpenRouter yang diverifikasi', async () => {
+  await page.click('.ask-model');
+  const r = await page.evaluate(() => ({
+    groups: [...document.querySelectorAll('.ask-pick .g')].map((g) => g.textContent),
+    options: [...document.querySelectorAll('.ask-pick [role="option"]')].map((o) => [o.querySelector('b').textContent, o.querySelector('.hint')?.textContent || '', o.dataset.model]),
+    selected: document.querySelectorAll('.ask-pick [aria-selected="true"]').length,
+  }));
+  assert.deepEqual(r.groups, ['On this computer', 'Cloud · OpenRouter']);
+  assert.deepEqual(r.options.map((o) => o[0]), ['Local', 'Register only', 'Claude Sonnet 5', 'Gemini 3.1 Flash Lite', 'GPT-5.5']);
+  assert.deepEqual(r.options.slice(2).map((o) => o[2]), ['anthropic/claude-sonnet-5', 'google/gemini-3.1-flash-lite', 'openai/gpt-5.5']);
+  assert.ok(r.options.slice(2).every((o) => /credits \/ answer/.test(o[1])));
+  assert.equal(r.selected, 1);
+  await page.keyboard.press('Escape');
+});
+
+test('A03b kredit: tanpa server tidak ada saldo; contoh berlabel "sample": <10 = banner, 0 = kartu Out of credits + Kirim mati + Use Local', async () => {
+  assert.match(await page.$eval('.credits', (c) => c.textContent), /No server yet/);
+  await page.evaluate(() => localStorage.setItem('ysmCreditsSample', '8'));
+  await page.click('.ask-model'); await page.click('.ask-pick [data-prov="cloud"]');
+  await page.evaluate(() => { document.querySelector('.ask-model').blur(); });
+  const low = await dialogText();
+  assert.match(low, /8 credits left\./);
+  assert.match(await page.$eval('.credits', (c) => c.textContent), /Credits 8 · sample/);
+  await page.evaluate(() => localStorage.setItem('ysmCreditsSample', '0'));
+  await page.click('[data-ask="new"]');
+  await page.type('.ask-comp textarea', 'hello');
+  assert.equal(await page.$eval('.send', (b) => b.disabled), true, 'Kirim mati pada 0 kredit di Awan');
+  assert.match(await dialogText(), /Out of credits\. Local answers still work\./);
+  await page.click('[data-act="use-local-banner"]');
+  assert.doesNotMatch(await dialogText(), /Out of credits/);
+  assert.equal(await page.$eval('.send', (b) => b.disabled), false, 'Lokal gratis: Kirim hidup lagi');
+  await page.evaluate(() => localStorage.removeItem('ysmCreditsSample'));
+  await page.$eval('.ask-comp textarea', (t) => { t.value = ''; });
+  await page.keyboard.press('Escape');
 });
 
 test('tanpa galat halaman', () => assert.deepEqual(pageErrors, []));

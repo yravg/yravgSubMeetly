@@ -345,6 +345,9 @@ async function startCapture({ streamId, captureType = 'tab', config, settings })
         throw new Error('No lab capture stream — Start demo audio or Pick (share tab audio).');
       }
       rt.media = stream;
+    } else if (captureType === 'mic') {
+      // Microphone source: the panel asked for permission first, so this resolves without a prompt.
+      rt.media = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     } else if (captureType === 'desktop') {
       // desktopCapture picker stream: Chrome requires requesting video along
       // with audio; we only need the audio and stop the video track at once.

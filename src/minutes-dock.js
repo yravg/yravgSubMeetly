@@ -55,10 +55,16 @@ export function defaultLayout() {
   };
 }
 
+/** Modern at phone width (board A04a): the navigator is an overlay there, so it must not start open over the table. Its rail opens it. */
+function narrowDefaults(l) {
+  if (document.documentElement.dataset.reskin === 'tide' && globalThis.innerWidth <= 720) l.left.mode = 'rail';
+  return l;
+}
+
 export function loadLayout() {
   try {
     const raw = localStorage.getItem(LS_LAYOUT);
-    if (!raw) return defaultLayout();
+    if (!raw) return narrowDefaults(defaultLayout());
     const saved = JSON.parse(raw);
     const d = defaultLayout();
     return {

@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   readStream, chatRequest, buildGrounding, registerAnswer, proposeStatus, applyProposal,
-  trimHistory, PROVIDERS, CLOUD_MODELS,
+  trimHistory, PROVIDERS, CLOUD_MODELS, exportAnswer,
 } from '../src/lib/ask-tide.js';
 
 const NOW = new Date(2026, 10, 9, 9, 30);
@@ -33,7 +33,7 @@ test('readStream: delta, done dan error melewati batas potongan', async () => {
   assert.deepEqual(bad, [{ error: 'model not loaded' }]);
 });
 
-test('chatRequest: POST /ask ke helper, sistem + 6 giliran terakhir, provider dan model', async () => {
+test('chatRequest: POST /ask ke helper dengan {question, grounding, history≤6}, provider dan model', async () => {
   const calls = [];
   const fetchStub = async (url, init) => { calls.push({ url, init }); return sseResponse(['data: {"delta":"ok"}\n\ndata: {"done":true}\n\n']); };
   const history = Array.from({ length: 10 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}` }));
@@ -43,9 +43,10 @@ test('chatRequest: POST /ask ke helper, sistem + 6 giliran terakhir, provider da
   assert.equal(calls[0].init.method, 'POST');
   const body = JSON.parse(calls[0].init.body);
   assert.equal(body.provider, 'local');
-  assert.equal(body.messages[0].role, 'system');
-  assert.equal(body.messages.length, 1 + 6 + 1, 'sistem + 6 giliran + pertanyaan');
-  assert.equal(body.messages.at(-1).content, 'Q');
+  assert.equal(body.question, 'Q');
+  assert.equal(body.grounding, 'SYS');
+  assert.deepEqual(body.history.map((h) => h.content), ['m4', 'm5', 'm6', 'm7', 'm8', 'm9'], '6 giliran terakhir');
+  assert.equal(body.messages, undefined, 'bentuk lama tidak dikirim lagi');
   assert.deepEqual(events.map((e) => e.delta || (e.done && 'done')), ['ok', 'done']);
 });
 
@@ -126,4 +127,62 @@ test('tulis hanya lewat Konfirmasi: usulan tidak mengubah apa pun, apply mengemb
   assert.notEqual(next, ms[0]);
   assert.throws(() => applyProposal({ ...ms[0], issuedAt: 'x' }, p), /issued/);
   assert.throws(() => applyProposal(ms[0], { ...p, meetingId: 'Z' }), /meeting/);
+});
+
+test('exportAnswer: "Export open actions to Markdown" → kartu export + berkas .md yang dihitung tangan', () => {
+  const ms = [
+    M('B', '2026-11-09', { items: [it('A1', 'action', { owner: 'Mei', due: '2026-11-06' }), it('A2', 'action', { owner: 'Lars', due: '2026-11-20' }), it('D1', 'decision'), it('R1', 'risk')] }),
+    M('A', '2026-11-02', { issuedAt: 'x', items: [it('A0', 'action', { owner: 'Mei', status: 'closed' })] }),
+  ];
+  const r = exportAnswer('Export open actions to Markdown', ms, { now: NOW });
+  assert.match(r.text, /\*\*2 rows\*\*/);
+  assert.deepEqual(r.card, { kind: 'export', title: 'Export to Markdown', sub: 'Open actions · all series', count: 2, filename: 'open-actions-2026-11-09.md' });
+  assert.equal(r.file.name, 'open-actions-2026-11-09.md');
+  assert.equal(r.file.mime, 'text/markdown');
+  assert.equal(r.file.content, [
+    '# Open actions', '',
+    'Exported from yravgSubMeetly on 2026-11-09 · 2 rows', '',
+    '| Ref | Item | Owner | Due | Status | Meeting |',
+    '| --- | --- | --- | --- | --- | --- |',
+    '| A1 | A1 text | Mei | 2026-11-06 | open | Meeting B |',
+    '| A2 | A2 text | Lars | 2026-11-20 | open | Meeting B |', '',
+  ].join('\n'));
+  const dec = exportAnswer('Ekspor decisions', ms, { now: NOW });
+  assert.equal(dec.card.sub, 'Decisions · all series');
+  assert.equal(dec.card.count, 1);
+  assert.equal(dec.file.name, 'decisions-2026-11-09.md');
+});
+
+test('exportAnswer: bukan permintaan ekspor → null; tanpa baris → tanpa kartu/berkas; sel dibersihkan', () => {
+  const ms = [M('B', '2026-11-09', { items: [it('A1', 'action', { text: { en: 'Fix a|b\nline two' } })] })];
+  assert.equal(exportAnswer('Open actions', ms, { now: NOW }), null);
+  assert.equal(exportAnswer('Translate a file', ms, { now: NOW }), null);
+  const none = exportAnswer('Export risks', ms, { now: NOW });
+  assert.equal(none.card, null);
+  assert.equal(none.file, null);
+  assert.match(none.text, /nothing to export/i);
+  const row = exportAnswer('Export open actions', ms, { now: NOW }).file.content.split('\n').find((l) => l.startsWith('| A1'));
+  assert.equal(row, '| A1 | Fix a\\|b line two |  |  | open | Meeting B |');
+});
+
+test('kartu daftar: judul, jumlah rapat, dan baris dengan nama rapat + label status (Overdue / Due Wed / Due 20 Nov / Done)', () => {
+  const ms = [M('B', '2026-11-09', { items: [
+    it('A1', 'action', { owner: 'Mei', due: '2026-11-06' }),
+    it('A2', 'action', { owner: 'Lars', due: '2026-11-20' }),
+    it('A3', 'action', { owner: 'Lars', due: '2026-11-11' }),
+    it('A4', 'action', { owner: 'Lars' }),
+  ] }), M('C', '2026-11-03', { seriesId: 'S2', items: [it('A9', 'action', { owner: 'Mei', due: '2026-11-04' })] })];
+  const open = registerAnswer('Open actions', ms, { now: NOW });
+  const card = open.cards[0];
+  assert.equal(card.title, 'Open actions');
+  assert.equal(card.meetings, 2);
+  const by = Object.fromEntries(card.rows.map((r) => [r.ref, r]));
+  assert.deepEqual([by.A1.label, by.A1.late], ['Overdue', true]);
+  assert.deepEqual([by.A3.label, by.A3.late], ['Due Wed', false]);
+  assert.deepEqual([by.A2.label, by.A2.late], ['Due 20 Nov', false]);
+  assert.equal(by.A4.label, '', 'tanpa tenggat: tanpa label');
+  assert.equal(by.A1.meeting, 'Meeting B');
+  assert.equal(by.A9.meeting, 'Meeting C');
+  const action = open.cards.find((c) => c.kind === 'action');
+  assert.equal(action.head, 'Mark as done');
 });

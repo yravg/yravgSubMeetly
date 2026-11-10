@@ -46,6 +46,9 @@ import { makeT as makeNotesT } from './lib/notes-i18n.js';
 import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js';
 import { makeResizable } from './lib/resizable.js';
 import { mountPerfPanel } from './perf-panel.js';
+import { mountLiveLayout } from './app-pages/live-layout.js';
+import { mountFilesLayout } from './app-pages/files-layout.js';
+import { mountSettingsLayout } from './app-pages/settings-layout.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
 import { detectOs } from './lib/helper-status.js';
@@ -58,6 +61,7 @@ import { tile as colourTile } from './lib/colour-icons.js';
 import { renderFeatureMap } from './lib/feature-map.js';
 import { mountAddinsPane, glossaryCaption } from './addins-ui.js';
 import { markedHtml } from './lib/glossary.js';
+import { migrateUiDefaults, shouldAdoptRemote, DEFAULT_RESKIN, DEFAULT_THEME } from './lib/ui-defaults.js';
 import { springProgress, slidingNumber, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -82,8 +86,8 @@ const state = {
     nativeDevice: 'auto', // helper compute: 'auto' | 'cpu' | 'cuda' (Win/Linux faster-whisper)
     tabRows: 'one', // 'one' = hanya bar bawah, 'two' = baris Captions/Notes di atas juga
     translationColour: 'indigo', // indigo | navy | teal | neutral | bronze — warna baris terjemahan langsung
-    theme: 'auto', // 'auto' | 'light' | 'dark'
-    reskin: 'yraverage', // 'yraverage' | 'coretax' | 'modern' — pola interaksi lokal
+    theme: DEFAULT_THEME, // 'auto' | 'light' | 'dark' (bawaan terang, lihat lib/ui-defaults.js)
+    reskin: DEFAULT_RESKIN, // 'yraverage' | 'coretax' | 'modern' | 'tide' — bawaan Tide
     // Two-way (consecutive) interpreting is opt-in; 'simultaneous' is the
     // historical one-way srcLang → tgtLang path.
     interpreter: { mode: 'simultaneous', a: 'ja', b: 'en' },
@@ -118,6 +122,7 @@ function applyI18n() {
   // The notes ticker (notes-panel.js) and the Minutes Register read the UI
   // language from <html lang>, so keep it in sync with the setting.
   document.documentElement.lang = state.settings.uiLang || 'en';
+  window.__ysmLiveRepaint?.();
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
@@ -971,7 +976,7 @@ function openSettingsPane() {
 }
 
 let addinsPane = null; // Settings › Add-ins (addins-ui.js), mounted at boot
-const SETTINGS_TABS = ['general', 'engine', 'models', 'output', 'addins', 'about'];
+const SETTINGS_TABS = ['general', 'engine', 'models', 'output', 'addins', 'helper', 'about'];
 function setSettingsTab(tab) {
   const next = SETTINGS_TABS.includes(tab) ? tab : 'general';
   $('settings-modal').dataset.stab = next;
@@ -1464,7 +1469,7 @@ function paintTiles() {
 // ---------------------------------------------------------------------------
 // theme: auto (ikut sistem) | light | dark — disimpan di chrome.storage.local
 function applyTheme() {
-  const theme = state.settings.theme || 'auto';
+  const theme = state.settings.theme || DEFAULT_THEME;
   document.documentElement.classList.remove('theme-light', 'theme-dark');
   if (theme === 'light') document.documentElement.classList.add('theme-light');
   else if (theme === 'dark') document.documentElement.classList.add('theme-dark');
@@ -1475,8 +1480,9 @@ function applyTheme() {
 }
 
 async function setTheme(theme) {
-  const next = ['auto', 'light', 'dark'].includes(theme) ? theme : 'auto';
+  const next = ['auto', 'light', 'dark'].includes(theme) ? theme : DEFAULT_THEME;
   state.settings.theme = next;
+  state.settings.themeExplicit = true;
   await saveSettings();
   applyTheme();
   pushUiPrefs();
@@ -1516,7 +1522,7 @@ const RESKINS = ['yraverage', 'coretax', 'modern', 'tide'];
 function applyReskin() {
   const reskin = RESKINS.includes(state.settings.reskin)
     ? state.settings.reskin
-    : 'yraverage';
+    : DEFAULT_RESKIN;
   document.documentElement.dataset.reskin = reskin;
   document.querySelectorAll('#reskin-toggle button').forEach((b) => {
     const active = b.dataset.reskin === reskin;
@@ -1526,8 +1532,9 @@ function applyReskin() {
 }
 
 async function setReskin(reskin) {
-  const next = RESKINS.includes(reskin) ? reskin : 'yraverage';
+  const next = RESKINS.includes(reskin) ? reskin : DEFAULT_RESKIN;
   state.settings.reskin = next;
+  state.settings.reskinExplicit = true;
   await saveSettings();
   applyReskin();
   pushUiPrefs();
@@ -1568,13 +1575,14 @@ async function pullUiPrefs() {
       persistLastConfig();
     }
   }
-  if (['auto', 'light', 'dark'].includes(res.prefs?.theme) && res.prefs.theme !== state.settings.theme) {
+  if (['auto', 'light', 'dark'].includes(res.prefs?.theme) && res.prefs.theme !== state.settings.theme && shouldAdoptRemote('theme', res.prefs.theme, state.settings)) {
     state.settings.theme = res.prefs.theme;
     changed = true;
   }
   if (
     RESKINS.includes(res.prefs?.reskin) &&
-    res.prefs.reskin !== state.settings.reskin
+    res.prefs.reskin !== state.settings.reskin &&
+    shouldAdoptRemote('reskin', res.prefs.reskin, state.settings)
   ) {
     state.settings.reskin = res.prefs.reskin;
     changed = true;
@@ -1606,13 +1614,8 @@ async function loadSettings() {
   }
   renderUiLangToggle();
   renderEngineToggle();
-  if (!['auto', 'light', 'dark'].includes(state.settings.theme)) {
-    state.settings.theme = 'auto';
-  }
+  Object.assign(state.settings, migrateUiDefaults(state.settings));
   applyTheme();
-  if (!RESKINS.includes(state.settings.reskin)) {
-    state.settings.reskin = 'yraverage';
-  }
   applyReskin();
   if (!['one', 'two'].includes(state.settings.tabRows)) state.settings.tabRows = 'one';
   applyTabRows();
@@ -1678,6 +1681,8 @@ let nativeInfo = null; // last /health result (null = offline/unknown)
  * { name, sizeBytes, progress 0–1, status idle|running|cancelling|cancelled|done|error, stage, jobId, cancellable }
  */
 let largeFileJob = null;
+// Offline job progress for the Files page (board A05): windows done / total, percent, start stamp.
+let fileProgress = null;
 /** @type {null | (() => void)} */
 let redrawHelperStatus = null;
 /** @type {null | (() => void)} */
@@ -2502,6 +2507,7 @@ function showToast(msg, kind = 'ok') {
   }, 5000);
 }
 if (typeof window !== 'undefined') window.__ysmToast = showToast;
+if (typeof window !== 'undefined') window.__ysmShowError = (raw) => showError(raw);
 
 async function startWithStream(streamId, captureType) {
   setStatus(t('loadingModels'));
@@ -2595,9 +2601,40 @@ async function onStart() {
   }
 }
 
+// Microphone source (board A02): the lab and the app window hand the stream to the pipeline in-page;
+// the extension asks for mic permission here (a visible page can prompt) and offscreen opens the mic itself.
+let micSource = false;
+async function startFromMic() {
+  setStatus(t('loadingModels'));
+  clearLivePreview();
+  $('live-preview').classList.remove('hidden');
+  const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+  if (!isLabHarness()) {
+    for (const track of mic.getTracks()) track.stop();
+    await startWithStream(null, 'mic');
+    return;
+  }
+  releaseLabCapture();
+  const t0 = performance.now();
+  window.__ysmCaptureStream = mic;
+  window.__ysmLabClock = () => (performance.now() - t0) / 1000;
+  state.currentTab = { id: 1, title: t('micTitle'), url: '', favIconUrl: '' };
+  await startWithStream(null, 'media');
+}
+
 async function startOnce() {
   if (state.mode === 'realtime') {
     persistLastConfig();
+    if (micSource) {
+      try {
+        hideError();
+        await startFromMic();
+      } catch (e) {
+        releaseLabCapture();
+        showCaptureError(e?.name === 'NotAllowedError' ? t('micDenied') : String(e?.message || e));
+      }
+      return;
+    }
     if (isLabHarness()) {
       try {
         setStatus(t('loadingModels'));
@@ -2641,6 +2678,7 @@ async function startOnce() {
     }
     setStatus(t('processing'));
     state.offlineLines = [];
+    fileProgress = { startedAt: Date.now(), idx: 0, total: 0, pct: 0 };
     $('off-lines').innerHTML = '';
     $('off-results').classList.remove('hidden');
     $('off-progress-text').textContent = '…';
@@ -2812,6 +2850,7 @@ function fmtTs(sec, srtStyle = false) {
 
 function pushOfflineLine({ line, idx, total }) {
   state.offlineLines.push(line);
+  if (total) fileProgress = { ...(fileProgress || { startedAt: Date.now() }), idx, total, pct: fileProgress?.large ? fileProgress.pct : Math.round((idx / total) * 100) };
   redrawHelperStatus?.();
   const host = $('off-lines');
   const div = document.createElement('div');
@@ -3080,6 +3119,11 @@ chrome.runtime.onMessage.addListener((msg) => {
       break;
     case 'offline-progress': {
       const d = msg.data;
+      fileProgress = {
+        startedAt: fileProgress?.startedAt || Date.now(), large: !!d.large, stage: d.stage,
+        idx: d.idx ?? fileProgress?.idx ?? 0, total: d.total ?? fileProgress?.total ?? 0,
+        pct: d.large ? Math.max(0, Math.min(100, Math.round(d.pct || 0))) : d.total ? Math.round(((d.idx || 0) / d.total) * 100) : fileProgress?.pct ?? 0,
+      };
       if (d.large) {
         const pct = Math.max(0, Math.min(100, Math.round(d.pct || 0)));
         largeFileJob = {
@@ -3117,6 +3161,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     }
     case 'offline-done':
       state.offlineRunning = false;
+      fileProgress = { ...(fileProgress || {}), pct: 100, done: true };
       syncCaptureStamp();
       if (largeFileJob) {
         largeFileJob = { ...largeFileJob, progress: 1, status: 'done', stage: 'done', cancellable: false };
@@ -3213,7 +3258,7 @@ function wire() {
     if (area && area !== 'local') return;
     applyExternalSettings(changes.settings?.newValue);
   });
-  $('btn-reskin-reset')?.addEventListener('click', () => setReskin('yraverage'));
+  $('btn-reskin-reset')?.addEventListener('click', () => setReskin(DEFAULT_RESKIN));
   $('src-lang').addEventListener('change', (e) => {
     state.srcLang = e.target.value;
     renderInterpreterUi();
@@ -3598,6 +3643,34 @@ async function init() {
   } else if (q.get('view')) {
     jumpTo(q.get('view'));
     if (q.get('view') === 'settings' && SETTINGS_TABS.includes(q.get('stab'))) setSettingsTab(q.get('stab'));
+  }
+  if (q.get('shell') === '1') document.documentElement.dataset.shell = q.get('view') || 'captions';
+  if (q.get('shell') === '1' && (q.get('view') === 'files' || q.get('view') === 'history')) {
+    mountFilesLayout({
+      view: q.get('view'),
+      lang: () => state.settings.uiLang,
+      running: () => state.offlineRunning,
+      file: () => state.offlineFile,
+      staging: () => state.offlineStaging,
+      lines: () => state.offlineLines,
+      progress: () => fileProgress,
+      exportKind: (kind) => exportLines(kind),
+    });
+    resyncPills(false);
+  }
+  if (q.get('shell') === '1' && q.get('view') === 'settings') {
+    mountSettingsLayout({ lang: () => state.settings.uiLang, hosted: location.protocol === 'chrome-extension:' || isWebHost(), setTab: (tb) => setSettingsTab(tb) });
+    if (SETTINGS_TABS.includes(q.get('stab'))) setSettingsTab(q.get('stab'));
+  }
+  if (q.get('shell') === '1' && q.get('view') === 'captions') {
+    mountLiveLayout({
+      lang: () => state.settings.uiLang,
+      env: location.protocol === 'chrome-extension:' ? 'ext' : isWebHost() ? 'web' : 'lab',
+      running: () => ({ on: state.mode === 'realtime' ? state.running : state.offlineRunning, startedAt: state.startedAt }),
+      setMic: (on) => { micSource = !!on; },
+    });
+    resyncPills(false); // the sliding pills were measured before the toggles moved into the cards
+    document.fonts?.ready.then(() => resyncPills(false));
   }
 }
 

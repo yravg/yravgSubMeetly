@@ -22,6 +22,10 @@ const RENAMED = {
   'button|Start Task': 'button|Start captions',
   'button|End Task': 'button|Stop captions',
   'button|Load sample data': 'button|Load demo meetings (removable)',
+  // A04: the register's layout presets became the Density control in the shell page's Layout & appearance menu.
+  'button|ReviewWide detail, sources below': 'button|Review',
+  'button|ReadingHeader open, no side panels': 'button|Reading',
+  'button|CompactRails only, dense rows': 'button|Compact',
 };
 const has = (found, k) => found.has(k) || found.has(RENAMED[k]);
 let server; let browser; let page;
@@ -50,7 +54,8 @@ const dump = (frame) => frame.evaluate(() => {
 
 async function route(hash) {
   await page.evaluate((h) => { location.hash = h; }, hash);
-  await page.waitForFunction((h) => document.querySelector('#page').dataset.route === h.replace(/^#/, '').split('?')[0], {}, hash);
+  // #helper is Settings on its Helper tab (board A07), so its page route is 'settings'.
+  await page.waitForFunction((h) => { const n = h.replace(/^#/, '').split('?')[0]; return document.querySelector('#page').dataset.route === ({ helper: 'settings' }[n] || n); }, {}, hash);
   await wait(400);
 }
 /** Bingkai yang dipasang halaman sekarang, setelah dokumennya siap. */
@@ -103,27 +108,31 @@ before(async () => {
     await st.evaluate((x) => document.querySelector(`[data-stab="${x}"]`)?.click(), t); await wait(400);
     add(await dump(st));
   }
-  // Area Developer = lab lama, tiap tab labnya.
+  // Area Developer asli (A08): kendali lab di halaman itu sendiri, tiap tab; menu "All test pages" dibuka;
+  // lalu panel produksi yang dipasangnya (tampilan bottom-nav lama).
   await route('#dev');
-  const lab = await frameOf('iframe.dev', 2500);
-  add(await dump(lab));
-  for (const t of ['pages', 'mock', 'guides', 'panel']) {
-    await lab.evaluate((x) => document.querySelector(`#ltabs [data-ltab="${x}"]`)?.click(), t); await wait(700);
-    add(await dump(lab));
+  const lab = await frameOf('#dv-frame', 2500);
+  for (const t of ['panel', 'pages', 'mock', 'guides']) {
+    await page.evaluate((x) => document.querySelector(`#dv-tabs [data-dtab="${x}"]`)?.click(), t); await wait(700);
+    add(await dump(page));
   }
+  await page.evaluate(() => { document.getElementById('dv-pages-menu').open = true; }); await wait(300);
+  add(await dump(page));
+  await page.evaluate(() => { document.getElementById('dv-pages-menu').open = false; });
   for (const v of ['captions', 'notes', 'history', 'helper', 'settings']) {
     await lab.evaluate((x) => document.querySelector(`.bottom-nav-item[data-view="${x}"], #view-tabs [data-view="${x}"]`)?.click(), v); await wait(600);
     add(await dump(lab));
   }
-  // Register, kosong lalu dengan data contoh (seperti capture2.mjs).
+  // Halaman Minutes asli (A04, tanpa iframe): kosong, lalu data contoh, lalu menu Layout & appearance.
   await route('#minutes');
-  const reg = await frameOf('iframe.reg');
-  // Library and Training now live in the Learn menu; open it so the dump sees them.
-  await reg.evaluate(() => document.getElementById('btn-learn')?.click());
-  add(await dump(reg));
-  await reg.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Load demo meetings/.test(b.textContent))?.click());
-  await wait(2500);
-  add(await dump(reg));
+  add(await dump(page));
+  await page.evaluate(() => [...document.querySelectorAll('#page button')].find((b) => /Load demo meetings/.test(b.textContent))?.click());
+  await page.waitForSelector('#page .mn-row', { timeout: 8000 });
+  await wait(500);
+  add(await dump(page));
+  await page.evaluate(() => document.querySelector('#page [data-mn="layout"]')?.click());
+  await wait(300);
+  add(await dump(page));
 });
 
 after(async () => { await browser?.close(); server?.kill('SIGTERM'); });

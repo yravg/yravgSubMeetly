@@ -246,3 +246,50 @@ fn qwen_translation_properties() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+/// `/ask` streams through `Translator::chat_stream`: several pieces, whose join is the answer,
+/// no chat-template leakage, and a register-grounded question is answered from the register.
+///
+///   cargo test -p submeetly-engine --test ml_golden qwen_ask_streams -- --ignored --nocapture
+#[test]
+#[ignore = "downloads a Qwen2.5 Instruct model; run with --ignored"]
+fn qwen_ask_streams() {
+    use submeetly_engine::translate::Translator;
+    let repo = std::env::var("TRANSLATE_TEST_MODEL")
+        .unwrap_or_else(|_| "Qwen/Qwen2.5-0.5B-Instruct".to_string());
+    let mut mt = Translator::load(&repo, candle_core::Device::Cpu, &hub_cache_dir())
+        .expect("load translator");
+    let grounding = "You are Tide. Answer from the register below, briefly.\n\
+        REGISTER\nA1 [action] Fix the gate — owner Mei, due 2026-11-06, open\n\
+        A2 [action] Order helmets — owner Lars, due 2026-11-20, open";
+    let turns = vec![(
+        "user".to_string(),
+        "How many open actions are there?".to_string(),
+    )];
+    let mut pieces: Vec<String> = Vec::new();
+    mt.chat_stream(grounding, &turns, 96, &mut |piece| {
+        pieces.push(piece.to_string());
+        true
+    })
+    .expect("stream");
+    let answer = pieces.concat();
+    println!("{} pieces: {answer}", pieces.len());
+    assert!(
+        pieces.len() >= 2,
+        "streamed in pieces, not one blob: {pieces:?}"
+    );
+    assert!(!answer.trim().is_empty());
+    assert!(
+        !["<|im_", "assistant\n"].iter().any(|p| answer.contains(p)),
+        "{answer}"
+    );
+
+    // The client going away (sink returns false) stops generation at once.
+    let mut seen = 0;
+    mt.chat_stream(grounding, &turns, 96, &mut |_| {
+        seen += 1;
+        false
+    })
+    .expect("stopped stream");
+    assert_eq!(seen, 1, "stopped after the first piece");
+}

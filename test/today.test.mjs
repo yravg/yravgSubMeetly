@@ -71,3 +71,10 @@ test('butir bawaan (ref sama di seri sama) dihitung sekali, versi rapat terbaru'
   ];
   assert.equal(computeToday(meetings, { now: NOW }).overdue.count, 0, 'ditutup di rapat terbaru');
 });
+
+test('"milik Anda": tindak lanjut minggu ini atas nama pengguna, tanpa membedakan huruf besar', () => {
+  const meetings = [M('m', '2026-11-09', { items: [it('A1', 'action', { owner: 'Enrico' }), it('A2', 'action', { owner: 'enrico ' }), it('A3', 'action', { owner: 'Mei Lin' }), it('D1', 'decision', { owner: 'Enrico' })] })];
+  assert.equal(computeToday(meetings, { now: NOW, me: 'Enrico' }).week.yoursAction, 2);
+  assert.equal(computeToday(meetings, { now: NOW }).week.yoursAction, 0, 'tanpa nama: nol');
+  assert.equal(computeToday(meetings, { now: NOW, me: 'Mei Lin' }).week.yoursAction, 1);
+});

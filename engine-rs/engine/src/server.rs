@@ -11,7 +11,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::app::{is_loopback_host, App};
-use crate::protocol::{Request, Response};
+use crate::protocol::{AskReply, Request, Response, SseRun};
 
 /// Bodies up to this size are buffered. Larger uploads to the file routes are
 /// streamed to a temp file (multi-GB media stays out of RAM); elsewhere drained.
@@ -141,6 +141,13 @@ fn handle_connection(stream: TcpStream, app: &App) -> io::Result<()> {
             write_page(&mut writer, &page)?;
             continue;
         }
+        if request.method == "POST" && request.path() == "/ask" {
+            // The answer streams, so the connection ends with it (no Content-Length).
+            return match app.handle_ask(&request) {
+                AskReply::Reply(response) => write_response(&mut writer, &response),
+                AskReply::Stream { headers, run } => write_sse(&mut writer, &headers, run),
+            };
+        }
         let response = app.handle(&request);
         if let Some(path) = &request.body_file {
             let _ = std::fs::remove_file(path);
@@ -204,6 +211,36 @@ fn write_response(writer: &mut TcpStream, response: &Response) -> io::Result<()>
     writer.flush()
 }
 
+/// A Server-Sent Events reply: one `data: {json}` block per event, flushed as it is made,
+/// then the connection closes. A failed write (the page closed) stops the model.
+fn write_sse(writer: &mut TcpStream, headers: &[(String, String)], run: SseRun) -> io::Result<()> {
+    let mut head = String::from("HTTP/1.1 200 OK\r\n");
+    for (name, value) in headers {
+        head.push_str(&format!("{name}: {value}\r\n"));
+    }
+    head.push_str("Connection: close\r\n\r\n");
+    writer.write_all(head.as_bytes())?;
+    writer.flush()?;
+    let mut failed = None;
+    run(&mut |event| {
+        let block = format!(
+            "data: {}\n\n",
+            serde_json::to_string(event).unwrap_or_default()
+        );
+        match writer
+            .write_all(block.as_bytes())
+            .and_then(|()| writer.flush())
+        {
+            Ok(()) => true,
+            Err(error) => {
+                failed = Some(error);
+                false
+            }
+        }
+    });
+    failed.map_or(Ok(()), Err)
+}
+
 fn write_page(writer: &mut TcpStream, page: &crate::web::WebResponse) -> io::Result<()> {
     let head = format!(
         "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-cache\r\nX-Content-Type-Options: nosniff\r\n\r\n",
@@ -226,6 +263,8 @@ fn reason_phrase(status: u16) -> &'static str {
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        409 => "Conflict",
+        503 => "Service Unavailable",
         500 => "Internal Server Error",
         501 => "Not Implemented",
         _ => "OK",
@@ -258,6 +297,36 @@ mod tests {
         stream.read_to_string(&mut response).expect("read");
         assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
         assert!(response.contains("\"ok\":true"), "{response}");
+    }
+
+    #[test]
+    fn a_stream_reply_sends_each_event_as_its_own_block_then_closes() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let address = listener.local_addr().expect("addr");
+        let t = thread::spawn(move || {
+            let headers = vec![("Content-Type".to_string(), "text/event-stream".to_string())];
+            let run: SseRun = Box::new(|emit| {
+                emit(&serde_json::json!({ "delta": "You own " }));
+                emit(&serde_json::json!({ "delta": "**4**" }));
+                emit(&serde_json::json!({ "done": true }));
+            });
+            write_sse(&mut listener.accept().expect("accept").0, &headers, run)
+        });
+        let mut stream = TcpStream::connect(address).expect("connect");
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).expect("read");
+        t.join().expect("thread").expect("write");
+        assert!(
+            raw.starts_with("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n"),
+            "{raw:?}"
+        );
+        assert!(!raw.contains("Content-Length"), "{raw:?}");
+        assert!(
+            raw.ends_with(
+                "data: {\"delta\":\"You own \"}\n\ndata: {\"delta\":\"**4**\"}\n\ndata: {\"done\":true}\n\n"
+            ),
+            "{raw:?}"
+        );
     }
 
     #[test]

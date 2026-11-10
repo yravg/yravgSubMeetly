@@ -26,7 +26,7 @@ export async function loadStore() {
   const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
   return { trusted: obj(got[TRUST_KEY]), removed: Array.isArray(got[REMOVED_KEY]) ? got[REMOVED_KEY] : [], runs: obj(got[RUNS_KEY]) };
 }
-const saveTrustState = (trusted, removed) => chrome.storage.local.set({ [TRUST_KEY]: trusted, [REMOVED_KEY]: removed });
+export const saveTrustState = (trusted, removed) => chrome.storage.local.set({ [TRUST_KEY]: trusted, [REMOVED_KEY]: removed });
 
 export async function recordRun(addinId, text) {
   const { runs } = await loadStore();
@@ -137,11 +137,11 @@ export function stripHtml(enabled, active, meetings, { lang = 'en', now, result 
 
 /* ---------- Settings › Add-ins ---------- */
 /** Side-panel i18n lookup (lib/i18n.js); English is the fallback for every missing key. */
-const tr = (lang, key, ...args) => {
+export const tr = (lang, key, ...args) => {
   const v = I18N[lang]?.[key] ?? I18N.en[key] ?? key;
   return typeof v === 'function' ? v(...args) : v;
 };
-const STATE_KEY = { 'needs-trust': 'aiStNeeds', enabled: 'aiStEnabled', changed: 'aiStChanged', broken: 'aiStBroken', removed: 'aiStRemoved' };
+export const STATE_KEY = { 'needs-trust': 'aiStNeeds', enabled: 'aiStEnabled', changed: 'aiStChanged', broken: 'aiStBroken', removed: 'aiStRemoved' };
 const SECTIONS = [
   ['aiStNeeds', (e) => ['needs-trust', 'changed', 'broken'].includes(e.state)],
   ['aiStEnabled', (e) => e.state === 'enabled'],
@@ -149,14 +149,14 @@ const SECTIONS = [
 ];
 
 // projectType / seriesId are manifest field names, quoted as written
-function scopeText(a, T) {
+export function scopeText(a, T) {
   if (a === 'always') return T('aiAlways');
   return [a.projectType && `projectType ${a.projectType.join(', ')}`, a.seriesId && `seriesId ${a.seriesId.join(', ')}`].filter(Boolean).join(' · ');
 }
 const DO_KEY = { recapEmail: 'aiDoRecap', exportIcs: 'aiDoIcs', applyGlossary: 'aiDoGlossary' };
 const doText = (d, T) => (DO_KEY[d.call] ? T(DO_KEY[d.call]) : d.call === 'addItem' ? T('aiDoAddItem', d.type) : T('aiDoOpen', d.url));
 
-function kindText(e, T) {
+export function kindText(e, T) {
   if (e.state === 'broken') return T('aiKindBroken');
   if (e.state === 'changed') return T('aiKindChanged');
   const m = e.manifest;

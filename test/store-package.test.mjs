@@ -50,7 +50,7 @@ test('tidak ada berkas pengembangan atau sampah di paket', { skip }, () => {
 
 test('setiap izin manifest dibahas di MV3-AUDIT.md (bahan justifikasi review)', () => {
   const audit = readFileSync(new URL('../store/MV3-AUDIT.md', import.meta.url), 'utf8');
-  const perms = [...manifestSrc.permissions, ...(manifestSrc.host_permissions || [])];
+  const perms = [...manifestSrc.permissions, ...(manifestSrc.optional_permissions || []), ...(manifestSrc.host_permissions || [])];
   const missing = perms.filter((p) => !audit.includes(p));
   assert.deepEqual(missing, [], `izin tanpa justifikasi tertulis: ${missing.join(', ')}`);
 });

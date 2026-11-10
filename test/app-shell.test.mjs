@@ -60,20 +60,24 @@ before(async () => {
 after(async () => { await browser?.close(); server?.kill('SIGTERM'); });
 
 const mascots = () => page.$$eval('img.tide-art', (l) => l.map((i) => i.src.split('/').pop()));
+// Hero utuh di setiap keadaan: bilah tanya dengan tombol kirim, empat chip, pemandangan.
+const heroParts = () => page.evaluate(() => ({ ask: !!document.querySelector('.hero .askbar input'), send: !!document.querySelector('.hero .askbar .send'), chips: document.querySelectorAll('.hero .chips .chip').length, scene: !!document.querySelector('.hero .hero-bg svg.harbour'), peek: !!document.querySelector('.hero .askbar .peek img') }));
 
-test('A09: sambutan pertama (wave) lalu kosong (sleep), satu maskot per layar', async () => {
+test('A09: sambutan pertama (wave) lalu kosong (sleep): hero tetap utuh, satu maskot di bilah tanya', async () => {
   assert.deepEqual(await mascots(), ['tide-wave.webp']);
+  assert.deepEqual(await heroParts(), { ask: true, send: true, chips: 4, scene: true, peek: true }, 'sambutan: hero tidak digantikan kartu');
+  assert.equal(await page.$eval('.hero h2', (h) => h.textContent), 'Good evening.'.replace('evening', await page.$eval('.hero h2', (h) => h.textContent.match(/morning|afternoon|evening/)[0])), 'tanpa nama: sapaan polos');
   // First run: a real setup list (engine, speech model, test caption), each with a way forward.
-  const steps = await page.$$eval('.hero ol.setup li', (l) => l.map((li) => ({ text: li.textContent.trim(), link: li.querySelector('a')?.getAttribute('href') || '' })));
+  const steps = await page.$$eval('.st.band ol.setup li', (l) => l.map((li) => ({ text: li.textContent.trim(), link: li.querySelector('a')?.getAttribute('href') || '' })));
   assert.ok(steps.length >= 2 && steps.length <= 3, JSON.stringify(steps));
   assert.equal(steps.at(-1).link, '#live');
   assert.match(steps.at(-1).text, /test caption/i);
   await page.click('[data-act="welcomed"]');
-  await page.waitForSelector('.st.in-hero');
+  await page.waitForSelector('.st.band');
   assert.deepEqual(await mascots(), ['tide-sleep.webp']);
-  const txt = await page.$eval('.hero', (h) => h.textContent);
-  assert.match(txt, /No meetings yet/);
-  assert.ok(await page.$('.hero a.pill-b[href="#live"]'), 'kosong menawarkan Start captions');
+  assert.deepEqual(await heroParts(), { ask: true, send: true, chips: 4, scene: true, peek: true }, 'kosong: hero tetap utuh');
+  assert.match(await page.$eval('.st.band', (h) => h.textContent), /No meetings yet/);
+  assert.ok(await page.$('.st.band a.pill-b[href="#live"]'), 'kosong menawarkan Start captions');
 });
 
 test('A01: angka dari register, satu maskot, kartu kemarin dan rapat hari ini', async () => {
@@ -96,6 +100,7 @@ test('A01: angka dari register, satu maskot, kartu kemarin dan rapat hari ini', 
   assert.match(r.over, /1 overdue/);
   assert.match(r.helper, /Helper/);
   assert.deepEqual(await mascots(), ['tide-shell.webp']);
+  assert.deepEqual(await heroParts(), { ask: true, send: true, chips: 4, scene: true, peek: true }, 'terisi: hero utuh');
   assert.equal(await page.$eval('.rail1 a.pill-b', (a) => a.getAttribute('href')), '#minutes?meeting=Y1');
 });
 
@@ -126,7 +131,7 @@ test('⇧S membuka Live captions; setiap rute nav memasang halamannya', async ()
   await page.keyboard.down('Shift'); await page.keyboard.press('S'); await page.keyboard.up('Shift');
   await page.waitForFunction(() => location.hash === '#live');
   const routes = await page.$$eval('#nav-meetings a, #nav-features a', (l) => l.map((a) => a.dataset.route));
-  assert.deepEqual(routes, ['today', 'live', 'minutes', 'notes', 'history', 'files', 'addins', 'island', 'perf', 'settings', 'dev'], 'lab: Developer tampil');
+  assert.deepEqual(routes, ['today', 'live', 'minutes', 'history', 'files', 'addins', 'glossary', 'island', 'perf', 'all', 'settings', 'dev'], 'urutan papan A01; lab: Developer tampil');
   const expect = { live: 'view=captions', history: 'view=history', files: 'view=files', addins: 'stab=addins', notes: 'view=notes', island: 'stab=output', perf: 'view=perf', settings: 'view=settings' };
   for (const [route, frag] of Object.entries(expect)) {
     await page.evaluate((r) => { location.hash = `#${r}`; }, route);
@@ -134,15 +139,18 @@ test('⇧S membuka Live captions; setiap rute nav memasang halamannya', async ()
     const src = await page.$eval('#page iframe.panel', (f) => f.getAttribute('src'));
     assert.ok(src.includes(frag), `${route} → ${src}`);
   }
-  // Tautan lama #glossary membuka catatan rapat (tempat panel Glosarium hidup), berlabel Notes; History berlabel Transcripts.
+  // Glossary membuka catatan rapat (tempat panel Glosarium hidup).
   await page.evaluate(() => { location.hash = '#glossary'; });
   await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'notes');
-  assert.equal(await page.$eval('#page-title', (h) => h.textContent), 'Notes');
-  assert.equal(await page.$eval('#nav-meetings [data-route="history"]', (a) => a.textContent.trim()), 'Transcripts');
+  assert.equal(await page.$eval('#page-title', (h) => h.textContent), 'Notes and glossary');
+  assert.equal(await page.$eval('#nav-features [data-route="glossary"]', (a) => a.classList.contains('on')), true, 'Glossary menyala di sidebar');
+  assert.equal(await page.$eval('#nav-meetings [data-route="history"]', (a) => a.textContent.trim()), 'History');
   // Lab: Live menyebut keadaan terkunci "Needs the extension".
   await page.evaluate(() => { location.hash = '#live'; });
   await page.waitForFunction(() => document.querySelector('#page').dataset.route === 'live');
-  assert.match(await page.$eval('#page', (p) => p.textContent), /Needs the extension/);
+  const liveFrame = await (await page.waitForSelector('#page iframe.panel')).contentFrame();
+  await liveFrame.waitForSelector('#ls-env-note');
+  assert.match(await liveFrame.$eval('#ls-env-note', (n) => n.textContent), /Needs the extension/);
 });
 
 test('Start captions di sidebar benar-benar memulai (bukan hanya membuka Live)', async () => {
@@ -156,68 +164,59 @@ test('Start captions di sidebar benar-benar memulai (bukan hanya membuka Live)',
   await page.evaluate(() => { location.hash = '#today'; });
 });
 
-test('A04: Minutes memasang register Modern yang mengikuti tema shell, menu gaya dan jendela Minutes', async () => {
+test('A04: Minutes digambar langsung (tanpa iframe); tautan Open register; Klasik = jendela Minutes', async () => {
   await page.evaluate(() => { location.hash = '#minutes?meeting=Y1'; });
-  await page.waitForSelector('#page iframe.reg');
-  const r = await page.evaluate(() => ({ frame: document.querySelector('#page iframe.reg').getAttribute('src'), classic: document.querySelector('.reg-list a[data-register="classic"]').getAttribute('href'), primary: document.querySelector('.tool > .btn.primary')?.dataset.act }));
-  assert.equal(r.frame, 'minutes.html?lang=en&skin=tide&follow=system&meeting=Y1');
-  assert.equal(r.classic, 'minutes.html?lang=en&meeting=Y1', 'tautan Klasik membuka halaman sendiri tanpa follow');
-  assert.equal(r.primary, 'win', 'satu tombol utama: buka di jendela');
+  await page.waitForSelector('#page .mn');
+  assert.equal(await page.$('#page iframe'), null, 'tanpa iframe register');
+  const r = await page.evaluate(() => ({ modern: document.querySelector('.mn-open a[data-register="modern"]').getAttribute('href'), classic: document.querySelector('.mn-open a[data-register="classic"]').getAttribute('href'), row: document.querySelector('.mn-row')?.dataset.ref }));
+  assert.equal(r.modern, 'minutes.html?lang=en&skin=tide&meeting=Y1');
+  assert.equal(r.classic, 'minutes.html?lang=en&meeting=Y1', 'tautan Klasik membuka halaman sendiri tanpa skin');
+  assert.equal(r.row, 'A2', 'butir rapat Y1 tampil');
   const n = (await browser.pages()).length;
-  await page.click('[data-act="win"]');
-  await page.waitForFunction((k) => true, {}, n);
-  await wait(800);
+  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
   assert.equal((await browser.pages()).length, n + 1, 'jendela Minutes terbuka (lab: window.open bernama)');
-  await page.click('[data-act="win"]'); await wait(800);
+  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
   assert.equal((await browser.pages()).length, n + 1, 'klik kedua tidak membuka jendela lain');
+  for (const p of (await browser.pages()).slice(n)) await p.close();
 });
 
-test('A04: Modern bawaan; Klasik lewat menu Style; pilihan diingat dan tampil lebih dulu', async () => {
-  await page.evaluate(() => { location.hash = '#minutes'; });
-  await page.waitForSelector('#page iframe.reg');
-  assert.deepEqual(await page.$$eval('.reg-list a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
-  const frame = await (await page.$('#page iframe.reg')).contentFrame();
-  await frame.waitForFunction(() => document.documentElement.dataset.reskin === 'tide' && getComputedStyle(document.body).fontFamily.includes('Plus Jakarta Sans'));
+test('A04: Modern bawaan; pilihan Open register diingat dan tampil lebih dulu', async () => {
+  await page.evaluate(() => { localStorage.removeItem('ysmShellRegister'); location.hash = '#minutes'; });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForSelector('#page .mn');
+  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
   const n = (await browser.pages()).length;
-  await page.click('.reg-menu summary');
-  await page.click('.reg-list a[data-register="classic"]');
-  await page.waitForFunction(() => !document.querySelector('#page iframe.reg')?.getAttribute('src').includes('skin=tide'));
-  await wait(1500);
-  const tab = (await browser.pages()).slice(n)[0];
-  assert.ok(tab, 'Klasik membuka tab sendiri');
-  assert.ok(new URL(tab.url()).searchParams.get('skin') === null && tab.url().includes('minutes.html?lang=en'), 'Klasik: tanpa skin=tide');
-  await tab.close();
-  assert.deepEqual(await page.$$eval('.reg-list a', (l) => l.map((a) => a.dataset.register)), ['classic', 'modern']);
-  // Klasik tanpa lapisan Tide (TIDE-024).
-  const cf = await (await page.$('#page iframe.reg')).contentFrame();
-  await cf.waitForFunction(() => document.readyState === 'complete');
-  assert.equal(await cf.evaluate(() => document.documentElement.dataset.reskin || null), null);
-  await page.click('.reg-menu summary');
-  await page.click('.reg-list a[data-register="modern"]'); await wait(1200);
+  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
+  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['classic', 'modern']);
+  await page.click('.mn-open a[data-register="modern"]'); await wait(900);
+  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
   for (const p of (await browser.pages()).slice(n)) await p.close();
 });
 
 test('A06: delapan fitur, Island dengan sakelar nyata, add-in terpasang di halaman yang sama', async () => {
-  await page.evaluate(() => { location.hash = '#all'; }); // alias of #addins
+  await page.evaluate(() => { location.hash = '#all'; });
   await page.waitForSelector('.tiles');
-  assert.equal(await page.$eval('#page', (p) => p.dataset.route), 'addins', '#all is an alias of Add-ins');
+  assert.equal(await page.$eval('#page', (p) => p.dataset.route), 'all', 'All features: halamannya sendiri (A06)');
   assert.equal(await page.$$eval('.tiles .tile2', (l) => l.length), 8);
-  assert.equal((await page.$$('.tiles [data-act="island"]')).length, 0, 'satu sakelar Island saja: di bilah atas');
+  assert.equal(await page.$$eval('.tiles .tile2 .sw-chip input', (l) => l.length), 4, 'sakelar nyata: Island + tiga add-in; fitur bawaan tanpa sakelar palsu');
   const before = await page.evaluate(() => chrome.storage.local.get('captionSurface'));
   await page.click('#island-chip'); await wait(300);
   const afterOn = await page.evaluate(() => chrome.storage.local.get('captionSurface'));
   assert.notEqual(afterOn.captionSurface, before.captionSurface || 'overlay');
   assert.equal(await page.$eval('#island-switch', (i) => i.checked), afterOn.captionSurface === 'both');
-  assert.equal(await page.$eval('[data-island-state]', (e) => e.textContent), 'On', 'kartu menunjukkan status sakelar');
+  assert.equal(await page.$eval('[data-feat-state="island"]', (e) => e.textContent), 'On', 'kartu menunjukkan status sakelar');
+  assert.equal(await page.$eval('[data-feat="island"]', (i) => i.checked), true, 'sakelar kartu ikut bilah atas');
   await page.click('#island-chip'); await wait(300);
-  assert.ok((await page.$eval('#addins-pane iframe', (f) => f.getAttribute('src'))).includes('stab=addins'));
+  assert.equal(await page.$('#addins-pane iframe'), null, 'add-in terpasang: baris asli, bukan bingkai');
+  await page.waitForSelector('#addins-rows .ia-row');
+  assert.equal(await page.$$eval('#addins-rows .ia-row', (l) => l.length), 5);
 });
 
-test('A08: area Developer (lab) memasang lab yang ada', async () => {
+test('A08: area Developer (lab) = halaman asli dengan panel terpasang (bukan bingkai lab); rincian di test/developer-area.test.mjs', async () => {
   await page.evaluate(() => { location.hash = '#dev'; });
-  const f = await (await page.waitForSelector('#page iframe.dev')).contentFrame();
-  await f.waitForSelector('#ltabs', { timeout: 20000 });
-  assert.equal(await page.$eval('#page iframe.dev', (x) => x.getAttribute('src')), '/app.html');
+  await page.waitForSelector('#dv-tabs');
+  assert.equal(await page.$('#page iframe.dev'), null);
+  assert.equal(await page.$eval('#dv-frame', (x) => x.getAttribute('src')), '/panel-test.html');
 });
 
 test('390 px: sidebar jadi lembar lewat tombol menu; tanpa gulir mendatar', async () => {
