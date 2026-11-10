@@ -160,6 +160,7 @@ export const LOW_CONFIDENCE = 0.7;
  * @property {string|null} end
  * @property {string} tz
  * @property {string|null} chair
+ * @property {string|null} source  who saved it: "island" | "paste" | "extension" (null = this app)
  * @property {Participant[]} attendees
  * @property {AgendaItem[]} agenda
  * @property {Record<string,Record<string,string>>} topics
@@ -346,6 +347,7 @@ export function createMeeting(partial = {}) {
     end: strOrNull(partial.end),
     tz: str(partial.tz || 'local'),
     chair: strOrNull(partial.chair),
+    source: strOrNull(partial.source),
     attendees: (Array.isArray(partial.attendees) ? partial.attendees : []).map((a) => ({
       name: str(a?.name),
       org: strOrNull(a?.org),

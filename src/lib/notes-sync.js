@@ -7,7 +7,7 @@ import {
   nativeSaveNote,
   nativeDeleteNote,
 } from './native.js';
-import { LOW_CONFIDENCE, normalizeProjectType } from './notes-schema.js';
+import { LOW_CONFIDENCE, normalizeProjectType, createMeeting } from './notes-schema.js';
 
 function textOf(t, lang = 'en') {
   if (!t) return '';
@@ -71,7 +71,7 @@ export function meetingToDoc(meeting, lang = meeting?.locale || 'en') {
     id: meeting.id,
     title: meeting.title || 'Notulen sesi',
     date: meeting.date || '',
-    source: 'extension',
+    source: meeting.source || 'extension',
     status: meeting.issuedAt ? 'issued' : 'ready',
     summary: textOf(meeting.summary, lang),
     decisions: items
@@ -153,4 +153,76 @@ export async function pullSharedNotes(url, lang = 'en') {
 export async function deleteSharedNote(url, id) {
   const res = await nativeDeleteNote(url, id);
   return !!res?.ok;
+}
+
+const person = (a) => {
+  if (a && typeof a === 'object') return { name: String(a.name || ''), org: a.org || null };
+  const m = /^(.*?)\s*\(([^()]*)\)$/.exec(String(a ?? '').trim());
+  return m ? { name: m[1].trim(), org: m[2].trim() || null } : { name: String(a ?? '').trim(), org: null };
+};
+const personKey = (p) => (p.org ? `${p.name} (${p.org})` : p.name);
+const seconds = (tc) => String(tc).split(':').reduce((s, p) => s * 60 + (Number(p) || 0), 0);
+
+/** v1 documents (helper, older island) carry only decisions[] and actions[]. */
+function v1Items(doc) {
+  return [
+    ...(doc.decisions || []).map((text, n) => ({ ref: `D-${n + 1}`, type: 'decision', text })),
+    ...(doc.actions || []).map((a, n) => ({ ref: a.id || `A-${n + 1}`, type: 'action', text: a.text, owner: a.owner, due: a.due, status: a.status })),
+  ];
+}
+
+/**
+ * Dokumen bersama (v2, atau v1 hanya decisions/actions) → rapat register: kebalikan
+ * `meetingToDoc`. `prev` = salinan lokal id yang sama: bidang yang tidak disimpan engine
+ * (agenda, email peserta, provenance butir) diambil darinya, selebihnya dokumen menang.
+ */
+export function docToMeeting(doc, lang = 'en', prev = null) {
+  const m = doc.meeting || {};
+  const locale = m.locale || prev?.locale || lang;
+  const time = (s) => (s ? String(s).replace(/^.*T/, '') : null); // island: local YYYY-MM-DDTHH:MM
+  const rows = Array.isArray(doc.items) && doc.items.length ? doc.items : v1Items(doc);
+  const items = rows.filter((d) => d?.text).map((d) => {
+    const pi = prev?.items?.find((x) => x.ref === d.ref);
+    const next = {
+      ref: d.ref, type: d.type, topic: d.topic || undefined, text: d.text, owner: d.owner, org: d.org, due: d.due,
+      status: d.status, priority: d.priority || undefined, likelihood: d.likelihood || undefined, review: d.review,
+      confidence: d.confidence, carriedFrom: d.carriedFrom, links: d.links, metric: d.metric,
+      src: d.tc || d.speaker ? { t0: d.tc ? seconds(d.tc) : 0, tc: d.tc, speaker: d.speaker } : null,
+    };
+    if (!pi) return next;
+    return { ...pi, ...next, text: textOf(pi.text, locale) === d.text ? pi.text : d.text, src: pi.src || next.src };
+  });
+  const attendees = (m.attendees || []).map((a) => {
+    const p = person(a);
+    return prev?.attendees?.find((x) => personKey(x) === personKey(p)) || p;
+  });
+  const summary = typeof doc.summary === 'string' ? doc.summary : textOf(doc.summary, locale);
+  return createMeeting({
+    ...prev,
+    id: doc.id,
+    title: doc.title,
+    date: doc.date || prev?.date,
+    source: doc.source || prev?.source,
+    seriesId: m.seriesId || prev?.seriesId,
+    seq: m.seq ?? prev?.seq,
+    projectType: m.projectType || prev?.projectType,
+    locale,
+    tz: m.tz || prev?.tz,
+    start: time(m.start) ?? prev?.start,
+    end: time(m.end) ?? prev?.end,
+    chair: m.chair ?? prev?.chair,
+    attendees,
+    summary: prev && textOf(prev.summary, locale) === summary ? prev.summary : summary,
+    items,
+    engine: m.engine || prev?.engine,
+    transcript: doc.transcript?.length ? doc.transcript : prev?.transcript,
+    issuedAt: m.issuedAt || (doc.status === 'issued' ? doc.generatedAt : null),
+    generatedAt: doc.generatedAt || prev?.generatedAt,
+  });
+}
+
+/** Semua dokumen bersama utuh (bukan ringkasan). Null bila helper tak terjangkau. */
+export async function pullSharedDocs(url) {
+  const notes = (await nativeGetNotes(url))?.notes;
+  return Array.isArray(notes) ? notes : null;
 }

@@ -1,5 +1,5 @@
 //! The Settings window's content: every setting yravgSubMeetly has, in a
-//! sidebar of sections (General, Appearance, Island, Music and lyrics,
+//! sidebar of sections (General, Appearance, Island, Media and lyrics,
 //! Pop-ups, Tabs, Add-ons, Focus, Prayer, AI, Oyenza, About), called
 //! Advanced settings. The last row of the island's Settings page (behind
 //! the gear) and the menu's Advanced settings… open it, in a window of its
@@ -152,7 +152,7 @@ impl Section {
             Section::General => "General",
             Section::Appearance => "Appearance",
             Section::Island => "Island",
-            Section::Music => "Music and lyrics",
+            Section::Music => "Media and lyrics",
             Section::Speech => "Captions and languages",
             Section::Models => "Models",
             Section::Popups => "Pop-ups",
@@ -552,7 +552,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         Section::Tabs => {
             let pages = start_pages(st);
             let start = PageKind::from_key(&s.start_page);
-            let start_name = if pages.contains(&start) { start.title() } else { pages.first().map_or("Music", |p| p.title()) };
+            let start_name = if pages.contains(&start) { start.title() } else { pages.first().map_or("Media", |p| p.title()) };
             let mut open = vec![switch(Key::RememberPage, "Open where you left off", Some("The page you last had open"), s.remember_page)];
             if !s.remember_page {
                 open.push(item(Key::StartPage, "Opens on", None, Ctl::Stepper(start_name.to_string())));
@@ -1695,6 +1695,11 @@ mod tests {
     use super::*;
     use poni_core::settings::Settings;
     use poni_core::store::Store;
+
+    #[test]
+    fn media_section_title() {
+        assert_eq!(Section::Music.title(), "Media and lyrics");
+    }
 
     fn state() -> AppState {
         AppState::new(Settings::default(), Store::default())

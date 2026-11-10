@@ -14,7 +14,15 @@ Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private
 | 2. Canvas (boards P01-P07) | done | worker `pmm-canvas` (Sonnet) + lead fixes; build: 7 boards, 0 anatomy problems, 29 new controls, 18/18 PRD rows placed; render 1640: 0 errors, 0 broken images, scrollWidth 1640; lint_boards 7/7; slop 73 (C), 0 errors, 27 warnings (11px mono labels, `!important` in Before/After panes, inline padding); contrast lowest checked pair 4.99 (`#F2745A` on `#2b2b2e`). Regenerate: `node build.mjs` (static) / `node build.mjs --dc <root>`; render needs `PUPPETEER_EXECUTABLE_PATH` = Chrome for Testing 154 |
 | 3. Owner answers Q1-Q3 | done | 2026-11-10: all defaults accepted; Q1 extended -> PMM-017/018 |
 | 3b. Owner sign-off on canvas | waived | owner 2026-11-10: proceed with the build once boards are finished |
-| 4. Build PMM-001 .. PMM-027 | in progress | orchestrator `pmm-lead` (Fable 5.2), checkpoint `.checkpoints/pmm-lead.md` |
+| 4. Build PMM-001 .. PMM-027 | in progress | orchestrator `pmm-lead` (Fable 5.2), checkpoint `.checkpoints/pmm-lead.md`; build steps below |
+| 4.1 PMM-001 rename + PMM-024 register real records | done | island 1.3.0 installed (`island/dist/yravgSubMeetly-Setup-1.3.0.exe`, sha256 9ccad895...b8a7). Tests: poni 291 pass / 6 ignored (`media_tab_reads_media`, `media_section_title`), poni-core 531; `test/register-sync.test.mjs` 9 + `test/register-sync-page.test.mjs` 2. Seen headless on the installed engine: register lists 10 island meetings, pill "Synced with island · just now", no write requests. Not seen on screen: the Media tab label on the pill |
+| 4.2 PMM-004/017/018 classifier + PMM-014 Settings rows | open | |
+| 4.3 PMM-011/012/013 Aa strip, pop-up language pills | open | |
+| 4.4 PMM-002/003/015 Media caption column | open | |
+| 4.5 PMM-005..009 Meeting tab with live notes | open | |
+| 4.6 PMM-019/020/021 Live in the room | open | |
+| 4.7 PMM-025/026/027 faster captions | open | |
+| 4.8 PMM-022 Captions tab, PMM-023 Minutes all records | open | |
 
 ## Decisions
 
@@ -29,6 +37,12 @@ Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private
 - Proposals, not code facts: pop-up width cap 372 -> 450, Meeting page 428 tall.
 - Older caption lines use `--faint` (navy at 50%), same as today's Live "previous line"; about 3.4:1 on white, below 4.5:1. Revisit at build.
 
+## Build notes
+
+- Rust on this laptop: default toolchain is `stable-x86_64-pc-windows-gnu` (fails: `dlltool.exe` not found). Set `$env:RUSTUP_TOOLCHAIN='stable-x86_64-pc-windows-msvc'`.
+- JS tests: `python3` must be a real `.exe` (Node `spawn` does not run `.cmd`): prepend a folder holding a copy of `python.exe` named `python3.exe` and set `PYTHONHOME=C:\Program Files\Python311`. `npm` from Git Bash is broken (stale kimi shim): run `npm` from PowerShell.
+- PMM-024 limits (comment `shortcut:` in `src/lib/engine-sync.js`): a meeting deleted on the engine side stays in the browser copy; a local edit made while the engine was down is overwritten at the next start. The Source fact shows the raw value for sources without a label (`calendar`).
+
 ## Next step
 
-Owner reviews the canvas (comments on boards). Then build in the PRD order, starting with PMM-001 (rename) and PMM-004/017 (classifier + user list).
+Step 4.2: meeting-source classifier (`poni_core::capture::source_kind`), `settings.meeting_apps`, pasted-link window, Settings rows.

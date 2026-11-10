@@ -152,7 +152,7 @@ impl PageKind {
             PageKind::Timer => "Agenda timer",
             PageKind::Talk => "Talk time",
             PageKind::Engine => "Engine",
-            PageKind::Media => "Music",
+            PageKind::Media => "Media",
             PageKind::Focus => "Focus",
             PageKind::Shelf => "Shelf",
             PageKind::Tasks => "Tasks",
@@ -712,6 +712,11 @@ mod tests {
 
     fn state() -> AppState {
         AppState::new(Settings::default(), Store::default())
+    }
+
+    #[test]
+    fn media_tab_reads_media() {
+        assert_eq!(PageKind::Media.title(), "Media");
     }
 
     #[test]

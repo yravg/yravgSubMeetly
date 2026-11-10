@@ -662,6 +662,8 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
   .appbar { padding: 0 12px; gap: 7px; }
   .appbar .pill.ondevice > span { display: none; }
   .appbar .pill.ondevice { padding: 3px 7px; }
+  .appbar .pill.sync-pill > span { display: none; }
+  .appbar .pill.sync-pill { padding: 3px 7px; }
   .appbar .btn.primary { padding: 0 10px; }
   .mswitch { max-width: 130px; }
 }
@@ -1347,3 +1349,12 @@ html[data-theme="coretax"] .sum-stats .is-warn dd { color: var(--warn-ink); }
 body[data-thv] #src-panel { display: none; }
 body[data-thv="inbox"] #top-panel, body[data-thv="projects"] #top-panel { display: none; }
 body[data-thv="highlights"] #strip, body[data-thv="highlights"] .prov { display: none; }
+
+/* ---- PMM-024: synced-with-island indicator + Sample tag ---- */
+.pill.sync-pill { color: var(--muted); border: 1px solid var(--border); }
+.pill.sync-pill .sy-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.pill.sync-pill.down .sy-dot { background: var(--warn-text); }
+.pill.sync-pill.pulse .sy-dot { animation: sy-pulse 300ms ease-out 1; }
+@keyframes sy-pulse { 50% { transform: scale(1.7); } }
+#m-title { display: inline-block; }
+#sample-badge { margin-left: 8px; vertical-align: middle; }

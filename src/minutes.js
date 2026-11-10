@@ -839,6 +839,10 @@ function paintHeader() {
   $('#m-mom').textContent = m.id;
   $('#m-series').textContent = T('seriesNth', series.findIndex((x) => x.id === m.id) + 1);
   $('#m-ptype').textContent = T(ptKey(m.projectType));
+  $('#sample-badge').classList.toggle('hidden', !isDemoMeeting(m));
+  $('#m-source-wrap').hidden = !m.source;
+  const srcKey = m.source ? `src${m.source[0].toUpperCase()}${m.source.slice(1)}` : '';
+  $('#m-source').textContent = srcKey && T(srcKey) !== srcKey ? T(srcKey) : m.source || '';
   $('#prov-line').textContent = m.engine
     ? T('pipeline', m.engine.asr, m.engine.segments, m.items.length)
     : T('noSource');
@@ -946,14 +950,18 @@ function paintChips() {
 }
 
 function paintSwitcher() {
-  const opt = (m) => `<option value="${esc(m.id)}" ${m.id === state.activeId ? 'selected' : ''}>${esc(m.date)} — ${esc(weekLabel(m))}${m.issuedAt ? ' ✓' : ''}</option>`;
+  // Meetings the island saved have no weekly number, so they are listed by title.
+  const opt = (m) => `<option value="${esc(m.id)}" ${m.id === state.activeId ? 'selected' : ''}>${esc(m.date)} — ${esc(m.source ? m.title : weekLabel(m))}${m.issuedAt ? ' ✓' : ''}${isDemoMeeting(m) ? ` · ${esc(T('sampleTag'))}` : ''}</option>`;
   const vis = visibleMeetings();
   const types = [...new Set(vis.map((m) => m.projectType || 'general'))];
   const sel = $('#m-switch');
   // Lebih dari satu tipe → kelompokkan per tipe supaya 200 rapat tetap bisa dinavigasi.
-  sel.innerHTML = types.length > 1
-    ? types.map((t) => `<optgroup label="${esc(T(ptKey(t)))}">${vis.filter((m) => (m.projectType || 'general') === t).map(opt).join('')}</optgroup>`).join('')
-    : vis.map(opt).join('');
+  const demo = vis.filter(isDemoMeeting);
+  sel.innerHTML = demo.length && demo.length < vis.length
+    ? `<optgroup label="${esc(T('grpIsland'))}">${vis.filter((m) => !isDemoMeeting(m)).map(opt).join('')}</optgroup><optgroup label="${esc(T('grpDemo'))}">${demo.map(opt).join('')}</optgroup>`
+    : types.length > 1
+      ? types.map((t) => `<optgroup label="${esc(T(ptKey(t)))}">${vis.filter((m) => (m.projectType || 'general') === t).map(opt).join('')}</optgroup>`).join('')
+      : vis.map(opt).join('');
 
   const counts = new Map();
   for (const m of state.meetings) { const t = m.projectType || 'general'; counts.set(t, (counts.get(t) || 0) + 1); }
@@ -1900,7 +1908,30 @@ async function boot() {
   paint();
   runUrlIntent();
   // Engine-hosted app window: mirror the register to the engine so island pages see it.
-  startEngineSync({ lang: () => state.lang, onError: () => toast(T('engineSyncFail'), true) });
+  const sync = startEngineSync({
+    lang: () => state.lang,
+    onError: () => toast(T('engineSyncFail'), true),
+    onSync: async (s) => {
+      paintSync(s);
+      if (s.changed) { await reloadAll(true); paint(); }
+    },
+  });
+  if (sync) setInterval(() => paintSync(), 15_000);
+}
+
+/** "Synced with island" pill (only when this page is served by the engine): last pull, refreshed text. */
+let lastSync = null;
+function paintSync(s) {
+  if (s) lastSync = s;
+  const pill = $('#sync-pill');
+  if (!lastSync) return;
+  const mins = Math.floor((Date.now() - lastSync.at) / 60000);
+  const text = !lastSync.ok ? T('syncDown') : !lastSync.count && !state.meetings.length ? T('syncEmpty') : mins < 1 ? T('syncNow') : T('syncAgo', mins);
+  pill.hidden = false;
+  pill.classList.toggle('down', !lastSync.ok);
+  $('#sync-text').textContent = text;
+  pill.title = text;
+  if (s) { pill.classList.remove('pulse'); void pill.offsetWidth; pill.classList.add('pulse'); }
 }
 
 boot();

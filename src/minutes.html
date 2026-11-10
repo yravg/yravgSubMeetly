@@ -18,6 +18,7 @@
       <span id="crumb-trail"></span>
     </div>
     <div class="grow"></div>
+    <span class="pill sync-pill" id="sync-pill" hidden role="status"><i class="sy-dot" aria-hidden="true"></i><span id="sync-text"></span></span>
     <span class="pill ondevice" id="pill-ondevice">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
       <span data-t="onDevice">On-device</span>
@@ -122,7 +123,7 @@
     <header class="mhead top" id="top-panel">
       <div class="mhead-top">
         <div class="mtitle-wrap">
-          <h1 id="m-title">—</h1>
+          <h1 id="m-title">—</h1><span class="sample-badge hidden" id="sample-badge" data-t="sampleTag">Sample</span>
           <div class="facts">
             <span><span class="k" data-t="date">Date</span> <span class="v mono" id="m-date">—</span></span>
             <span><span class="k" data-t="time">Time</span> <span class="v mono" id="m-time">—</span></span>
@@ -131,6 +132,7 @@
             <span><span class="k" data-t="mom">MoM</span> <span class="v mono" id="m-mom">—</span></span>
             <span><span class="k" data-t="series">Series</span> <span class="v mono" id="m-series">—</span></span>
             <span><span class="k" data-t="projectType">Type</span> <span class="v" id="m-ptype">—</span></span>
+            <span id="m-source-wrap" hidden><span class="k" data-t="factSource">Source</span> <span class="v" id="m-source">—</span></span>
           </div>
         </div>
         <div class="head-actions">
