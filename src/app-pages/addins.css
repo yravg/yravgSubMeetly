@@ -5,7 +5,9 @@
 .ia-tt b { font-size: var(--text-lg); }
 .ia-tt small { display: block; font-size: var(--text-md); color: var(--muted); }
 .ia-tt .ia-may { font-size: var(--text-sm); }
-.ia-pill { display: inline-flex; align-items: center; height: 22px; padding: 0 10px; margin-left: 6px; border-radius: var(--radius-full); font-size: var(--text-sm); font-weight: var(--font-semibold); background: var(--warn-bg); color: var(--warn-text); vertical-align: 2px; }
+.ia-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pill-b:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ia-pill { display: inline-flex; align-items: center; height: 22px; padding: 0 10px; border-radius: var(--radius-full); font-size: var(--text-sm); font-weight: var(--font-semibold); background: var(--warn-bg); color: var(--warn-text); }
 .ia-pill.enabled { background: var(--card2); color: var(--accent-soft); }
 .ia-pill.broken { background: var(--danger-bg); color: var(--danger); }
 .ia-pill.removed { background: var(--bg); color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }

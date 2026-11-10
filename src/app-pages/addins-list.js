@@ -37,7 +37,7 @@ function rowHtml(e, ui, locked, T) {
   const sub = e.state === 'broken' ? esc(e.error) : esc(e.manifest?.description || kindText(e, T));
   const json = ui.review === e.id ? `<pre class="ia-json">${esc(JSON.stringify(e.raw, null, 2))}</pre><p class="mut small">${e.hash ? T('aiHashNote', esc(e.hash)) : T('aiInvalidNote')}</p>` : '';
   return `<div class="ia-row" data-id="${esc(e.id)}" data-state="${e.state}">
-    <span class="ia-top">${tile(iconOf(e), 30)}<span class="ia-tt"><b>${esc(name)}</b> <span class="ia-pill ${e.state}">${esc(T(STATE_KEY[e.state]))}</span><small>${sub}</small>${may ? `<small class="ia-may">${esc(T('aiMayCall'))}: ${esc(may)}</small>` : ''}</span><span class="ia-btns">${buttons.join('')}</span></span>${json}</div>`;
+    <span class="ia-top">${tile(iconOf(e), 30)}<span class="ia-tt"><span class="ia-name"><b>${esc(name)}</b><span class="ia-pill ${e.state}">${esc(T(STATE_KEY[e.state]))}</span></span><small>${sub}</small>${may ? `<small class="ia-may">${esc(T('aiMayCall'))}: ${esc(may)}</small>` : ''}</span><span class="ia-btns">${buttons.join('')}</span></span>${json}</div>`;
 }
 
 /** Murni: model + keadaan UI → HTML. model = { entries, meeting, error }. */
