@@ -26,6 +26,8 @@ Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private
 
 ## Decisions
 
+- Audio playback in tests (owner 2026-11-10, IDM grabs media URLs): never open a media URL (mp3, lab-server sample, YouTube) through the default browser, `start`, `explorer.exe <url>`, `Start-Process <url>` or Chrome's default profile. Play local files only, in-process: PowerShell `System.Windows.Media.MediaPlayer` on a local path (curl to a scratch file first), `ffplay -nodisp -autoexit <local file>`, or SAPI speech (`System.Speech.Synthesis.SpeechSynthesizer`). Browser tests: only headless puppeteer with Chrome for Testing (`PUPPETEER_EXECUTABLE_PATH`, its own temp profile).
+
 - Owner 2026-11-10: after the boards are finished, build without waiting for a canvas sign-off. Orchestrator: Fable 5.2. Workers: Opus 5.5 at low effort or Sonnet 5.5 at high effort.
 
 - Canvas: Before and After where a real Before exists (owner screenshots of the Music page and Advanced settings; the island window is left out of screen capture, so other Before frames are drawn from today's code and labelled so). No reference strips (no public Teams Facilitator frames). Claude Design only. Taken from the owner's earlier canvas answers (Before+After, Design only) and the "no check-ins" rule.
