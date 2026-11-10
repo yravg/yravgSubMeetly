@@ -148,6 +148,9 @@
   }
 }
 
+/* Chip "Current page": teks hijau-tinta di atas tint hijau 14% hanya 4,39:1; di atas mint padat 4,88:1 (gelap 9,31:1). */
+:root[data-reskin='tide'] .target-tag { background: var(--tide-mint); border-color: transparent; }
+
 /* Gerak berkurang: pegas jadi pudar 120 ms (papan K01). */
 @media (prefers-reduced-motion: reduce) {
   :root[data-reskin='tide'] {
