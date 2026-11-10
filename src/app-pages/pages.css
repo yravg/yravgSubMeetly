@@ -171,3 +171,26 @@ html[data-shell] .ls-preview .live-tgt-box .line { font: 500 var(--text-md)/1.4 
 
 .fh-chip { border-radius: 999px; background: var(--card2); color: var(--accent-soft); font: 700 var(--text-xs)/1 var(--font-ui); padding: 8px 16px; }
 .fh-chip[hidden] { display: none; }
+
+/* ---------------- A07 Settings and Helper ---------------- */
+html[data-shell='settings'] main { max-width: 1180px; }
+html[data-shell='settings'] .settings-view { padding: 0; }
+html[data-shell='settings'] .modal-card { background: transparent; border: 0; box-shadow: none; padding: 0; max-width: none; width: 100%; }
+html[data-shell='settings'] .modal-head { display: none; }
+html[data-shell='settings'] .settings-search-row { display: flex; gap: var(--space-3); align-items: center; margin-bottom: var(--space-4); }
+html[data-shell='settings'] .settings-search { flex: 1; max-width: 520px; border-radius: 999px; background: var(--card2); border: 1px solid var(--border); padding: 11px 18px; }
+html[data-shell='settings'] #btn-close-settings { font-size: 0; display: inline-flex; align-items: center; gap: 6px; background: var(--card2); border: 1px solid var(--border); border-radius: 999px; padding: 9px 16px; color: var(--text); cursor: pointer; }
+html[data-shell='settings'] #btn-close-settings::before { content: '‹'; font: 600 var(--text-md)/1 var(--font-ui); }
+html[data-shell='settings'] #btn-close-settings::after { content: attr(aria-label); font: 600 var(--text-sm)/1 var(--font-ui); }
+html[data-shell='settings'] .settings-tabs { display: flex; gap: var(--space-5); background: transparent; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0; margin-bottom: var(--space-4); overflow-x: auto; }
+html[data-shell='settings'] .settings-tabs button { flex: none; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 12px 2px; margin-bottom: -1px; color: var(--text2); font: 600 var(--text-sm)/1 var(--font-ui); cursor: pointer; }
+html[data-shell='settings'] .settings-tabs button.active { background: transparent; color: var(--text); border-bottom-color: var(--accent); }
+html[data-shell='settings'] .settings-tabs button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+html[data-shell='settings'] .set-card { background: transparent; border: 0; box-shadow: none; padding: 0; }
+html[data-shell='settings'] .set-card-head { display: none; }
+html[data-shell='settings'] .setting-row { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-3); }
+.settings-view:not([data-searching])[data-stab='helper'] .set-card:not([data-pane='helper']) { display: none; }
+.settings-view:not([data-searching]):not([data-stab='helper']) .set-card[data-pane='helper'] { display: none; }
+html[data-shell='settings'] .set-card[data-pane='helper'] .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--tide-shadow); margin-bottom: var(--space-4); }
+html[data-shell='settings'] .set-dev label { display: flex; flex-direction: column; gap: 2px; }
+html[data-shell='settings'] .set-dev small { color: var(--muted); font-size: var(--text-xs); }

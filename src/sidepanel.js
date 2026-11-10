@@ -48,6 +48,7 @@ import { makeResizable } from './lib/resizable.js';
 import { mountPerfPanel } from './perf-panel.js';
 import { mountLiveLayout } from './app-pages/live-layout.js';
 import { mountFilesLayout } from './app-pages/files-layout.js';
+import { mountSettingsLayout } from './app-pages/settings-layout.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
 import { detectOs } from './lib/helper-status.js';
@@ -974,7 +975,7 @@ function openSettingsPane() {
 }
 
 let addinsPane = null; // Settings › Add-ins (addins-ui.js), mounted at boot
-const SETTINGS_TABS = ['general', 'engine', 'models', 'output', 'addins', 'about'];
+const SETTINGS_TABS = ['general', 'engine', 'models', 'output', 'addins', 'helper', 'about'];
 function setSettingsTab(tab) {
   const next = SETTINGS_TABS.includes(tab) ? tab : 'general';
   $('settings-modal').dataset.stab = next;
@@ -3657,6 +3658,10 @@ async function init() {
       exportKind: (kind) => exportLines(kind),
     });
     resyncPills(false);
+  }
+  if (q.get('shell') === '1' && q.get('view') === 'settings') {
+    mountSettingsLayout({ lang: () => state.settings.uiLang, hosted: location.protocol === 'chrome-extension:' || isWebHost(), setTab: (tb) => setSettingsTab(tb) });
+    if (SETTINGS_TABS.includes(q.get('stab'))) setSettingsTab(q.get('stab'));
   }
   if (q.get('shell') === '1' && q.get('view') === 'captions') {
     mountLiveLayout({

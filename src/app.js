@@ -160,12 +160,12 @@ const $ = (s) => document.querySelector(s);
 const MEETING_ROUTES = ['today', 'live', 'minutes', 'notes', 'history', 'files'];
 const FEATURE_ROUTES = ['addins', 'island', 'perf', 'settings'];
 // Old links keep working. #glossary used to open meeting notes, where the Glossary add-in panel lives once trusted.
-const ALIAS = { glossary: 'notes', all: 'addins' }; // All features became a section of Add-ins
+const ALIAS = { glossary: 'notes', all: 'addins', helper: 'settings' }; // #helper is Settings on its Helper tab (board A07) // All features became a section of Add-ins
 // Halaman yang masih memasang panel samping: view (+ tab Pengaturan).
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 // Pages whose panel document lays itself out as a board page (src/app-pages/*-layout.js).
-const SHELLED = new Set(['live', 'history', 'files']);
-const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&shell=1&lang=${LANG}`;
+const SHELLED = new Set(['live', 'history', 'files', 'settings']);
+const panelUrl = ([view, stab], shell = false) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}${shell ? '&shell=1' : ''}&lang=${LANG}`;
 
 const state = { setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
 const store = {
@@ -355,24 +355,27 @@ function plansPage() {
 
 /* ---------- Settings: Developer switch (extension) ---------- */
 function settingsPage(params) {
-  const sw = HOSTED ? `<div class="cd devsw"><div><b>${esc(T('devArea'))}</b><p class="mut">${esc(T('devAreaBody'))}</p></div><label class="sw-chip bare"><input type="checkbox" role="switch" data-act="dev"${state.developer ? ' checked' : ''} aria-label="${esc(T('devArea'))}" /></label></div>` : '';
-  return `${sw}<iframe class="frame panel" title="${esc(T('settings'))}" src="${esc(panelUrl(params?.get('stab') ? ['settings', params.get('stab').replace(/[^a-z]/g, '')] : PANEL.settings))}"></iframe>`;
+  // The Developer switch now lives inside the page (General tab, extension only): see app-pages/settings-layout.js.
+  return `<iframe class="frame panel shell" title="${esc(T('settings'))}" src="${esc(panelUrl(['settings', (params?.get('stab') || '').replace(/[^a-z]/g, '') || undefined], true))}"></iframe>`;
 }
 
 /* ---------- panel-backed pages ---------- */
 function panelPage(route) {
-  return `<iframe class="frame panel${SHELLED.has(route) ? ' shell' : ''}" title="${esc(T(route))}" src="${esc(panelUrl(PANEL[route]))}"></iframe>`;
+  return `<iframe class="frame panel${SHELLED.has(route) ? ' shell' : ''}" title="${esc(T(route))}" src="${esc(panelUrl(PANEL[route], SHELLED.has(route)))}"></iframe>`;
 }
 
 /* ---------- router ---------- */
 function parseHash() {
   const [r0, q] = location.hash.replace(/^#/, '').split('?');
   const r = ALIAS[r0] || r0;
-  const route = [...MEETING_ROUTES, ...FEATURE_ROUTES, 'helper', ...(state.showPlans ? ['plans'] : []), ...(state.developer ? ['dev'] : [])].includes(r) ? r : 'today';
-  return { route, params: new URLSearchParams(q || '') };
+  const route = [...MEETING_ROUTES, ...FEATURE_ROUTES, ...(state.showPlans ? ['plans'] : []), ...(state.developer ? ['dev'] : [])].includes(r) ? r : 'today';
+  const params = new URLSearchParams(q || '');
+  if (r0 === 'helper') params.set('stab', 'helper');
+  return { route, params };
 }
 
 let lastRoute = null;
+let lastStab = '';
 function render() {
   const { route, params } = parseHash();
   document.title = `${T(route)} · yravgSubMeetly`;
@@ -382,7 +385,9 @@ function render() {
   const page = $('#page');
   page.dataset.route = route;
   // Bingkai panel tidak dimuat ulang saat hanya data beranda yang berubah.
-  if (route === lastRoute && !['today', 'minutes', 'addins', 'plans'].includes(route)) return;
+  const stab = route === 'settings' ? params.get('stab') || '' : '';
+  if (route === lastRoute && stab === lastStab && !['today', 'minutes', 'addins', 'plans'].includes(route)) return;
+  lastStab = stab;
   if (route === 'minutes' && lastRoute === 'minutes' && page.querySelector('iframe.reg')) {
     const btn = page.querySelector('[data-act="win"]');
     if (btn) btn.innerHTML = state.minutesWin ? `<span class="dot ok"></span>${esc(T('windowOpen'))}` : esc(T('openWindow'));
@@ -536,6 +541,7 @@ async function boot() {
   await syncIsland();
   globalThis.chrome?.storage?.onChanged?.addListener((ch) => {
     if ('captionSurface' in ch) syncIsland();
+    if ('ysmDeveloper' in ch && HOSTED) { state.developer = !!ch.ysmDeveloper.newValue; paintNav(parseHash().route); }
     if (WIN_ID_KEY in ch) refreshWin();
   });
   window.addEventListener('storage', (e) => { if (e.key === 'minutesRegister') loadRegister(); });

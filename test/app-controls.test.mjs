@@ -50,7 +50,8 @@ const dump = (frame) => frame.evaluate(() => {
 
 async function route(hash) {
   await page.evaluate((h) => { location.hash = h; }, hash);
-  await page.waitForFunction((h) => document.querySelector('#page').dataset.route === h.replace(/^#/, '').split('?')[0], {}, hash);
+  // #helper is Settings on its Helper tab (board A07), so its page route is 'settings'.
+  await page.waitForFunction((h) => { const n = h.replace(/^#/, '').split('?')[0]; return document.querySelector('#page').dataset.route === ({ helper: 'settings' }[n] || n); }, {}, hash);
   await wait(400);
 }
 /** Bingkai yang dipasang halaman sekarang, setelah dokumennya siap. */
