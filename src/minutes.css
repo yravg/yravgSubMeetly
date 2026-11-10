@@ -274,6 +274,9 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
 .c-ref { width: 88px; } .c-type { width: 106px; } .c-topic { width: 130px; }
 .c-owner { width: 152px; } .c-due { width: 100px; } .c-status { width: 112px; } .c-src { width: 116px; }
 .c-age { width: 92px; } .c-raised { width: 100px; }
+/* Modern (minutes-tide.css) turns these on; Classic never shows them. */
+.row-act, .reg-tb, #reg-density { display: none; }
+.srcrow { display: contents; }
 
 .ref { font-family: var(--mono); font-size: var(--text-xs); color: var(--muted2); white-space: nowrap; }
 .ref .carry { color: var(--warn-text); }

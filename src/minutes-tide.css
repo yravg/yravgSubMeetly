@@ -77,3 +77,71 @@ html[data-reskin="tide"] #empty-state .empty::before {
   background: url('tide/tide-sleep.webp') center / contain no-repeat;
 }
 html[data-reskin="tide"] #empty-state .empty { text-align: center; }
+
+/* ==========================================================================
+   A04a rest (owner decisions 2026-11-10): type palette, sticky header with
+   scroll shadow, row density, hover actions, sentence-case Source chips,
+   overdue as a red sub-line. Specificity bumps only, no !important.
+   ========================================================================== */
+:root[data-reskin="tide"][data-theme="coretax"] {
+  --t-action: #0A0F0C; --t-decision: #0E9F6E; --t-metric: #2563EB; --t-risk: #C0362C; --t-question: #7C3AED; --t-info: #64748B;
+}
+:root[data-reskin="tide"]:not([data-theme="coretax"]) {
+  --t-action: #E8F2EC; --t-decision: #34D399; --t-metric: #60A5FA; --t-risk: #F87171; --t-question: #A78BFA; --t-info: #94A3B8;
+}
+
+/* Type: pill with an ink word and an 8 px hue dot. */
+html[data-reskin="tide"] .type { height: 26px; padding: 0 10px; border-radius: 999px; background: var(--card2); box-shadow: inset 0 0 0 1px var(--border); font-size: 13px; gap: 7px; }
+html[data-reskin="tide"] .topic { background: var(--card3); border: 0; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--text2); padding: 2px 9px; }
+html[data-reskin="tide"] .av { width: 28px; height: 28px; font-size: 10.5px; }
+
+/* Sticky header: the column row stays under the toolbar; its shadow fades in after 4 px of scroll. */
+html[data-reskin="tide"] thead th { font-size: 12px; letter-spacing: 0.04em; padding: 9px 12px; background: var(--card); box-shadow: none; transition: box-shadow 120ms ease; }
+html[data-reskin="tide"] #pane[data-scrolled="true"] thead th { box-shadow: 0 6px 10px -8px rgba(10, 15, 12, 0.35); }
+html[data-reskin="tide"]:not([data-theme="coretax"]) #pane[data-scrolled="true"] thead th { box-shadow: 0 6px 10px -8px rgba(0, 0, 0, 0.7); }
+
+/* Density: Review / Reading / Compact. Reading is the board's default. */
+html[data-reskin="tide"] .reg-tb:not([hidden]) { display: flex; justify-content: flex-end; align-items: center; padding: 8px 20px; border-bottom: 1px solid var(--border); background: var(--bg); }
+html[data-reskin="tide"] #reg-density { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--card2); box-shadow: inset 0 0 0 1px var(--border); }
+html[data-reskin="tide"] #reg-density button { height: 26px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: 600 13px var(--font-ui); cursor: pointer; }
+html[data-reskin="tide"] #reg-density button[aria-pressed="true"] { background: var(--accent-fill); color: var(--on-accent-fill); }
+html[data-reskin="tide"] tbody td { transition: padding 160ms ease; font-size: 14px; line-height: 1.5; }
+html[data-reskin="tide"][data-row-density="reading"] tbody td { padding-top: 12px; padding-bottom: 12px; }
+html[data-reskin="tide"][data-row-density="review"] tbody td { padding-top: 8px; padding-bottom: 8px; }
+html[data-reskin="tide"][data-row-density="review"] tbody td { line-height: 1.4; }
+html[data-reskin="tide"][data-row-density="compact"] tbody td { padding-top: 3px; padding-bottom: 3px; line-height: 1.3; font-size: 13px; }
+html[data-reskin="tide"][data-row-density="compact"] .type { height: 22px; font-size: 12.5px; }
+html[data-reskin="tide"][data-row-density="compact"] .av { width: 22px; height: 22px; font-size: 9px; }
+
+/* Row hover: Accept / Edit / Owner at the item cell's lower edge. */
+html[data-reskin="tide"] tbody td.c-item { position: relative; }
+html[data-reskin="tide"] tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--tide-green); }
+html[data-reskin="tide"] tbody tr:hover td { background: var(--card2); }
+html[data-reskin="tide"] .row-act { display: flex; gap: 6px; padding: 4px; position: absolute; right: 8px; bottom: 6px; z-index: 2; border-radius: 999px; background: var(--card); box-shadow: var(--shadow-float, 0 8px 24px rgba(0, 0, 0, 0.25)), inset 0 0 0 1px var(--border); opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
+html[data-reskin="tide"] tbody tr:hover .row-act,
+html[data-reskin="tide"] tbody tr:focus-within .row-act { opacity: 1; pointer-events: auto; }
+html[data-reskin="tide"] .row-act button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--card2); color: var(--text); font: 600 13px var(--font-ui); cursor: pointer; }
+html[data-reskin="tide"] .row-act button.p { background: var(--accent-fill); color: var(--on-accent-fill); }
+html[data-reskin="tide"] .row-act button:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+html[data-reskin="tide"][data-row-density="compact"] .row-act button { height: 24px; font-size: 12px; }
+
+/* Overdue: the date stays ink; only the sub-line is red and bold. */
+html[data-reskin="tide"] .due { font-family: var(--font-ui); font-size: 14px; font-weight: 600; color: var(--text); }
+html[data-reskin="tide"] .due.over { color: var(--text); font-weight: 600; }
+html[data-reskin="tide"] .due .rel,
+html[data-reskin="tide"] .due.over .rel { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+html[data-reskin="tide"] .due.over .rel { color: var(--danger); }
+html[data-reskin="tide"] .status { font-size: 14px; font-weight: 600; }
+html[data-reskin="tide"] .status .sd { width: 14px; height: 14px; }
+html[data-reskin="tide"] .status[data-s="closed"] { --c: var(--accent-soft); }
+html[data-reskin="tide"] .status[data-s="closed"] .sd { background: var(--tide-green); border-color: var(--tide-green); }
+
+/* Source: timecode, then a sentence-case status chip and the position bar. */
+html[data-reskin="tide"] .srcrow { display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 6px; }
+html[data-reskin="tide"] .srcrow .conf { margin: 0; width: 44px; }
+html[data-reskin="tide"] .rev { display: inline-block; margin: 0; padding: 1px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+html[data-reskin="tide"] .rev[data-r="accepted"] { background: var(--card3); color: var(--accent-soft); }
+html[data-reskin="tide"] .rev[data-r="edited"] { background: var(--card2); color: var(--text2); box-shadow: inset 0 0 0 1px var(--border); }
+html[data-reskin="tide"] .rev[data-r="ai"] { background: color-mix(in srgb, var(--warn-text) 14%, transparent); color: var(--warn-text); }
+html[data-reskin="tide"] .rev[data-r="ai"].low { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+html[data-reskin="tide"] .srcrow .conf i { background: var(--tide-green); }

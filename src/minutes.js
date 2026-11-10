@@ -52,7 +52,15 @@ if (new URLSearchParams(globalThis.location?.search || '').get('skin') === 'tide
     l.href = href;
     document.head.append(l);
   }
+  // Owner decision 2026-11-10: the Modern theme picker names its two choices after Tide.
+  for (const [pick, key] of [['dark', 'themeTideDark'], ['coretax', 'themeTideLight']]) {
+    document.querySelector(`[data-theme-pick="${pick}"] b`)?.setAttribute('data-t', key);
+    document.querySelector(`[data-theme-pick="${pick}"] small`)?.setAttribute('data-t', `${key}Sub`);
+  }
 }
+const IS_TIDE = document.documentElement.dataset.reskin === 'tide';
+/** Hue per item type: Classic keeps the shared palette; Modern reads the Tide --t-* tokens (light and dark). */
+const typeHue = new Proxy(TYPE_COLOR, { get: (c, t) => (IS_TIDE ? `var(--t-${String(t)})` : c[t]) });
 
 const LS_LANG = 'ysmMinutesLang';
 const LS_NAME = 'ysmMinutesMe';
@@ -365,9 +373,16 @@ function cellSrc(it) {
   const conf = low
     ? `<span class="pill-warn src-flag" title="${esc(T('lowAsr'))}">${flagIcon(10)} ${esc(T('asr'))} ${pct(it.confidence)}%</span>`
     : `<span class="conf" title="${esc(T('asr'))} ${pct(it.confidence)}%"><i style="width:${pct(it.confidence)}%;background:${confColor(it.confidence)}"></i></span>`;
+  // .srcrow is display:contents in Classic; Modern lays it out as chip + bar.
   return `<span class="src ${low ? 'lit' : ''}" data-play="${esc(it.src.tc)}">▶ ${esc(it.src.tc)}</span>
-    ${conf}
-    <span class="rev ${low ? 'low' : ''}" data-r="${it.review}">${esc(T(it.review))}</span>`;
+    <span class="srcrow">${conf}
+    <span class="rev ${low ? 'low' : ''}" data-r="${it.review}">${esc(T(it.review))}</span></span>`;
+}
+/** Modern A04a: Accept / Edit / Owner appear on row hover. Hidden by CSS in Classic. Nothing is written until a button is pressed. */
+function rowActions(it) {
+  const m = activeMeeting();
+  const canAccept = it.review === 'ai' && !m?.issuedAt;
+  return `<span class="row-act" role="group" aria-label="${esc(T('rowActions'))}">${canAccept ? `<button type="button" class="p" data-act="accept">${checkIcon(14)}${esc(T('accept'))}</button>` : ''}<button type="button" data-act="edit">${esc(T('rowEdit'))}</button><button type="button" data-act="owner">${esc(T('rowOwner'))}</button></span>`;
 }
 function cellItem(it) {
   const alt = state.dual && itemAltText(it) ? `<span class="alt">${esc(itemAltText(it))}</span>` : '';
@@ -428,7 +443,7 @@ function viewTable(rows) {
         <td class="c-ref">${cellRef(it)}</td>
         <td class="c-type">${cellType(it)}</td>
         <td class="c-topic"><span class="topic${!it.topic || it.topic === 'general' ? ' plain' : ''}">${esc(topicLabel(it.topic))}</span></td>
-        <td class="c-item">${cellItem(it)}</td>
+        <td class="c-item">${cellItem(it)}${rowActions(it)}</td>
         <td class="c-owner">${cellOwner(it)}</td>
         <td class="c-due">${cellDue(it)}</td>
         <td class="c-status">${cellStatus(it)}</td>
@@ -890,11 +905,11 @@ function paintSummary(stats) {
   const counts = ITEM_TYPES.map((t) => [t, m.items.filter((i) => i.type === t).length]).filter(([, n]) => n).sort((x, y) => y[1] - x[1]);
   const share = (n) => (stats.total ? Math.round((n / stats.total) * 100) : 0);
   sum.stack.setAttribute('aria-label', counts.map(([t, n]) => `${T(t)} ${n}`).join(', '));
-  sum.stack.innerHTML = counts.map(([t, n]) => `<i style="flex:${n};background:${TYPE_COLOR[t]}" title="${esc(T(t))} ${n}"></i>`).join('');
+  sum.stack.innerHTML = counts.map(([t, n]) => `<i style="flex:${n};background:${typeHue[t]}" title="${esc(T(t))} ${n}"></i>`).join('');
   sum.legend.innerHTML = counts.length
-    ? counts.map(([t, n]) => `<li><span class="sw" style="background:${TYPE_COLOR[t]}"></span>${esc(T(t))} <b class="mono">${n}</b></li>`).join('')
+    ? counts.map(([t, n]) => `<li><span class="sw" style="background:${typeHue[t]}"></span>${esc(T(t))} <b class="mono">${n}</b></li>`).join('')
     : `<li class="none">${esc(T('sumNone'))}</li>`;
-  sum.rank.innerHTML = counts.map(([t, n]) => `<li><span class="sw" style="background:${TYPE_COLOR[t]}"></span><span class="nm">${esc(T(t))}${t === 'question' && stats.questionsOpen !== n ? ` <em>${esc(T('openN', stats.questionsOpen))}</em>` : ''}</span><span class="v mono">${n}</span><span class="sh mono">${share(n)}%</span></li>`).join('');
+  sum.rank.innerHTML = counts.map(([t, n]) => `<li><span class="sw" style="background:${typeHue[t]}"></span><span class="nm">${esc(T(t))}${t === 'question' && stats.questionsOpen !== n ? ` <em>${esc(T('openN', stats.questionsOpen))}</em>` : ''}</span><span class="v mono">${n}</span><span class="sh mono">${share(n)}%</span></li>`).join('');
   sum.xp.hidden = !counts.length;
   paintSummaryOpen();
   const rows = [
@@ -920,7 +935,7 @@ function paintChips() {
   $('#chips').innerHTML = ITEM_TYPES.map((t) => {
     const n = m ? m.items.filter((i) => i.type === t).length : 0;
     const on = state.types.has(t);
-    return `<button class="chip" data-type="${t}" aria-pressed="${on}" style="--dot:${TYPE_COLOR[t]}">
+    return `<button class="chip" data-type="${t}" aria-pressed="${on}" style="--dot:${typeHue[t]}">
       <span class="dot"></span>${esc(T(t))}<span class="ct">${n}</span></button>`;
   }).join('');
   $('#btn-review-only').setAttribute('aria-pressed', String(state.reviewOnly));
@@ -1030,7 +1045,7 @@ function linkedBlock(it, m, variant = 'fld') {
     <label class="lbl">${esc(T('dLinked'))}</label>
     <div class="linkrows">${links.map(({ item, meeting }) => `
       <div class="linkrow" data-link="${esc(item.ref)}" data-meeting="${esc(meeting.id)}">
-        <span class="bar" style="background:${TYPE_COLOR[item.type]}"></span>
+        <span class="bar" style="background:${typeHue[item.type]}"></span>
         <span class="r">${esc(item.ref)}</span>
         <span class="t">${esc(pickText(item.text, state.lang))}${item.type === 'metric' && item.metric ? ` · ${esc(fmtNum(item.metric.value))}${esc(item.metric.unit)}` : ''}</span>
       </div>`).join('')}</div>
@@ -1278,6 +1293,7 @@ function paint() {
     : viewCarry();
   if (state.view === 'table' || state.view === 'topic') pane.insertAdjacentHTML('beforeend', crossSearchHtml());
 
+  $('#reg-tb').hidden = state.view !== 'table' || !rows.length;
   $('#q').value = state.q;
   paintFooter(rows);
   paintDrawer();
@@ -1371,6 +1387,32 @@ async function acceptSelected() {
   replaceActive(await acceptWithXp(m, it));
   toast(T('msgAccepted'));
   paint();
+}
+
+async function rowAction(btn) {
+  const ref = btn.closest('tr[data-ref]')?.dataset.ref;
+  const m = activeMeeting();
+  const it = m?.items.find((i) => i.ref === ref);
+  if (!it) return;
+  const what = btn.dataset.act;
+  if (what === 'accept') {
+    if (it.review !== 'ai' || m.issuedAt) return;
+    replaceActive(await acceptWithXp(m, it));
+    toast(T('msgAccepted'));
+    paint();
+    return;
+  }
+  selectRef(ref);
+  if (what === 'owner') $('#f-owner')?.focus();
+}
+
+/** Modern A04a row density (Review / Reading / Compact): row heights only, remembered per computer. */
+const LS_ROW_DENSITY = 'ysmRowDensity';
+function setRowDensity(d, save = true) {
+  if (!['review', 'reading', 'compact'].includes(d)) d = 'reading';
+  document.documentElement.dataset.rowDensity = d;
+  document.querySelectorAll('#reg-density [data-row-density]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.rowDensity === d)));
+  if (save) { try { localStorage.setItem(LS_ROW_DENSITY, d); } catch { /* storage blocked: the choice lasts this visit */ } }
 }
 
 async function discardDrawer() {
@@ -1680,6 +1722,8 @@ function wireEvents() {
   });
 
   $('#pane').addEventListener('click', (e) => {
+    const act = e.target.closest('.row-act [data-act]');
+    if (act) { e.stopPropagation(); rowAction(act); return; }
     if (e.target.closest('#btn-save-summary')) { doSaveSummary(); return; }
     const play = e.target.closest('[data-play]');
     if (play) { e.stopPropagation(); toast(`${T('msgSeeking')} ${play.dataset.play}`); return; }
@@ -1803,12 +1847,26 @@ function paintStaticStrings() {
 /* ==========================================================================
    Boot
    ========================================================================== */
+function wireTideRegister() {
+  let saved = null;
+  try { saved = localStorage.getItem(LS_ROW_DENSITY); } catch { /* storage blocked */ }
+  setRowDensity(saved, false);
+  $('#reg-density').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-row-density]');
+    if (b) setRowDensity(b.dataset.rowDensity);
+  });
+  // Sticky header: the shadow fades in once rows have scrolled under it.
+  const pane = $('#pane');
+  pane.addEventListener('scroll', () => { pane.dataset.scrolled = String(pane.scrollTop > 4); }, { passive: true });
+}
+
 async function boot() {
   document.querySelector(`.langsw button[data-lang="${state.lang}"]`)?.setAttribute('aria-pressed', 'true');
   document.querySelector(`.langsw button[data-lang="${state.lang === 'en' ? 'id' : 'en'}"]`)?.setAttribute('aria-pressed', 'false');
   mountPills();
   wireEvents();
   paintStaticStrings();
+  if (IS_TIDE) wireTideRegister();
   // Tab labels change width with the language and with the window.
   resyncPills(false);
   window.addEventListener('resize', () => resyncPills(false));
