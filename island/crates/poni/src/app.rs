@@ -1770,8 +1770,7 @@ impl App {
     /// is remembered (`captions_on`): the next start of the island picks it up again.
     fn set_captions(&mut self, on: bool) {
         let sink = self.sink.clone();
-        let s = &self.st.settings;
-        let (src, tgt) = (s.source_lang.clone(), poni_core::capture::caption_target(s.translate_captions, &s.target_lang).to_string());
+        let (src, tgt) = self.caption_langs();
         self.st.settings.captions_on = on;
         self.save_settings();
         self.st.caption_hint = None;
@@ -1790,6 +1789,25 @@ impl App {
         }
         self.st.helper.capturing = self.st.capture.running();
         self.request_frame();
+    }
+
+    /// Spoken and target language codes for captions, as Settings has them now.
+    fn caption_langs(&self) -> (String, String) {
+        let s = &self.st.settings;
+        (s.source_lang.clone(), poni_core::capture::caption_target(s.translate_captions, &s.target_lang).to_string())
+    }
+
+    /// Running captions take the languages of Settings from their next window on, without a restart:
+    /// no gap in the audio, no reopened device, and the session keeps its lines.
+    fn retune_captions(&mut self) {
+        let (src, tgt) = self.caption_langs();
+        if self.services.as_ref().is_some_and(|svc| svc.capture_langs(&src, &tgt)) {
+            self.st.caption_hint = None;
+            self.request_frame();
+        } else {
+            self.set_captions(true);
+        }
+        self.captions_notice();
     }
 
     /// Start or Stop pressed by the person: the automatic captions leave that choice alone.
@@ -2142,6 +2160,7 @@ impl App {
         }
         let retranslate = before.lyrics_translate != now.lyrics_translate || before.target_lang != now.target_lang;
         let new_language = before.source_lang != now.source_lang || before.target_lang != now.target_lang;
+        let new_caption_target = new_language || before.translate_captions != now.translate_captions;
         if retranslate {
             self.start_lyric_translation();
         }
@@ -2151,9 +2170,9 @@ impl App {
                 s.helper_post_prefs(poni_core::lang_prefs::patch_body(&self.st.settings.source_lang, &self.st.settings.target_lang));
             }
         }
-        // Running captions pick up a new language by starting again.
-        if new_language && self.st.capture.running() {
-            self.set_captions(true);
+        // Running captions pick up a new language or translation choice at once.
+        if new_caption_target && self.st.capture.running() {
+            self.retune_captions();
         }
         self.st.pomodoro.cfg = self.st.settings.pomodoro.clone();
         // Prayer times: off stops it at once; a new place, or following the location again.
@@ -4027,12 +4046,12 @@ impl App {
         if a == InlineAction::Translate {
             // Flip translation for the running captions and say what they do now; the notice stays.
             self.st.settings.translate_captions = !self.st.settings.translate_captions;
+            self.save_settings();
             if self.st.capture.running() {
-                self.set_captions(true);
+                self.retune_captions();
             } else {
-                self.save_settings();
+                self.captions_notice();
             }
-            self.captions_notice();
             return;
         }
         if a == InlineAction::StopAdzan {

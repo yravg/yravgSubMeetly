@@ -120,6 +120,9 @@ pub struct CaptureService {
     done: Receiver<()>,
     thread: Option<JoinHandle<()>>,
     health: Arc<Health>,
+    /// Spoken and target language, read before each request: a change in Settings reaches the
+    /// next window without restarting the device reader.
+    langs: Arc<Mutex<(String, String)>>,
 }
 
 impl CaptureService {
@@ -131,14 +134,21 @@ impl CaptureService {
         let (tx, rx) = channel::<()>();
         let (done_tx, done) = channel::<()>();
 
-        let (h, s) = (health.clone(), slot.clone());
-        std::thread::Builder::new().name("poni-capture-post".into()).spawn(move || post_loop(port, &src, &tgt, wake_rx, s, h, log))?;
+        let langs = Arc::new(Mutex::new((src, tgt)));
+        let (h, s, l) = (health.clone(), slot.clone(), langs.clone());
+        std::thread::Builder::new().name("poni-capture-post".into()).spawn(move || post_loop(port, l, wake_rx, s, h, log))?;
         let h = health.clone();
         let thread = std::thread::Builder::new().name("poni-capture".into()).spawn(move || {
             capture_loop(rx, h, slot, wake_tx);
             let _ = done_tx.send(());
         })?;
-        Ok(Self { tx, done, thread: Some(thread), health })
+        Ok(Self { tx, done, thread: Some(thread), health, langs })
+    }
+
+    /// New languages for the next window; the translation note is worked out again from its answer.
+    pub fn set_langs(&self, src: String, tgt: String) {
+        *self.langs.lock().unwrap_or_else(|e| e.into_inner()) = (src, tgt);
+        self.health.hint(None);
     }
 }
 
@@ -229,7 +239,7 @@ impl Health {
 // ---------------------------------------------------------------------------
 // The poster: one request in flight, newest window wins.
 
-fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mutex<Option<Vec<f32>>>>, health: Arc<Health>, log: SessionLog) {
+fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>, slot: Arc<Mutex<Option<Vec<f32>>>>, health: Arc<Health>, log: SessionLog) {
     // The engine never downloads by itself: without the speech model a /draft answers 409. So the
     // window is not even sent while /models says it is not there, and a 409 closes the gate until
     // it says it is (a download the person pressed). The translation model is not a gate: the
@@ -237,6 +247,8 @@ fn post_loop(port: u16, src: &str, tgt: &str, wake: Receiver<()>, slot: Arc<Mute
     let mut speech = Gate::default();
     while wake.recv().is_ok() {
         let Some(window) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
+        let (src, tgt) = langs.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let (src, tgt) = (src.as_str(), tgt.as_str());
         if !speech.open(|| speech_on_disk(port)) {
             health.engine(Some(poni_core::capture::SPEECH_MISSING.into()));
             continue;

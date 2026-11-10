@@ -195,6 +195,11 @@ impl Services {
         Ok(())
     }
 
+    /// New languages for running captions, without stopping them. False when none run.
+    pub fn capture_langs(&self, src: &str, tgt: &str) -> bool {
+        self.capture.as_ref().inspect(|c| c.set_langs(src.into(), tgt.into())).is_some()
+    }
+
     pub fn capture_stop(&mut self) {
         self.capture = None;
     }
