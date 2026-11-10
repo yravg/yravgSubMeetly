@@ -47,6 +47,7 @@ import { classifyError, errTitleKey, errHintKey } from './lib/friendly-error.js'
 import { makeResizable } from './lib/resizable.js';
 import { mountPerfPanel } from './perf-panel.js';
 import { mountLiveLayout } from './app-pages/live-layout.js';
+import { mountFilesLayout } from './app-pages/files-layout.js';
 import { mountHelperStatusCard } from './helper-status.js';
 import { mountHelperGuide } from './helper-guide.js';
 import { detectOs } from './lib/helper-status.js';
@@ -1680,6 +1681,8 @@ let nativeInfo = null; // last /health result (null = offline/unknown)
  * { name, sizeBytes, progress 0–1, status idle|running|cancelling|cancelled|done|error, stage, jobId, cancellable }
  */
 let largeFileJob = null;
+// Offline job progress for the Files page (board A05): windows done / total, percent, start stamp.
+let fileProgress = null;
 /** @type {null | (() => void)} */
 let redrawHelperStatus = null;
 /** @type {null | (() => void)} */
@@ -2675,6 +2678,7 @@ async function startOnce() {
     }
     setStatus(t('processing'));
     state.offlineLines = [];
+    fileProgress = { startedAt: Date.now(), idx: 0, total: 0, pct: 0 };
     $('off-lines').innerHTML = '';
     $('off-results').classList.remove('hidden');
     $('off-progress-text').textContent = '…';
@@ -2846,6 +2850,7 @@ function fmtTs(sec, srtStyle = false) {
 
 function pushOfflineLine({ line, idx, total }) {
   state.offlineLines.push(line);
+  if (total) fileProgress = { ...(fileProgress || { startedAt: Date.now() }), idx, total, pct: fileProgress?.large ? fileProgress.pct : Math.round((idx / total) * 100) };
   redrawHelperStatus?.();
   const host = $('off-lines');
   const div = document.createElement('div');
@@ -3114,6 +3119,11 @@ chrome.runtime.onMessage.addListener((msg) => {
       break;
     case 'offline-progress': {
       const d = msg.data;
+      fileProgress = {
+        startedAt: fileProgress?.startedAt || Date.now(), large: !!d.large, stage: d.stage,
+        idx: d.idx ?? fileProgress?.idx ?? 0, total: d.total ?? fileProgress?.total ?? 0,
+        pct: d.large ? Math.max(0, Math.min(100, Math.round(d.pct || 0))) : d.total ? Math.round(((d.idx || 0) / d.total) * 100) : fileProgress?.pct ?? 0,
+      };
       if (d.large) {
         const pct = Math.max(0, Math.min(100, Math.round(d.pct || 0)));
         largeFileJob = {
@@ -3151,6 +3161,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     }
     case 'offline-done':
       state.offlineRunning = false;
+      fileProgress = { ...(fileProgress || {}), pct: 100, done: true };
       syncCaptureStamp();
       if (largeFileJob) {
         largeFileJob = { ...largeFileJob, progress: 1, status: 'done', stage: 'done', cancellable: false };
@@ -3634,6 +3645,19 @@ async function init() {
     if (q.get('view') === 'settings' && SETTINGS_TABS.includes(q.get('stab'))) setSettingsTab(q.get('stab'));
   }
   if (q.get('shell') === '1') document.documentElement.dataset.shell = q.get('view') || 'captions';
+  if (q.get('shell') === '1' && (q.get('view') === 'files' || q.get('view') === 'history')) {
+    mountFilesLayout({
+      view: q.get('view'),
+      lang: () => state.settings.uiLang,
+      running: () => state.offlineRunning,
+      file: () => state.offlineFile,
+      staging: () => state.offlineStaging,
+      lines: () => state.offlineLines,
+      progress: () => fileProgress,
+      exportKind: (kind) => exportLines(kind),
+    });
+    resyncPills(false);
+  }
   if (q.get('shell') === '1' && q.get('view') === 'captions') {
     mountLiveLayout({
       lang: () => state.settings.uiLang,

@@ -164,7 +164,7 @@ const ALIAS = { glossary: 'notes', all: 'addins' }; // All features became a sec
 // Halaman yang masih memasang panel samping: view (+ tab Pengaturan).
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 // Pages whose panel document lays itself out as a board page (src/app-pages/*-layout.js).
-const SHELLED = new Set(['live']);
+const SHELLED = new Set(['live', 'history', 'files']);
 const panelUrl = ([view, stab]) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}&shell=1&lang=${LANG}`;
 
 const state = { setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
