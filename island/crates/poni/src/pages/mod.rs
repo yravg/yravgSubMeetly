@@ -319,6 +319,7 @@ pub fn next_wake(page: PageKind, st: &AppState) -> Option<f64> {
         PageKind::Prayer => prayer::next_wake(st),
         PageKind::Downloads => downloads::next_wake(st),
         PageKind::Call => call::next_wake(st),
+        PageKind::Live => live::next_wake(st),
         _ => None,
     }
 }
@@ -802,13 +803,37 @@ mod tests {
         assert!(tabs(&st).contains(&Call));
         st.joined = Default::default();
         // Saved: 10 minutes, then gone (unless it is the page open).
-        st.call.saved = Some(crate::state::CallSaved { id: "MOM-WIN-1".into(), title: "Site".into(), minutes: 38, counts: Default::default(), at: 600.0, dismissed: false });
+        st.call.saved = Some(crate::state::CallSaved { id: "MOM-WIN-1".into(), title: "Site".into(), minutes: 38, counts: Default::default(), at: 600.0, dismissed: false, room: false });
         assert!(tabs(&st).contains(&Call));
         st.now = 1200.0;
         assert!(!tabs(&st).contains(&Call));
         st.page = Call;
         assert!(tabs(&st).contains(&Call));
         assert!(content_height(Call, &st) <= content_height(System, &st));
+    }
+
+    #[test]
+    fn live_is_the_rooms_meeting_view_while_captions_hear_the_room() {
+        use poni_core::capture::{CaptureState, Source};
+        let mut st = state();
+        st.now = 100.0;
+        assert_eq!(st.live_source(), Source::Room, "Live starts on the room");
+        let plain = content_height(PageKind::Live, &st);
+        assert_eq!(live::next_wake(&st), None);
+        st.capture = CaptureState::On;
+        assert_eq!(content_height(PageKind::Live, &st), plain, "This PC's captions keep today's Live");
+        st.call.room = true;
+        assert!(st.room_live() && !st.call_live(), "a room session is Live's, not the Meeting tab's");
+        assert!(content_height(PageKind::Live, &st) > plain, "the notes column and the source row");
+        assert_eq!(live::next_wake(&st), Some(100.1), "the mic level and the clock move");
+        // Unfollow still works there: today's Live (its Unfollowed state) comes back.
+        st.helper.set_following(false);
+        assert_eq!(content_height(PageKind::Live, &st), plain);
+        assert_eq!(live::next_wake(&st), None);
+        // Its saved result shows on Live: the Meeting tab does not come up for it.
+        st.capture = CaptureState::Off;
+        st.call.saved = Some(crate::state::CallSaved { id: "MOM-WIN-2".into(), title: "In-room meeting".into(), minutes: 12, counts: Default::default(), at: 90.0, dismissed: false, room: true });
+        assert!(!tabs(&st).contains(&PageKind::Call));
     }
 
     #[test]

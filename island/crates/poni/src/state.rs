@@ -597,6 +597,10 @@ pub struct AppState {
     pub calendar_day: Option<i64>,
     /// The island's own capture of what the PC plays (`services::capture`).
     pub capture: poni_core::capture::CaptureState,
+    /// The microphone's level while captions hear the room (Live's mic chip, PMM-019).
+    pub mic_level: f32,
+    /// Live's mic chip: Windows' microphones (id, name) as last listed, for the chip's name.
+    pub mics: Vec<(String, String)>,
     /// Where the sound playing now goes: a meeting, media or nothing (PMM-004).
     pub meeting_source: poni_core::meeting_source::SourceKind,
     /// The transcript a media captions session was just kept as (PMM-015): its id and the track
@@ -696,6 +700,8 @@ impl AppState {
             calendar_past: false,
             calendar_day: None,
             capture: Default::default(),
+            mic_level: 0.0,
+            mics: Vec::new(),
             meeting_source: poni_core::meeting_source::SourceKind::None,
             kept_transcript: None,
             meeting_seen: Default::default(),
@@ -846,10 +852,21 @@ impl AppState {
         self.capture.running() && self.call.meeting
     }
 
+    /// Live hears the room now (Room or Both, PMM-019/020): Live shows the session like Meeting.
+    pub fn room_live(&self) -> bool {
+        self.capture.running() && self.call.room
+    }
+
+    /// What Live listens to (Settings `live_source`).
+    pub fn live_source(&self) -> poni_core::capture::Source {
+        poni_core::capture::Source::parse(&self.settings.live_source)
+    }
+
     /// The Meeting tab belongs in the row: a meeting runs, or its session was saved in the last
     /// 10 minutes (PMM-005). Settings › Tabs can still take it off.
     pub fn call_tab_on(&self) -> bool {
-        poni_core::live_notes::shows_tab(self.meeting_now() || self.call_live(), self.call.saved.as_ref().map(|s| s.at), self.now)
+        // An in-room session's result shows on Live, not here.
+        poni_core::live_notes::shows_tab(self.meeting_now() || self.call_live(), self.call.saved.as_ref().filter(|s| !s.room).map(|s| s.at), self.now)
     }
 
     /// Settings took this page's tab off the header's row (Music, Shelf,
@@ -970,6 +987,13 @@ mod tests {
 pub struct CallState {
     /// The running session heard a meeting source (its notes refresh; Stop shows "Saved" here).
     pub meeting: bool,
+    /// The running session heard the room (Live with Room or Both): Live shows it with its notes,
+    /// and Stop saves an "In-room" meeting (PMM-020).
+    pub room: bool,
+    /// Live's title for the room session, as the person typed it (else the calendar's or
+    /// "In-room meeting"), and the title field while it is edited.
+    pub title: Option<String>,
+    pub title_edit: Option<String>,
     /// When the running session's captions started (`now`), for the elapsed time.
     pub started: Option<f64>,
     /// The session's newest lines, oldest first, and how many it has.
@@ -977,8 +1001,8 @@ pub struct CallState {
     pub heard: usize,
     /// "Notes so far": the engine's draft and the person's items.
     pub notes: poni_core::live_notes::LiveNotes,
-    /// A session on its way to the engine: its id, title and length in minutes.
-    pub saving: Option<(String, String, u32)>,
+    /// A session on its way to the engine: its id, title, length in minutes and whether it was in-room.
+    pub saving: Option<(String, String, u32, bool)>,
     /// The session saved last; the tab shows it for 10 minutes.
     pub saved: Option<CallSaved>,
     /// The note being edited: its place in `notes.items` and the text so far.
@@ -1000,4 +1024,6 @@ pub struct CallSaved {
     pub at: f64,
     /// Dismiss pressed: the tab stays its 10 minutes, without the result.
     pub dismissed: bool,
+    /// An in-room session (Live shows the result too).
+    pub room: bool,
 }

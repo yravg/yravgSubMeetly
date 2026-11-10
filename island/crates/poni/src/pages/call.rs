@@ -32,6 +32,7 @@ const OFFER_H: f32 = 34.0;
 const NOTE_MAX: usize = 300;
 const EDIT_ID: &str = "call.edit";
 const NOTE_ID: &str = "call.note";
+const TITLE_ID: &str = "live.title.edit";
 /// The kinds "+ Note" offers, in its picker's order.
 const ADD: [(Kind, &str, &str); 3] =
     [(Kind::Decision, "Decision", "Type a decision"), (Kind::Action, "Action", "Type an action, @owner at the end"), (Kind::Note, "Note", "Type a note")];
@@ -61,8 +62,8 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         None => (page, None),
     };
     if st.call_live() {
-        live(ui, st, body);
-    } else if let Some((_, t, _)) = st.call.saving.clone() {
+        live(ui, st, body, false);
+    } else if let Some((_, t, ..)) = st.call.saving.clone() {
         hkit::message(ui, body, st.accent, Icon::Call, &format!("Saving {t}"), "The engine drafts its minutes with the notes you kept and typed.", false, None);
     } else if st.call.saved.as_ref().is_some_and(|s| !s.dismissed) {
         saved(ui, st, body);
@@ -93,29 +94,67 @@ fn title(st: &AppState) -> (String, Option<String>) {
 
 // ---------------------------------------------------------------- live
 
-fn live(ui: &mut Ui, st: &mut AppState, area: Rect) {
+/// Live's title for a room session: what the person typed, else the calendar meeting running now,
+/// else "In-room meeting" (PMM-020).
+fn room_title(st: &AppState) -> String {
+    st.call.title.clone().or_else(|| st.running_event_title()).unwrap_or_else(|| poni_core::capture::ROOM_TITLE.to_string())
+}
+
+/// The session running now: captions left, "Notes so far" right, under a header with its title and
+/// time. The Meeting tab's view, and Live's while it hears the room (`room`, PMM-020): there the
+/// title can be edited, Hold and Unfollow stay beside Stop, and the source row sits under the header.
+pub(crate) fn live(ui: &mut Ui, st: &mut AppState, area: Rect, room: bool) {
     let head = Rect::new(area.x, area.y, area.w, HEAD_H);
     let cy = head.center().y;
-    // Right to left: Stop captions, Aa.
+    // Right to left: Stop captions, (Live) Unfollow and Hold, Aa.
     let w = ui.pill_width("Stop captions", false, true);
     let b = Rect::new(head.right() - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
-    if ui.pill(wid("call.stop"), b, "Stop captions", None, PillStyle::Neutral).clicked {
+    if ui.pill(wid(if room { "live.captions" } else { "call.stop" }), b, "Stop captions", None, PillStyle::Neutral).clicked {
         st.cmd(Command::Captions(false));
     }
-    let right = quick_captions::aa_button(ui, st, b.x - PILL_GAP, cy) - PILL_GAP;
+    let mut right = b.x - PILL_GAP;
+    if room {
+        right = super::live::hold_unfollow(ui, st, right, cy);
+    }
+    let right = quick_captions::aa_button(ui, st, right, cy) - PILL_GAP;
 
-    // Left: title, the app, a red dot and the time since captions started.
-    let (name, chip) = title(st);
+    // Left: title, the app (Live: its source, or Held), a red dot and the time since captions started.
+    let (name, chip) = if room {
+        (room_title(st), Some(if st.helper.paused() { "Held".to_string() } else { st.live_source().label().to_string() }))
+    } else {
+        title(st)
+    };
     let time = poni_core::datetime::fmt_duration(st.call.started.map_or(0.0, |t| st.now - t));
     let time_st = TextStyle::footnote().weight(Weight::Semibold).tabular().color(palette::RED);
     let chip_st = TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT_DIM);
     let name_st = TextStyle::body().weight(Weight::Semibold);
     let tw = ui.c.measure(&time, &time_st, 120.0).0.ceil();
     let cw = chip.as_deref().map_or(0.0, |c| ui.c.measure(c, &chip_st, 160.0).0.ceil() + 12.0);
-    let tail = cw + if cw > 0.0 { 8.0 } else { 0.0 } + 14.0 + tw;
-    let nw = ui.c.measure(&name, &name_st, 400.0).0.ceil().min((right - head.x - 8.0 - tail).max(0.0));
-    ui.c.text(&name, Rect::new(head.x, cy - 10.0, nw, 20.0), &name_st);
-    let mut x = head.x + nw + 8.0;
+    let pencil = if room { 22.0 } else { 0.0 };
+    let tail = cw + if cw > 0.0 { 8.0 } else { 0.0 } + 14.0 + tw + pencil;
+    let room_w = (right - head.x - 8.0 - tail).max(0.0);
+    let mut nw = ui.c.measure(&name, &name_st, 400.0).0.ceil().min(room_w);
+    if let Some(mut buf) = st.call.title_edit.clone().filter(|_| room) {
+        nw = room_w.min(240.0);
+        let resp = ui.text_input(wid(TITLE_ID), Rect::new(head.x, cy - 12.0, nw, 24.0), &mut buf, poni_core::capture::ROOM_TITLE, 80);
+        if resp.submitted {
+            let t = buf.trim();
+            st.call.title = (!t.is_empty()).then(|| t.to_string());
+            st.call.title_edit = None;
+            ui.blur();
+        } else if resp.cancelled {
+            st.call.title_edit = None;
+        } else {
+            st.call.title_edit = Some(buf);
+        }
+    } else {
+        ui.c.text(&name, Rect::new(head.x, cy - 10.0, nw, 20.0), &name_st);
+        if room && ui.icon_button(wid("live.title"), Rect::new(head.x + nw + 2.0, cy - 10.0, 20.0, 20.0), Icon::Pencil, palette::TEXT_DIM, 12.0).clicked {
+            ui.focus_text(wid(TITLE_ID), name.chars().count());
+            st.call.title_edit = Some(name.clone());
+        }
+    }
+    let mut x = head.x + nw + 8.0 + pencil;
     if let Some(c) = chip.as_deref() {
         ui.c.fill_rrect(Rect::new(x, cy - 9.0, cw, 18.0), 9.0, palette::SURFACE);
         ui.c.text(c, Rect::new(x, cy - 9.0, cw, 18.0), &chip_st.center());
@@ -124,7 +163,12 @@ fn live(ui: &mut Ui, st: &mut AppState, area: Rect) {
     ui.c.fill_circle(Point::new(x + 4.0, cy), 4.0, palette::RED);
     ui.c.text(&time, Rect::new(x + 14.0, cy - 9.0, tw + 2.0, 18.0), &time_st);
 
-    let cols = Rect::new(area.x, head.bottom() + 6.0, area.w, (area.bottom() - head.bottom() - 6.0).max(0.0));
+    let mut top = head.bottom() + 6.0;
+    if room {
+        super::live::source_row(ui, st, Rect::new(area.x, top, area.w, super::live::SOURCE_H));
+        top += super::live::SOURCE_H + 6.0;
+    }
+    let cols = Rect::new(area.x, top, area.w, (area.bottom() - top).max(0.0));
     let (left, rest) = cols.split_left((cols.w * 0.44).floor());
     ui.c.fill_rect(Rect::new(left.right() + 8.0, cols.y, 1.0, cols.h), palette::BORDER);
     captions(ui, st, Rect::new(left.x, left.y, left.w - 4.0, left.h));
@@ -386,7 +430,7 @@ fn footer(ui: &mut Ui, st: &mut AppState, r: Rect) {
 // ---------------------------------------------------------------- saved and empty
 
 /// "Saved · <title>, <n> min", what it holds, Open in Minutes and Dismiss (board P04 a).
-fn saved(ui: &mut Ui, st: &mut AppState, area: Rect) {
+pub(crate) fn saved(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let Some(s) = st.call.saved.as_ref() else { return };
     let (id, head, line) = (s.id.clone(), format!("Saved \u{b7} {}, {} min", s.title, s.minutes), s.counts.line());
     let top = area.y + ((area.h - 132.0) / 2.0).max(0.0);

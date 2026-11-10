@@ -25,6 +25,7 @@ use crate::window::{self, FrameClock, FrameTick, MonitorInfo};
 use crate::{dragdrop, shell};
 use poni_core::spot;
 use poni_core::addons::Status as AddonStatus;
+use poni_core::capture::{Source, ROOM_TITLE};
 use poni_core::frametime::{ambient_divisor, MotionStats};
 use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::pairdrop::{MeetEvent, PeerEvent};
@@ -724,7 +725,7 @@ impl App {
             self.try_add_tray();
             services::power::register_session(self.helper);
             if self.st.settings.captions_on {
-                self.set_captions(true);
+                self.set_captions(true, Source::Pc);
             }
             if !crate::autostart::packaged() {
                 self.updater = Some(crate::updates::Updater::start(paths::data_dir().join("update.json"), &mut self.st, crate::updates::unix_now()));
@@ -1772,9 +1773,10 @@ impl App {
         self.st.notify(Icon::Lyrics, palette::BLUE, "Apple Music lyrics off", "Lyrics from LRCLIB only", 4.0, None);
     }
 
-    /// Captions from what the PC plays on (true) or off, in the languages of Settings. On or off
-    /// is remembered (`captions_on`): the next start of the island picks it up again.
-    fn set_captions(&mut self, on: bool) {
+    /// Captions from `source` (what the PC plays, the room's microphone, or both) on (true) or off,
+    /// in the languages of Settings. On or off is remembered (`captions_on`): the next start of the
+    /// island picks it up again (from what the PC plays).
+    fn set_captions(&mut self, on: bool, source: Source) {
         let sink = self.sink.clone();
         let (src, tgt) = self.caption_langs();
         self.st.settings.captions_on = on;
@@ -1783,10 +1785,13 @@ impl App {
         let Some(svc) = self.services.as_mut() else { return };
         if on {
             svc.engine_start();
-            self.st.capture = match svc.capture_start(&sink, poni_core::helper::configured_port(), &src, &tgt) {
+            let mic = self.st.settings.mic_device.clone();
+            self.st.capture = match svc.capture_start(&sink, poni_core::helper::configured_port(), &src, &tgt, source, &mic) {
                 Ok(()) => poni_core::capture::CaptureState::On,
                 Err(e) => poni_core::capture::CaptureState::Failed(e),
             };
+            // Once the session heard the room it is an in-room meeting, whatever it switches to.
+            self.st.call.room |= source.room();
             self.st.helper.set_following(true);
             self.st.kept_transcript = None;
             self.fold_session_source();
@@ -1813,16 +1818,43 @@ impl App {
             self.st.caption_hint = None;
             self.request_frame();
         } else {
-            self.set_captions(true);
+            self.set_captions(true, Source::Pc);
         }
         self.captions_notice();
     }
 
     /// Start or Stop pressed by the person: the automatic captions leave that choice alone.
-    fn captions_by_hand(&mut self, on: bool) {
+    fn captions_by_hand(&mut self, on: bool, source: Source) {
         let wanted = self.captions_wanted();
         self.auto_captions.manual(on, wanted);
-        self.set_captions(on);
+        self.set_captions(on, source);
+    }
+
+    /// Live's source picked (PMM-019): remembered, and running Live captions switch to it with the
+    /// session's lines kept.
+    fn set_live_source(&mut self, source: Source) {
+        self.st.settings.live_source = source.key().to_string();
+        self.save_settings();
+        // "Use This PC instead" on a blocked mic that never heard a line: not an in-room session.
+        if self.st.capture.mic_blocked() && self.st.call.heard == 0 {
+            self.st.call.room = false;
+        }
+        if self.st.capture.running() && self.st.page == PageKind::Live {
+            self.set_captions(true, source);
+        }
+    }
+
+    /// Live's mic chip pressed: the next of Windows' microphones (after the last, Windows' default
+    /// again); running room captions reopen on it.
+    fn next_mic(&mut self) {
+        self.st.mics = services::capture::input_devices();
+        let ids: Vec<String> = self.st.mics.iter().map(|(id, _)| id.clone()).collect();
+        self.st.settings.mic_device = poni_core::capture::next_mic(&ids, &self.st.settings.mic_device);
+        self.save_settings();
+        if self.st.room_live() {
+            let source = self.st.live_source();
+            self.set_captions(true, source);
+        }
     }
 
     /// The PC plays sound that is not a music app (a call, a video, a meeting), a video plays, or a
@@ -1889,7 +1921,7 @@ impl App {
         let wanted = self.captions_wanted();
         match self.auto_captions.step(self.st.settings.auto_captions, wanted, self.st.capture.running(), self.st.now) {
             AutoStep::Start => {
-                self.set_captions(true);
+                self.set_captions(true, Source::Pc);
                 if self.st.capture.running() {
                     // A meeting's captions open the Meeting tab (PMM-005), unless Settings says Live.
                     if self.captions_page() == PageKind::Call {
@@ -1898,7 +1930,7 @@ impl App {
                     self.captions_notice();
                 }
             }
-            AutoStep::Stop => self.set_captions(false),
+            AutoStep::Stop => self.set_captions(false, Source::Pc),
             AutoStep::Nothing => {}
         }
     }
@@ -1929,6 +1961,7 @@ impl App {
             lines: p.lines,
             transcript: false,
             notes: None,
+            room: false,
         };
         let cut = if p.dropped > 0 { format!(" (the first {} left out)", p.dropped) } else { String::new() };
         self.st.helper_notice = Some((format!("Drafting minutes from {} lines{cut}\u{2026}", m.lines.len()), self.st.now + 30.0, false));
@@ -1963,8 +1996,12 @@ impl App {
         let Some(svc) = self.services.as_ref() else { return };
         let (n, tail) = svc.session_tail(crate::pages::call::LINES);
         self.st.call.heard = n;
-        self.st.call.lines = tail;
-        if self.st.call.meeting && !self.st.tab_hidden(PageKind::Call) && self.st.call.notes.due(self.st.now, n, self.st.power.saver) {
+        // Hold on Live's room view keeps the lines it shows (the session goes on underneath).
+        if !(self.st.call.room && self.st.helper.paused()) {
+            self.st.call.lines = tail;
+        }
+        let notes_shown = (self.st.call.meeting && !self.st.tab_hidden(PageKind::Call)) || self.st.call.room;
+        if notes_shown && self.st.call.notes.due(self.st.now, n, self.st.power.saver) {
             self.call_refresh();
         }
     }
@@ -1977,7 +2014,8 @@ impl App {
             return;
         }
         self.st.call.notes.ask(self.st.now, lines.len());
-        let (sink, port, title) = (self.sink.clone(), poni_core::helper::configured_port(), self.st.running_event_title().unwrap_or_default());
+        let title = self.st.call.title.clone().or_else(|| self.st.running_event_title()).unwrap_or_default();
+        let (sink, port) = (self.sink.clone(), poni_core::helper::configured_port());
         std::thread::spawn(move || sink.send(AppEvent::CallNotes(services::capture::draft_notes(port, &title, &lines))));
     }
 
@@ -2011,9 +2049,13 @@ impl App {
         }
         let t = clock::local_now();
         let start = poni_core::meeting_doc::start_stamp(&t);
-        let transcript = seen.transcript();
+        // A session that heard the room is an in-room meeting, not a video's transcript (PMM-020).
+        let room = call.room;
+        let transcript = seen.transcript() && !room;
         let title = if transcript {
             seen.title.clone().unwrap_or_else(|| format!("Video {}", start.replace('T', " ")))
+        } else if room {
+            call.title.clone().or_else(|| self.st.running_event_title()).unwrap_or_else(|| ROOM_TITLE.to_string())
         } else {
             self.st.running_event_title().unwrap_or_else(|| poni_core::meeting_doc::default_title(&t))
         };
@@ -2023,14 +2065,16 @@ impl App {
             date: t.day_key(),
             start,
             locale: self.st.settings.source_lang.clone(),
-            // A meeting's session keeps the Meeting tab's notes (not with that tab switched off).
-            notes: (seen.meeting() && !transcript && !self.st.tab_hidden(PageKind::Call)).then_some(notes),
+            // A meeting's session keeps the Meeting tab's notes (not with that tab switched off); a
+            // room session keeps Live's.
+            notes: ((seen.meeting() && !transcript && !self.st.tab_hidden(PageKind::Call)) || room).then_some(notes),
             lines,
             transcript,
+            room,
         };
         if m.notes.is_some() {
             let minutes = (m.lines.last().map_or(0.0, |l| l.t1) / 60.0).round().max(1.0) as u32;
-            self.st.call.saving = Some((m.id.clone(), m.title.clone(), minutes));
+            self.st.call.saving = Some((m.id.clone(), m.title.clone(), minutes, room));
         }
         // The track it captioned offers "Save as meeting" on the Media page (board P04 b).
         self.st.kept_transcript = transcript.then(|| (m.id.clone(), self.st.media.as_ref().map(|x| x.track_key.clone()).unwrap_or_default()));
@@ -2072,9 +2116,9 @@ impl App {
             Ok((id, counts)) => {
                 pinfo!("meeting {id} saved");
                 // The Meeting tab shows the result for 10 minutes (PMM-009).
-                let on_tab = self.st.page == PageKind::Call;
-                if let Some((sid, title, minutes)) = saving.filter(|(sid, ..)| *sid == id) {
-                    self.st.call.saved = Some(crate::state::CallSaved { id: sid, title, minutes, counts, at: self.st.now, dismissed: false });
+                let on_tab = self.st.page == PageKind::Call || (self.st.page == PageKind::Live && saving.as_ref().is_some_and(|s| s.3));
+                if let Some((sid, title, minutes, room)) = saving.filter(|(sid, ..)| *sid == id) {
+                    self.st.call.saved = Some(crate::state::CallSaved { id: sid, title, minutes, counts, at: self.st.now, dismissed: false, room });
                 }
                 // The new meeting is the one shown, from its first item.
                 self.st.helper.select(&id);
@@ -2523,8 +2567,8 @@ impl App {
                 }
                 crate::services::engine::open_when_ready("/app/setup-extension.html");
             }
-            StartCaptions => self.captions_by_hand(true),
-            StopCaptions => self.captions_by_hand(false),
+            StartCaptions => self.captions_by_hand(true, Source::Pc),
+            StopCaptions => self.captions_by_hand(false, Source::Pc),
             OpenCaptionsPanel => shell::open_in_chrome(&format!("chrome-extension://{}/sidepanel.html", crate::services::engine::EXTENSION_ID)),
             Quit => {
                 self.quit(0);
@@ -3669,6 +3713,7 @@ impl App {
         self.last_frame_t = anim_t;
         self.st.now = self.st.now.max(anim_t);
         self.tick();
+        self.st.mic_level = self.services.as_ref().map_or(0.0, |s| s.mic_level());
         let now = self.st.now;
 
         // The pointer left the open island since the last frame: the close
@@ -4695,7 +4740,14 @@ impl App {
                     }
                 }
                 Command::Calendar(c) => self.calendar_cmd(c),
-                Command::Captions(on) => self.captions_by_hand(on),
+                Command::Captions(on) => self.captions_by_hand(on, Source::Pc),
+                Command::LiveCaptions => {
+                    let source = self.st.live_source();
+                    self.captions_by_hand(true, source);
+                }
+                Command::LiveSource(source) => self.set_live_source(source),
+                Command::NextMic => self.next_mic(),
+                Command::MicPrivacy => shell::open_microphone_settings(),
                 Command::PasteTranscript => self.paste_transcript(),
                 Command::JoinMeeting(u) => self.join_meeting(&u),
                 Command::JoinPastedLink => {

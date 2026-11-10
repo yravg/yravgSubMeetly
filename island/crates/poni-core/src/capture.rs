@@ -154,12 +154,143 @@ impl Pipeline {
     }
 
     pub fn feed(&mut self, interleaved: &[f32]) -> Vec<Vec<f32>> {
-        let mono = downmix(interleaved, self.channels);
-        let mut out = Vec::with_capacity(mono.len() / 2 + 1);
-        self.resampler.push(&mono, &mut out);
+        let out = self.mono(interleaved);
         let mut windows = self.chunker.push(&out);
         windows.retain(|w| !is_silent(w));
         windows
+    }
+
+    /// Device buffers in, one channel at [`RATE`] out (no windows): one side of a [`Mixer`].
+    pub fn mono(&mut self, interleaved: &[f32]) -> Vec<f32> {
+        let mono = downmix(interleaved, self.channels);
+        let mut out = Vec::with_capacity(mono.len() / 2 + 1);
+        self.resampler.push(&mono, &mut out);
+        out
+    }
+}
+
+/// What Live captions listen to (PMM-019): the room (the microphone), what this PC plays
+/// (loopback), or both mixed into one stream (PMM-021).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Source {
+    Room,
+    Pc,
+    Both,
+}
+
+impl Source {
+    pub const ALL: [Source; 3] = [Source::Room, Source::Pc, Source::Both];
+
+    /// The settings value (`live_source`).
+    pub fn key(self) -> &'static str {
+        match self {
+            Source::Room => "room",
+            Source::Pc => "pc",
+            Source::Both => "both",
+        }
+    }
+
+    /// Room unless the value says otherwise (an old file has none).
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "pc" => Source::Pc,
+            "both" => Source::Both,
+            _ => Source::Room,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Source::Room => "Room",
+            Source::Pc => "This PC",
+            Source::Both => "Both",
+        }
+    }
+
+    /// The microphone is part of it.
+    pub fn room(self) -> bool {
+        self != Source::Pc
+    }
+
+    /// What the PC plays is part of it.
+    pub fn pc(self) -> bool {
+        self != Source::Room
+    }
+}
+
+/// Live's title for a room session nobody named (PMM-020).
+pub const ROOM_TITLE: &str = "In-room meeting";
+
+/// The microphone after `current` in Windows' list `ids` (empty = Windows' default): the default,
+/// then each one, then the default again. A microphone no longer listed goes back to the default.
+pub fn next_mic(ids: &[String], current: &str) -> String {
+    if current.is_empty() {
+        return ids.first().cloned().unwrap_or_default();
+    }
+    ids.iter().position(|id| id == current).and_then(|i| ids.get(i + 1)).cloned().unwrap_or_default()
+}
+
+pub const MIC_BLOCKED: &str = "Windows is blocking the microphone. Allow desktop apps to use the microphone, then try again. Nothing was recorded.";
+pub const MIC_IN_USE: &str = "Another app holds the microphone for itself. Captions start when it lets go.";
+
+/// The sentence for a microphone that would not open, by its HRESULT: Windows' privacy switch
+/// (`E_ACCESSDENIED`) or an app holding it exclusively (`AUDCLNT_E_DEVICE_IN_USE`).
+pub fn mic_open_problem(hresult: i32) -> Option<&'static str> {
+    match hresult as u32 {
+        0x8007_0005 => Some(MIC_BLOCKED),
+        0x8889_000A => Some(MIC_IN_USE),
+        _ => None,
+    }
+}
+
+/// Which side of a hybrid meeting a line came from (PMM-021).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Side {
+    Room,
+    Online,
+}
+
+/// A line as the session keeps it: with "Both" its side in front, so the minutes tell them apart.
+/// shortcut: the side rides in the text, since the engine keeps only t0/t1/source/translation per
+/// transcript line; give lines a `side` field once the engine stores one.
+pub fn tagged(side: Option<Side>, text: &str) -> String {
+    match side {
+        Some(Side::Room) => format!("[Room] {text}"),
+        Some(Side::Online) => format!("[Online] {text}"),
+        None => text.to_string(),
+    }
+}
+
+/// "Both": the microphone and the PC's sound (each mono at [`RATE`]) into one window for the
+/// engine, tagged with the louder side. The mic sets the pace: loopback delivers nothing while the
+/// PC plays nothing, so a missing PC part is silence, and at most two windows of it wait.
+/// shortcut: the two clocks are not aligned beyond that; a drift under one window is fine for
+/// captions.
+#[derive(Default)]
+pub struct Mixer {
+    mic: Vec<f32>,
+    pc: Vec<f32>,
+}
+
+impl Mixer {
+    pub fn push(&mut self, mic: &[f32], pc: &[f32]) -> Vec<(Vec<f32>, Side)> {
+        let window = WINDOW_S * RATE as usize;
+        self.mic.extend_from_slice(mic);
+        self.pc.extend_from_slice(pc);
+        let extra = self.pc.len().saturating_sub(2 * window);
+        self.pc.drain(..extra);
+        let mut out = Vec::new();
+        while self.mic.len() >= window {
+            let rest = self.mic.split_off(window);
+            let m = std::mem::replace(&mut self.mic, rest);
+            let p: Vec<f32> = self.pc.drain(..window.min(self.pc.len())).collect();
+            let side = if rms(&p) > rms(&m) { Side::Online } else { Side::Room };
+            let mixed: Vec<f32> = m.iter().enumerate().map(|(i, s)| (s + p.get(i).copied().unwrap_or(0.0)).clamp(-1.0, 1.0)).collect();
+            if !is_silent(&mixed) {
+                out.push((mixed, side));
+            }
+        }
+        out
     }
 }
 
@@ -260,6 +391,11 @@ impl CaptureState {
     /// Captions wait for the speech model to be downloaded ([`SPEECH_MISSING`]).
     pub fn needs_model(&self) -> bool {
         matches!(self, CaptureState::Warn(m) if m == SPEECH_MISSING)
+    }
+
+    /// Windows' privacy switch keeps the microphone closed ([`MIC_BLOCKED`]).
+    pub fn mic_blocked(&self) -> bool {
+        matches!(self, CaptureState::Warn(m) if m == MIC_BLOCKED)
     }
 
     /// The sentence to show, if there is a problem.
@@ -382,6 +518,74 @@ impl Auto {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn live_listens_to_the_room_unless_told_otherwise() {
+        assert_eq!(Source::parse(""), Source::Room, "an old settings file has no source");
+        assert_eq!(Source::parse("nope"), Source::Room);
+        for s in Source::ALL {
+            assert_eq!(Source::parse(s.key()), s);
+        }
+        assert!(Source::Room.room() && !Source::Room.pc());
+        assert!(!Source::Pc.room() && Source::Pc.pc());
+        assert!(Source::Both.room() && Source::Both.pc());
+    }
+
+    #[test]
+    fn a_blocked_or_held_microphone_is_said_in_plain_words() {
+        assert_eq!(mic_open_problem(0x8007_0005_u32 as i32), Some(MIC_BLOCKED));
+        assert_eq!(mic_open_problem(0x8889_000A_u32 as i32), Some(MIC_IN_USE));
+        assert_eq!(mic_open_problem(0x8000_4005_u32 as i32), None);
+        assert!(CaptureState::Warn(MIC_BLOCKED.into()).mic_blocked());
+        assert!(!CaptureState::Warn(MIC_IN_USE.into()).mic_blocked());
+    }
+
+    #[test]
+    fn both_mixes_the_room_and_the_pc_and_says_which_was_louder() {
+        let w = WINDOW_S * RATE as usize;
+        let mut m = Mixer::default();
+        // Room speech, the PC quiet: one window, tagged Room, the mix is the mic.
+        let out = m.push(&vec![0.2; w], &vec![0.01; w]);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].1, Side::Room);
+        assert!((out[0].0[0] - 0.21).abs() < 1e-6);
+        // The call louder than the room: Online.
+        let out = m.push(&vec![0.01; w], &vec![0.3; w]);
+        assert_eq!(out[0].1, Side::Online);
+        // Loopback gives nothing while the PC plays nothing: the mic still makes windows.
+        let out = m.push(&vec![0.2; w], &[]);
+        assert_eq!((out.len(), out[0].1), (1, Side::Room));
+        // Silence from both is dropped, like a single source's.
+        assert!(m.push(&vec![0.0; w], &vec![0.0; w]).is_empty());
+        // Sums past full scale are clipped, not wrapped.
+        assert_eq!(m.push(&vec![0.9; w], &vec![0.9; w])[0].0[0], 1.0);
+    }
+
+    #[test]
+    fn the_pc_side_cannot_pile_up_behind_the_mic() {
+        let w = WINDOW_S * RATE as usize;
+        let mut m = Mixer::default();
+        // Ten windows of PC sound and no mic: only the newest two are kept.
+        assert!(m.push(&[], &vec![0.3; 10 * w]).is_empty());
+        assert_eq!(m.pc.len(), 2 * w);
+    }
+
+    #[test]
+    fn the_mic_chip_steps_through_windows_microphones_and_back_to_the_default() {
+        let ids = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(next_mic(&ids, ""), "a");
+        assert_eq!(next_mic(&ids, "a"), "b");
+        assert_eq!(next_mic(&ids, "b"), "", "after the last: Windows' default");
+        assert_eq!(next_mic(&ids, "gone"), "", "an unplugged mic goes back to the default");
+        assert_eq!(next_mic(&[], ""), "");
+    }
+
+    #[test]
+    fn a_tagged_line_says_its_side() {
+        assert_eq!(tagged(Some(Side::Room), "hello"), "[Room] hello");
+        assert_eq!(tagged(Some(Side::Online), "hi"), "[Online] hi");
+        assert_eq!(tagged(None, "hi"), "hi");
+    }
 
     #[test]
     fn only_the_missing_model_sentence_asks_for_a_download() {

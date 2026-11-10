@@ -192,12 +192,18 @@ impl Services {
         }
     }
 
-    /// Start capturing the PC's audio for captions, or say why not. Restarts a running one.
-    pub fn capture_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str) -> Result<(), String> {
+    /// Start capturing `source` (the PC's audio, the microphone `mic`, or both) for captions, or
+    /// say why not. Restarts a running one.
+    pub fn capture_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str, source: poni_core::capture::Source, mic: &str) -> Result<(), String> {
         self.capture = None; // the old one stops first: one device reader at a time
         self.session.lock().unwrap_or_else(|e| e.into_inner()).begin();
-        self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into(), self.session.clone()).map_err(|e| format!("Captions could not start ({e})."))?);
+        self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into(), self.session.clone(), source, mic.into()).map_err(|e| format!("Captions could not start ({e})."))?);
         Ok(())
+    }
+
+    /// The microphone's level while captions hear the room (0 otherwise).
+    pub fn mic_level(&self) -> f32 {
+        self.capture.as_ref().map_or(0.0, |c| c.mic_level())
     }
 
     /// New languages for running captions, without stopping them. False when none run.

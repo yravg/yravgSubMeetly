@@ -12,22 +12,24 @@
 //! engine skips stretches instead of falling further behind; upgrade to a
 //! queue only if skipped speech becomes a complaint).
 //!
-//! Only what the PC plays is captured, not the microphone.
+//! What it reads is the Live source (PMM-019): the PC's sound (loopback), a microphone (the room
+//! around the laptop, capture endpoint chosen in Settings or Windows' default), or both, mixed into
+//! one window tagged with the louder side (PMM-021, `poni_core::capture::Mixer`).
 
 use crate::events::{AppEvent, EventSink};
 use crate::services::audio::{device_id, ComApartment};
-use poni_core::capture::{pcm_bytes, CaptureState, Pipeline};
+use poni_core::capture::{pcm_bytes, CaptureState, Mixer, Pipeline, Side, Source};
 use poni_core::helper;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use windows::Win32::Media::Audio::{
-    eConsole, eRender, IAudioCaptureClient, IAudioClient, IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, WAVEFORMATEX,
-    WAVEFORMATEXTENSIBLE,
+    eCapture, eConsole, eRender, IAudioCaptureClient, IAudioClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED,
+    DEVICE_STATE_ACTIVE, WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
 };
-use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL};
+use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ};
 
 /// `AUDCLNT_STREAMFLAGS_LOOPBACK`: capture what the endpoint renders.
 const LOOPBACK: u32 = 0x0002_0000;
@@ -95,6 +97,8 @@ pub struct Meeting {
     pub transcript: bool,
     /// The Meeting tab's notes so far (a meeting session): saved with the final draft (PMM-009).
     pub notes: Option<poni_core::live_notes::LiveNotes>,
+    /// Live heard the room (Room or Both): saved as an "In-room" meeting (PMM-020).
+    pub room: bool,
 }
 
 /// A saved session's id and what its notes held, or why not with its lines back.
@@ -104,11 +108,11 @@ pub type Saved = Result<(String, poni_core::live_notes::Counts), (String, Vec<he
 /// the transcript is kept without them), then keeps the document. `Err` returns the lines.
 pub fn save_meeting(port: u16, m: Meeting) -> Saved {
     use poni_core::live_notes::{draft_items, onto_doc};
-    use poni_core::meeting_doc::{as_transcript, generate_body, generated_note, meeting_doc};
+    use poni_core::meeting_doc::{as_in_room, as_transcript, generate_body, generated_note, meeting_doc};
     let draft = helper::request(port, "POST", "/notes/generate", Some(&generate_body(&m.title, &m.lines))).ok().filter(|(c, _)| *c == 200).and_then(|(_, b)| generated_note(&b));
     let Some(doc) = meeting_doc(&m.id, &m.title, &m.date, &m.start, &m.locale, &m.lines, draft.as_ref()) else { return Err(("Nothing was heard.".into(), Vec::new())) };
     // The draft is kept on a transcript too, so "Save as meeting" gives a meeting with its notes.
-    let doc = if m.transcript { as_transcript(doc) } else { doc };
+    let doc = if m.transcript { as_transcript(doc) } else if m.room { as_in_room(doc) } else { doc };
     // A Meeting tab session: the final draft joins the kept and typed items (the last draft stays
     // when the engine gives none).
     let (doc, counts) = match m.notes {
@@ -164,13 +168,19 @@ pub struct CaptureService {
     /// Spoken and target language, read before each request: a change in Settings reaches the
     /// next window without restarting the device reader.
     langs: Arc<Mutex<(String, String)>>,
+    /// The microphone's level (f32 bits, RMS of the last packets) for Live's mic chip.
+    level: Arc<AtomicU32>,
 }
 
 impl CaptureService {
-    /// Start capturing; `src`/`tgt` are the engine's language codes (`auto` detects).
-    pub fn start(sink: EventSink, port: u16, src: String, tgt: String, log: SessionLog) -> std::io::Result<Self> {
+    /// Start capturing `source` (`mic`: a capture endpoint id, empty for Windows' default);
+    /// `src`/`tgt` are the engine's language codes (`auto` detects).
+    pub fn start(sink: EventSink, port: u16, src: String, tgt: String, log: SessionLog, source: Source, mic: String) -> std::io::Result<Self> {
         let health = Arc::new(Health { sink: sink.clone(), st: Mutex::new(HealthState { sent: Some(CaptureState::On), ..Default::default() }) });
-        let slot: Arc<Mutex<Option<Vec<f32>>>> = Arc::default();
+        let slot: Slot = Arc::default();
+        let level = Arc::new(AtomicU32::new(0));
+        // The mic first: with Both it sets the pace of the mix.
+        let flows: Vec<Flow> = [source.room().then_some(Flow::Mic(mic)), source.pc().then_some(Flow::Pc)].into_iter().flatten().collect();
         let (wake_tx, wake_rx) = channel::<()>();
         let (tx, rx) = channel::<()>();
         let (done_tx, done) = channel::<()>();
@@ -178,12 +188,17 @@ impl CaptureService {
         let langs = Arc::new(Mutex::new((src, tgt)));
         let (h, s, l) = (health.clone(), slot.clone(), langs.clone());
         std::thread::Builder::new().name("poni-capture-post".into()).spawn(move || post_loop(port, l, wake_rx, s, h, log))?;
-        let h = health.clone();
+        let (h, lv) = (health.clone(), level.clone());
         let thread = std::thread::Builder::new().name("poni-capture".into()).spawn(move || {
-            capture_loop(rx, h, slot, wake_tx);
+            capture_loop(rx, h, slot, wake_tx, flows, lv);
             let _ = done_tx.send(());
         })?;
-        Ok(Self { tx, done, thread: Some(thread), health, langs })
+        Ok(Self { tx, done, thread: Some(thread), health, langs, level })
+    }
+
+    /// The microphone's RMS level now (0 without one).
+    pub fn mic_level(&self) -> f32 {
+        f32::from_bits(self.level.load(Ordering::Relaxed))
     }
 
     /// New languages for the next window; the translation note is worked out again from its answer.
@@ -280,14 +295,17 @@ impl Health {
 // ---------------------------------------------------------------------------
 // The poster: one request in flight, newest window wins.
 
-fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>, slot: Arc<Mutex<Option<Vec<f32>>>>, health: Arc<Health>, log: SessionLog) {
+/// The newest window and, with Both, its louder side.
+type Slot = Arc<Mutex<Option<(Vec<f32>, Option<Side>)>>>;
+
+fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>, slot: Slot, health: Arc<Health>, log: SessionLog) {
     // The engine never downloads by itself: without the speech model a /draft answers 409. So the
     // window is not even sent while /models says it is not there, and a 409 closes the gate until
     // it says it is (a download the person pressed). The translation model is not a gate: the
     // engine captions without it and each answer says so in `translateState`.
     let mut speech = Gate::default();
     while wake.recv().is_ok() {
-        let Some(window) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
+        let Some((window, side)) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
         let (src, tgt) = langs.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let (src, tgt) = (src.as_str(), tgt.as_str());
         if !speech.open(|| speech_on_disk(port)) {
@@ -299,7 +317,7 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
                 health.engine(None);
                 health.hint(poni_core::capture::translation_hint(d.translate, src, tgt));
                 if !d.source.is_empty() {
-                    log.lock().unwrap_or_else(|e| e.into_inner()).push(d.source, d.translation);
+                    log.lock().unwrap_or_else(|e| e.into_inner()).push(poni_core::capture::tagged(side, &d.source), d.translation);
                     health.heard();
                 }
             }
@@ -387,6 +405,43 @@ fn retry(why: impl Into<String>) -> OpenError {
     OpenError { fatal: false, why: why.into() }
 }
 
+/// One device the capture reads: what the PC plays (loopback of the default output) or a
+/// microphone (a capture endpoint id, empty for Windows' default).
+enum Flow {
+    Pc,
+    Mic(String),
+}
+
+impl Flow {
+    fn device(&self, en: &IMMDeviceEnumerator) -> windows::core::Result<IMMDevice> {
+        match self {
+            Flow::Pc => unsafe { en.GetDefaultAudioEndpoint(eRender, eConsole) },
+            Flow::Mic(id) if id.is_empty() => unsafe { en.GetDefaultAudioEndpoint(eCapture, eConsole) },
+            Flow::Mic(id) => unsafe { en.GetDevice(&windows::core::HSTRING::from(id.as_str())) },
+        }
+    }
+
+    /// It reads Windows' default device, which can change under it.
+    fn follows_default(&self) -> bool {
+        !matches!(self, Flow::Mic(id) if !id.is_empty())
+    }
+
+    fn what(&self) -> &'static str {
+        match self {
+            Flow::Pc => "output device",
+            Flow::Mic(_) => "microphone",
+        }
+    }
+
+    /// Why opening failed, in words: a blocked or held microphone says so plainly (PMM-019).
+    fn failed(&self, step: &str, e: windows::core::Error) -> OpenError {
+        match poni_core::capture::mic_open_problem(e.code().0).filter(|_| matches!(self, Flow::Mic(_))) {
+            Some(why) => retry(why),
+            None => retry(format!("The {} could not be {step} ({e}).", self.what())),
+        }
+    }
+}
+
 struct Session {
     id: String,
     client: IAudioClient,
@@ -402,44 +457,46 @@ impl Drop for Session {
 }
 
 impl Session {
-    fn open(enumerator: &IMMDeviceEnumerator) -> Result<Session, OpenError> {
-        let device = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }.map_err(|_| retry("No audio output device. Captions resume when one is available."))?;
+    fn open(enumerator: &IMMDeviceEnumerator, flow: &Flow) -> Result<Session, OpenError> {
+        let device = flow.device(enumerator).map_err(|_| match flow {
+            Flow::Pc => retry("No audio output device. Captions resume when one is available."),
+            Flow::Mic(_) => retry("No microphone. Captions resume when one is plugged in."),
+        })?;
         let id = device_id(&device);
-        let client: IAudioClient = unsafe { device.Activate(CLSCTX_ALL, None) }.map_err(|e| retry(format!("The output device could not be opened ({e}).")))?;
-        let fmt = unsafe { client.GetMixFormat() }.map_err(|e| retry(format!("The output device's format could not be read ({e}).")))?;
+        let client: IAudioClient = unsafe { device.Activate(CLSCTX_ALL, None) }.map_err(|e| flow.failed("opened", e))?;
+        let fmt = unsafe { client.GetMixFormat() }.map_err(|e| flow.failed("read", e))?;
         // The mix format is CoTaskMem: free it once, after Initialize has read it.
         let (rate, channels, float) = unsafe { describe(fmt) };
-        let init = if float { unsafe { client.Initialize(AUDCLNT_SHAREMODE_SHARED, LOOPBACK, BUFFER_100NS, 0, fmt, None) } } else { Ok(()) };
+        let flags = if matches!(flow, Flow::Pc) { LOOPBACK } else { 0 };
+        let init = if float { unsafe { client.Initialize(AUDCLNT_SHAREMODE_SHARED, flags, BUFFER_100NS, 0, fmt, None) } } else { Ok(()) };
         unsafe { CoTaskMemFree(Some(fmt as *const _)) };
         if !float {
-            return Err(OpenError { fatal: true, why: "The output device mixes audio in a format captions cannot read (needs 32-bit float).".into() });
+            return Err(OpenError { fatal: true, why: format!("The {} mixes audio in a format captions cannot read (needs 32-bit float).", flow.what()) });
         }
-        init.map_err(|e| retry(format!("Capturing the output device failed ({e}).")))?;
-        let capture: IAudioCaptureClient = unsafe { client.GetService() }.map_err(|e| retry(format!("Capturing the output device failed ({e}).")))?;
-        unsafe { client.Start() }.map_err(|e| retry(format!("Capturing the output device failed ({e}).")))?;
+        init.map_err(|e| flow.failed("captured", e))?;
+        let capture: IAudioCaptureClient = unsafe { client.GetService() }.map_err(|e| flow.failed("captured", e))?;
+        unsafe { client.Start() }.map_err(|e| flow.failed("captured", e))?;
         Ok(Session { id, client, capture, pipeline: Pipeline::new(rate, channels), channels })
     }
 
-    /// Read every packet that is waiting; each finished window goes to `out`.
-    fn drain(&mut self, mut out: impl FnMut(Vec<f32>)) -> windows::core::Result<()> {
+    /// Every packet that is waiting, interleaved as the device gives it.
+    fn drain(&mut self) -> windows::core::Result<Vec<f32>> {
+        let mut all = Vec::new();
         loop {
             if unsafe { self.capture.GetNextPacketSize()? } == 0 {
-                return Ok(());
+                return Ok(all);
             }
             let (mut data, mut frames, mut flags) = (std::ptr::null_mut::<u8>(), 0u32, 0u32);
             unsafe { self.capture.GetBuffer(&mut data, &mut frames, &mut flags, None, None)? };
             let n = frames as usize * self.channels;
-            let samples: Vec<f32> = if flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0 || data.is_null() {
-                vec![0.0; n]
+            if flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0 || data.is_null() {
+                all.resize(all.len() + n, 0.0);
             } else {
                 // SAFETY: WASAPI returns `frames` frames of the mix format (checked as f32); the
                 // buffer is valid until ReleaseBuffer, and the bytes are copied before it.
-                unsafe { std::slice::from_raw_parts(data as *const f32, n) }.to_vec()
-            };
-            unsafe { self.capture.ReleaseBuffer(frames)? };
-            for w in self.pipeline.feed(&samples) {
-                out(w);
+                all.extend_from_slice(unsafe { std::slice::from_raw_parts(data as *const f32, n) });
             }
+            unsafe { self.capture.ReleaseBuffer(frames)? };
         }
     }
 }
@@ -462,7 +519,7 @@ unsafe fn describe(fmt: *const WAVEFORMATEX) -> (u32, usize, bool) {
     (f.nSamplesPerSec, f.nChannels.max(1) as usize, float)
 }
 
-fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Arc<Mutex<Option<Vec<f32>>>>, wake: Sender<()>) {
+fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Slot, wake: Sender<()>, flows: Vec<Flow>, level: Arc<AtomicU32>) {
     let com = ComApartment::enter_mta();
     if !com.initialized {
         health.fail("Windows audio could not be started on this thread.".into());
@@ -481,15 +538,19 @@ fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Arc<Mutex<Option<
         Err(RecvTimeoutError::Timeout) => {}
         _ => stopped.store(true, Ordering::Relaxed),
     };
-    let mut session: Option<Session> = None;
+    // One session per flow; every one is open before any is read.
+    let mut sessions: Vec<Option<Session>> = flows.iter().map(|_| None).collect();
+    let mut mixer = Mixer::default();
     let mut checked = Instant::now();
     while !stopped.load(Ordering::Relaxed) {
-        let Some(s) = session.as_mut() else {
-            match Session::open(&enumerator) {
+        if let Some(i) = sessions.iter().position(Option::is_none) {
+            match Session::open(&enumerator, &flows[i]) {
                 Ok(s) => {
-                    health.device(None);
-                    checked = Instant::now();
-                    session = Some(s);
+                    sessions[i] = Some(s);
+                    if sessions.iter().all(Option::is_some) {
+                        health.device(None);
+                        checked = Instant::now();
+                    }
                 }
                 Err(e) if e.fatal => return health.fail(e.why),
                 Err(e) => {
@@ -498,28 +559,89 @@ fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Arc<Mutex<Option<
                 }
             }
             continue;
-        };
-        let drained = s.drain(|w| {
-            // Newest wins: an older window the poster has not taken is dropped.
-            *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(w);
-            let _ = wake.send(());
-        });
-        let mut lost = drained.err().map(|e| format!("The output device went away ({e}). Reconnecting."));
+        }
+        let mut read = Vec::with_capacity(flows.len());
+        let mut lost = None;
+        for (s, f) in sessions.iter_mut().flatten().zip(&flows) {
+            match s.drain() {
+                Ok(raw) => read.push(raw),
+                Err(e) => {
+                    lost = Some(format!("The {} went away ({e}). Reconnecting.", f.what()));
+                    break;
+                }
+            }
+        }
         if lost.is_none() && checked.elapsed() >= DEVICE_CHECK {
             checked = Instant::now();
-            let now = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }.map(|d| device_id(&d)).unwrap_or_default();
-            if now != s.id {
-                lost = Some("The default output device changed. Reconnecting.".into());
+            for (s, f) in sessions.iter().flatten().zip(&flows) {
+                if f.follows_default() && f.device(&enumerator).map(|d| device_id(&d)).unwrap_or_default() != s.id {
+                    lost = Some(format!("The default {} changed. Reconnecting.", f.what()));
+                }
             }
         }
         if let Some(why) = lost {
             crate::pinfo!("capture: {why}");
             health.device(Some(why));
-            session = None;
+            sessions.iter_mut().for_each(|s| *s = None);
             continue;
+        }
+        if matches!(flows[0], Flow::Mic(_)) && !read[0].is_empty() {
+            level.store(poni_core::capture::rms(&read[0]).to_bits(), Ordering::Relaxed);
+        }
+        let windows: Vec<(Vec<f32>, Option<Side>)> = match sessions.as_mut_slice() {
+            [Some(s)] => s.pipeline.feed(&read[0]).into_iter().map(|w| (w, None)).collect(),
+            [Some(mic), Some(pc)] => {
+                let (m, p) = (mic.pipeline.mono(&read[0]), pc.pipeline.mono(&read[1]));
+                mixer.push(&m, &p).into_iter().map(|(w, side)| (w, Some(side))).collect()
+            }
+            _ => Vec::new(),
+        };
+        for w in windows {
+            // Newest wins: an older window the poster has not taken is dropped.
+            *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(w);
+            let _ = wake.send(());
         }
         nap(POLL);
     }
+}
+
+/// The active microphones: (endpoint id, name), for Live's mic chip (PMM-019). Read on a short MTA
+/// thread of its own, so the calling thread's apartment does not matter.
+pub fn input_devices() -> Vec<(String, String)> {
+    std::thread::spawn(|| {
+        let com = ComApartment::enter_mta();
+        if !com.initialized {
+            return Vec::new();
+        }
+        let list = || -> windows::core::Result<Vec<(String, String)>> {
+            let en: IMMDeviceEnumerator = unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
+            let all = unsafe { en.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE)? };
+            let mut out = Vec::new();
+            for i in 0..unsafe { all.GetCount()? } {
+                let d = unsafe { all.Item(i)? };
+                out.push((device_id(&d), friendly_name(&d).unwrap_or_else(|| "Microphone".into())));
+            }
+            Ok(out)
+        };
+        list().unwrap_or_default()
+    })
+    .join()
+    .unwrap_or_default()
+}
+
+/// The name Windows shows for an endpoint ("Microphone Array (Realtek...)").
+fn friendly_name(d: &IMMDevice) -> Option<String> {
+    use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
+    use windows::Win32::UI::Shell::PropertiesSystem::PROPERTYKEY;
+    // PKEY_Device_FriendlyName.
+    const KEY: PROPERTYKEY = PROPERTYKEY { fmtid: windows::core::GUID::from_u128(0xa45c254e_df1c_4efd_8020_67d146a850e0), pid: 14 };
+    let store = unsafe { d.OpenPropertyStore(STGM_READ) }.ok()?;
+    let v = unsafe { store.GetValue(&KEY) }.ok()?;
+    let p = unsafe { PropVariantToStringAlloc(&v) }.ok()?;
+    // SAFETY: a NUL-terminated CoTaskMem string we own and free once.
+    let name = unsafe { p.to_string() }.ok();
+    unsafe { CoTaskMemFree(Some(p.0 as *const _)) };
+    name.filter(|n| !n.is_empty())
 }
 
 #[cfg(test)]
@@ -590,16 +712,20 @@ mod tests {
 
     /// Real hardware, real engine: play speech on this PC, point `PONI_TEST_ENGINE_PORT`
     /// at a running engine, run with `--ignored --nocapture`. Prints what `/live` holds after 40 s.
+    /// `PONI_TEST_SOURCE` (room, pc, both) and `PONI_TEST_MIC` (an endpoint id) test the room.
     #[test]
     #[ignore = "needs a running engine and speech playing on this PC"]
     fn what_this_pc_plays_reaches_the_engine_as_a_caption() {
         let port: u16 = std::env::var("PONI_TEST_ENGINE_PORT").expect("PONI_TEST_ENGINE_PORT").parse().unwrap();
+        let source = Source::parse(&std::env::var("PONI_TEST_SOURCE").unwrap_or_else(|_| "pc".into()));
         let (tx, rx) = channel();
         let sink = EventSink::new(tx, crate::events::SendHwnd::new(windows::Win32::Foundation::HWND::default()));
-        let svc = CaptureService::start(sink, port, "auto".into(), "en".into(), Default::default()).unwrap();
+        let log = SessionLog::default();
+        let svc = CaptureService::start(sink, port, "auto".into(), "en".into(), log.clone(), source, std::env::var("PONI_TEST_MIC").unwrap_or_default()).unwrap();
         let t0 = std::time::Instant::now();
-        let (mut heard, mut states) = (0, Vec::new());
+        let (mut heard, mut states, mut peak) = (0, Vec::new(), 0f32);
         while t0.elapsed() < Duration::from_secs(40) {
+            peak = peak.max(svc.mic_level());
             match rx.recv_timeout(Duration::from_millis(500)) {
                 Ok(crate::events::AppEvent::Capture(CaptureEvent::Heard)) => {
                     heard += 1;
@@ -609,7 +735,11 @@ mod tests {
                 _ => {}
             }
         }
+        eprintln!("mic level peak {peak}");
         drop(svc);
+        for l in log.lock().unwrap().lines() {
+            eprintln!("line: {} | {}", l.source, l.translation);
+        }
         let live = helper::request(port, "GET", "/live", None);
         eprintln!("heard {heard} times; states {states:?}; /live {live:?}");
         assert!(heard > 0, "the engine never returned a caption");
@@ -621,11 +751,29 @@ mod tests {
         let com = ComApartment::enter_mta();
         assert!(com.initialized);
         let enumerator: IMMDeviceEnumerator = unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) }.unwrap();
-        match Session::open(&enumerator) {
+        match Session::open(&enumerator, &Flow::Pc) {
             Ok(mut s) => {
-                s.drain(|_| {}).expect("drain");
+                s.drain().expect("drain");
             }
             Err(e) => eprintln!("no loopback here ({}): {}", if e.fatal { "fatal" } else { "retry" }, e.why),
         }
+    }
+
+    /// The real default microphone, if there is one: opens a capture session (or says in words why
+    /// not: blocked, held, missing), and the list of microphones names each one.
+    #[test]
+    fn a_mic_session_opens_on_this_pcs_default_microphone_or_says_why() {
+        let com = ComApartment::enter_mta();
+        assert!(com.initialized);
+        let enumerator: IMMDeviceEnumerator = unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) }.unwrap();
+        match Session::open(&enumerator, &Flow::Mic(String::new())) {
+            Ok(mut s) => {
+                s.drain().expect("drain");
+            }
+            Err(e) => eprintln!("no microphone here ({}): {}", if e.fatal { "fatal" } else { "retry" }, e.why),
+        }
+        let mics = input_devices();
+        eprintln!("microphones: {mics:?}");
+        assert!(mics.iter().all(|(id, name)| !id.is_empty() && !name.is_empty()));
     }
 }

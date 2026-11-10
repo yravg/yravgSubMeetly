@@ -79,7 +79,9 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         st.meeting_page = 0;
     }
     let title = if note.date.is_empty() { note.title.clone() } else { format!("{} \u{b7} {}", note.title, note.date) };
-    let tx = if transcript { head.x + hkit::chip(ui, head.x, cy, "Video", accent) + 8.0 } else { head.x };
+    // A meeting held in the room around the laptop (Live, PMM-020): tagged "In-room".
+    let tag = if transcript { Some("Video") } else { poni_core::meeting_doc::is_in_room(&note.raw).then_some("In-room") };
+    let tx = tag.map_or(head.x, |t| head.x + hkit::chip(ui, head.x, cy, t, accent) + 8.0);
     ui.c.text(&title, Rect::new(tx, cy - 11.0, (px - tx - 10.0).max(0.0), 22.0), &TextStyle::headline());
 
     // Foot: what the meeting waits on (or the last press), Paste, and the item pages.

@@ -87,6 +87,20 @@ pub fn is_transcript(doc: &Value) -> bool {
     doc.get("source").and_then(Value::as_str) == Some(SOURCE_MEDIA)
 }
 
+/// PMM-020: a meeting held in the room around the laptop (Live with Room or Both), saved like any
+/// meeting with `source: "room"` as its type; the Minutes page tags it "In-room". The register's
+/// sync imports it as a meeting (only `media` is left out).
+pub const SOURCE_ROOM: &str = "room";
+
+pub fn as_in_room(mut doc: Value) -> Value {
+    doc["source"] = json!(SOURCE_ROOM);
+    doc
+}
+
+pub fn is_in_room(doc: &Value) -> bool {
+    doc.get("source").and_then(Value::as_str) == Some(SOURCE_ROOM)
+}
+
 /// The kept transcript as a meeting (`None` when it is one already).
 pub fn promote(doc: &Value) -> Option<Value> {
     is_transcript(doc).then(|| {
@@ -150,6 +164,15 @@ mod tests {
         // Everything else (id, transcript, items) rides along unchanged.
         assert_eq!((meeting["id"].clone(), meeting["transcript"].clone()), (kept["id"].clone(), kept["transcript"].clone()));
         assert!(!is_transcript(&json!({ "id": "x" })) && !is_transcript(&json!(null)));
+    }
+
+    #[test]
+    fn a_room_session_is_a_meeting_of_type_in_room() {
+        let doc = meeting_doc("MOM-WIN-2", "In-room meeting", "2026-11-11", "2026-11-11T09:00", "en", &[line(0.0, "Hi", "")], None).unwrap();
+        assert!(!is_in_room(&doc));
+        let room = as_in_room(doc);
+        assert!(is_in_room(&room) && !is_transcript(&room), "in-room is a meeting, not a transcript");
+        assert_eq!(promote(&room), None);
     }
 
     #[test]

@@ -11,7 +11,8 @@
 //! `javascript:`, `shell:`, relative names that would be searched on `PATH`)
 //! is logged and refused. Fixed exceptions: Settings > Apps > Startup
 //! ([`open_startup_settings`]) and Settings > Privacy > Notifications
-//! ([`open_notification_settings`]) and Settings > Time & language > Language
+//! ([`open_notification_settings`]) and Settings > Privacy > Microphone
+//! ([`open_microphone_settings`]) and Settings > Time & language > Language
 //! & region ([`open_language_settings`]), constant URIs; adding a Windows
 //! language feature ([`run_elevated_install`]), the one elevated run: Windows'
 //! own PowerShell with a fixed command line per feature, UAC asking first;
@@ -158,6 +159,18 @@ pub fn open_notification_settings() {
         let r = unsafe { ShellExecuteW(None, w!("open"), w!("ms-settings:privacy-notifications"), None, None, SW_SHOWNORMAL) };
         if (r.0 as isize) <= 32 {
             crate::pwarn!("open failed ({}): ms-settings:privacy-notifications", r.0 as isize);
+        }
+    });
+}
+
+/// Open Settings > Privacy & security > Microphone (asynchronously): the
+/// switch that lets desktop apps use the microphone, when Live's room
+/// captions find it blocked (PMM-019).
+pub fn open_microphone_settings() {
+    run("open", || {
+        let r = unsafe { ShellExecuteW(None, w!("open"), w!("ms-settings:privacy-microphone"), None, None, SW_SHOWNORMAL) };
+        if (r.0 as isize) <= 32 {
+            crate::pwarn!("open failed ({}): ms-settings:privacy-microphone", r.0 as isize);
         }
     });
 }

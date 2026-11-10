@@ -145,6 +145,14 @@ pub enum Command {
     Calendar(CalendarCmd),
     /// Start (true) or stop (false) captions from what the PC plays.
     Captions(bool),
+    /// Live › Start captions: from Live's source (Room, This PC or Both; PMM-019).
+    LiveCaptions,
+    /// Live › source picker: listen to this from now on.
+    LiveSource(poni_core::capture::Source),
+    /// Live › mic chip: the next of Windows' microphones.
+    NextMic,
+    /// Live › mic blocked: Windows' Settings › Privacy & security › Microphone.
+    MicPrivacy,
     /// Read a transcript from the clipboard and save it as a meeting (Meeting page).
     PasteTranscript,
     /// Open a meeting's join link: the Teams app when it is installed, else the browser.

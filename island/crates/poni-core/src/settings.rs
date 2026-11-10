@@ -146,6 +146,10 @@ pub struct Settings {
     pub auto_captions: bool,
     /// Captions carry a translation into `target_lang` (on by default, English); off: the spoken line only.
     pub translate_captions: bool,
+    /// What Live captions listen to (`capture::Source::key`): `room` (default), `pc` or `both`.
+    pub live_source: String,
+    /// The microphone for Room and Both: a Windows endpoint id, empty for Windows' default.
+    pub mic_device: String,
     /// Meeting apps and hosts the person added (Settings › Meeting apps).
     pub meeting_apps: Vec<crate::meeting_source::MeetingApp>,
     /// One switch per built-in meeting family; one switched off counts as media.
@@ -255,6 +259,8 @@ impl Default for Settings {
             captions_on: false,
             auto_captions: true,
             translate_captions: true,
+            live_source: "room".into(),
+            mic_device: String::new(),
             meeting_apps: Vec::new(),
             meeting_families: Default::default(),
             open_meeting_tab: true,
@@ -398,6 +404,7 @@ mod tests {
         let s: Settings = serde_json::from_str(r#"{"auto_captions":false}"#).unwrap();
         assert!(s.meeting_apps.is_empty() && s.open_meeting_tab && s.meeting_families.slack && s.meeting_families.teams);
         assert!(!s.quick_captions_open, "the pill's caption strip starts hidden");
+        assert_eq!((s.live_source.as_str(), s.mic_device.as_str()), ("room", ""), "Live starts on the room, Windows' default mic");
         let s: Settings = serde_json::from_str(r#"{"meeting_families":{"slack":false},"meeting_apps":[{"kind":"host","value":"meeting.tencent.com","label":"Tencent Meeting"}]}"#).unwrap();
         assert!(!s.meeting_families.slack && s.meeting_families.zoom);
         assert_eq!(s.meeting_apps[0].value, "meeting.tencent.com");
