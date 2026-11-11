@@ -628,6 +628,9 @@ pub struct AppState {
     pub meeting_pick: Option<Vec<String>>,
     /// What the last caption said about its translation (missing, loading), for the Live page.
     pub caption_hint: Option<poni_core::capture::TranslateHint>,
+    /// Translation is paused for now (Live › Pause translation, the tray / menu bar): captions go
+    /// on, only the translation stops. Not a setting: it ends with the app.
+    pub translation_paused: bool,
     /// The engine's models and the download under way (Settings, the Live page).
     pub models: poni_core::models::Models,
     /// The engine's AI connector and templates (Settings › Models).
@@ -728,6 +731,7 @@ impl AppState {
             call: Default::default(),
             meeting_pick: None,
             caption_hint: None,
+            translation_paused: false,
             models: Default::default(),
             ai: Default::default(),
             webhooks: Default::default(),

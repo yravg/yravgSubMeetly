@@ -155,6 +155,12 @@ pub enum Command {
     Captions(bool),
     /// Live › Start captions: from Live's source (Room, This PC or Both; PMM-019).
     LiveCaptions,
+    /// Pause or resume the translation of running captions (the caption itself goes on).
+    ToggleTranslationPause,
+    /// Copy the caption now on screen, with its translation, to the clipboard.
+    CopyCaption,
+    /// Save this meeting's transcript as a CSV file in Downloads (the engine's `format=csv`).
+    ExportCsv(String),
     /// Live › source picker: listen to this from now on.
     LiveSource(poni_core::capture::Source),
     /// Live › mic chip: the next of Windows' microphones.

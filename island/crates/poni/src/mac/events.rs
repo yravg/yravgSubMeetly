@@ -109,6 +109,8 @@ pub enum AppEvent {
     MeetingSignals(crate::services::meeting_probe::Seen),
     /// A meeting exported to a file (`Command::ExportNote`), or why not.
     NoteExported(Result<std::path::PathBuf, String>),
+    /// A CSV export ended: the file it wrote (its full path), or why it could not.
+    Exported(Result<String, String>),
     /// What the engine supervisor sees (`services::engine`).
     Engine(poni_core::engine_link::EngineInfo),
     /// The engine's webhooks (`services::integrations`), and one line about the change just made.

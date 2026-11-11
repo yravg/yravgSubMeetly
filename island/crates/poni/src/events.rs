@@ -152,6 +152,8 @@ pub enum AppEvent {
     HelperNotice(String),
     /// A meeting exported to a file (`Command::ExportNote`), or why not.
     NoteExported(Result<std::path::PathBuf, String>),
+    /// A CSV export ended: the file it wrote (its full path), or why it could not.
+    Exported(Result<String, String>),
     /// The engine's calendar, or why it could not be read.
     Calendar(Result<poni_core::calendar::Calendar, String>),
     /// The answer to "Open notes" on a meeting: the note's title, or why not.

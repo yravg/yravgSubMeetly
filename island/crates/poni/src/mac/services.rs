@@ -64,6 +64,8 @@ pub mod engine;
 pub mod integrations;
 #[path = "../services/models.rs"]
 pub mod models;
+#[path = "../services/export.rs"]
+pub mod export;
 #[path = "services/location.rs"]
 pub mod location;
 #[path = "services/login.rs"]

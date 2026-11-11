@@ -196,6 +196,9 @@ pub struct Live {
     pub at: Option<u64>,
 }
 
+/// Engine lines kept for the "Recent lines" cards ([`View::earlier`]).
+pub const EARLIER_KEPT: usize = 12;
+
 /// How long a line counts as "now" for the collapsed pill.
 pub const LIVE_FRESH_MS: u64 = 8_000;
 
@@ -712,6 +715,9 @@ pub struct View {
     pub timer: Stopwatch,
     /// The engine line before its newest one.
     pub prev_line: String,
+    /// The engine lines before its newest one, oldest first ([`EARLIER_KEPT`] of them): the
+    /// "Recent lines" cards of a session that has no note yet ([`crate::history_cards`]).
+    pub earlier: Vec<Line>,
     /// Live is paused on the engine's line: what the page shows meanwhile.
     pub held: Option<Captions>,
     /// The engine's calendar, asked less often than the notes. None until it answers once.
@@ -727,7 +733,7 @@ pub struct View {
 
 impl Default for View {
     fn default() -> Self {
-        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), held: None, calendar: None, calendar_err: None, capturing: false, selected: None }
+        Self { link: Link::Connecting, snap: Snapshot::default(), following: true, frozen: None, rtt: Vec::new(), timer: Stopwatch::default(), prev_line: String::new(), earlier: Vec::new(), held: None, calendar: None, calendar_err: None, capturing: false, selected: None }
     }
 }
 
@@ -749,8 +755,17 @@ impl View {
         match r {
             Ok((snap, ms)) => {
                 match (&self.snap.live, &snap.live) {
-                    (Some(old), Some(new)) if new.seq > old.seq && old.seq > 0 => self.prev_line = old.source.clone(),
-                    (_, Some(new)) if new.seq == 0 => self.prev_line.clear(),
+                    (Some(old), Some(new)) if new.seq > old.seq && old.seq > 0 => {
+                        self.prev_line = old.source.clone();
+                        self.earlier.push(Line { t0: 0.0, t1: 0.0, source: old.source.clone(), translation: old.translation.clone(), speaker: String::new() });
+                        if self.earlier.len() > EARLIER_KEPT {
+                            self.earlier.remove(0);
+                        }
+                    }
+                    (_, Some(new)) if new.seq == 0 => {
+                        self.prev_line.clear();
+                        self.earlier.clear();
+                    }
                     _ => {}
                 }
                 self.link = Link::Online;
@@ -856,6 +871,26 @@ impl View {
             Some(l) => Captions { previous: self.prev_line.clone(), current: l.source.clone(), translation: l.translation.clone(), speaker: String::new() },
             None => self.note().map(|n| captions(n, self.frozen)).unwrap_or_default(),
         }
+    }
+
+    /// The "Recent lines" cards above the caption now shown: the lines before the one the page
+    /// already shows dim over the caption ([`captions`]'s `previous`), so no line appears twice.
+    /// The engine's lines while that is the caption, else the note's. None while the page is held
+    /// on an engine line (the cards would drift under a held caption).
+    pub fn cards(&self, now_ms: u64, n: u8) -> Vec<crate::history_cards::Card> {
+        use crate::history_cards::recent;
+        if self.held.is_some() {
+            return Vec::new();
+        }
+        if let Some(l) = self.followed_line(now_ms) {
+            let mut lines = self.earlier.clone();
+            lines.push(Line { t0: 0.0, t1: 0.0, source: l.source.clone(), translation: l.translation.clone(), speaker: String::new() });
+            // [.., older, previous, current]: the cards are the lines before `previous`.
+            return lines.len().checked_sub(2).map(|prev| recent(&lines, Some(prev), n)).unwrap_or_default();
+        }
+        let Some(note) = self.note() else { return Vec::new() };
+        let cur = self.frozen.unwrap_or(note.transcript.len().saturating_sub(1)).min(note.transcript.len().saturating_sub(1));
+        cur.checked_sub(1).map(|prev| recent(&note.transcript, Some(prev), n)).unwrap_or_default()
     }
 
     /// Live is paused, on a note line or on the engine's line.
@@ -972,6 +1007,30 @@ mod tests {
         v.apply(Ok((heard(""), 5)));
         assert_eq!(v.pill_text(2000), Some(("Halo", "")), "no translation: the second line is empty");
         assert_eq!(v.pill_text(20_000), None, "an old line is not now");
+    }
+
+    #[test]
+    fn recent_cards_follow_the_engine_lines() {
+        let mut v = View::default();
+        let snap = |seq: u64, s: &str| Snapshot {
+            live: Some(Live { seq, source: s.into(), translation: format!("T{s}"), at: Some(now_ms()), ..Live::default() }),
+            ..Snapshot::default()
+        };
+        for (i, s) in ["a", "b", "c", "d"].iter().enumerate() {
+            v.apply(Ok((snap(i as u64 + 1, s), 5)));
+        }
+        // The same seq again (every poll) adds nothing.
+        v.apply(Ok((snap(4, "d"), 5)));
+        // "d" is the caption and "c" the dim previous line: the cards are the lines before those.
+        let c = v.cards(now_ms(), 2);
+        assert_eq!(c.iter().map(|c| c.source.as_str()).collect::<Vec<_>>(), ["a", "b"]);
+        assert_eq!(c[1].translation, "Tb");
+        // A held page shows no cards; a new session (seq 0) forgets the old lines.
+        v.held = Some(Captions::default());
+        assert!(v.cards(now_ms(), 2).is_empty());
+        v.held = None;
+        v.apply(Ok((snap(0, ""), 5)));
+        assert!(v.earlier.is_empty());
     }
 
     #[test]

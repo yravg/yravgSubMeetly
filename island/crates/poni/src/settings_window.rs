@@ -360,6 +360,7 @@ pub enum Key {
     DetectMeetings,
     ShowSpeakers,
     TranslateCaptions,
+    LogCards,
     SpokenLang,
     TargetLang,
     LyricsTranslate,
@@ -708,6 +709,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                     switch(Key::AutoCaptions, "Start captions by themselves", Some("When the PC plays sound (a call, a video, a meeting; not a music app); they stop after it ends"), s.auto_captions),
                     switch(Key::ShowSpeakers, "Show who is speaking", Some("Names the speaker in front of a caption line when the engine could tell (You, Others, Speaker 2); a reading aid, not exact"), s.show_speakers),
                     switch(Key::TranslateCaptions, "Translate captions", Some("A second line in the language under Translate into (English by default)"), s.translate_captions),
+                    item(Key::LogCards, "Recent lines", Some("Cards of the lines before the caption on Live; Off hides them"), Ctl::Stepper(if s.log_cards == 0 { "Off".to_string() } else { s.log_cards.to_string() })),
                 ],
             ),
             Block::Group(Some("Meeting apps"), meeting_rows(st)),
@@ -931,6 +933,7 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             return;
         }
         Key::TranslateCaptions => s.translate_captions = !s.translate_captions,
+        Key::LogCards => s.log_cards = poni_core::history_cards::clamp_count((s.log_cards as i32 + step).clamp(0, poni_core::history_cards::MAX_CARDS as i32) as u8),
         Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
         Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
         Key::LyricsTranslate => s.lyrics_translate = !s.lyrics_translate,
