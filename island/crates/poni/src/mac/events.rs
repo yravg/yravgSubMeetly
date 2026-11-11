@@ -111,6 +111,18 @@ pub enum AppEvent {
     ModelDeleted { id: String, result: Result<u64, String> },
     ModelSelected { kind: poni_core::models::Kind, result: Result<(), String> },
     ModelPlaced { kind: poni_core::models::Kind, result: Result<(), String> },
+    /// The helper link's answer (engine health, notes, the live line) with its poll counter.
+    Helper(Result<(poni_core::helper::Snapshot, u32), String>),
+    HelperNotice(String),
+    /// The calendar, as the helper link reads it once a minute.
+    Calendar(Result<poni_core::calendar::Calendar, String>),
+    CalendarNotes(Result<String, String>),
+    /// Live captions: the capture's state, a heard line, the interim (`services::capture`).
+    Capture(crate::services::capture::CaptureEvent),
+    /// The captioned session became a meeting (or why not, with its lines back).
+    MeetingSaved(crate::services::capture::Saved),
+    /// The notes so far, drafted by the engine for the Meeting view.
+    CallNotes(Option<Vec<poni_core::live_notes::Item>>),
 }
 
 /// Windows' window handle, which `services::models::relocate` names; the Mac has no picker (a model's

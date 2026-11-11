@@ -9,6 +9,8 @@ pub mod audio;
 pub mod backdrop;
 pub mod bluetooth;
 pub mod capture;
+// The half of live captions that is not about a device: shared with the Mac app (mac/services.rs).
+pub mod capture_core;
 pub mod livecap;
 pub mod engine;
 pub mod clipboard;

@@ -42,6 +42,7 @@ use objc2_core_foundation::{CGPoint, CGRect, CGSize};
 use objc2_core_graphics::CGContext;
 use objc2_foundation::{NSNotification, NSNotificationCenter, NSRunLoop, NSRunLoopCommonModes, NSTimer};
 use poni_core::addons::{Status as AddonStatus, DOWNLOADER, JAPANESE_READINGS, PRAYER_TIMES, SYSTEM};
+use poni_core::capture::Source;
 use poni_core::frametime::MotionStats;
 use poni_core::phonedrop::{Event as PhoneEvent, QrMatrix};
 use poni_core::geom::{palette, Color, Point, Rect};
@@ -468,6 +469,11 @@ pub struct App {
     engine: Option<services::engine::EngineService>,
     /// When Settings last asked the engine for its models (mono seconds).
     models_asked: f64,
+    /// Live captions: the device reader (None = off), what the session heard, and the helper link
+    /// that reads the engine's /live, /notes and /calendar for the pill and the pages.
+    capture: Option<services::capture::CaptureService>,
+    session: services::capture::SessionLog,
+    helper_link: Option<services::helper::HelperService>,
     /// The Downloader add-on's runner: started at the first download.
     downloader: Option<services::downloader::DownloaderService>,
     /// New versions (`crate::updates`); None in the smoke test.
@@ -596,6 +602,9 @@ impl App {
             addons: None,
             engine: None,
             models_asked: f64::NEG_INFINITY,
+            capture: None,
+            session: Default::default(),
+            helper_link: None,
             downloader: None,
             updater: None,
             adzan: Default::default(),
@@ -632,6 +641,15 @@ impl App {
         match services::engine::EngineService::start(self.sink.clone()) {
             Ok(e) => self.engine = Some(e),
             Err(e) => pwarn!("engine: the supervisor did not start ({e})"),
+        }
+        match services::helper::HelperService::start(self.sink.clone()) {
+            Ok(h) => self.helper_link = Some(h),
+            Err(e) => pwarn!("helper link: did not start ({e})"),
+        }
+        // Captions that were on when the app quit start again (as on Windows).
+        if self.st.settings.captions_on {
+            let source = Source::parse(&self.st.settings.captions_source);
+            self.set_captions(true, source);
         }
         self.lyrics = match services::lyrics::LyricsService::start(self.sink.clone()) {
             Ok(l) => Some(l),
@@ -672,6 +690,10 @@ impl App {
         // destructors): yt-dlp's groups get their SIGTERM now.
         self.downloader = None;
         // The engine this app started goes with it (one it found running is left alone).
+        // Captions running at quit: the session is saved as a meeting while the engine is still up.
+        if self.capture.take().is_some() {
+            self.end_session(true);
+        }
         if let Some(e) = self.engine.take() {
             e.stop();
         }
@@ -868,6 +890,25 @@ impl App {
 
     /// Apply side effects of a settings change (from the menu, a reload or a page).
     fn settings_changed(&mut self, before: &Settings) {
+        // Running captions pick up a new language, translation choice or latency mode at once.
+        {
+            let now = &self.st.settings;
+            let language = before.source_lang != now.source_lang || before.target_lang != now.target_lang;
+            let target = language || before.translate_captions != now.translate_captions;
+            let latency = before.latency_mode != now.latency_mode;
+            let prefs = poni_core::lang_prefs::patch_body(&now.source_lang, &now.target_lang);
+            if target && self.st.capture.running() {
+                self.retune_captions();
+            }
+            if latency {
+                self.retune_latency();
+            }
+            if language {
+                if let Some(h) = &self.helper_link {
+                    h.post_prefs(prefs);
+                }
+            }
+        }
         // The Settings window shows the change.
         if let Some(s) = self.settings_ui.as_mut() {
             s.view.dirty = true;
@@ -1171,8 +1212,12 @@ impl App {
             | MenuCmd::OpenMinutes
             | MenuCmd::SetupExtension
             | MenuCmd::OpenCaptionsPanel
-            | MenuCmd::StartCaptions
-            | MenuCmd::StopCaptions => {}
+            => {}
+            MenuCmd::StartCaptions => {
+                let source = self.st.live_source();
+                self.captions_by_hand(true, source);
+            }
+            MenuCmd::StopCaptions => self.captions_by_hand(false, Source::Pc),
             MenuCmd::Quit => {
                 self.quit(0);
                 return;
@@ -1491,7 +1536,7 @@ impl App {
         self.st.now = now;
         let media_before = matches!(ev, AppEvent::Media(_) | AppEvent::MediaTimeline { .. }).then(|| self.media_snapshot());
         // What the Settings window shows that a service reports.
-        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
+        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Models(_) | AppEvent::Helper(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
         if let Some(s) = self.settings_ui.as_mut().filter(|_| shown) {
             s.view.dirty = true;
         }
@@ -1645,6 +1690,32 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::Helper(r) => {
+                self.st.helper.apply(r);
+                if !self.st.models.moving().is_empty() && self.st.models.due(now) {
+                    self.refresh_models();
+                }
+            }
+            AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
+            AppEvent::Calendar(r) => self.st.helper.apply_calendar(r),
+            AppEvent::CalendarNotes(Ok(id)) => {
+                self.st.records.list = false;
+                self.st.meeting_page = 0;
+                if !id.is_empty() {
+                    self.st.helper.select(&id);
+                }
+                self.set_page(PageKind::Meeting);
+                self.request_frame();
+            }
+            AppEvent::CalendarNotes(Err(e)) => self.st.helper_notice = Some((e, now + 6.0, true)),
+            AppEvent::Capture(e) => self.on_capture(e),
+            AppEvent::MeetingSaved(r) => self.on_meeting_saved(r),
+            AppEvent::CallNotes(draft) => {
+                if self.st.call.notes.busy {
+                    self.st.call.notes.answer(self.st.now, draft);
+                    self.request_frame();
+                }
+            }
             AppEvent::Models(r) => {
                 self.st.models.apply(r, now);
             }
@@ -2841,6 +2912,21 @@ impl App {
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
                 Command::ModelsRefresh => self.refresh_models(),
+                Command::Captions(on) => self.captions_by_hand(on, Source::Pc),
+                Command::LiveCaptions => {
+                    let source = self.st.live_source();
+                    self.captions_by_hand(true, source);
+                }
+                Command::LiveSource(source) => self.set_live_source(source),
+                Command::HelperPoll => {
+                    if let Some(h) = &self.helper_link {
+                        h.poll();
+                    }
+                }
+                Command::CallNotesRefresh => self.call_refresh(),
+                Command::MicPrivacy => {
+                    let _ = std::process::Command::new("/usr/bin/open").arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone").spawn();
+                }
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelPullId(id) => self.pull_model_id(id),
@@ -4546,4 +4632,8 @@ impl Smoke {
 // The Downloads page's commands and yt-dlp's reports.
 #[path = "app_downloads.rs"]
 mod downloads;
+
+// Live captions: start and stop, what the capture reports, the session saved as a meeting.
+#[path = "app_captions.rs"]
+mod captions;
 
