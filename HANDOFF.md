@@ -537,3 +537,10 @@ Fitur besar; status per langkah ada di `docs/handoff/pill-meetings.md`, rencana 
 - Spoken language, Translate into and Translate captions changed in Settings (or the pop-up's Translate pill) now reach running captions from their next 4 s window: `CaptureService::set_langs` (shared languages read before each `/draft`), `Services::capture_langs`, `App::retune_captions`. Before: Translate captions did nothing until a restart; each language +/- stopped and reopened the WASAPI device (up to 800 ms on the UI thread). Commit 6ea3ea3, installed `island/dist/yravgSubMeetly-Setup-1.2.9.exe` (sha256 ba184be5…ef2f). poni tests 289 pass.
 - Clippy `-D warnings` fails on the current stable toolchain (1.99) with 9 pre-existing lints in poni-core (`is_multiple_of`, `as_chunks`), not from this change.
 - Next big feature: Media / Meeting tabs with live minutes and quick caption settings on the pill. PRD `docs/roadmap/pill-media-meeting.md`, handoff `docs/handoff/pill-media-meeting.md`; canvas in progress before any build.
+
+## Island 1.3.12: model lights, download bar, ModelScope (2026-11-11)
+
+- PR #8 merged (`5e0d1a2`). Andon light per model row (green on device, yellow downloading, orange part there, red failed, grey absent), yellow bar while downloading, red failure notice 15 s, failure reason in `%LOCALAPPDATA%\yravgSubMeetly\poni.log` (`models: download <id> from <source> failed: ...`). Settings › Models › Downloads › Download from: Hugging Face or ModelScope; engine `POST /models/pull {source}`.
+- Installed on the laptop: 1.3.12 (`island/dist/yravgSubMeetly-Setup-1.3.12.exe`, sha256 8dfa3350…b428). Live check with the release engine: Qwen3-0.6B GGUF from ModelScope about 4.7 MB/s, finished; OPUS-MT pairs are not on ModelScope (no safetensors).
+- Build note: D: is exFAT (no hard links); run engine tests with TMP/TEMP on E: or `locations::a_probe_writes_cleans_up_and_reports_links` fails. Use `-j 2`/`-j 4` (C: full, page file cannot grow).
+- Details: `docs/handoff/pill-media-meeting.md` row 4.10.
