@@ -21,6 +21,7 @@ use crate::settings_window::{self, Key, Section};
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_SMALL};
 use poni_core::capture::{lang_name, resolve_px, step_px, Show, Source};
+use poni_core::library::{Action as LibAction, Filter};
 use poni_core::livecap;
 use poni_core::geom::{palette, Color, Rect};
 use poni_core::meeting_source::Family;
@@ -40,8 +41,10 @@ const SUB_H: f32 = 28.0;
 /// A sentence under a row, up to two lines.
 const NOTE_H: f32 = 34.0;
 
-/// The five groups of board P09, in order.
-const SUBS: [&str; 5] = ["Sources", "Speed", "Translation", "Display", "Apps"];
+/// The five groups of board P09, in order, then the model library (PMM-028).
+const SUBS: [&str; 6] = ["Sources", "Speed", "Translation", "Display", "Apps", "Models"];
+/// A library row: the name over its kind · languages · state line.
+const LIB_H: f32 = 40.0;
 
 /// One row of a group. Every setting the single page had is in exactly one group.
 #[derive(Clone, Debug, PartialEq)]
@@ -65,6 +68,10 @@ enum Row {
     Readout,
     Apps,
     OpenTab,
+    /// Models: the search box and the On device / All / Recommended filter.
+    LibSearch,
+    /// Models: the n-th row the filter and the search let through.
+    LibModel(usize),
 }
 
 impl Row {
@@ -73,6 +80,8 @@ impl Row {
             Row::Source => SOURCE_H + 4.0,
             Row::Note(_) => NOTE_H,
             Row::Offer => SOURCE_H + 4.0,
+            Row::LibSearch => ROW_H + 4.0,
+            Row::LibModel(_) => LIB_H,
             _ => ROW_H,
         }
     }
@@ -108,13 +117,22 @@ fn rows(st: &AppState, sub: u8) -> Vec<Row> {
             v
         }
         3 => vec![Row::Show, Row::Font, Row::Readout],
-        _ => vec![Row::Auto, Row::Apps, Row::OpenTab],
+        4 => vec![Row::Auto, Row::Apps, Row::OpenTab],
+        _ => {
+            let n = settings_window::library_shown(st, &st.ui.lib_query).len();
+            let mut v = vec![Row::LibSearch];
+            v.extend((0..n).map(Row::LibModel));
+            if n == 0 {
+                v.push(Row::Note("No models here. Try All, clear the search, or start the engine from the tray menu.".into()));
+            }
+            v
+        }
     }
 }
 
 /// The pill is as tall as the group needs (no height limit, owner 2026-11-11).
 pub fn height(st: &AppState) -> f32 {
-    hkit::GUIDE_H + SUB_H + 6.0 + rows(st, st.ui.captions_sub.min(4)).iter().map(Row::h).sum::<f32>() + 6.0
+    hkit::GUIDE_H + SUB_H + 6.0 + rows(st, st.ui.captions_sub.min(5)).iter().map(Row::h).sum::<f32>() + 6.0
 }
 
 /// How many meeting apps count: the built-in families still on and the ones the person added.
@@ -168,7 +186,7 @@ fn lang_row(ui: &mut Ui, st: &AppState, n: u64, r: Rect, w: Which, label: &str) 
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let area = hkit::guide(ui, st, area, PageKind::Captions, "Every caption and translation setting. The Aa strip on Live keeps the quick ones.");
-    let sub = st.ui.captions_sub.min(4);
+    let sub = st.ui.captions_sub.min(5);
     sub_tabs(ui, st, Rect::new(area.x, area.y, area.w, SUB_H), sub);
     let mut y = area.y + SUB_H + 6.0;
     let mut clicked = false;
@@ -287,8 +305,47 @@ fn draw_row(ui: &mut Ui, st: &mut AppState, row: &Row, r: Rect) -> bool {
         Row::Offer => offer_row(ui, st, r),
         Row::Show => show_row(ui, st, r),
         Row::Font => font_row(ui, st, r),
+        Row::LibSearch => lib_search_row(ui, st, r),
+        Row::LibModel(n) => lib_row(ui, st, r, *n),
     }
     false
+}
+
+/// The search box at the left, the filter at the right.
+fn lib_search_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
+    let names: Vec<&str> = Filter::ALL.iter().map(|f| f.label()).collect();
+    let pw = picker_width(ui, &names);
+    let sel = Filter::ALL.iter().position(|f| *f == st.ui.lib_filter).unwrap_or(0);
+    if let Some(i) = picker(ui, "cap.libfilter", r.right() - PAD - pw, r.center().y - 12.0, 24.0, &names, sel) {
+        st.ui.lib_filter = Filter::ALL[i];
+        st.models.deleting = None;
+    }
+    let field = Rect::new(r.x, r.y + 2.0, (r.w - pw - 3.0 * PAD).max(0.0), r.h - 4.0);
+    let accent = st.accent;
+    ui.text_input_row(wid("cap.libsearch"), field, &mut st.ui.lib_query, "Search models or languages", 40, accent, Some(Icon::Search));
+}
+
+/// One model: its name over kind · languages · state, its buttons at the right.
+fn lib_row(ui: &mut Ui, st: &mut AppState, r: Rect, n: usize) {
+    let Some((id, kind, pair, dir, label, sub, acts)) = settings_window::library_shown(st, &st.ui.lib_query).get(n).map(|e| (e.c.id.clone(), e.c.kind, e.pair, e.c.st.dir.clone(), e.c.label.clone(), e.sub(&st.models), e.actions(&st.models))) else { return };
+    let mut x = r.right() - PAD;
+    let mut pressed = None;
+    for (k, a) in acts.iter().enumerate().rev() {
+        let w = ui.pill_width(a.label(), false, true);
+        x -= w;
+        let b = Rect::new(x, r.center().y - PILL_SMALL / 2.0, w, PILL_SMALL);
+        x -= 4.0;
+        let style = if matches!(a, LibAction::Confirm) { PillStyle::Primary(palette::RED) } else { PillStyle::Utility };
+        if ui.pill(wid_n("cap.libact", (n * 8 + k) as u64), b, a.label(), None, style).clicked {
+            pressed = Some(*a);
+        }
+    }
+    let tw = (x - 4.0 - r.x - PAD).max(0.0);
+    ui.c.text(&label, Rect::new(r.x + PAD, r.y + 3.0, tw, 18.0), &TextStyle::body().weight(Weight::Regular));
+    ui.c.text(&sub, Rect::new(r.x + PAD, r.y + 20.0, tw, 16.0), &TextStyle::caption().color(palette::TEXT_DIM));
+    if let Some(a) = pressed {
+        settings_window::library_act(st, id, kind, pair, dir, a);
+    }
 }
 
 /// A language row (the step buttons, the name that opens the list); true when the list was touched.
@@ -434,9 +491,38 @@ mod tests {
     }
 
     #[test]
+    fn the_models_group_lists_the_library_with_search_and_filter() {
+        let mut st = state();
+        let body = r#"{"models":[{"kind":"asr","id":"openai/whisper-base","downloaded":true,"bytes":290000000}],"catalog":[
+          {"kind":"asr","id":"openai/whisper-base","label":"Whisper base","approxBytes":290000000,"selected":true,"downloaded":true,"bytes":290000000},
+          {"kind":"translate","id":"Qwen/q","label":"Qwen","approxBytes":988000000},
+          {"kind":"translate-pair","id":"Helsinki-NLP/opus-mt-en-id","label":"OPUS-MT English to Indonesian","approxBytes":291000000}]}"#;
+        st.models.apply(Ok(poni_core::models::parse(body).unwrap()), 0.0);
+        assert_eq!(rows(&st, 5), [Row::LibSearch, Row::LibModel(0)], "On device by default");
+        st.ui.lib_filter = Filter::All;
+        assert_eq!(rows(&st, 5).len(), 4);
+        st.ui.lib_query = "indonesian".into();
+        assert_eq!(rows(&st, 5), [Row::LibSearch, Row::LibModel(0)]);
+        st.ui.lib_query = "nothing like it".into();
+        assert!(matches!(rows(&st, 5)[..], [Row::LibSearch, Row::Note(_)]), "an empty list says why");
+        // Download on a row asks for that model by id; Delete asks first, Keep takes it back.
+        st.ui.lib_query.clear();
+        let e = settings_window::library_shown(&st, "")[1];
+        let (id, kind, dir) = (e.c.id.clone(), e.c.kind, e.c.st.dir.clone());
+        settings_window::library_act(&mut st, id.clone(), kind, false, dir, LibAction::Download);
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelPullId(i) if *i == id)));
+        settings_window::library_act(&mut st, id.clone(), kind, false, None, LibAction::Delete);
+        assert_eq!(st.models.deleting.as_deref(), Some(id.as_str()));
+        settings_window::library_act(&mut st, id.clone(), kind, false, None, LibAction::Keep);
+        assert_eq!(st.models.deleting, None);
+        settings_window::library_act(&mut st, id.clone(), kind, false, None, LibAction::Confirm);
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelDelete(i) if *i == id)));
+    }
+
+    #[test]
     fn the_pill_grows_with_the_group_and_has_no_cap() {
         let mut st = state();
-        let h: Vec<f32> = (0..5u8).map(|g| { st.ui.captions_sub = g; height(&st) }).collect();
+        let h: Vec<f32> = (0..6u8).map(|g| { st.ui.captions_sub = g; height(&st) }).collect();
         assert!(h.iter().all(|h| *h > hkit::GUIDE_H + SUB_H), "{h:?}");
         assert!(h[2] > h[0], "Translation has more rows than Sources: {h:?}");
         st.ui.captions_sub = 1;

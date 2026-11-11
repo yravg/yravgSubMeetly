@@ -101,6 +101,23 @@ pub fn select(sink: EventSink, port: u16, kind: Kind, id: String) {
         .ok();
 }
 
+/// Delete `id`'s files (`DELETE /models/cache/<org>--<name>?confirm=1`); the engine refuses the
+/// models it runs. `AppEvent::ModelDeleted` carries the bytes freed or the engine's reason.
+pub fn delete(sink: EventSink, port: u16, id: String) {
+    std::thread::Builder::new()
+        .name("poni-models-delete".into())
+        .spawn(move || {
+            let path = format!("/models/cache/{}?confirm=1", poni_core::urlenc::encode(&id.replacen('/', "--", 1)));
+            let result = match helper::request(port, "DELETE", &path, None) {
+                Ok((200, reply)) => Ok(serde_json::from_str::<Value>(&reply).ok().and_then(|v| v.get("freedBytes")?.as_u64()).unwrap_or(0)),
+                Ok((code, reply)) => Err(sentence(&reply, code)),
+                Err(e) => Err(format!("The engine stopped answering ({e}).")),
+            };
+            sink.send(AppEvent::ModelDeleted { id, result });
+        })
+        .ok();
+}
+
 /// Move `id` to a folder: the one the person picks (`pick`), or back to the engine's default.
 /// `owner`: the window the picker opens in front of.
 /// The engine copies in the background and checks the copy before it switches, so `AppEvent::ModelPlaced`

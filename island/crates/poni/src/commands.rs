@@ -177,6 +177,10 @@ pub enum Command {
     ModelFolder(poni_core::models::Kind),
     /// Move this model back to the engine's default folder.
     ModelFolderReset(poni_core::models::Kind),
+    /// Model library: download this model by id (a catalog model or a fast pair).
+    ModelPullId(String),
+    /// Model library: delete this model's files (never the one in use; the engine refuses it too).
+    ModelDelete(String),
     /// The Downloads page (`pages::downloads`).
     Download(DownloadCmd),
     /// A Windows language feature (`poni_core::winlang`): Settings' rows and

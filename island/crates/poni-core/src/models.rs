@@ -127,18 +127,21 @@ pub struct Choice {
 pub struct Inventory {
     pub rows: Vec<Row>,
     pub catalog: Vec<Choice>,
+    /// The fast OPUS-MT language pairs (`translate-pair` rows): used for their pair once on disk,
+    /// never chosen, so kept out of `catalog` (`kind` is `Translate` for the download events).
+    pub pairs: Vec<Choice>,
     /// The translation model the engine recommends and whether it is on disk (an older engine
     /// does not say).
     pub recommended: Option<(String, bool)>,
 }
 
-fn find_status<'a>(rows: &'a [Row], catalog: &'a [Choice], id: &str) -> Option<&'a Status> {
-    rows.iter().find(|r| r.id.as_deref() == Some(id)).map(|r| &r.st).or_else(|| catalog.iter().find(|c| c.id == id).map(|c| &c.st))
+fn find_status<'a>(rows: &'a [Row], catalog: &'a [Choice], pairs: &'a [Choice], id: &str) -> Option<&'a Status> {
+    rows.iter().find(|r| r.id.as_deref() == Some(id)).map(|r| &r.st).or_else(|| catalog.iter().chain(pairs).find(|c| c.id == id).map(|c| &c.st))
 }
 
 impl Inventory {
     pub fn status(&self, id: &str) -> Option<&Status> {
-        find_status(&self.rows, &self.catalog, id)
+        find_status(&self.rows, &self.catalog, &self.pairs, id)
     }
 }
 
@@ -152,20 +155,15 @@ pub fn parse(body: &str) -> Option<Inventory> {
         .iter()
         .filter_map(|m| Some(Row { kind: kind(m)?, id: text(m, "id"), loaded: flag(m, "loaded"), loading: flag(m, "loading"), pinned: flag(m, "fromEnv"), st: Status::read(m) }))
         .collect();
-    let catalog = v
-        .get("catalog")
-        .and_then(Value::as_array)
-        .map(|a| {
-            a.iter()
-                .filter_map(|m| {
-                    let id = text(m, "id")?;
-                    Some(Choice { kind: kind(m)?, label: text(m, "label").unwrap_or_else(|| id.clone()), id, approx_bytes: num(m, "approxBytes"), selected: flag(m, "selected"), st: Status::read(m) })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let choice = |m: &Value, kind: Kind| {
+        let id = text(m, "id")?;
+        Some(Choice { kind, label: text(m, "label").unwrap_or_else(|| id.clone()), id, approx_bytes: num(m, "approxBytes"), selected: flag(m, "selected"), st: Status::read(m) })
+    };
+    let listed = v.get("catalog").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
+    let catalog = listed.iter().filter_map(|m| choice(m, kind(m)?)).collect();
+    let pairs = listed.iter().filter(|m| m.get("kind").and_then(Value::as_str) == Some("translate-pair")).filter_map(|m| choice(m, Kind::Translate)).collect();
     let recommended = v.get("recommended").and_then(|r| Some((text(r, "id")?, flag(r, "downloaded"))));
-    Some(Inventory { rows, catalog, recommended })
+    Some(Inventory { rows, catalog, pairs, recommended })
 }
 
 /// Is the speech model on disk? `Some(true)` when `/health` says it is loaded or `/models` (fetched
@@ -195,6 +193,8 @@ pub fn translation_on_disk(health: &str, models: impl FnOnce() -> Option<String>
 pub struct Models {
     pub rows: Vec<Row>,
     pub catalog: Vec<Choice>,
+    /// The fast language pairs (see [`Inventory::pairs`]).
+    pub pairs: Vec<Choice>,
     /// The engine's recommended translation model and whether it is on disk.
     pub recommended: Option<(String, bool)>,
     /// What the person stepped to in Settings, until the engine uses it (a model still to download).
@@ -210,6 +210,9 @@ pub struct Models {
     pub failed: Option<(Kind, String)>,
     /// A folder picker or a move request is open for this model: no second one starts.
     pub placing: Option<Kind>,
+    /// The library row whose Delete asks to be confirmed, and the delete under way.
+    pub deleting: Option<String>,
+    pub removing: Option<String>,
 }
 
 /// The "Folder" row of a model: where it lives, and which buttons make sense now.
@@ -293,6 +296,7 @@ impl Models {
             Ok(inv) => {
                 self.rows = inv.rows;
                 self.catalog = inv.catalog;
+                self.pairs = inv.pairs;
                 self.recommended = inv.recommended;
                 self.error = None;
                 // A pick the engine has taken up is no longer a pick.
@@ -314,7 +318,7 @@ impl Models {
     }
 
     pub fn status(&self, id: &str) -> Option<&Status> {
-        find_status(&self.rows, &self.catalog, id)
+        find_status(&self.rows, &self.catalog, &self.pairs, id)
     }
 
     pub fn set_pick(&mut self, k: Kind, id: Option<String>) {

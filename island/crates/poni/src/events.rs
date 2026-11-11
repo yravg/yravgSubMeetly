@@ -170,6 +170,8 @@ pub enum AppEvent {
     Models(Result<poni_core::models::Inventory, String>),
     /// A model download ended.
     ModelPulled { kind: poni_core::models::Kind, id: String, result: Result<(), String> },
+    /// A model's files were deleted (bytes freed), or why not.
+    ModelDeleted { id: String, result: Result<u64, String> },
     /// The engine switched (or refused to switch) its model.
     ModelSelected { kind: poni_core::models::Kind, result: Result<(), String> },
     /// A folder request for a model ended: started (the engine moves it in the background), refused,

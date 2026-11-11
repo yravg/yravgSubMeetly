@@ -2282,6 +2282,43 @@ impl App {
         services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
     }
 
+    /// The library's Download: any model by id, under the same one-job rule as [`Self::pull_model`].
+    fn pull_model_id(&mut self, id: String) {
+        let m = &mut self.st.models;
+        // A pair downloads like a translation model (its events carry that kind).
+        let Some(kind) = m.catalog.iter().chain(&m.pairs).find(|c| c.id == id).map(|c| c.kind) else { return };
+        if m.pulling.is_some() || m.status(&id).is_some_and(|s| s.pulling) {
+            return;
+        }
+        m.pulling = Some(kind);
+        m.failed = None;
+        if let Some(svc) = self.services.as_mut() {
+            svc.engine_start();
+        }
+        services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
+    }
+
+    /// The library's confirmed Delete. Never the model in use (the row has no Delete then, and the engine refuses).
+    fn delete_model(&mut self, id: String) {
+        let m = &mut self.st.models;
+        m.deleting = None;
+        if m.removing.is_some() || [poni_core::models::Kind::Asr, poni_core::models::Kind::Translate].iter().any(|&k| m.selected(k).as_deref() == Some(id.as_str())) {
+            return;
+        }
+        m.removing = Some(id.clone());
+        services::models::delete(self.sink.clone(), poni_core::helper::configured_port(), id);
+    }
+
+    fn on_model_deleted(&mut self, id: String, result: std::result::Result<u64, String>) {
+        self.st.models.removing = None;
+        let name = self.st.models.catalog.iter().chain(&self.st.models.pairs).find(|c| c.id == id).map_or(id.clone(), |c| c.label.clone());
+        match result {
+            Ok(freed) => self.st.notify(Icon::Check, palette::GREEN, format!("{name} deleted"), format!("{} freed", poni_core::phonedrop::fmt_bytes(freed)), 6.0, None),
+            Err(e) => self.st.notify(Icon::Download, palette::ORANGE, format!("{name} not deleted"), e, 8.0, None),
+        }
+        self.refresh_models();
+    }
+
     fn select_model(&mut self, kind: poni_core::models::Kind, id: String) {
         services::models::select(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
     }
@@ -2706,7 +2743,7 @@ impl App {
         // What the Settings window shows that a service reports.
         let shown = matches!(
             ev,
-            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelPlaced { .. }
+            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. }
         );
         if let Some(w) = self.settings_win.as_mut().filter(|_| shown) {
             w.view.dirty = true;
@@ -2993,6 +3030,7 @@ impl App {
             }
             AppEvent::ModelPulled { kind, id, result } => self.on_model_pulled(kind, id, result),
             AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
+            AppEvent::ModelDeleted { id, result } => self.on_model_deleted(id, result),
             AppEvent::ModelPlaced { kind, result } => self.on_model_placed(kind, result),
             AppEvent::LyricsTr { track_key, tgt, lines, state } => {
                 // A late answer for another song or another target language is dropped.
@@ -4908,6 +4946,8 @@ impl App {
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelFolder(k) => self.place_model(k, true),
                 Command::ModelFolderReset(k) => self.place_model(k, false),
+                Command::ModelPullId(id) => self.pull_model_id(id),
+                Command::ModelDelete(id) => self.delete_model(id),
             }
         }
         self.sync_phone_offer();

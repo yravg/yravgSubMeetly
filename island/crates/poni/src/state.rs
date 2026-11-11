@@ -342,6 +342,9 @@ impl PhoneDrop {
 pub struct PageUiState {
     /// The Captions tab's group: 0 Sources, 1 Speed, 2 Translation, 3 Display, 4 Apps.
     pub captions_sub: u8,
+    /// The model library's filter and search text (Advanced settings › Models, Captions › Models).
+    pub lib_filter: poni_core::library::Filter,
+    pub lib_query: String,
     pub task_input: String,
     pub task_scroll: f32,
     pub shelf_scroll: f32,

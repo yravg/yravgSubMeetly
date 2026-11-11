@@ -31,6 +31,7 @@ pub mod lyric_tr;
 pub mod meeting_doc;
 pub mod meeting_source;
 pub mod mediaremote;
+pub mod library;
 pub mod models;
 pub mod notifications;
 pub mod nowplaying;

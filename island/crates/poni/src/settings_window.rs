@@ -30,6 +30,7 @@ use crate::ui::{wid, wid_n, CursorKind, Hit, Input, MouseButton, PillStyle, Ui, 
 use crate::version::VERSION;
 use poni_core::capture;
 use poni_core::geom::{palette, Color, Point, Rect};
+use poni_core::library::{Action as LibAction, Filter};
 use poni_core::models::Kind;
 use poni_core::settings::{IdleStyle, MonitorChoice, PrayerSound, Theme, TranslationColor};
 use std::collections::HashMap;
@@ -255,6 +256,50 @@ fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     rows
 }
 
+/// Advanced settings › Models › Library: the filter, then one row per model it lets through with
+/// its buttons. No search box here: the settings kit has no text field (the pill's group has one).
+fn library_items(st: &AppState) -> Vec<Item> {
+    let f = st.ui.lib_filter;
+    let mut rows = vec![item(Key::LibFilter, "Show", None, Ctl::Choice(Filter::ALL.iter().map(|f| f.label()).collect(), Filter::ALL.iter().position(|x| *x == f)))];
+    let shown = library_shown(st, "");
+    if shown.is_empty() {
+        rows.push(item(Key::LibLang, "No models here", Some("Try All, or start the engine from the tray menu"), Ctl::None));
+    }
+    for (i, e) in shown.iter().enumerate().take(u8::MAX as usize) {
+        let acts = e.actions(&st.models);
+        let ctl = if acts.is_empty() { Ctl::None } else { Ctl::Choice(acts.iter().map(|a| a.label()).collect(), None) };
+        rows.push(item(Key::LibModel(i as u8), &e.c.label, Some(&e.sub(&st.models)), ctl));
+    }
+    rows
+}
+
+/// The library rows for the filter and `query`, with the person's spoken → translate-into languages.
+pub fn library_shown<'a>(st: &'a AppState, query: &str) -> Vec<poni_core::library::Entry<'a>> {
+    poni_core::library::shown(&st.models, st.ui.lib_filter, query, &st.settings.source_lang, &st.settings.target_lang)
+}
+
+/// What a library button does; shared with the pill's Captions › Models group.
+pub fn library_act(st: &mut AppState, id: String, kind: Kind, pair: bool, dir: Option<String>, a: LibAction) {
+    match a {
+        LibAction::Use if !pair => st.cmd(Command::ModelSelect(kind, id)),
+        LibAction::Download => st.cmd(Command::ModelPullId(id)),
+        LibAction::ByHand => {
+            let folder = manual_model_dir(&id);
+            let _ = std::fs::create_dir_all(&folder);
+            st.cmd(Command::OpenUrl(format!("https://huggingface.co/{id}/tree/main")));
+            st.cmd(Command::OpenPath(folder.display().to_string()));
+        }
+        LibAction::Folder => {
+            if let Some(d) = dir {
+                st.cmd(Command::OpenPath(d));
+            }
+        }
+        LibAction::Delete => st.models.deleting = Some(id),
+        LibAction::Confirm => st.cmd(Command::ModelDelete(id)),
+        LibAction::Keep | LibAction::Use => st.models.deleting = None,
+    }
+}
+
 /// The sections the sidebar lists now.
 pub fn sections(st: &AppState) -> Vec<Section> {
     Section::ALL.into_iter().filter(|s| s.shown(st)).collect()
@@ -298,6 +343,12 @@ pub enum Key {
     ModelFolderReset(poni_core::models::Kind),
     /// Download by hand: the model's files page and the folder the engine reads them from.
     ModelManual(poni_core::models::Kind),
+    /// Model library: the On device / All / Recommended filter.
+    LibFilter,
+    /// Model library: a row's buttons; the index into the filtered list.
+    LibModel(u8),
+    /// Languages on this PC: a line that only says something.
+    LibLang,
     HudVolume,
     HudPower,
     HudBluetooth,
@@ -587,10 +638,12 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 ],
             ),
             Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
+            Block::Group(Some("Languages on this PC"), poni_core::library::language_rows(&st.models).into_iter().map(|(name, text)| item(Key::LibLang, name, Some(&text), Ctl::None)).collect()),
         ],
         Section::Models => [Kind::Asr, Kind::Translate]
             .into_iter()
             .map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k)))
+            .chain([Block::Group(Some("Library"), library_items(st))])
             .collect(),
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
@@ -799,6 +852,20 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             st.cmd(Command::ModelFolderReset(k));
             return;
         }
+        Key::LibFilter => {
+            if let Act::Pick(i) = act {
+                st.ui.lib_filter = Filter::ALL.get(i).copied().unwrap_or_default();
+                st.models.deleting = None;
+            }
+            return;
+        }
+        Key::LibModel(n) => {
+            let Act::Pick(i) = act else { return };
+            let Some((id, kind, pair, dir, a)) = library_shown(st, "").get(n as usize).and_then(|e| Some((e.c.id.clone(), e.c.kind, e.pair, e.c.st.dir.clone(), *e.actions(&st.models).get(i)?))) else { return };
+            library_act(st, id, kind, pair, dir, a);
+            return;
+        }
+        Key::LibLang => return,
         Key::HudVolume => s.hud_volume = !s.hud_volume,
         Key::HudPower => s.hud_power = !s.hud_power,
         Key::HudBluetooth => s.hud_bluetooth = !s.hud_bluetooth,
@@ -1828,6 +1895,8 @@ mod tests {
                     // Paste reads the clipboard and Pick lists running apps: the app does both.
                     Key::MeetingAddLink => assert!(st.cmds.contains(&Command::MeetingAddLink)),
                     Key::MeetingPickApps => assert!(st.cmds.contains(&Command::MeetingPickApps)),
+                    // The library's filter is a view of the list, not a setting.
+                    Key::LibFilter => assert!(st.cmds.is_empty()),
                     _ => assert!(saved, "{:?} didn't save", it.key),
                 }
             }
@@ -1928,6 +1997,32 @@ mod tests {
         st.cmds.clear();
         apply(&mut st, Key::Captions, Act::Toggle);
         assert!(st.cmds.iter().any(|c| matches!(c, Command::Captions(true))));
+    }
+
+    #[test]
+    fn the_library_filters_the_models_and_its_buttons_act_on_the_row() {
+        use poni_core::models::parse;
+        let mut st = state();
+        let body = r#"{"models":[{"kind":"asr","id":"org/speech-base","downloaded":true,"bytes":150000000}],
+            "catalog":[{"kind":"asr","id":"org/speech-base","label":"Base","selected":true,"downloaded":true,"bytes":150000000,"dir":"D:/hf"},
+                       {"kind":"asr","id":"org/speech-small","label":"Small","downloaded":true,"bytes":490000000,"dir":"D:/hf"},
+                       {"kind":"translate","id":"org/mt-big","label":"Qwen big","approxBytes":6000000000}]}"#;
+        st.models.apply(Ok(parse(body).unwrap()), 1.0);
+        let lib = |st: &AppState| rows(Section::Models, st).into_iter().filter(|i| matches!(i.key, Key::LibModel(_))).map(|i| (i.label, i.ctl)).collect::<Vec<_>>();
+        // On device first: the one in use has only its folder; another can be used or deleted.
+        assert_eq!(lib(&st), [("Base".into(), Ctl::Choice(vec!["Folder"], None)), ("Small".into(), Ctl::Choice(vec!["Use", "Folder", "Delete"], None))]);
+        apply(&mut st, Key::LibFilter, Act::Pick(1));
+        assert_eq!(lib(&st).len(), 3);
+        assert_eq!(lib(&st)[2], ("Qwen big".into(), Ctl::Choice(vec!["Download", "By hand"], None)));
+        apply(&mut st, Key::LibModel(1), Act::Pick(0));
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(Kind::Asr, id) if id == "org/speech-small")));
+        apply(&mut st, Key::LibModel(1), Act::Pick(2));
+        let small = rows(Section::Models, &st).into_iter().find(|i| i.key == Key::LibModel(1)).unwrap();
+        assert_eq!((small.sub.as_deref(), small.ctl), (Some("Speech · All languages · Delete Small? Frees 490 MB."), Ctl::Choice(vec!["Delete", "Keep"], None)));
+        apply(&mut st, Key::LibModel(1), Act::Pick(0));
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelDelete(id) if id == "org/speech-small")));
+        // Languages on this PC: one line per caption language.
+        assert!(rows(Section::Speech, &st).iter().any(|i| i.key == Key::LibLang && i.label == "Indonesian" && i.sub.as_deref() == Some("Speech on device · translation off")));
     }
 
     #[test]
