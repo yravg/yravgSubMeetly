@@ -30,7 +30,16 @@ before(async () => {
     const url = new URL(req.url, 'http://x');
     const json = (status, body) => { res.statusCode = status; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(body)); };
     if (url.pathname === '/health') return json(200, { ok: true, device: 'cpu', models: [] });
-    if (url.pathname === '/models') return json(200, { models: [], catalog: cat });
+    if (url.pathname === '/models') return json(200, { models: [], catalog: cat, recommended: { id: 'Qwen/Qwen2.5-1.5B-Instruct', downloaded: true } });
+    if (req.method === 'DELETE' && url.pathname.startsWith('/models/cache/')) {
+      const id = decodeURIComponent(url.pathname.slice('/models/cache/'.length)).replace('--', '/');
+      calls.push({ path: url.pathname, query: url.search });
+      const m = cat.find((r) => r.id === id);
+      if (!m || m.selected) return json(400, { error: 'refusing to delete an active inventory model' });
+      const freedBytes = m.bytes;
+      Object.assign(m, { downloaded: false, bytes: 0 });
+      return json(200, { ok: true, id, freedBytes });
+    }
     if (url.pathname === '/models/pull' || url.pathname === '/engine/models' || url.pathname === '/engine/models/location') {
       let body = '';
       req.on('data', (c) => { body += c; });
@@ -98,10 +107,10 @@ test('Models: catalog rows say what is on disk, pick, download with progress, fa
   assert.equal(r[0].selected, true);
   assert.match(r[0].sub, /On disk/);
   assert.match(r[1].sub, /Not downloaded, about 922 MB/, 'size comes from the catalog, not invented');
-  assert.deepEqual(r[1].buttons.map((b) => b.text), ['Download']);
+  assert.deepEqual(r[1].buttons.map((b) => b.text), ['Download', 'By hand']);
   assert.equal(r[2].selected, false, 'translation is on, so Off is not the choice');
   assert.match(r[3].sub, /286 MB of it was saved earlier/, 'partial bytes show');
-  assert.deepEqual(r[4].buttons.map((b) => b.text), ['Use']);
+  assert.deepEqual(r[4].buttons.map((b) => b.text), ['Use', 'Delete'], 'on disk, not in use: it can be deleted');
 
   // Use a downloaded model: the engine is told, the row flips.
   await click(page, 'Qwen 2.5 1.5B', 'Use');
@@ -129,10 +138,66 @@ test('Models: catalog rows say what is on disk, pick, download with progress, fa
   await waitRows(page, () => document.querySelector('#native-models .m-error'), 'error shown');
   r = await rows(page);
   assert.match(r[1].error, /^download failed: no network$/);
-  assert.deepEqual(r[1].buttons.map((b) => b.text), ['Try again']);
+  assert.deepEqual(r[1].buttons.map((b) => b.text), ['Try again', 'By hand']);
   if (process.env.MODELS_SHOT) { await page.$eval('#native-models', (e) => e.scrollIntoView()); await page.screenshot({ path: process.env.MODELS_SHOT + '-b.png' }); }
   assert.deepEqual(errors, []);
   await page.close();
+});
+
+test('Library: filter chips, search, fast pairs, delete with its size, languages on this device', { timeout: 60_000 }, async () => {
+  const saved = cat; calls = [];
+  cat = [...catalog(), row('translate-pair', 'Helsinki-NLP/opus-mt-en-id', 'OPUS-MT English to Indonesian', 291_000_000, { downloaded: true, bytes: 291_000_000 })];
+  const page = await browser.newPage();
+  await page.setViewport({ width: 520, height: 900 });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.evaluateOnNewDocument((engine) => localStorage.setItem('settings', JSON.stringify({ nativeUrl: engine })), origin);
+  await openModels(page);
+  await waitRows(page, () => document.querySelectorAll('#native-models .m-item').length >= 6, 'six rows');
+  const titles = async () => (await rows(page)).map((x) => x.title);
+  let r = await rows(page);
+  assert.deepEqual(r.at(-1).buttons.map((b) => b.text), ['Delete'], 'a pair on disk is never "used", only kept or deleted');
+  assert.match(r.at(-1).sub, /English → Bahasa Indonesia · On disk/);
+  // Filters.
+  const chip = (f) => page.click(`#models-lib-bar [data-filter="${f}"]`);
+  await chip('device');
+  await waitRows(page, () => document.querySelectorAll('#native-models .m-item').length === 3, 'on device');
+  assert.deepEqual(await titles(), ['Whisper base', 'Qwen 2.5 1.5B', 'OPUS-MT English to Indonesian']);
+  await chip('recommended');
+  await waitRows(page, () => document.querySelectorAll('#native-models .m-item').length === 2, 'recommended');
+  assert.deepEqual(await titles(), ['Whisper base', 'Qwen 2.5 1.5B'], 'engine pick and the speech model in use (no zh→en pair here)');
+  // Search keeps its caret through the re-render.
+  await chip('all');
+  await page.type('#models-lib-bar .m-search', 'indo');
+  await waitRows(page, () => document.querySelectorAll('#native-models .m-item').length === 1, 'search');
+  assert.deepEqual(await titles(), ['OPUS-MT English to Indonesian']);
+  assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('m-search')), true);
+  await page.type('#models-lib-bar .m-search', 'zzz');
+  await waitRows(page, () => !document.querySelector('#native-models .m-item'), 'none');
+  assert.match(await page.$eval('#native-models', (e) => e.textContent), /No models here/);
+  await page.$eval('#models-lib-bar .m-search', (e) => { e.value = ''; e.dispatchEvent(new Event('input')); });
+  await waitRows(page, () => document.querySelectorAll('#native-models .m-item').length >= 6, 'cleared');
+  // Delete asks with the size, Keep takes it back, Delete deletes.
+  await click(page, 'Qwen 2.5 1.5B', 'Delete');
+  await waitRows(page, () => /Delete Qwen 2.5 1.5B\? Frees 2.9 GB/.test(document.querySelector('#native-models').textContent), 'asks');
+  r = await rows(page);
+  assert.deepEqual(r.find((x) => x.title === 'Qwen 2.5 1.5B').buttons.map((b) => b.text), ['Delete', 'Keep']);
+  await click(page, 'Qwen 2.5 1.5B', 'Keep');
+  await waitRows(page, () => !/Frees/.test(document.querySelector('#native-models').textContent), 'kept');
+  assert.equal(calls.length, 0, 'nothing deleted yet');
+  await click(page, 'Qwen 2.5 1.5B', 'Delete');
+  await waitRows(page, () => /Frees/.test(document.querySelector('#native-models').textContent), 'asks again');
+  await click(page, 'Qwen 2.5 1.5B', 'Delete');
+  await waitRows(page, () => [...document.querySelectorAll('#native-models .m-item')].some((e) => e.querySelector('.m-name').textContent === 'Qwen 2.5 1.5B' && /Not downloaded/.test(e.textContent)), 'deleted');
+  assert.deepEqual(calls.at(-1), { path: '/models/cache/Qwen--Qwen2.5-1.5B-Instruct', query: '?confirm=1' });
+  assert.equal((await rows(page))[0].buttons.length, 0, 'the speech model in use has no Delete');
+  // Languages on this device.
+  const langs = await page.$$eval('#native-models .m-lang', (els) => els.map((e) => e.textContent));
+  assert.equal(langs.length, 12);
+  assert.match(langs[1], /^Bahasa IndonesiaSpeech on device · translated by Qwen 2\.5 0\.5B, not downloaded · fast pair from English: on device$/);
+  assert.deepEqual(errors, []);
+  await page.close();
+  cat = saved;
 });
 
 test('Models: an engine without a catalog shows nothing instead of invented rows', { timeout: 30_000 }, async () => {
@@ -167,7 +232,7 @@ test('Models: folder, free space, change location with the engine refusals in wo
   assert.equal(r[0].dir, 'Folder: C:/hub · 112 GB free');
   assert.deepEqual(r[0].buttons, ['Change location…'], 'in use, on disk: only the folder action');
   assert.match(r[1].errors[0], /That drive is not connected: F:.models/, 'drive away is said, not a generic error');
-  assert.deepEqual(r[1].buttons, ['Download (off)', 'Change location…'], 'download is blocked while the drive is away');
+  assert.deepEqual(r[1].buttons, ['Download (off)', 'Change location…', 'By hand'], 'download is blocked while the drive is away; by hand still works');
   assert.equal(r[3].bar, '40%');
   assert.deepEqual(r[3].buttons, ['Moving… (off)'], 'one move at a time: no second action while it runs');
   assert.ok(r[3].dir.startsWith('Folder: C:/hub'));

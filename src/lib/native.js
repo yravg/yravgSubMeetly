@@ -172,6 +172,22 @@ export async function nativePullModel(url, id, timeoutMs = 5000) {
   return postJson(`${base(url)}/models/pull`, { id }, timeoutMs);
 }
 
+// Delete a downloaded model's files (DELETE /models/cache/<org>--<name>?confirm=1). The engine refuses
+// the models it runs. { ok, freedBytes } or { error }.
+export async function nativeDeleteModel(url, id, timeoutMs = 15000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base(url)}/models/cache/${encodeURIComponent(id.replace('/', '--'))}?confirm=1`, { method: 'DELETE', signal: ctrl.signal });
+    const j = await r.json().catch(() => ({}));
+    return r.ok ? j : { ...j, error: j.error || `HTTP ${r.status}` };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Put one model's files in another folder (dir) or back in the default (null). 200 remapped, 202 a move started
 // (progress is on the model row); refusals come back as { error, code, needBytes?, freeBytes? }.
 export async function nativeSetModelLocation(url, id, dir, timeoutMs = 8000) {

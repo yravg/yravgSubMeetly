@@ -21,6 +21,7 @@ import {
   nativePullModel,
   nativeSetModels,
   nativeSetModelLocation,
+  nativeDeleteModel,
   nativeGetDevice,
   nativeSetDevice,
   HELPER_DEVICE_OPTIONS,
@@ -38,6 +39,7 @@ import {
 } from './lib/export-options.js';
 import { stageFileToOpfs, needsNativeFilePath } from './lib/offline-io.js';
 import { I18N } from './lib/i18n.js';
+import { libraryRows, languagesOf, canDelete, languageRows, manualDir } from './lib/model-library.js';
 import { watchEngineWording } from './lib/engine-wording.js';
 import { normalizeInterpreter } from './lib/interpreter.js';
 import { mountNotesPanel, loadProjectTypePref } from './notes-panel.js';
@@ -915,7 +917,7 @@ function updateWarning() {
   el.querySelector('.manage-models')?.addEventListener('click', () => {
     openSettings();
     requestAnimationFrame(() => {
-      const host = document.querySelector('#asr-models');
+      const host = document.querySelector(nativeInfo ? '#native-models' : '#asr-models'); // the engine's library when it runs
       const adv = host?.closest('details'); // hosted window keeps browser models under Advanced
       if (adv) adv.open = true;
       host?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1919,6 +1921,47 @@ let locOpen = null; // id of the model whose folder editor is open
 let modelsSeq = 0; // only the newest render may touch the list: a slower earlier one would wipe a field being typed in
 let locFocus = false; // focus the field once, right after the editor opens
 let locDraft = ''; // what was typed there; survives the 1.5 s re-render while a transfer runs
+let libFilter = 'all'; // the library's On device / All / Recommended (all: every row, as before the filter)
+let libQuery = '';
+let delAsk = null; // id of the model whose Delete asks to be confirmed
+// The caption languages the island lists (poni_core::capture::LANGS).
+const CAPTION_LANGS = ['en', 'id', 'zh', 'ja', 'ko', 'es', 'fr', 'de', 'th', 'ru', 'ar', 'vi'];
+// The filter chips and the search box: built once at the top of the list, so a re-render keeps the caret.
+function modelsLibraryBar(host) {
+  let bar = document.getElementById('models-lib-bar');
+  if (bar) return bar;
+  bar = document.createElement('div');
+  bar.id = 'models-lib-bar';
+  bar.className = 'm-libbar';
+  const chips = document.createElement('div');
+  chips.className = 'm-chips';
+  chips.setAttribute('role', 'group');
+  chips.setAttribute('aria-label', t('modelsShow'));
+  for (const [f, key] of [['device', 'modelsFilterDevice'], ['all', 'modelsFilterAll'], ['recommended', 'modelsFilterRecommended']]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mini-btn';
+    b.dataset.filter = f;
+    b.textContent = t(key);
+    b.setAttribute('aria-pressed', String(f === libFilter));
+    b.addEventListener('click', () => {
+      libFilter = f;
+      delAsk = null;
+      chips.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.filter === f)));
+      renderNativeModels();
+    });
+    chips.appendChild(b);
+  }
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'm-search';
+  search.placeholder = t('modelsSearch');
+  search.setAttribute('aria-label', t('modelsSearch'));
+  search.addEventListener('input', () => { libQuery = search.value; renderNativeModels(); });
+  bar.append(search, chips);
+  host.prepend(bar);
+  return bar;
+}
 // The engine's refusal codes for a folder change or a download, in words (POST /engine/models/location, /models/pull).
 function locMessage(r) {
   const why = { 'bad-dir': 'modelsLocBadDir', 'dir-not-writable': 'modelsLocNotWritable', busy: 'modelsLocBusy', 'target-has-copy': 'modelsLocHasCopy', 'model-dir-unavailable': 'modelsDriveAway' }[r.code];
@@ -1938,8 +1981,11 @@ async function renderNativeModels() {
   const res = await nativeGetModels(url);
   if (seq !== modelsSeq) return;
   const catalog = res && Array.isArray(res.catalog) ? res.catalog : [];
-  host.replaceChildren();
-  if (!catalog.length) return; // an engine without the catalog: nothing to pick, nothing invented
+  if (!catalog.length) return host.replaceChildren(); // an engine without the catalog: nothing to pick, nothing invented
+  // The search box stays (a re-render keeps its caret); everything under it is drawn again.
+  const bar = modelsLibraryBar(host);
+  [...host.children].forEach((c) => c !== bar && c.remove());
+  const shown = libraryRows(res, { filter: libFilter, query: libQuery, src: state.srcLang, tgt: state.tgtLang, names: LANG_NAMES });
   const rerender = () => renderNativeModels();
   const fail = (why) => showToast(t('modelsSetFailed', { why }), 'error');
   const choose = async (patch) => {
@@ -2047,14 +2093,14 @@ async function renderNativeModels() {
     }
     return { extra, more };
   };
-  for (const [kind, heading] of [['asr', t('modelsAsr')], ['translate', t('modelsTranslate')]]) {
-    const rows = catalog.filter((m) => m.kind === kind);
+  for (const [kind, heading] of [['asr', t('modelsAsr')], ['translate', t('modelsTranslate')], ['translate-pair', t('modelsPairs')]]) {
+    const rows = shown.filter((m) => m.kind === kind);
     if (!rows.length) continue;
     const h = document.createElement('div');
     h.className = 'models-title';
     h.textContent = heading;
     host.appendChild(h);
-    if (kind === 'translate') {
+    if (kind === 'translate' && libFilter === 'all' && !libQuery.trim()) {
       const anySelected = rows.some((m) => m.selected);
       host.appendChild(row({
         title: t('modelsOff'),
@@ -2064,10 +2110,9 @@ async function renderNativeModels() {
       }));
     }
     for (const m of rows) {
-      const base = m.downloaded
-        ? `${t('modelsOnDisk')} · ${fmtBytes(m.bytes)}`
-        : t('modelsNotDownloaded', { size: fmtBytes(m.approxBytes) });
-      const sub = !m.downloaded && m.partialBytes > 0 ? `${base}. ${t('modelsPartial', { done: fmtBytes(m.partialBytes) })}` : base;
+      const state1 = m.downloaded ? `${t('modelsOnDisk')} · ${fmtBytes(m.bytes)}` : t('modelsNotDownloaded', { size: fmtBytes(m.approxBytes) });
+      const base = `${languagesOf(m, LANG_NAMES)} · ${state1}`;
+      let sub = !m.downloaded && m.partialBytes > 0 ? `${base}. ${t('modelsPartial', { done: fmtBytes(m.partialBytes) })}` : base;
       let action = null;
       let bar = null;
       if (m.pulling) {
@@ -2084,10 +2129,29 @@ async function renderNativeModels() {
             rerender();
           },
         };
-      } else if (!m.selected) {
+      } else if (!m.selected && kind !== 'translate-pair') {
         action = { label: t('modelsUse'), run: () => choose({ [kind]: m.id }) };
       }
       const { extra, more } = folderBits(m, m.label || m.id);
+      const name = m.label || m.id;
+      if (!m.downloaded && !m.pulling && !m.moving) {
+        more.push({ label: t('modelsByHand'), run() {
+          window.open(`https://huggingface.co/${m.id}/tree/main`, '_blank', 'noopener');
+          showToast(t('modelsByHandNote', { dir: manualDir(m.id) }));
+        } });
+      }
+      if (delAsk === m.id && canDelete(m)) {
+        sub = t('modelsDeleteAsk', { name, size: fmtBytes(m.bytes) });
+        action = { label: t('modelsDelete'), async run() {
+          delAsk = null;
+          const r = await nativeDeleteModel(url, m.id);
+          showToast(r.error ? t('modelsDeleteFailed', { why: r.error }) : t('modelsDeleted', { name, size: fmtBytes(r.freedBytes || 0) }), r.error ? 'error' : undefined);
+          rerender();
+        } };
+        more.splice(0, more.length, { label: t('modelsKeep'), run() { delAsk = null; rerender(); } });
+      } else if (canDelete(m)) {
+        more.push({ label: t('modelsDelete'), run() { delAsk = m.id; rerender(); } });
+      }
       if (m.moving) {
         moving = true;
         bar = Number.isFinite(m.movePct) ? m.movePct : 0;
@@ -2096,6 +2160,20 @@ async function renderNativeModels() {
       }
       host.appendChild(row({ title: m.label || m.id, sub, selected: !!m.selected, action, more, extra, bar, error: m.pulling ? '' : m.pullError }));
     }
+  }
+  if (!shown.length) host.appendChild(note(t('modelsNone')));
+  const lh = document.createElement('div');
+  lh.className = 'models-title';
+  lh.textContent = t('modelsLanguages');
+  host.appendChild(lh);
+  for (const l of languageRows(res, CAPTION_LANGS, LANG_NAMES)) {
+    const d = document.createElement('div');
+    d.className = 'm-lang';
+    const n = document.createElement('div');
+    n.className = 'm-name';
+    n.textContent = l.name;
+    d.append(n, note(l.text));
+    host.appendChild(d);
   }
   // A re-render would drop the focus (and the caret) of a path being typed, so progress waits while the field is focused.
   const again = () => (host.querySelector('.m-loc-input:focus') ? (modelsPollTimer = setTimeout(again, 1500)) : rerender());
