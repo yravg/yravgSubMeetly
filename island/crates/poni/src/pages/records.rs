@@ -91,7 +91,8 @@ pub fn draw_history(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKind) 
         Filter::Media => ("No video transcripts yet", "Captions of a video are kept here when they stop."),
         _ => ("No meetings saved yet", "Captions of a meeting are saved here when they stop."),
     };
-    foot_and_rows(ui, st, rows, rest, foot, "records.history", &format!("{} saved", rows.len()), title, line);
+    let hint = format!("{} saved", rows.len());
+    foot_and_rows(ui, st, rows, rest, foot, "records.history", &hint, title, line);
 }
 
 /// The rows of one page in `rest`, and the foot: a count on the left, the pager and Paste on the right.

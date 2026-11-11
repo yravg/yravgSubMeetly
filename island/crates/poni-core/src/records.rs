@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn a_long_app_name_is_cut_for_the_chip() {
-        assert_eq!(chip(&with_app(doc("a", "2026-11-10"), Some("meeting.tencent.com"))), "Meeting \u{b7} meeting.tenc\u{2026}");
+        assert_eq!(chip(&with_app(doc("a", "2026-11-10"), Some("meeting.tencent.com"))), "Meeting \u{b7} meeting.tence\u{2026}");
     }
 
     #[test]

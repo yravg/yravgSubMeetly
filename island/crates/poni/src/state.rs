@@ -1001,6 +1001,21 @@ mod tests {
         assert!(st.settings.addon_on(JAPANESE_READINGS.id));
         assert!(matches!(st.cmds.pop(), Some(Command::SaveSettings)));
     }
+
+    #[test]
+    fn minutes_opens_on_its_list_and_a_picked_record_leaves_it() {
+        let mut st = st();
+        assert!(!st.records.list, "nothing asked for the list yet");
+        st.records.page = 3;
+        st.go_tab(PageKind::Live);
+        assert!(!st.records.list, "only Minutes opens on the list");
+        st.go_tab(PageKind::Meeting);
+        assert!((st.records.list, st.records.page) == (true, 0));
+        assert_eq!(st.cmds.pop(), Some(Command::SetPage(PageKind::Meeting)));
+        st.meeting_page = 2;
+        st.show_record("MOM-1");
+        assert!((st.records.list, st.meeting_page) == (false, 0), "one record, from its first item");
+    }
 }
 
 /// The Meeting tab (PMM-005..009, PMM-018).

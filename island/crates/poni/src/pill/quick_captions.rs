@@ -19,7 +19,7 @@ use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
 use crate::pages::settings::draw_switch;
 use crate::state::AppState;
-use crate::ui::{wid, wid_n, KeyInput, PillStyle, Ui, WidgetId, PILL_SMALL};
+use crate::ui::{wid, wid_n, KeyInput, PillStyle, Ui, WidgetId, PILL_GAP, PILL_SMALL};
 use poni_core::capture::{lang_name, step_lang, LANGS};
 use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::settings::Settings;
