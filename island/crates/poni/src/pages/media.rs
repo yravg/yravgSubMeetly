@@ -330,6 +330,8 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     } else {
         let r = Rect::new(area.x, area.y, area.w, H_EMPTY);
         super::empty_state(ui, r, Icon::Music, "Nothing playing", "Play music in Spotify, a browser or any media app");
+        // Kept video transcripts stay reachable with nothing playing (PMM-023).
+        crate::pill::quick_captions::history_button(ui, st, area.right(), area.y + crate::ui::PILL_SMALL / 2.0);
     }
     put_anim(a);
 }

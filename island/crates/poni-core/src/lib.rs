@@ -38,6 +38,7 @@ pub mod phonedrop;
 pub mod pomodoro;
 pub mod power;
 pub mod prayer;
+pub mod records;
 pub mod romanize;
 pub mod script;
 pub mod settings;

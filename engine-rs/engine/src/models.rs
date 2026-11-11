@@ -149,6 +149,9 @@ pub fn delete_cached(cache: &Path, slug: &str, active: &[String], confirm: bool)
 pub enum Kind {
     Asr,
     Translate,
+    /// An OPUS-MT model for one language pair: used for fast captions of that pair when
+    /// downloaded, never chosen as the translation model.
+    PairMt,
 }
 
 impl Kind {
@@ -156,6 +159,7 @@ impl Kind {
         match self {
             Kind::Asr => "asr",
             Kind::Translate => "translate",
+            Kind::PairMt => "translate-pair",
         }
     }
 }
@@ -170,7 +174,7 @@ pub struct Spec {
 
 /// Models the engine can run and `POST /engine/models` accepts. Whisper and Qwen are
 /// multilingual: one download serves every language, so there is no per-language model.
-pub const CATALOG: [Spec; 7] = [
+pub const CATALOG: [Spec; 14] = [
     spec(
         Kind::Asr,
         "openai/whisper-base",
@@ -213,6 +217,50 @@ pub const CATALOG: [Spec; 7] = [
         "Qwen2.5 3B",
         6_170_000_000,
     ),
+    // q4_k_m GGUF: one file each, quantized for CPU speed.
+    spec(
+        Kind::Translate,
+        "unsloth/Qwen3-0.6B-GGUF",
+        "Qwen3 0.6B (fast)",
+        397_000_000,
+    ),
+    spec(
+        Kind::Translate,
+        "unsloth/Qwen3-1.7B-GGUF",
+        "Qwen3 1.7B (balanced)",
+        1_110_000_000,
+    ),
+    // OPUS-MT per pair (the pairs of `marian::PAIRS`); other pairs use the LLM.
+    spec(
+        Kind::PairMt,
+        "Helsinki-NLP/opus-mt-en-id",
+        "OPUS-MT English to Indonesian",
+        291_000_000,
+    ),
+    spec(
+        Kind::PairMt,
+        "Helsinki-NLP/opus-mt-id-en",
+        "OPUS-MT Indonesian to English",
+        291_000_000,
+    ),
+    spec(
+        Kind::PairMt,
+        "Helsinki-NLP/opus-mt-en-zh",
+        "OPUS-MT English to Chinese",
+        312_000_000,
+    ),
+    spec(
+        Kind::PairMt,
+        "Helsinki-NLP/opus-mt-zh-en",
+        "OPUS-MT Chinese to English",
+        312_000_000,
+    ),
+    spec(
+        Kind::PairMt,
+        "Helsinki-NLP/opus-mt-ja-en",
+        "OPUS-MT Japanese to English",
+        303_000_000,
+    ),
 ];
 
 const fn spec(kind: Kind, id: &'static str, label: &'static str, approx_bytes: u64) -> Spec {
@@ -239,7 +287,7 @@ impl std::fmt::Display for ModelNotDownloaded {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let what = match self.kind {
             Kind::Asr => "speech",
-            Kind::Translate => "translation",
+            Kind::Translate | Kind::PairMt => "translation",
         };
         write!(f, "{what} model not downloaded")
     }
@@ -308,16 +356,25 @@ pub fn cache_state(cache: &Path, repo_id: &str, kind: Kind) -> CacheState {
         .map(|entry| entry.path())
         .collect();
     let have = |name: &str| snapshot_file(&snapshots, name).is_some();
-    let weights = match kind {
-        Kind::Asr => have("model.safetensors"),
+    let gguf = crate::translate::gguf_file(repo_id).filter(|_| kind == Kind::Translate);
+    let downloaded = match kind {
+        // A GGUF carries its config and tokenizer inside.
+        _ if gguf.is_some() => gguf.is_some_and(|file| have(&file)),
+        Kind::PairMt => crate::marian::FILES.iter().all(|n| have(n)),
+        Kind::Asr => have("model.safetensors") && have("config.json") && have("tokenizer.json"),
         // Sharded repos (Qwen 1.5B and up) name their shards in the index.
-        Kind::Translate => match snapshot_file(&snapshots, "model.safetensors.index.json") {
-            Some(index) => shard_names(&index).is_some_and(|names| names.iter().all(|n| have(n))),
-            None => have("model.safetensors"),
-        },
+        Kind::Translate => {
+            let weights = match snapshot_file(&snapshots, "model.safetensors.index.json") {
+                Some(index) => {
+                    shard_names(&index).is_some_and(|names| names.iter().all(|n| have(n)))
+                }
+                None => have("model.safetensors"),
+            };
+            weights && have("config.json") && have("tokenizer.json")
+        }
     };
     CacheState {
-        downloaded: weights && have("config.json") && have("tokenizer.json"),
+        downloaded,
         bytes,
         partial_bytes,
     }
@@ -389,7 +446,10 @@ pub fn pull(
             crate::whisper::fetch_files(cache, repo_id, Some(&handler), &mut finished)?;
         }
         Kind::Translate => {
-            crate::translate::fetch_files(cache, repo_id, Some(&handler), &mut finished)?;
+            crate::translate::fetch_any(cache, repo_id, Some(&handler), &mut finished)?;
+        }
+        Kind::PairMt => {
+            crate::marian::fetch_files(cache, repo_id, Some(&handler), &mut finished)?;
         }
     }
     Ok(())
@@ -434,5 +494,48 @@ mod tests {
         let _ = fs::remove_file(&file);
         assert_eq!(progress.bytes_done(), 1000);
         assert_eq!(progress.current_total(), 0);
+    }
+
+    /// A GGUF repo is complete with its one q4_k_m file; no config.json or tokenizer.json.
+    #[test]
+    fn gguf_repo_is_downloaded_with_its_one_file() {
+        let cache = std::env::temp_dir().join(format!("gguf-state-{}", std::process::id()));
+        let id = "unsloth/Qwen3-0.6B-GGUF";
+        let snap = model_root(&cache, id).join("snapshots/abc");
+        fs::create_dir_all(&snap).expect("snapshot");
+        assert!(!cache_state(&cache, id, Kind::Translate).downloaded);
+        fs::write(snap.join("Qwen3-0.6B-Q8_0.gguf"), b"x").expect("other quant");
+        assert!(!cache_state(&cache, id, Kind::Translate).downloaded);
+        fs::write(snap.join("Qwen3-0.6B-Q4_K_M.gguf"), b"x").expect("gguf");
+        assert!(cache_state(&cache, id, Kind::Translate).downloaded);
+        let _ = fs::remove_dir_all(&cache);
+    }
+
+    /// An OPUS-MT pair needs its config, source pieces, vocab and weights.
+    #[test]
+    fn opus_mt_pair_is_downloaded_with_all_its_files() {
+        let cache = std::env::temp_dir().join(format!("pair-state-{}", std::process::id()));
+        let id = "Helsinki-NLP/opus-mt-en-id";
+        let snap = model_root(&cache, id).join("snapshots/abc");
+        fs::create_dir_all(&snap).expect("snapshot");
+        for name in &crate::marian::FILES[..3] {
+            fs::write(snap.join(name), b"x").expect("file");
+        }
+        assert!(!cache_state(&cache, id, Kind::PairMt).downloaded);
+        // The weights come from another revision (the safetensors PR): any snapshot counts.
+        let pr = model_root(&cache, id).join("snapshots/def");
+        fs::create_dir_all(&pr).expect("pr snapshot");
+        fs::write(pr.join("model.safetensors"), b"x").expect("weights");
+        assert!(cache_state(&cache, id, Kind::PairMt).downloaded);
+        let _ = fs::remove_dir_all(&cache);
+    }
+
+    /// Every OPUS-MT pair the engine routes to has a catalog row a client can pull.
+    #[test]
+    fn every_opus_mt_pair_is_in_the_catalog() {
+        for (src, tgt, repo, _) in crate::marian::PAIRS {
+            let spec = catalog_spec(repo).unwrap_or_else(|| panic!("{src}-{tgt} missing"));
+            assert_eq!(spec.kind, Kind::PairMt);
+        }
     }
 }

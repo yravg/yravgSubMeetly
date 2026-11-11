@@ -261,6 +261,20 @@ pub fn extra_height(st: &AppState) -> f32 {
 }
 
 /// The "Aa" button with its right edge at `right`, centred on `cy`. Returns its left edge.
+/// The "History" button of Live, Meeting and Media (PMM-023): the page's own saved records in place
+/// of the page. Its right edge at `right`; returns its left edge.
+pub fn history_button(ui: &mut Ui, st: &mut AppState, right: f32, cy: f32) -> f32 {
+    let w = ui.pill_width("History", false, true);
+    let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+    if ui.pill(wid("qc.history"), b, "History", None, PillStyle::Utility).clicked {
+        st.records.history = Some(st.page);
+        st.records.page = 0;
+    }
+    b.x
+}
+
+/// The "Aa" button with its right edge at `right`, centred on `cy`, and History to its left.
+/// Returns the left edge of both.
 pub fn aa_button(ui: &mut Ui, st: &mut AppState, right: f32, cy: f32) -> f32 {
     let open = st.settings.quick_captions_open;
     let w = ui.pill_width("Aa", false, true);
@@ -270,7 +284,7 @@ pub fn aa_button(ui: &mut Ui, st: &mut AppState, right: f32, cy: f32) -> f32 {
         st.ui.quick = QuickUi::default();
         st.cmd(Command::SaveSettings);
     }
-    b.x
+    history_button(ui, st, b.x - PILL_GAP, cy)
 }
 
 fn chip_text() -> TextStyle {

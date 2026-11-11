@@ -1,15 +1,40 @@
-//! Translation LLM on candle: Qwen2.5 Instruct, greedy, with the exact
-//! prompts of `translate_text` / `refine_text` in native/server.py.
+//! Translation LLM on candle: Qwen2.5 Instruct (safetensors) or Qwen3 (q4_k GGUF), greedy,
+//! with the exact prompts of `translate_text` / `refine_text` in native/server.py.
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use candle_core::quantized::gguf_file::{Content, Value as Gv};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
+use candle_transformers::models::quantized_qwen3::ModelWeights as Qwen3Q;
 use candle_transformers::models::qwen2::{Config, ModelForCausalLM};
 use hf_hub::progress::Progress;
-use serde_json::Value;
+use serde_json::{json, Map, Value};
 use tokenizers::Tokenizer;
+
+/// The one file a `*-GGUF` repo serves the engine (q4_k_m), or `None` for safetensors repos.
+pub fn gguf_file(repo_id: &str) -> Option<String> {
+    let name = repo_id.rsplit('/').next()?;
+    name.strip_suffix("-GGUF")
+        .map(|base| format!("{base}-Q4_K_M.gguf"))
+}
+
+/// Download (or find cached) every file `Translator::load` reads for `repo_id`.
+pub fn fetch_any(
+    cache: &Path,
+    repo_id: &str,
+    progress: Option<&Progress>,
+    finished: &mut dyn FnMut(&Path),
+) -> Result<()> {
+    if let Some(file) = gguf_file(repo_id) {
+        let path = crate::ml::hub_file_with(cache, repo_id, None, &file, progress.cloned())?;
+        finished(&path);
+    } else {
+        fetch_files(cache, repo_id, progress, finished)?;
+    }
+    Ok(())
+}
 
 /// The cached files `Translator::load` reads; weights may be sharded.
 pub struct QwenFiles {
@@ -56,7 +81,9 @@ pub fn fetch_files(
     })
 }
 
-pub const DEFAULT_TRANSLATE_MODEL: &str = "Qwen/Qwen2.5-0.5B-Instruct";
+/// Measured on the caption bench (docs/roadmap/caption-speed.md): faster than Qwen2.5-0.5B
+/// f32 on CPU and 16/20 vs 4/20 on the Indonesian meaning check.
+pub const DEFAULT_TRANSLATE_MODEL: &str = "unsloth/Qwen3-1.7B-GGUF";
 
 const LANG_NAMES: [(&str, &str); 20] = [
     ("en", "English"),
@@ -225,16 +252,115 @@ pub fn first_line(out: &str) -> String {
         .to_string()
 }
 
+/// Qwen2/Qwen3 pre-tokenizer split (the `Split` regex of their tokenizer.json).
+const QWEN_SPLIT: &str = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+";
+
+fn gguf_strings<'a>(content: &'a Content, key: &str) -> Result<Vec<&'a str>> {
+    let Some(value) = content.metadata.get(key) else {
+        bail!("gguf has no {key}");
+    };
+    value
+        .to_vec()?
+        .iter()
+        .map(|v| {
+            v.to_string()
+                .map(String::as_str)
+                .map_err(|e| anyhow!("{e}"))
+        })
+        .collect()
+}
+
+/// The tokenizer.json equivalent of a GGUF's `tokenizer.ggml.*` (gpt2 BPE, Qwen split):
+/// the GGUF repos ship no tokenizer.json, so it is rebuilt the way llama.cpp reads it.
+pub fn gguf_tokenizer(content: &Content) -> Result<Tokenizer> {
+    let model = content
+        .metadata
+        .get("tokenizer.ggml.model")
+        .and_then(|v| v.to_string().ok())
+        .map(String::as_str);
+    if model != Some("gpt2") {
+        bail!("unsupported gguf tokenizer {model:?}");
+    }
+    let tokens = gguf_strings(content, "tokenizer.ggml.tokens")?;
+    let merges = gguf_strings(content, "tokenizer.ggml.merges")?;
+    let types: Vec<i32> = match content.metadata.get("tokenizer.ggml.token_type") {
+        Some(Gv::Array(values)) => values.iter().map(|v| v.to_i32().unwrap_or(1)).collect(),
+        _ => vec![1; tokens.len()],
+    };
+    let vocab: Map<String, Value> = tokens
+        .iter()
+        .enumerate()
+        .map(|(id, t)| (t.to_string(), json!(id)))
+        .collect();
+    // Control (3) and user-defined (4) tokens are matched whole, never split.
+    let added: Vec<Value> = tokens
+        .iter()
+        .enumerate()
+        .filter(|(id, _)| matches!(types.get(*id), Some(3 | 4)))
+        .map(|(id, t)| {
+            json!({"id": id, "content": t, "single_word": false, "lstrip": false,
+                   "rstrip": false, "normalized": false, "special": types[id] == 3})
+        })
+        .collect();
+    let byte_level = json!({"type": "ByteLevel", "add_prefix_space": false,
+                            "trim_offsets": false, "use_regex": false});
+    let spec = json!({
+        "version": "1.0",
+        "added_tokens": added,
+        "normalizer": {"type": "NFC"},
+        "pre_tokenizer": {"type": "Sequence", "pretokenizers": [
+            {"type": "Split", "pattern": {"Regex": QWEN_SPLIT}, "behavior": "Isolated", "invert": false},
+            byte_level,
+        ]},
+        "post_processor": null,
+        "decoder": byte_level,
+        "model": {"type": "BPE", "dropout": null, "unk_token": null,
+                  "continuing_subword_prefix": "", "end_of_word_suffix": "",
+                  "fuse_unk": false, "byte_fallback": false, "ignore_merges": false,
+                  "vocab": vocab, "merges": merges},
+    });
+    spec.to_string()
+        .parse()
+        .map_err(|e| anyhow!("gguf tokenizer: {e}"))
+}
+
+enum Model {
+    Qwen2(ModelForCausalLM),
+    /// Qwen3 answers after an empty think block (its non-thinking mode).
+    Qwen3Q(Qwen3Q),
+}
+
 pub struct Translator {
     pub repo_id: String,
-    model: ModelForCausalLM,
+    model: Model,
     tokenizer: Tokenizer,
     device: Device,
     stops: Vec<u32>,
 }
 
+fn stop_ids(tokenizer: &Tokenizer) -> Vec<u32> {
+    ["<|im_end|>", "<|endoftext|>"]
+        .iter()
+        .filter_map(|t| tokenizer.token_to_id(t))
+        .collect()
+}
+
 impl Translator {
     pub fn load(repo_id: &str, device: Device, cache: &Path) -> Result<Self> {
+        if let Some(file) = gguf_file(repo_id) {
+            let path = crate::ml::hub_file_with(cache, repo_id, None, &file, None)?;
+            let mut reader = std::fs::File::open(&path)?;
+            let content = Content::read(&mut reader).map_err(|e| anyhow!("{e}"))?;
+            let tokenizer = gguf_tokenizer(&content)?;
+            let model = Qwen3Q::from_gguf(content, &mut reader, &device)?;
+            return Ok(Self {
+                repo_id: repo_id.to_string(),
+                model: Model::Qwen3Q(model),
+                stops: stop_ids(&tokenizer),
+                tokenizer,
+                device,
+            });
+        }
         let files = fetch_files(cache, repo_id, None, &mut |_| {})?;
         let config: Config =
             serde_json::from_slice(&std::fs::read(files.config)?).context("qwen config")?;
@@ -248,16 +374,12 @@ impl Translator {
         // SAFETY: the hub cache files are not modified while mapped.
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&weights, dtype, &device)? };
         let model = ModelForCausalLM::new(&config, vb)?;
-        let stops = ["<|im_end|>", "<|endoftext|>"]
-            .iter()
-            .filter_map(|t| tokenizer.token_to_id(t))
-            .collect();
         Ok(Self {
             repo_id: repo_id.to_string(),
-            model,
+            model: Model::Qwen2(model),
+            stops: stop_ids(&tokenizer),
             tokenizer,
             device,
-            stops,
         })
     }
 
@@ -302,24 +424,31 @@ impl Translator {
         max_tokens: usize,
         seen: &mut dyn FnMut(&str) -> bool,
     ) -> Result<()> {
+        let prompt = match self.model {
+            Model::Qwen2(_) => prompt.to_string(),
+            Model::Qwen3Q(_) => format!("{prompt}<think>\n\n</think>\n\n"),
+        };
         let ids = self
             .tokenizer
             .encode(prompt, false)
             .map_err(|e| anyhow!("{e}"))?
             .get_ids()
             .to_vec();
-        self.model.clear_kv_cache();
+        match &mut self.model {
+            Model::Qwen2(m) => m.clear_kv_cache(),
+            Model::Qwen3Q(m) => m.clear_kv_cache(),
+        }
         let mut out: Vec<u32> = Vec::new();
         let mut input = ids.clone();
         let mut offset = 0;
         for _ in 0..max_tokens {
             let tensor = Tensor::new(input.as_slice(), &self.device)?.unsqueeze(0)?;
-            let logits = self
-                .model
-                .forward(&tensor, offset)?
-                .squeeze(0)?
-                .squeeze(0)?
-                .to_dtype(DType::F32)?;
+            let logits = match &mut self.model {
+                Model::Qwen2(m) => m.forward(&tensor, offset)?,
+                Model::Qwen3Q(m) => m.forward(&tensor, offset)?,
+            };
+            // (1, 1, vocab) for Qwen2, (1, vocab) for quantized Qwen3.
+            let logits = logits.flatten_all()?.to_dtype(DType::F32)?;
             let next = logits.argmax(0)?.to_scalar::<u32>()?;
             offset += input.len();
             if self.stops.contains(&next) {
@@ -352,6 +481,15 @@ impl Translator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gguf_repos_name_their_q4_k_m_file() {
+        assert_eq!(
+            gguf_file("unsloth/Qwen3-1.7B-GGUF").as_deref(),
+            Some("Qwen3-1.7B-Q4_K_M.gguf")
+        );
+        assert_eq!(gguf_file("Qwen/Qwen2.5-0.5B-Instruct"), None);
+    }
 
     #[test]
     fn prompts_match_the_oracle_text() {

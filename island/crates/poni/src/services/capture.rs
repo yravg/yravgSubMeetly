@@ -99,6 +99,8 @@ pub struct Meeting {
     pub notes: Option<poni_core::live_notes::LiveNotes>,
     /// Live heard the room (Room or Both): saved as an "In-room" meeting (PMM-020).
     pub room: bool,
+    /// The meeting app the session heard, for the Minutes chip (PMM-023).
+    pub app: Option<String>,
 }
 
 /// A saved session's id and what its notes held, or why not with its lines back.
@@ -108,11 +110,11 @@ pub type Saved = Result<(String, poni_core::live_notes::Counts), (String, Vec<he
 /// the transcript is kept without them), then keeps the document. `Err` returns the lines.
 pub fn save_meeting(port: u16, m: Meeting) -> Saved {
     use poni_core::live_notes::{draft_items, onto_doc};
-    use poni_core::meeting_doc::{as_in_room, as_transcript, generate_body, generated_note, meeting_doc};
+    use poni_core::meeting_doc::{as_in_room, as_transcript, generate_body, generated_note, meeting_doc, with_app};
     let draft = helper::request(port, "POST", "/notes/generate", Some(&generate_body(&m.title, &m.lines))).ok().filter(|(c, _)| *c == 200).and_then(|(_, b)| generated_note(&b));
     let Some(doc) = meeting_doc(&m.id, &m.title, &m.date, &m.start, &m.locale, &m.lines, draft.as_ref()) else { return Err(("Nothing was heard.".into(), Vec::new())) };
     // The draft is kept on a transcript too, so "Save as meeting" gives a meeting with its notes.
-    let doc = if m.transcript { as_transcript(doc) } else if m.room { as_in_room(doc) } else { doc };
+    let doc = if m.transcript { as_transcript(doc) } else if m.room { as_in_room(doc) } else { with_app(doc, m.app.as_deref()) };
     // A Meeting tab session: the final draft joins the kept and typed items (the last draft stays
     // when the engine gives none).
     let (doc, counts) = match m.notes {

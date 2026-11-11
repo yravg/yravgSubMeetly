@@ -443,8 +443,7 @@ pub(crate) fn saved(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let x = area.center().x - (ow + PILL_GAP + dw) / 2.0;
     let y = top + 104.0;
     if ui.pill(wid("call.open"), Rect::new(x, y, ow, PILL_SMALL), "Open in Minutes", None, PillStyle::Primary(st.accent)).clicked {
-        st.helper.select(&id);
-        st.meeting_page = 0;
+        st.show_record(&id);
         st.cmd(Command::SetPage(PageKind::Meeting));
     }
     if ui.pill(wid("call.dismiss"), Rect::new(x + ow + PILL_GAP, y, dw, PILL_SMALL), "Dismiss", None, PillStyle::Utility).clicked {

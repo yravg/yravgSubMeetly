@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 
 use crate::audio::{self, MonoStream, Windows, SAMPLE_RATE};
 use crate::locations::Locations;
+use crate::marian::{pair_repo, MarianMt};
 use crate::models::{cache_state, catalog_spec, Kind, ModelNotDownloaded};
 use crate::translate::{Translator, DEFAULT_TRANSLATE_MODEL};
 use crate::whisper::DEFAULT_ASR_MODEL;
@@ -40,6 +41,8 @@ pub struct Ml {
     /// The loaded model and the id it was loaded for; a changed choice reloads on next use.
     asr: Mutex<Option<(String, WhisperAsr)>>,
     mt: Mutex<Option<(String, Translator)>>,
+    /// The OPUS-MT pair model last used by `translate_fast` (one at a time).
+    pair: Mutex<Option<(String, MarianMt)>>,
     asr_loaded_id: RwLock<Option<String>>,
     mt_loaded_id: RwLock<Option<String>>,
     asr_loading: AtomicBool,
@@ -63,6 +66,19 @@ struct Picked {
     asr_from_env: bool,
     translate: Option<String>,
     translate_from_env: bool,
+    /// Nobody chose: the default, which may give way to a model already on disk.
+    translate_default: bool,
+}
+
+/// The translation model to run when the default is not downloaded and nobody chose one:
+/// the first downloaded catalog model, so an install made under an older default keeps
+/// translating until the new default is pulled.
+fn fallback_translate(downloaded: &dyn Fn(&str) -> bool) -> Option<&'static str> {
+    CATALOG
+        .iter()
+        .filter(|spec| spec.kind == Kind::Translate && spec.id != DEFAULT_TRANSLATE_MODEL)
+        .map(|spec| spec.id)
+        .find(|id| downloaded(id))
 }
 
 fn pick_models(env: &dyn Fn(&str) -> Option<String>, saved: &SavedModels) -> Picked {
@@ -90,11 +106,15 @@ fn pick_models(env: &dyn Fn(&str) -> Option<String>, saved: &SavedModels) -> Pic
             .unwrap_or_else(|| DEFAULT_TRANSLATE_MODEL.to_string());
         (Some(id), false)
     };
+    let translate_default = !translate_from_env
+        && saved.translate.as_deref() != Some("off")
+        && saved_id(&saved.translate, Kind::Translate).is_none();
     Picked {
         asr,
         asr_from_env,
         translate,
         translate_from_env,
+        translate_default,
     }
 }
 
@@ -131,6 +151,7 @@ impl Ml {
             locations,
             asr: Mutex::new(None),
             mt: Mutex::new(None),
+            pair: Mutex::new(None),
             asr_loaded_id: RwLock::new(None),
             mt_loaded_id: RwLock::new(None),
             asr_loading: AtomicBool::new(false),
@@ -269,6 +290,24 @@ impl Ml {
             *write(&self.mt_loaded_id) = Some(want);
         }
         f(&mut guard.as_mut().expect("loaded above").1)
+    }
+
+    /// Fast (caption) translation: the OPUS-MT model of the pair when it is downloaded,
+    /// else the translation LLM.
+    pub fn translate_fast(&self, text: &str, src: &str, tgt: &str) -> Result<String> {
+        if let Some(repo) = pair_repo(src, tgt) {
+            if let Ok(cache) = self.downloaded_dir(repo, Kind::PairMt) {
+                let mut guard = lock(&self.pair);
+                if guard.as_ref().map(|(id, _)| id.as_str()) != Some(repo) {
+                    *guard = None;
+                    eprintln!("[translate] loading {repo} ...");
+                    let model = MarianMt::load(repo, self.device.clone(), &cache)?;
+                    *guard = Some((repo.to_string(), model));
+                }
+                return guard.as_mut().expect("loaded above").1.translate(text);
+            }
+        }
+        self.with_translator(|mt| mt.translate(text, src, tgt, true))
     }
 
     pub fn segments(
@@ -603,13 +642,10 @@ mod tests {
     }
 
     #[test]
-    fn defaults_are_the_small_models() {
+    fn defaults_are_whisper_base_and_qwen3_1_7b_gguf() {
         let picked = pick_models(&env(&[]), &SavedModels::default());
         assert_eq!(picked.asr, "openai/whisper-base");
-        assert_eq!(
-            picked.translate.as_deref(),
-            Some("Qwen/Qwen2.5-0.5B-Instruct")
-        );
+        assert_eq!(picked.translate.as_deref(), Some("unsloth/Qwen3-1.7B-GGUF"));
         assert!(!picked.asr_from_env && !picked.translate_from_env);
     }
 
@@ -654,9 +690,6 @@ mod tests {
             ),
         );
         assert_eq!(picked.asr, "openai/whisper-base");
-        assert_eq!(
-            picked.translate.as_deref(),
-            Some("Qwen/Qwen2.5-0.5B-Instruct")
-        );
+        assert_eq!(picked.translate.as_deref(), Some("unsloth/Qwen3-1.7B-GGUF"));
     }
 }

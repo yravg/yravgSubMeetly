@@ -308,12 +308,19 @@ pub struct SessionSeen {
     media: bool,
     /// The first media title heard (the video's): it names the transcript.
     pub title: Option<String>,
+    /// The first meeting app heard (PMM-023): the Minutes chip says "Meeting · Teams".
+    pub app: Option<String>,
 }
 
 impl SessionSeen {
     pub fn saw(&mut self, kind: &SourceKind, media_title: Option<&str>) {
         match kind {
-            SourceKind::Meeting { .. } => self.meeting = true,
+            SourceKind::Meeting { label, .. } => {
+                self.meeting = true;
+                if self.app.is_none() {
+                    self.app = Some(label.clone());
+                }
+            }
             SourceKind::Media => {
                 self.media = true;
                 if self.title.is_none() {
@@ -353,6 +360,8 @@ mod tests {
         call.saw(&SourceKind::Media, Some("a video"));
         call.saw(&teams, None);
         assert!(!call.transcript(), "a meeting at any moment keeps today's save");
+        assert_eq!(call.app.as_deref(), Some("Teams"), "the meeting app is kept for the Minutes chip");
+        assert_eq!(video.app, None);
 
         let mut room = SessionSeen::default();
         room.saw(&SourceKind::None, None);

@@ -15,10 +15,10 @@ use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_GAP, PILL_SMALL};
 use poni_core::geom::{palette, Rect};
 use poni_core::helper::{self, Decision, Item, Kind, PageState, Review, Status};
 
-const HEAD_H: f32 = 30.0;
-const ROW_H: f32 = 36.0;
+pub(super) const HEAD_H: f32 = 30.0;
+pub(super) const ROW_H: f32 = 36.0;
 pub const MAX_ROWS: usize = 5;
-const FOOT_H: f32 = 28.0;
+pub(super) const FOOT_H: f32 = 28.0;
 
 pub fn height(_st: &AppState) -> f32 {
     HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H + hkit::GUIDE_H
@@ -50,11 +50,17 @@ fn verb(d: Decision) -> &'static str {
 }
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
-    let area = hkit::guide(ui, st, area, PageKind::Meeting, "Decisions, actions and questions of any meeting. Paste reads a copied transcript.");
+    let purpose = if st.records.list { "Every saved record: meetings, live sessions, video transcripts and pastes." } else { "Decisions, actions and questions of any meeting. Paste reads a copied transcript." };
+    let area = hkit::guide(ui, st, area, PageKind::Meeting, purpose);
     let accent = st.accent;
     let state = helper::note_state(&st.helper.link, st.helper.note());
     if state == PageState::Error {
         hkit::offline(ui, st, area, wid("meeting.retry"));
+        return;
+    }
+    // Minutes opens on every record (PMM-023); a press opens one in the register below.
+    if st.records.list && !st.helper.snap.notes.is_empty() {
+        super::records::draw_list(ui, st, area);
         return;
     }
     let Some(note) = st.helper.note().cloned() else {
@@ -113,6 +119,14 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     } else {
         b
     };
+    // Back to the list of every record.
+    let w = ui.pill_width("All records", false, true);
+    let all = Rect::new(b.x - PILL_GAP - w, fy - PILL_SMALL / 2.0, w, PILL_SMALL);
+    if ui.pill(wid("meeting.records"), all, "All records", None, PillStyle::Utility).clicked {
+        st.records.list = true;
+        st.records.page = 0;
+    }
+    let b = all;
     let toast = st.helper_notice.as_ref().filter(|(_, until, _)| *until > ui.now).map(|(m, _, bad)| (m.clone(), *bad));
     let status = match (&toast, locked, waiting) {
         (Some((t, _)), _, _) => t.clone(),

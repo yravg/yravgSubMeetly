@@ -101,6 +101,24 @@ pub fn is_in_room(doc: &Value) -> bool {
     doc.get("source").and_then(Value::as_str) == Some(SOURCE_ROOM)
 }
 
+/// PMM-023: a transcript pasted from Teams, read.ai or a .vtt, listed in Minutes as "Pasted".
+pub const SOURCE_PASTE: &str = "paste";
+
+/// PMM-023: the meeting app a session heard ("Teams", a host) travels in the document's `source`,
+/// `island:Teams`: the engine keeps `source` as given but drops unknown `meeting` keys, and
+/// nothing else reads `source` of an island meeting. `None` or an empty app leaves it `island`.
+pub fn with_app(mut doc: Value, app: Option<&str>) -> Value {
+    if let Some(app) = app.map(str::trim).filter(|a| !a.is_empty()) {
+        doc["source"] = json!(format!("island:{app}"));
+    }
+    doc
+}
+
+/// The app [`with_app`] recorded.
+pub fn meeting_app(doc: &Value) -> Option<&str> {
+    doc.get("source").and_then(Value::as_str)?.strip_prefix("island:").filter(|a| !a.is_empty())
+}
+
 /// The kept transcript as a meeting (`None` when it is one already).
 pub fn promote(doc: &Value) -> Option<Value> {
     is_transcript(doc).then(|| {
@@ -130,7 +148,7 @@ pub fn with_base(doc: Value, base: Option<&Value>, speakers: &[String]) -> Value
             o.insert(k, v);
         }
     }
-    o.insert("source".into(), json!("paste"));
+    o.insert("source".into(), json!(SOURCE_PASTE));
     let m = o.entry("meeting").or_insert_with(|| json!({}));
     if let Some(m) = m.as_object_mut() {
         let list = m.entry("attendees").or_insert_with(|| json!([]));

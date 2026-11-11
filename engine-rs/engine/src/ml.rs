@@ -87,6 +87,22 @@ pub fn hub_file_with(
 ) -> Result<PathBuf> {
     let (owner, name) = split_id(repo_id);
     let repo = client(cache)?.model(owner, name);
+    // Cached files never ask the Hub: a `main` lookup costs a round trip on every model
+    // load and hangs on a dead link. shortcut: a newer upstream commit is not picked up;
+    // delete the cached model to update it.
+    let cached = repo
+        .download_file()
+        .filename(filename)
+        .maybe_revision(revision)
+        .local_files_only(true)
+        .send();
+    match cached {
+        // A recorded 404 (`.no_exist`) is as good as asking again.
+        Ok(_) | Err(HFError::EntryNotFound { .. }) => {
+            return cached.with_context(|| format!("download {repo_id}/{filename}"))
+        }
+        Err(_) => {}
+    }
     wait_for_lock(|| {
         repo.download_file()
             .filename(filename)
@@ -114,6 +130,30 @@ mod tests {
     fn downloads_go_to_the_folder_they_are_given() {
         let dir = std::env::temp_dir().join("ml-cache-pin");
         assert_eq!(async_client(&dir).unwrap().cache_dir(), dir);
+    }
+
+    /// A file already in the cache loads without asking the Hub (a slow or dead link
+    /// must not hold up a model load). The repo does not exist on the Hub at all.
+    #[test]
+    fn a_cached_file_is_returned_without_the_network() {
+        let cache = std::env::temp_dir().join(format!("ml-cached-{}", std::process::id()));
+        let root = cache.join("models--nobody--not-a-real-repo-7f3a");
+        let sha = "0123456789abcdef0123456789abcdef01234567";
+        std::fs::create_dir_all(root.join("refs")).unwrap();
+        std::fs::create_dir_all(root.join("snapshots").join(sha)).unwrap();
+        std::fs::write(root.join("refs/main"), sha).unwrap();
+        let file = root.join("snapshots").join(sha).join("config.json");
+        std::fs::write(&file, "{}").unwrap();
+        // hf-hub records a 404 as an empty `.no_exist` file: a 404 again, no request.
+        let no_exist = root.join(".no_exist").join(sha);
+        std::fs::create_dir_all(&no_exist).unwrap();
+        std::fs::write(no_exist.join("model.safetensors.index.json"), "").unwrap();
+        let repo = "nobody/not-a-real-repo-7f3a";
+        let got = hub_file_with(&cache, repo, None, "config.json", None);
+        let index = hub_file_with(&cache, repo, None, "model.safetensors.index.json", None);
+        let _ = std::fs::remove_dir_all(&cache);
+        assert_eq!(got.expect("cached"), file);
+        assert!(is_not_found(&index.expect_err("recorded 404")));
     }
 
     #[test]

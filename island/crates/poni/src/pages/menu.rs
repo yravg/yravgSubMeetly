@@ -188,7 +188,7 @@ fn go(st: &mut AppState, p: PageKind) {
     if p == PageKind::Settings {
         st.ui.before_settings = Some(st.page);
     }
-    st.cmd(Command::SetPage(p));
+    st.go_tab(p);
 }
 
 /// The open list, over the page. Call after the page is drawn.

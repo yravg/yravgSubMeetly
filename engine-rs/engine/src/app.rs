@@ -587,9 +587,12 @@ impl App {
                 if text.trim().is_empty() {
                     return Ok(self.json_response(request, 200, json!({ "text": "" })));
                 }
-                let out = self
-                    .ml
-                    .with_translator(|mt| mt.translate(&text, &src, &tgt, fast))?;
+                let out = if fast {
+                    self.ml.translate_fast(&text, &src, &tgt)?
+                } else {
+                    self.ml
+                        .with_translator(|mt| mt.translate(&text, &src, &tgt, false))?
+                };
                 self.json_response(request, 200, json!({ "text": out, "ms": ms() }))
             }
             "/translate_refine" => {
@@ -717,9 +720,12 @@ impl App {
             }
         }
         let mt_start = std::time::Instant::now();
-        let translation = self
-            .ml
-            .with_translator(|mt| mt.translate(&source, src, tgt, !accurate))?;
+        let translation = if accurate {
+            self.ml
+                .with_translator(|mt| mt.translate(&source, src, tgt, false))?
+        } else {
+            self.ml.translate_fast(&source, src, tgt)?
+        };
         let translate_ms = mt_start.elapsed().as_millis() as u64;
         self.record_live(&source, &translation, ms(), pcm.len());
         Ok(self.json_response(
@@ -975,6 +981,8 @@ impl App {
                     "selected": match spec.kind {
                         Kind::Asr => asr == spec.id,
                         Kind::Translate => translate.as_deref() == Some(spec.id),
+                        // Never chosen: used for its pair whenever it is downloaded.
+                        Kind::PairMt => false,
                     },
                 });
                 row.as_object_mut()
@@ -1387,7 +1395,11 @@ impl App {
         let bad = asr.as_deref().is_some_and(|id| !known(id, Kind::Asr))
             || translate.is_some_and(|id| id != "off" && !known(id, Kind::Translate));
         if bad {
-            let allowed: Vec<&str> = CATALOG.iter().map(|spec| spec.id).collect();
+            let allowed: Vec<&str> = CATALOG
+                .iter()
+                .filter(|spec| spec.kind != Kind::PairMt)
+                .map(|spec| spec.id)
+                .collect();
             return self.json_response(
                 request,
                 400,

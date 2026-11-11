@@ -100,8 +100,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     };
     ui.c.text(&line, Rect::new(foot.x, foot.center().y - 8.0, (right - foot.x - 8.0).max(0.0), 16.0), &TextStyle::caption().color(palette::TEXT_FAINT));
     if let Some(id) = open {
-        st.helper.select(&id);
-        st.meeting_page = 0;
+        st.show_record(&id);
         st.cmd(Command::SetPage(PageKind::Meeting));
     }
 

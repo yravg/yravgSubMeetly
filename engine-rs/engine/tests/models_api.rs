@@ -98,14 +98,12 @@ fn rows_say_what_is_on_disk_and_what_is_only_partly_there() {
         ("model.safetensors", 300),
     ];
     cache_files(&cache, "openai/whisper-base", &base);
-    // Qwen 0.5B: weights half way (an `.incomplete` blob, no snapshot file yet).
-    cache_files(
-        &cache,
-        "Qwen/Qwen2.5-0.5B-Instruct",
-        &[("config.json", 5), ("tokenizer.json", 6)],
-    );
+    // The default Qwen3 GGUF half way (an `.incomplete` blob, no snapshot file yet); a
+    // README alone is not the model.
+    let gguf = "unsloth/Qwen3-1.7B-GGUF";
+    cache_files(&cache, gguf, &[("README.md", 11)]);
     write(
-        &cache.join("models--Qwen--Qwen2.5-0.5B-Instruct/blobs/abc.incomplete"),
+        &cache.join("models--unsloth--Qwen3-1.7B-GGUF/blobs/abc.incomplete"),
         700,
     );
 
@@ -115,10 +113,8 @@ fn rows_say_what_is_on_disk_and_what_is_only_partly_there() {
     assert_eq!(asr["bytes"], 330);
     assert_eq!(asr["partialBytes"], 0);
     let mt = &body["models"][1];
-    assert_eq!(
-        mt["downloaded"], false,
-        "config and tokenizer alone are not a model"
-    );
+    assert_eq!(mt["id"], gguf);
+    assert_eq!(mt["downloaded"], false, "the .gguf file is not there yet");
     assert_eq!(
         mt["bytes"], 11,
         ".incomplete is not counted as downloaded bytes"
@@ -185,8 +181,18 @@ fn catalog_lists_the_fixed_choices_and_marks_the_selected_ones() {
             "Qwen/Qwen2.5-0.5B-Instruct",
             "Qwen/Qwen2.5-1.5B-Instruct",
             "Qwen/Qwen2.5-3B-Instruct",
+            "unsloth/Qwen3-0.6B-GGUF",
+            "unsloth/Qwen3-1.7B-GGUF",
+            "Helsinki-NLP/opus-mt-en-id",
+            "Helsinki-NLP/opus-mt-id-en",
+            "Helsinki-NLP/opus-mt-en-zh",
+            "Helsinki-NLP/opus-mt-zh-en",
+            "Helsinki-NLP/opus-mt-ja-en",
         ]
     );
+    let pair = row(&body, "catalog", "Helsinki-NLP/opus-mt-en-id");
+    assert_eq!(pair["kind"], "translate-pair");
+    assert_eq!(pair["selected"], false);
     let small = row(&body, "catalog", "openai/whisper-small");
     assert_eq!(small["kind"], "asr");
     assert_eq!(small["approxBytes"], 967_000_000_u64);
@@ -196,7 +202,7 @@ fn catalog_lists_the_fixed_choices_and_marks_the_selected_ones() {
         true
     );
     assert_eq!(
-        row(&body, "catalog", "Qwen/Qwen2.5-0.5B-Instruct")["selected"],
+        row(&body, "catalog", "unsloth/Qwen3-1.7B-GGUF")["selected"],
         true
     );
 }
@@ -213,7 +219,15 @@ fn the_chosen_models_are_validated_applied_and_survive_a_restart() {
         json!({ "asr": "acme/mine" }),
     );
     assert_eq!(status, 400);
-    assert_eq!(body["allowed"].as_array().map(Vec::len), Some(7));
+    // OPUS-MT pair models are pulled, never chosen.
+    assert_eq!(body["allowed"].as_array().map(Vec::len), Some(9));
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/engine/models",
+        json!({ "translate": "Helsinki-NLP/opus-mt-en-id" }),
+    );
+    assert_eq!(status, 400);
     // A Qwen id is not a speech model.
     let (status, _) = call(
         &app,

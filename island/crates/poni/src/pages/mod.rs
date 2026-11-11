@@ -24,6 +24,7 @@ pub mod meeting;
 pub mod menu;
 pub mod notifications;
 pub mod prayer;
+pub mod records;
 pub mod script;
 pub mod settings;
 pub mod shelf;
@@ -283,6 +284,9 @@ pub fn step_tab(p: PageKind, st: &AppState, forward: bool) -> PageKind {
 }
 
 pub fn content_height(p: PageKind, st: &AppState) -> f32 {
+    if records::history_shows(st, p) {
+        return records::history_height();
+    }
     match p {
         PageKind::Live => live::height(st),
         PageKind::Call => call::height(st),
@@ -417,6 +421,9 @@ pub(crate) fn draw_pages(ui: &mut Ui, st: &mut AppState, body: Rect, header: Rec
 }
 
 pub(crate) fn draw_page(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKind) {
+    if records::history_shows(st, page) {
+        return records::draw_history(ui, st, area, page);
+    }
     match page {
         PageKind::Live => live::draw(ui, st, area),
         PageKind::Call => call::draw(ui, st, area),
@@ -570,7 +577,7 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
             ui.c.fill_circle(Point::new(ix + TAB_ICON, cy - TAB_ICON / 2.0 + 1.0), 3.0, palette::RED);
         }
         if resp.clicked && !active {
-            st.cmd(Command::SetPage(p));
+            st.go_tab(p);
         }
     }
     // The keyboard's focus ring, with the name of what it is on.

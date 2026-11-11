@@ -589,6 +589,8 @@ pub struct AppState {
     pub calendar_pinged: Option<String>,
     /// Which page of rows the Meeting, Inbox and Calendar pages show (0 = first).
     pub meeting_page: usize,
+    /// PMM-023: the Minutes tab's list of every record, and each tab's History.
+    pub records: RecordsUi,
     pub inbox_page: usize,
     pub calendar_page: usize,
     /// Calendar lists meetings that ended this week instead of the coming ones.
@@ -695,6 +697,7 @@ impl AppState {
             calendar_confirm: None,
             calendar_pinged: None,
             meeting_page: 0,
+            records: RecordsUi::default(),
             inbox_page: 0,
             calendar_page: 0,
             calendar_past: false,
@@ -879,6 +882,24 @@ impl AppState {
         self.cmds.push(c);
     }
 
+    /// A tab pressed (or stepped to): Minutes opens on its list of records, the other pages as
+    /// they are.
+    pub fn go_tab(&mut self, p: PageKind) {
+        if p == PageKind::Meeting {
+            self.records.list = true;
+            self.records.page = 0;
+        }
+        self.cmd(Command::SetPage(p));
+    }
+
+    /// Show one record in Minutes' register, from its first item (a meeting just saved, one picked
+    /// in a list or from Inbox). The caller then goes to the page.
+    pub fn show_record(&mut self, id: &str) {
+        self.helper.select(id);
+        self.meeting_page = 0;
+        self.records.list = false;
+    }
+
     pub fn media_cmd(&mut self, c: MediaCmd) {
         self.cmds.push(Command::Media(c));
     }
@@ -1013,6 +1034,18 @@ pub struct CallState {
     pub asked_hosts: Vec<String>,
     /// How far the notes column is scrolled (DIPs).
     pub scroll: f32,
+}
+
+/// What the record lists show (PMM-023).
+#[derive(Clone, Debug, Default)]
+pub struct RecordsUi {
+    /// Minutes shows the list of records; off, it shows one record's register.
+    pub list: bool,
+    pub filter: poni_core::records::Filter,
+    /// Which page of rows the list or History shows (0 = first).
+    pub page: usize,
+    /// Live, Meeting or Media shows its own History instead of its page.
+    pub history: Option<PageKind>,
 }
 
 pub struct CallSaved {

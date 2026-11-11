@@ -1967,6 +1967,7 @@ impl App {
             transcript: false,
             notes: None,
             room: false,
+            app: None,
         };
         let cut = if p.dropped > 0 { format!(" (the first {} left out)", p.dropped) } else { String::new() };
         self.st.helper_notice = Some((format!("Drafting minutes from {} lines{cut}\u{2026}", m.lines.len()), self.st.now + 30.0, false));
@@ -2076,6 +2077,7 @@ impl App {
             lines,
             transcript,
             room,
+            app: seen.app.clone(),
         };
         if m.notes.is_some() {
             let minutes = (m.lines.last().map_or(0.0, |l| l.t1) / 60.0).round().max(1.0) as u32;
@@ -2109,8 +2111,7 @@ impl App {
         if self.st.kept_transcript.as_ref().is_some_and(|(k, _)| k == id) {
             self.st.kept_transcript = None;
         }
-        self.st.helper.select(id);
-        self.st.meeting_page = 0;
+        self.st.show_record(id);
         self.set_page(PageKind::Meeting);
         self.st.helper_notice = Some(("Saved as meeting".into(), self.st.now + 4.0, false));
     }
@@ -2126,8 +2127,7 @@ impl App {
                     self.st.call.saved = Some(crate::state::CallSaved { id: sid, title, minutes, counts, at: self.st.now, dismissed: false, room });
                 }
                 // The new meeting is the one shown, from its first item.
-                self.st.helper.select(&id);
-                self.st.meeting_page = 0;
+                self.st.show_record(&id);
                 if self.st.helper_notice.as_ref().is_some_and(|n| n.0.starts_with("Drafting minutes")) {
                     self.st.helper_notice = None;
                 }
@@ -2843,10 +2843,11 @@ impl App {
             }
             AppEvent::CalendarNotes(Ok(id)) => {
                 // That meeting is the one shown, whether it was just made or already there.
+                self.st.records.list = false;
+                self.st.meeting_page = 0;
                 if !id.is_empty() {
                     self.st.helper.select(&id);
                 }
-                self.st.meeting_page = 0;
                 self.set_page(PageKind::Meeting);
                 self.request_frame();
             }
@@ -3974,7 +3975,7 @@ impl App {
                 self.wheel_acc += wheel_left;
                 if self.wheel_acc.abs() >= 1.0 && now - self.page_switch_t > 0.3 {
                     let next = pages::step_tab(p, &self.st, self.wheel_acc < 0.0);
-                    self.st.cmds.push(Command::SetPage(next));
+                    self.st.go_tab(next);
                     self.wheel_acc = 0.0;
                     self.page_switch_t = now;
                 }
@@ -4583,6 +4584,7 @@ impl App {
     fn set_page(&mut self, p: PageKind) {
         if p != self.st.page {
             self.st.page = p;
+            self.st.records.history = None;
             self.st.ui.addon_about = None;
             // Settings is never where the island opens next time.
             if p != PageKind::Settings {

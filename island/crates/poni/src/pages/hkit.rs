@@ -126,7 +126,7 @@ pub fn guide(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKind, purpose
                 let resp = ui.button(wid_n("guide.nav", i as u64), r.inset(-4.0, 0.0));
                 ui.c.text(label, r, &off.clone().color(if resp.hovered { palette::TEXT } else { palette::TEXT_DIM }));
                 if resp.clicked {
-                    st.cmd(Command::SetPage(*p));
+                    st.go_tab(*p);
                 }
             }
             x += w + NAV_GAP;

@@ -321,6 +321,7 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
         let w = ui.pill_width(&label, false, true);
         let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
         if ui.pill(wid("live.needs"), b, &label, None, PillStyle::Primary(palette::ORANGE)).clicked {
+            st.records.list = false;
             st.cmd(Command::SetPage(PageKind::Meeting));
         }
         right = b.x - PILL_GAP;

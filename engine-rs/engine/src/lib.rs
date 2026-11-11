@@ -7,6 +7,7 @@ pub mod engine;
 pub mod heuristic;
 pub mod ics;
 pub mod locations;
+pub mod marian;
 pub mod ml;
 pub mod models;
 pub mod native_host;
