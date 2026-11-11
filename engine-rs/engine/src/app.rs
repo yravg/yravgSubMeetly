@@ -710,6 +710,39 @@ impl App {
                 json!({ "source": "", "translation": "", "ms": ms(), "asr_ms": asr_ms }),
             ));
         }
+        // The person's translation provider, when one is on: its answer is the caption's translation.
+        // On any failure the local model below answers and `translateError` says why.
+        let mut provider_error: Option<String> = None;
+        // Only final lines go out: an interim (the growing utterance) would call the service every second.
+        if !interim {
+            match crate::providers::try_translate(&self.state_dir, &source, src, tgt) {
+                Some(Ok((translation, via))) => {
+                    let translate_ms = ms().saturating_sub(asr_ms);
+                    self.record_live(&source, &translation, ms(), pcm.len());
+                    return Ok(self.json_response(
+                        request,
+                        200,
+                        json!({
+                            "source": source,
+                            "translation": translation,
+                            "ms": ms(),
+                            "asr_ms": asr_ms,
+                            "translate_ms": translate_ms,
+                            "translate_via": via,
+                            "translateState": "ready",
+                        }),
+                    ));
+                }
+                Some(Err(e)) => provider_error = Some(e),
+                None => {}
+            }
+        }
+        let with_err = |mut v: Value| -> Value {
+            if let Some(e) = &provider_error {
+                v["translateError"] = json!(e);
+            }
+            v
+        };
         let downloaded = self.ml.translate_downloaded();
         let (mt, state) = draft_translation(
             self.ml.translate_available(),
@@ -744,7 +777,7 @@ impl App {
                 return Ok(self.json_response(
                     request,
                     200,
-                    json!({
+                    with_err(json!({
                         "source": source,
                         "translation": translation,
                         "ms": ms(),
@@ -752,7 +785,7 @@ impl App {
                         "translate_ms": translate_ms,
                         "translate_via": "whisper",
                         "translateState": state,
-                    }),
+                    })),
                 ));
             }
             DraftMt::SourceOnly => {
@@ -764,13 +797,13 @@ impl App {
                 return Ok(self.json_response(
                     request,
                     200,
-                    json!({
+                    with_err(json!({
                         "source": source,
                         "translation": translation,
                         "ms": ms(),
                         "asr_ms": asr_ms,
                         "translateState": state,
-                    }),
+                    })),
                 ));
             }
         }
@@ -788,14 +821,14 @@ impl App {
         Ok(self.json_response(
             request,
             200,
-            json!({
+            with_err(json!({
                 "source": source,
                 "translation": translation,
                 "ms": ms(),
                 "asr_ms": asr_ms,
                 "translate_ms": translate_ms,
                 "translateState": state,
-            }),
+            })),
         ))
     }
 
@@ -1705,6 +1738,11 @@ impl App {
             "/notes/templates" => {
                 Some(self.json_response(request, 200, crate::templates::list_json(&self.state_dir)))
             }
+            "/translate/provider" => Some(self.json_response(
+                request,
+                200,
+                crate::providers::load(&self.state_dir).public(),
+            )),
             _ => None,
         }
     }
@@ -1718,12 +1756,17 @@ impl App {
                 | "/ai/connector/test"
                 | "/notes/templates"
                 | "/notes/templates/default"
+                | "/translate/provider"
+                | "/translate/provider/test"
         ) {
             return None;
         }
         let Some(body) = parse_body(&request.body) else {
             return Some(self.json_response(request, 400, json!({ "error": "invalid JSON body" })));
         };
+        if path.starts_with("/translate/provider") {
+            return Some(self.provider_post(request, path, &body));
+        }
         let current = crate::connector::load(&self.state_dir);
         Some(match path {
             "/ai/connector" => match crate::connector::apply_patch(&current, &body)
@@ -1759,6 +1802,30 @@ impl App {
                 Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
             },
         })
+    }
+
+    /// `POST /translate/provider` (choose and configure the caption translation provider) and
+    /// `POST /translate/provider/test` (one sentence through it, enabled or not).
+    fn provider_post(&self, request: &Request, path: &str, body: &Value) -> Response {
+        let current = crate::providers::load(&self.state_dir);
+        if path == "/translate/provider/test" {
+            let mut probe = body.clone();
+            probe["enabled"] = json!(false);
+            let src = body.get("src").and_then(Value::as_str).unwrap_or("en");
+            let tgt = body.get("tgt").and_then(Value::as_str).unwrap_or("id");
+            return match crate::providers::apply_patch(&current, &probe) {
+                Ok(cfg) => self.json_response(request, 200, crate::providers::test(&cfg, src, tgt)),
+                Err(e) => {
+                    self.json_response(request, 400, json!({ "ok": false, "error": e.to_string() }))
+                }
+            };
+        }
+        match crate::providers::apply_patch(&current, body)
+            .and_then(|cfg| crate::providers::save(&self.state_dir, &cfg).map(|()| cfg))
+        {
+            Ok(cfg) => self.json_response(request, 200, cfg.public()),
+            Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+        }
     }
 
     fn health(&self) -> Value {
@@ -2076,25 +2143,55 @@ impl App {
     /// grouped by voice from the audio file at `path` ("Speaker N"). See `diarize.rs` for the limits.
     fn post_diarize(&self, request: &Request) -> Response {
         let Some(Value::Object(payload)) = parse_body(&request.body) else {
-            return self.json_response(request, 400, json!({ "error": "body must be a JSON object" }));
+            return self.json_response(
+                request,
+                400,
+                json!({ "error": "body must be a JSON object" }),
+            );
         };
         let segments = match payload.get("segments") {
             Some(Value::Array(a)) => a.clone(),
-            _ => return self.json_response(request, 400, json!({ "error": "segments must be an array" })),
+            _ => {
+                return self.json_response(
+                    request,
+                    400,
+                    json!({ "error": "segments must be an array" }),
+                )
+            }
         };
-        let max = payload.get("maxSpeakers").and_then(Value::as_u64).unwrap_or(0) as usize;
-        let needs_audio = segments.iter().any(|s| s.get("channel").and_then(Value::as_str).is_none_or(|c| c.trim().is_empty()));
+        let max = payload
+            .get("maxSpeakers")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as usize;
+        let needs_audio = segments.iter().any(|s| {
+            s.get("channel")
+                .and_then(Value::as_str)
+                .is_none_or(|c| c.trim().is_empty())
+        });
         let mut turns = Vec::new();
         if needs_audio {
-            if let Some(path) = payload.get("path").and_then(Value::as_str).filter(|p| !p.is_empty()) {
+            if let Some(path) = payload
+                .get("path")
+                .and_then(Value::as_str)
+                .filter(|p| !p.is_empty())
+            {
                 match crate::audio::decode_file(std::path::Path::new(path)) {
                     Ok(pcm) => turns = crate::diarize::diarize(&pcm, max),
-                    Err(e) => return self.json_response(request, 400, json!({ "error": format!("could not read the audio: {e}") })),
+                    Err(e) => {
+                        return self.json_response(
+                            request,
+                            400,
+                            json!({ "error": format!("could not read the audio: {e}") }),
+                        )
+                    }
                 }
             }
         }
         let labelled = crate::diarize::label_segments(&segments, &turns);
-        let speakers: std::collections::BTreeSet<String> = labelled.iter().filter_map(|s| s.get("speaker").and_then(Value::as_str).map(str::to_string)).collect();
+        let speakers: std::collections::BTreeSet<String> = labelled
+            .iter()
+            .filter_map(|s| s.get("speaker").and_then(Value::as_str).map(str::to_string))
+            .collect();
         self.json_response(request, 200, json!({ "segments": labelled, "speakers": speakers, "method": if turns.is_empty() { "channel" } else { "acoustic" } }))
     }
 

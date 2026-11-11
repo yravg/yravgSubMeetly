@@ -290,6 +290,47 @@ fn ai_items(ai: &crate::ai::AiView) -> Vec<Item> {
     ]
 }
 
+/// Settings › Models › Caption translation service: on this device (default) or an online or
+/// self-hosted service. Only the fields the chosen provider needs are shown.
+fn provider_items(ai: &crate::ai::AiView) -> Vec<Item> {
+    let pv = &ai.provider;
+    let set = |v: &str, empty: String| if v.is_empty() { empty } else { v.to_string() };
+    let mut rows = vec![item(Key::ProviderPick, "Translate captions with", Some("On this device by default. Others send the caption text to that service"), Ctl::Stepper(pv.name()))];
+    if pv.is_local() {
+        return rows;
+    }
+    let privacy = if pv.off_device { "On: each caption line's text is sent to the service. Off: it stays on this computer" } else { "On: captions use this server (it runs on this computer)" };
+    rows.push(switch(Key::ProviderEnabled, "Use this service for captions", Some(privacy), pv.enabled));
+    if pv.needs("baseUrl") {
+        let empty = if pv.default_base_url.is_empty() { "Copy the server URL, then press Paste".to_string() } else { format!("Default {}. Copy a URL, then press Paste to change it", pv.default_base_url) };
+        rows.push(item(Key::ProviderUrl, "Server URL", Some(&set(&pv.base_url, empty)), Ctl::Button("Paste URL")));
+    }
+    if pv.needs("appId") {
+        rows.push(item(Key::ProviderAppId, "App id", Some(&set(&pv.app_id, "Copy the app id, then press Paste".to_string())), Ctl::Button("Paste id")));
+    }
+    if pv.needs("model") {
+        rows.push(item(Key::ProviderModel, "Model name", Some(&set(&pv.model, "Copy the model's name, then press Paste".to_string())), Ctl::Button("Paste name")));
+    }
+    if pv.needs("key") {
+        let t = if pv.has_key {
+            if pv.key_hint.is_empty() {
+                "Saved. Never shown again.".to_string()
+            } else {
+                format!("Saved, ends in {}. Never shown again.", pv.key_hint)
+            }
+        } else {
+            "Not set".to_string()
+        };
+        rows.push(item(Key::ProviderKey, "API key", Some(&t), Ctl::Button("Paste key")));
+    }
+    if pv.needs("secret") {
+        let t = if pv.has_secret { "Saved. Never shown again." } else { "Not set" };
+        rows.push(item(Key::ProviderSecret, "Secret", Some(t), Ctl::Button("Paste secret")));
+    }
+    rows.push(item(Key::ProviderTest, "Check the service", Some("Translates one short sentence"), Ctl::Button("Test")));
+    rows
+}
+
 /// Settings › Models › Download from: Hugging Face or ModelScope (modelscope.cn mirrors the
 /// catalog and answers where huggingface.co is slow or blocked).
 fn source_item(source: &str) -> Item {
@@ -410,6 +451,14 @@ pub enum Key {
     AiKey,
     AiTest,
     SummaryTemplate,
+    ProviderPick,
+    ProviderEnabled,
+    ProviderUrl,
+    ProviderAppId,
+    ProviderModel,
+    ProviderKey,
+    ProviderSecret,
+    ProviderTest,
     /// Model library: a row's buttons; the index into the filtered list.
     LibModel(u8),
     /// Languages on this PC: a line that only says something.
@@ -755,7 +804,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         Section::Overlay => overlay_blocks(&s.overlay),
         Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
-            .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai))])
+            .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai)), Block::Group(Some("Caption translation service"), provider_items(&st.ai))])
             .chain([Kind::Asr, Kind::Translate].into_iter().map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k))))
             .chain([Block::Speed, Block::Group(Some("Library"), library_items(st))])
             .collect(),
@@ -987,6 +1036,37 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::AiTest => {
             st.cmd(Command::Ai(crate::ai::AiCmd::Test));
+            return;
+        }
+        Key::ProviderPick => {
+            if step != 0 {
+                match st.ai.provider.step(step) {
+                    Some(id) => st.cmd(Command::Ai(crate::ai::AiCmd::ProviderPick(id))),
+                    // The engine's list isn't known yet (it is still starting): ask for it again.
+                    None => st.cmd(Command::Ai(crate::ai::AiCmd::Refresh)),
+                }
+            }
+            return;
+        }
+        Key::ProviderEnabled => {
+            let on = !st.ai.provider.enabled;
+            st.cmd(Command::Ai(crate::ai::AiCmd::ProviderEnable(on)));
+            return;
+        }
+        Key::ProviderUrl | Key::ProviderAppId | Key::ProviderModel | Key::ProviderKey | Key::ProviderSecret => {
+            use crate::ai::ProvField;
+            let field = match key {
+                Key::ProviderUrl => ProvField::Url,
+                Key::ProviderAppId => ProvField::AppId,
+                Key::ProviderModel => ProvField::Model,
+                Key::ProviderKey => ProvField::Key,
+                _ => ProvField::Secret,
+            };
+            st.cmd(Command::Ai(crate::ai::AiCmd::ProviderPaste(field)));
+            return;
+        }
+        Key::ProviderTest => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::ProviderTest));
             return;
         }
         Key::SummaryTemplate => {
@@ -2296,7 +2376,7 @@ mod tests {
                     // Paste reads the clipboard and Pick lists running apps: the app does both.
                     Key::MeetingAddLink => assert!(st.cmds.contains(&Command::MeetingAddLink)),
                     // The AI connector's rows ask the engine through the app.
-                    Key::AiEnabled | Key::AiUrl | Key::AiModel | Key::AiKey | Key::AiTest | Key::SummaryTemplate => assert!(st.cmds.iter().any(|c| matches!(c, Command::Ai(_))), "{:?}", it.key),
+                    Key::AiEnabled | Key::AiUrl | Key::AiModel | Key::AiKey | Key::AiTest | Key::SummaryTemplate | Key::ProviderPick | Key::ProviderEnabled | Key::ProviderUrl | Key::ProviderAppId | Key::ProviderModel | Key::ProviderKey | Key::ProviderSecret | Key::ProviderTest => assert!(st.cmds.iter().any(|c| matches!(c, Command::Ai(_))), "{:?}", it.key),
                     Key::MeetingPickApps => assert!(st.cmds.contains(&Command::MeetingPickApps)),
                     // The webhooks live in the engine: the app asks it, nothing goes to the settings file.
                     Key::WebhookAdd => assert!(st.cmds.contains(&Command::WebhookAddFromClipboard) && !saved),
@@ -2309,6 +2389,41 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn the_provider_rows_follow_the_chosen_service_and_ask_the_engine() {
+        use crate::ai::{AiCmd, ProvField, ProviderView};
+        let mut st = state();
+        let keys = |st: &AppState| rows(Section::Models, st).iter().map(|i| i.key).collect::<Vec<_>>();
+        // On this device (the default): only the picker.
+        assert!(keys(&st).contains(&Key::ProviderPick));
+        assert!(!keys(&st).contains(&Key::ProviderEnabled), "nothing to switch on for the local model");
+        st.ai.provider = ProviderView {
+            id: "baidu".into(),
+            label: "Baidu Translate".into(),
+            needs: vec!["appId".into(), "secret".into()],
+            off_device: true,
+            providers: vec![("local".into(), "On this device".into()), ("baidu".into(), "Baidu Translate".into()), ("deepl".into(), "DeepL".into())],
+            ..ProviderView::default()
+        };
+        let k = keys(&st);
+        for want in [Key::ProviderPick, Key::ProviderEnabled, Key::ProviderAppId, Key::ProviderSecret, Key::ProviderTest] {
+            assert!(k.contains(&want), "{want:?}");
+        }
+        assert!(!k.contains(&Key::ProviderKey) && !k.contains(&Key::ProviderUrl) && !k.contains(&Key::ProviderModel), "only what Baidu needs");
+        // The stepper asks for the next provider; a switch asks to turn it on; pastes name their field.
+        apply(&mut st, Key::ProviderPick, Act::Step(1));
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::ProviderPick("deepl".into()))));
+        apply(&mut st, Key::ProviderEnabled, Act::Toggle);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::ProviderEnable(true))));
+        apply(&mut st, Key::ProviderSecret, Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::ProviderPaste(ProvField::Secret))));
+        apply(&mut st, Key::ProviderTest, Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::ProviderTest)));
+        // The row about privacy says where the text goes.
+        let enabled = rows(Section::Models, &st).into_iter().find(|i| i.key == Key::ProviderEnabled).unwrap();
+        assert!(enabled.sub.as_deref().is_some_and(|t| t.contains("sent to the service")), "{:?}", enabled.sub);
     }
 
     #[test]
