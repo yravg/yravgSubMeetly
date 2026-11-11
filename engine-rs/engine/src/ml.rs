@@ -86,6 +86,8 @@ pub fn hub_file_with(
     progress: Option<Progress>,
 ) -> Result<PathBuf> {
     let (owner, name) = split_id(repo_id);
+    // A chosen folder behind a junction fails the same way as the default (os error 448).
+    let cache = &crate::models::real_path(cache);
     let repo = client(cache)?.model(owner, name);
     // Cached files never ask the Hub: a `main` lookup costs a round trip on every model
     // load and hangs on a dead link. shortcut: a newer upstream commit is not picked up;

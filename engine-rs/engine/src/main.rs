@@ -16,6 +16,7 @@ fn main() {
             exit(2);
         }
         None => {
+            submeetly_engine::models::pin_real_hf_home();
             let state_dir = default_state_dir();
             migrate_state_dir(&state_dir, &legacy_state_dir());
             if let Err(error) = submeetly_engine::server::run(submeetly_engine::App::new(state_dir))

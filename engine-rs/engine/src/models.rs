@@ -31,6 +31,63 @@ pub fn hub_cache_dir() -> PathBuf {
         .join("hub")
 }
 
+/// `path` with every symlink or junction along it replaced by its target, without traversing
+/// any of them. Windows Redirection Guard (on for processes Explorer starts on recent builds)
+/// refuses to cross a junction a user made (os error 448): `~/.cache/huggingface` moved to
+/// another drive with a junction made every download and load fail.
+pub fn real_path(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        out.push(part);
+        let mut guard = 0;
+        while guard < 16
+            && fs::symlink_metadata(&out)
+                .is_ok_and(|m| m.file_type().is_symlink() || is_junction(&m))
+        {
+            let Ok(target) = fs::read_link(&out) else {
+                break;
+            };
+            out = if target.is_absolute() {
+                target
+            } else {
+                out.parent().unwrap_or(Path::new("")).join(target)
+            };
+            guard += 1;
+        }
+    }
+    out
+}
+
+#[cfg(windows)]
+fn is_junction(m: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    m.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+fn is_junction(_: &fs::Metadata) -> bool {
+    false
+}
+
+/// Point `HF_HOME` at the real folder behind any junction, before any thread starts, so the hub
+/// cache and the Xet cache never cross one. Leaves an explicit `HF_HOME` / `HF_HUB_CACHE` alone.
+pub fn pin_real_hf_home() {
+    if env::var_os("HF_HOME").is_some_and(|v| !v.is_empty())
+        || env::var_os("HF_HUB_CACHE").is_some_and(|v| !v.is_empty())
+    {
+        return;
+    }
+    let home = home_dir()
+        .unwrap_or_default()
+        .join(".cache")
+        .join("huggingface");
+    let real = real_path(&home);
+    if real != home {
+        env::set_var("HF_HOME", real);
+    }
+}
+
 pub(crate) fn counted(name: &str) -> bool {
     !(name.starts_with('.') || name.ends_with(".lock") || name.ends_with(".metadata"))
 }
@@ -457,6 +514,23 @@ pub fn pull(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_plain_path_stays_as_it_is_and_a_linked_folder_becomes_its_target() {
+        let dir = std::env::temp_dir().join(format!("sm-real-path-{}", std::process::id()));
+        let target = dir.join("target");
+        fs::create_dir_all(target.join("hub")).unwrap();
+        assert_eq!(real_path(&target.join("hub")), target.join("hub"));
+        let link = dir.join("link");
+        #[cfg(unix)]
+        let made = std::os::unix::fs::symlink(&target, &link).is_ok();
+        #[cfg(windows)]
+        let made = std::os::windows::fs::symlink_dir(&target, &link).is_ok(); // needs Developer Mode
+        if made {
+            assert_eq!(real_path(&link.join("hub")), target.join("hub"));
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     use super::*;
     use hf_hub::progress::{FileProgress, FileStatus};
 
