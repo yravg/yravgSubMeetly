@@ -340,6 +340,25 @@ impl Ml {
         f(&mut guard.as_mut().expect("loaded above").1)
     }
 
+    /// A fresh copy of a downloaded speech model for the speed test (`bench.rs`), separate from the
+    /// one the engine keeps loaded: the test never swaps the model a caption session is using.
+    pub fn load_for_bench_asr(&self, id: &str) -> Result<WhisperAsr> {
+        let cache = self.downloaded_dir(id, Kind::Asr)?;
+        WhisperAsr::load(id, self.device.clone(), &cache)
+    }
+
+    /// Same for a translation LLM.
+    pub fn load_for_bench_translator(&self, id: &str) -> Result<Translator> {
+        let cache = self.downloaded_dir(id, Kind::Translate)?;
+        Translator::load(id, self.device.clone(), &cache)
+    }
+
+    /// Same for an OPUS-MT pair model.
+    pub fn load_for_bench_pair(&self, id: &str) -> Result<MarianMt> {
+        let cache = self.downloaded_dir(id, Kind::PairMt)?;
+        MarianMt::load(id, self.device.clone(), &cache)
+    }
+
     /// Fast (caption) translation: the OPUS-MT model of the pair when it is downloaded,
     /// else the translation LLM.
     pub fn translate_fast(&self, text: &str, src: &str, tgt: &str) -> Result<String> {

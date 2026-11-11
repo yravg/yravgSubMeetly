@@ -637,6 +637,8 @@ pub struct AppState {
     pub ai: crate::ai::AiView,
     /// The engine's webhooks, for Settings › General.
     pub webhooks: poni_core::webhooks::Webhooks,
+    /// What the engine measured of each model's speed on this PC (Settings › Models › Speed).
+    pub speed: poni_core::speed::Speed,
     /// Side effects requested during the frame.
     pub cmds: Vec<Command>,
 }
@@ -735,6 +737,7 @@ impl AppState {
             models: Default::default(),
             ai: Default::default(),
             webhooks: Default::default(),
+            speed: Default::default(),
             cmds: Vec::new(),
         };
         // On ones start by checking their files (the worker reports back);

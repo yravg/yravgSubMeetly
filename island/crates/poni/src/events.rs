@@ -186,6 +186,10 @@ pub enum AppEvent {
     /// A folder request for a model ended: started (the engine moves it in the background), refused,
     /// or the picker was cancelled (`Ok`, nothing to say).
     ModelPlaced { kind: poni_core::models::Kind, result: Result<(), String> },
+    /// What the engine says about the model speed tests (or why it could not say).
+    Speed(Result<poni_core::speed::Report, String>),
+    /// A speed test was refused by the engine (the reason).
+    SpeedStarted(Result<(), String>),
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

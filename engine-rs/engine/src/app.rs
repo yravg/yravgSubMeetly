@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Map, Value};
 
 use crate::audio::pcm_f32_le;
+use crate::bench::{Bench, MlRunner};
 use crate::calendar::{Calendar, Fail};
 use crate::engine::{mt_engine, segments_json, Jobs, Ml, SavedModels, ASR_ENGINE};
 use crate::heuristic::heuristic_notes;
@@ -101,6 +102,8 @@ fn transfers_lock(transfers: &Mutex<Transfers>) -> std::sync::MutexGuard<'_, Tra
 pub struct App {
     state_dir: PathBuf,
     models_path: PathBuf,
+    /// Speed tests of the downloaded models (`bench.rs`).
+    bench: Arc<Bench>,
     transfers: SharedTransfers,
     locations: Arc<Locations>,
     notes_path: PathBuf,
@@ -124,6 +127,10 @@ impl App {
         let ui_prefs_path = env_path("UI_PREFS_PATH", state_dir.join("ui-prefs.json"));
         let models_path = env_path("ENGINE_MODELS_PATH", state_dir.join("engine-models.json"));
         let integrations_path = state_dir.join("integrations.json");
+        let bench = Arc::new(Bench::load(env_path(
+            "ENGINE_BENCH_PATH",
+            state_dir.join("bench.json"),
+        )));
         let allowed_origins = env::var("ALLOWED_ORIGINS")
             .unwrap_or_default()
             .split(',')
@@ -161,6 +168,7 @@ impl App {
         Self {
             calendar: Calendar::new(state_dir.clone()),
             state_dir,
+            bench,
             models_path,
             transfers: SharedTransfers::default(),
             notes_path,
@@ -325,6 +333,7 @@ impl App {
             "/integrations/webhooks" => {
                 self.json_response(request, 200, self.integrations.list())
             }
+            "/models/bench" => self.json_response(request, 200, self.bench.snapshot()),
             "/models" => self.json_response(request, 200, self.models_body()),
             "/engine/mode" => {
                 self.json_response(request, 200, json!({ "mode": self.load_engine_mode() }))
@@ -390,6 +399,7 @@ impl App {
             "/calendar/refresh" => self.post_calendar_refresh(request),
             "/calendar/notes" => self.post_calendar_note(request),
             "/models/pull" => self.post_models_pull(request),
+            "/models/bench" => self.post_models_bench(request),
             "/shutdown" => {
                 self.shutdown.store(true, Ordering::Relaxed);
                 self.json_response(request, 200, json!({ "ok": true, "shutting_down": true }))
@@ -1143,6 +1153,79 @@ impl App {
                 (self.ml.translate_id().as_deref() == Some(id)).then_some(Kind::Translate)
             }
         })
+    }
+
+    /// The catalog models that are fully on disk (what a speed test can run).
+    fn bench_candidates(&self) -> Vec<(String, Kind)> {
+        CATALOG
+            .iter()
+            .filter(|spec| {
+                self.locations
+                    .usable_dir(spec.id)
+                    .ok()
+                    .is_some_and(|dir| cache_state(&dir, spec.id, spec.kind).downloaded)
+            })
+            .map(|spec| (spec.id.to_string(), spec.kind))
+            .collect()
+    }
+
+    /// `POST /models/bench` `{id}` | `{ids:[..]}` | `{kind:"asr"|"translate"|"pair"|"all"}`: queue
+    /// speed tests (one at a time, in the background) and answer 202 with the state. A model
+    /// that is not downloaded is refused; nothing is ever measured for a model that is not here.
+    fn post_models_bench(&self, request: &Request) -> Response {
+        let payload = parse_body(&request.body).unwrap_or_else(|| json!({}));
+        let candidates = self.bench_candidates();
+        let mut wanted: Vec<String> = Vec::new();
+        if let Some(id) = payload.get("id").and_then(Value::as_str) {
+            wanted.push(id.to_string());
+        }
+        if let Some(ids) = payload.get("ids").and_then(Value::as_array) {
+            wanted.extend(ids.iter().filter_map(Value::as_str).map(str::to_string));
+        }
+        let mut items: Vec<(String, Kind)> = Vec::new();
+        if wanted.is_empty() {
+            let which = payload.get("kind").and_then(Value::as_str).unwrap_or("all");
+            if !matches!(which, "asr" | "translate" | "pair" | "all") {
+                return self.json_response(
+                    request,
+                    400,
+                    json!({ "error": "kind must be asr, translate, pair or all" }),
+                );
+            }
+            items = candidates
+                .into_iter()
+                .filter(|(_, kind)| which == "all" || crate::bench::kind_label(*kind) == which)
+                .collect();
+        } else {
+            for id in wanted {
+                match candidates.iter().find(|(c, _)| *c == id) {
+                    Some(found) => items.push(found.clone()),
+                    None if self.model_kind(&id).is_some() => {
+                        return self.json_response(
+                            request,
+                            409,
+                            json!({ "error": format!("{id} is not downloaded, so there is nothing to test"), "code": "model-not-downloaded" }),
+                        )
+                    }
+                    None => {
+                        return self.json_response(
+                            request,
+                            400,
+                            json!({ "error": "id must be one of the /models catalog ids" }),
+                        )
+                    }
+                }
+            }
+        }
+        let runner = Arc::new(MlRunner {
+            ml: Arc::clone(&self.ml),
+        });
+        let started = self.bench.enqueue(runner, items);
+        self.json_response(
+            request,
+            202,
+            json!({ "ok": true, "started": started, "bench": self.bench.snapshot() }),
+        )
     }
 
     /// Starts the download in the background and answers 202 at once; progress is

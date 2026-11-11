@@ -50,6 +50,7 @@ pub mod script;
 pub mod settings;
 pub mod sha256;
 pub mod shelf;
+pub mod speed;
 pub mod spot;
 pub mod spring;
 pub mod store;
