@@ -2279,7 +2279,7 @@ impl App {
         if let Some(svc) = self.services.as_mut() {
             svc.engine_start();
         }
-        services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
+        services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id, self.st.settings.model_source.clone());
     }
 
     /// The library's Download: any model by id, under the same one-job rule as [`Self::pull_model`].
@@ -2295,7 +2295,7 @@ impl App {
         if let Some(svc) = self.services.as_mut() {
             svc.engine_start();
         }
-        services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
+        services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id, self.st.settings.model_source.clone());
     }
 
     /// The library's confirmed Delete. Never the model in use (the row has no Delete then, and the engine refuses).
@@ -2328,16 +2328,23 @@ impl App {
         self.st.models.failed = result.err().map(|e| (kind, e));
         // A model stepped to and now on disk is what the person asked for: switch to it.
         if self.st.models.failed.is_none() && self.st.models.chosen(kind).as_deref() == Some(id.as_str()) && self.st.models.selected(kind).as_deref() != Some(id.as_str()) {
-            self.select_model(kind, id);
+            self.select_model(kind, id.clone());
         }
         if kind == poni_core::models::Kind::Translate && self.st.models.failed.is_none() {
             self.start_lyric_translation();
         }
         self.refresh_models();
         let title = if self.st.models.failed.is_none() { format!("{} downloaded", kind.label()) } else { format!("{} download failed", kind.label()) };
-        let (icon, color) = if self.st.models.failed.is_none() { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
+        let (icon, color) = if self.st.models.failed.is_none() { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::RED) };
         let sub = self.st.models.failed.as_ref().map_or_else(|| "Captions start by themselves".to_string(), |(_, e)| e.clone());
-        self.st.notify(icon, color, title, sub, 6.0, None);
+        // The full reason goes to poni.log so a failure can be read back later, not only seen.
+        match &self.st.models.failed {
+            Some((_, e)) => pinfo!("models: download {id} from {} failed: {e}", self.st.settings.model_source),
+            None => pinfo!("models: download {id} from {} finished", self.st.settings.model_source),
+        }
+        // A failure stays up longer: it has a reason to read.
+        let secs = if self.st.models.failed.is_none() { 6.0 } else { 15.0 };
+        self.st.notify(icon, color, title, sub, secs, None);
     }
 
     /// Choose the folder of the model Settings shows for `kind` (`pick`), or send it back to the default.

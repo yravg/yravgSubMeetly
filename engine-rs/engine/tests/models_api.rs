@@ -362,6 +362,12 @@ fn a_pull_runs_in_the_background_and_its_failure_shows_on_the_row() {
     let (app, _, _) = app();
     let (status, _) = call(&app, "POST", "/models/pull", json!({ "id": "acme/mine" }));
     assert_eq!(status, 400);
+    let source = json!({ "id": "openai/whisper-base", "source": "somewhere" });
+    let (status, body) = call(&app, "POST", "/models/pull", source);
+    assert_eq!(
+        status, 400,
+        "an unknown source is refused, not ignored: {body}"
+    );
 
     let started = Instant::now();
     let id = "openai/whisper-base";

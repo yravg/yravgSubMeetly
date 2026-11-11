@@ -30,7 +30,7 @@ use crate::ui::{wid, wid_n, CursorKind, Hit, Input, MouseButton, PillStyle, Ui, 
 use crate::version::VERSION;
 use poni_core::capture;
 use poni_core::geom::{palette, Color, Point, Rect};
-use poni_core::library::{Action as LibAction, Filter};
+use poni_core::library::{Action as LibAction, Filter, Light};
 use poni_core::models::Kind;
 use poni_core::settings::{IdleStyle, MonitorChoice, PrayerSound, Theme, TranslationColor};
 use std::collections::HashMap;
@@ -56,6 +56,8 @@ const NAV_TILE: f32 = 22.0;
 const ROW_H: f32 = 40.0;
 const ROW_H_SUB: f32 = 52.0;
 const ROW_PAD: f32 = 14.0;
+/// Radius of a model row's andon light.
+const LIGHT_R: f32 = 5.0;
 const GROUP_TITLE_H: f32 = 24.0;
 const GROUP_GAP: f32 = 18.0;
 const GROUP_R: f32 = 10.0;
@@ -238,7 +240,11 @@ fn manual_model_dir(id: &str) -> std::path::PathBuf {
 fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     let d = m.describe(k);
     let value = m.step(k, 1).and_then(|_| m.chosen(k)).map(|id| m.label_of(&id));
-    let mut rows = vec![item(Key::ModelPick(k), k.label(), Some(&d.text), value.map_or(Ctl::None, Ctl::Stepper))];
+    let mut pick = item(Key::ModelPick(k), k.label(), Some(&d.text), value.map_or(Ctl::None, Ctl::Stepper));
+    if let Some(st) = m.chosen(k).and_then(|id| m.status(&id)) {
+        pick = pick.lit(st);
+    }
+    let mut rows = vec![pick];
     if let Some(b) = d.button {
         rows.push(item(Key::ModelPull(k), &format!("{} download", k.label()), None, Ctl::Button(b)));
     }
@@ -256,6 +262,14 @@ fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     rows
 }
 
+/// Settings › Models › Download from: Hugging Face or ModelScope (modelscope.cn mirrors the
+/// catalog and answers where huggingface.co is slow or blocked).
+fn source_item(source: &str) -> Item {
+    let at = poni_core::library::SOURCES.iter().position(|(k, _)| *k == source);
+    let names = poni_core::library::SOURCES.iter().map(|(_, n)| *n).collect();
+    item(Key::ModelSource, "Download from", Some("ModelScope when Hugging Face is slow or blocked"), Ctl::Choice(names, at))
+}
+
 /// Advanced settings › Models › Library: the filter, then one row per model it lets through with
 /// its buttons. No search box here: the settings kit has no text field (the pill's group has one).
 fn library_items(st: &AppState) -> Vec<Item> {
@@ -268,7 +282,7 @@ fn library_items(st: &AppState) -> Vec<Item> {
     for (i, e) in shown.iter().enumerate().take(u8::MAX as usize) {
         let acts = e.actions(&st.models);
         let ctl = if acts.is_empty() { Ctl::None } else { Ctl::Choice(acts.iter().map(|a| a.label()).collect(), None) };
-        rows.push(item(Key::LibModel(i as u8), &e.c.label, Some(&e.sub(&st.models)), ctl));
+        rows.push(item(Key::LibModel(i as u8), &e.c.label, Some(&e.sub(&st.models)), ctl).lit(&e.c.st));
     }
     rows
 }
@@ -286,7 +300,7 @@ pub fn library_act(st: &mut AppState, id: String, kind: Kind, pair: bool, dir: O
         LibAction::ByHand => {
             let folder = manual_model_dir(&id);
             let _ = std::fs::create_dir_all(&folder);
-            st.cmd(Command::OpenUrl(format!("https://huggingface.co/{id}/tree/main")));
+            st.cmd(Command::OpenUrl(poni_core::library::files_url(&st.settings.model_source, &id)));
             st.cmd(Command::OpenPath(folder.display().to_string()));
         }
         LibAction::Folder => {
@@ -345,6 +359,7 @@ pub enum Key {
     ModelManual(poni_core::models::Kind),
     /// Model library: the On device / All / Recommended filter.
     LibFilter,
+    ModelSource,
     /// Model library: a row's buttons; the index into the filtered list.
     LibModel(u8),
     /// Languages on this PC: a line that only says something.
@@ -407,10 +422,22 @@ pub struct Item {
     pub label: String,
     pub sub: Option<String>,
     pub ctl: Ctl,
+    /// A model row's andon light, and its download bar (0 to 1) while one runs.
+    pub light: Option<Light>,
+    pub progress: Option<f32>,
 }
 
 fn item(key: Key, label: &str, sub: Option<&str>, ctl: Ctl) -> Item {
-    Item { key, label: label.to_string(), sub: sub.map(str::to_string), ctl }
+    Item { key, label: label.to_string(), sub: sub.map(str::to_string), ctl, light: None, progress: None }
+}
+
+impl Item {
+    /// The light and bar of a model in state `st`.
+    fn lit(mut self, st: &poni_core::models::Status) -> Item {
+        self.light = Some(Light::of(st));
+        self.progress = poni_core::library::progress(st);
+        self
+    }
 }
 
 fn switch(key: Key, label: &str, sub: Option<&str>, on: bool) -> Item {
@@ -640,9 +667,9 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
             Block::Group(Some("Languages on this PC"), poni_core::library::language_rows(&st.models).into_iter().map(|(name, text)| item(Key::LibLang, name, Some(&text), Ctl::None)).collect()),
         ],
-        Section::Models => [Kind::Asr, Kind::Translate]
+        Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
-            .map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k)))
+            .chain([Kind::Asr, Kind::Translate].into_iter().map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k))))
             .chain([Block::Group(Some("Library"), library_items(st))])
             .collect(),
         Section::Popups => vec![Block::Group(
@@ -843,7 +870,7 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             if let Some(id) = st.models.chosen(k) {
                 let dir = manual_model_dir(&id);
                 let _ = std::fs::create_dir_all(&dir);
-                st.cmd(Command::OpenUrl(format!("https://huggingface.co/{id}/tree/main")));
+                st.cmd(Command::OpenUrl(poni_core::library::files_url(&st.settings.model_source, &id)));
                 st.cmd(Command::OpenPath(dir.display().to_string()));
             }
             return;
@@ -851,6 +878,11 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::ModelFolderReset(k) => {
             st.cmd(Command::ModelFolderReset(k));
             return;
+        }
+        Key::ModelSource => {
+            let Act::Pick(i) = act else { return };
+            let Some((key, _)) = poni_core::library::SOURCES.get(i) else { return };
+            s.model_source = (*key).into();
         }
         Key::LibFilter => {
             if let Act::Pick(i) = act {
@@ -1602,15 +1634,31 @@ fn draw_row(ui: &mut Ui, it: &Item, at: (usize, usize), row: Rect, view: Rect, a
             }
         }
     }
+    // A model's andon light before the label: green on device, yellow downloading, orange part
+    // there, red failed, grey absent.
+    let lx = match it.light {
+        Some(l) => {
+            let cy = if it.sub.is_some() { row.center().y - 9.5 } else { row.center().y };
+            ui.c.fill_circle(Point::new(inner.x + LIGHT_R, cy), LIGHT_R, l.color());
+            inner.x + 2.0 * LIGHT_R + 8.0
+        }
+        None => inner.x,
+    };
     // The label, and the dim line under it.
-    let tw = (ctl_x - 16.0 - inner.x).max(0.0);
+    let tw = (ctl_x - 16.0 - lx).max(0.0);
     match &it.sub {
         Some(sub) => {
             let cy = row.center().y;
-            ui.c.text(&it.label, Rect::new(inner.x, cy - 19.0, tw, 19.0), &TextStyle::body());
-            ui.c.text(sub, Rect::new(inner.x, cy + 1.0, tw, 17.0), &TextStyle::footnote().color(palette::TEXT_DIM));
+            ui.c.text(&it.label, Rect::new(lx, cy - 19.0, tw, 19.0), &TextStyle::body());
+            ui.c.text(sub, Rect::new(lx, cy + 1.0, tw, 17.0), &TextStyle::footnote().color(palette::TEXT_DIM));
         }
-        None => ui.c.text(&it.label, Rect::new(inner.x, row.y, tw, row.h), &TextStyle::body()),
+        None => ui.c.text(&it.label, Rect::new(lx, row.y, tw, row.h), &TextStyle::body()),
+    }
+    // The download bar along the row's foot while one runs.
+    if let Some(p) = it.progress {
+        let bar = Rect::new(lx, row.bottom() - 7.0, (inner.right() - lx).max(0.0), 3.0);
+        ui.c.fill_rrect(bar, 1.5, palette::TRACK);
+        ui.c.fill_rrect(Rect::new(bar.x, bar.y, (bar.w * p.clamp(0.0, 1.0)).max(3.0), bar.h), 1.5, palette::YELLOW);
     }
     act
 }
@@ -2023,6 +2071,30 @@ mod tests {
         assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelDelete(id) if id == "org/speech-small")));
         // Languages on this PC: one line per caption language.
         assert!(rows(Section::Speech, &st).iter().any(|i| i.key == Key::LibLang && i.label == "Indonesian" && i.sub.as_deref() == Some("Speech on device · translation off")));
+    }
+
+    #[test]
+    fn model_rows_carry_an_andon_light_and_downloads_can_come_from_modelscope() {
+        use poni_core::models::parse;
+        let mut st = state();
+        let body = r#"{"models":[{"kind":"asr","id":"openai/whisper-base","downloaded":true,"bytes":150000000}],
+            "catalog":[{"kind":"asr","id":"openai/whisper-base","label":"Base","selected":true,"downloaded":true,"bytes":150000000},
+                       {"kind":"translate","id":"org/mt-big","label":"Big","approxBytes":6000000000,"pulling":true,"pct":25},
+                       {"kind":"translate","id":"org/mt-mid","label":"Mid","approxBytes":1000000000,"pullError":"download failed (Hugging Face): timed out"}]}"#;
+        st.models.apply(Ok(parse(body).unwrap()), 1.0);
+        apply(&mut st, Key::LibFilter, Act::Pick(1));
+        let lib: Vec<(Option<Light>, Option<f32>)> = rows(Section::Models, &st).into_iter().filter(|i| matches!(i.key, Key::LibModel(_))).map(|i| (i.light, i.progress)).collect();
+        assert_eq!(lib, [(Some(Light::Ready), None), (Some(Light::Working), Some(0.25)), (Some(Light::Failed), None)]);
+        assert_eq!(row(Section::Models, &st, Key::ModelPick(Kind::Asr)).and_then(|i| i.light), Some(Light::Ready));
+
+        let source = |st: &AppState| row(Section::Models, st, Key::ModelSource).map(|i| i.ctl);
+        assert_eq!(source(&st), Some(Ctl::Choice(vec!["Hugging Face", "ModelScope"], Some(0))));
+        apply(&mut st, Key::ModelSource, Act::Pick(1));
+        assert_eq!(st.settings.model_source, "modelscope");
+        assert_eq!(source(&st), Some(Ctl::Choice(vec!["Hugging Face", "ModelScope"], Some(1))));
+        st.cmds.clear();
+        apply(&mut st, Key::ModelManual(Kind::Asr), Act::Press);
+        assert!(st.cmds.contains(&Command::OpenUrl("https://www.modelscope.cn/models/openai-mirror/whisper-base/files".into())));
     }
 
     #[test]

@@ -144,6 +144,8 @@ pub struct Settings {
     /// What those captions listened to (`capture::Source::key`): the next start reopens the same
     /// source. `pc` for an old file, which only knew what the PC plays.
     pub captions_source: String,
+    /// Where model downloads come from: `huggingface` or `modelscope` (the engine's `source`).
+    pub model_source: String,
     /// Captions start by themselves while a video plays or a calendar meeting runs, and stop after
     /// it ends ([`crate::capture::Auto`]).
     pub auto_captions: bool,
@@ -280,6 +282,7 @@ impl Default for Settings {
             target_lang: "en".into(),
             captions_on: false,
             captions_source: "pc".into(),
+            model_source: "huggingface".into(),
             auto_captions: true,
             translate_captions: true,
             live_source: "room".into(),
