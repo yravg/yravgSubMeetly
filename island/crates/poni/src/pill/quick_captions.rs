@@ -370,10 +370,17 @@ pub fn strip(ui: &mut Ui, st: &mut AppState, r: Rect, page: Rect) {
     if let Some(a) = act {
         run(st, a);
     }
-    let mut clicked = pressed.is_some();
+    language_list(ui, st, page, r.bottom(), pressed.is_some());
+}
+
+/// The open language list over `page` (a scrim down to `bottom` closes it) and the strip's keys.
+/// `clicked`: a control of the caller was pressed, so the keyboard comes to the list. The Captions
+/// page (PMM-022) uses it for the languages it draws itself.
+pub fn language_list(ui: &mut Ui, st: &mut AppState, page: Rect, bottom: f32, clicked: bool) {
+    let mut clicked = clicked;
     if st.ui.quick.list.is_some() && !st.ui.quick.notice {
         // Anything outside the list closes it; the rows below win over this.
-        if ui.button(wid("qc.scrim"), Rect::new(page.x, page.y, page.w, r.bottom() - page.y)).clicked {
+        if ui.button(wid("qc.scrim"), Rect::new(page.x, page.y, page.w, bottom - page.y)).clicked {
             st.ui.quick.list = None;
         } else {
             let (lw, lh) = list_size(st.ui.quick.list.unwrap_or(Which::Into));

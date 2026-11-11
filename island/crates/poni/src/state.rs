@@ -875,6 +875,10 @@ impl AppState {
     /// Settings took this page's tab off the header's row (Music, Shelf,
     /// Tasks, Focus or Notifications).
     pub fn tab_hidden(&self, p: PageKind) -> bool {
+        // Captions (PMM-022) starts hidden: its own switch, not the hidden list.
+        if p == PageKind::Captions {
+            return !self.settings.captions_tab;
+        }
         p.hideable() && self.settings.hidden_tabs.iter().any(|k| k == p.key())
     }
 

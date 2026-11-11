@@ -99,6 +99,8 @@ pub enum Command {
     SaveSettings,
     /// Open the Settings window, or bring it forward (the gear, Windows).
     OpenSettings,
+    /// The same, on one section (the Captions tab's "Manage" opens Captions and languages).
+    OpenSettingsAt(crate::settings_window::Section),
     SetPage(PageKind),
     /// A menu entry chosen in the island's Menu list (same as the tray menu).
     Menu(crate::tray::MenuCmd),

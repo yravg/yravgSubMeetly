@@ -2974,7 +2974,7 @@ impl App {
                 Command::Notify(_) => {}
                 // Windows' language features are Windows'.
                 Command::WinLang(_) => {}
-                Command::OpenSettings => self.show_settings(),
+                Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
                 Command::Usage(c) => self.usage_cmd(c),
                 Command::Ielts(c) => self.ielts_cmd(c),
                 Command::Notes(c) => self.notes_cmd(c),

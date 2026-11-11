@@ -24,6 +24,7 @@ pub mod meeting;
 pub mod menu;
 pub mod notifications;
 pub mod prayer;
+pub mod captions;
 pub mod records;
 pub mod script;
 pub mod settings;
@@ -64,6 +65,9 @@ pub enum PageKind {
     Call,
     /// The newest meeting's decisions (I03).
     Meeting,
+    /// Every caption and translation setting on the pill (PMM-022); off until Settings › Tabs
+    /// switches it on.
+    Captions,
     /// Open items across meetings (I04).
     Inbox,
     /// Meetings read from an Outlook or Gmail calendar (ICS link or file).
@@ -99,10 +103,11 @@ pub enum PageKind {
 impl PageKind {
     /// The tab row's order: the island's own pages, Oyenza, then the
     /// add-ons' pages and the "+".
-    pub const ALL: [PageKind; 19] = [
+    pub const ALL: [PageKind; 20] = [
         PageKind::Live,
         PageKind::Call,
         PageKind::Meeting,
+        PageKind::Captions,
         PageKind::Inbox,
         PageKind::Calendar,
         PageKind::Timer,
@@ -126,6 +131,7 @@ impl PageKind {
             PageKind::Live => "live",
             PageKind::Call => "call",
             PageKind::Meeting => "meeting",
+            PageKind::Captions => "captions",
             PageKind::Inbox => "inbox",
             PageKind::Calendar => "calendar",
             PageKind::Timer => "timer",
@@ -155,6 +161,7 @@ impl PageKind {
             PageKind::Live => "Live",
             PageKind::Call => "Meeting",
             PageKind::Meeting => "Minutes",
+            PageKind::Captions => "Captions",
             PageKind::Inbox => "Inbox",
             PageKind::Calendar => "Today",
             PageKind::Timer => "Agenda timer",
@@ -179,6 +186,7 @@ impl PageKind {
             PageKind::Live => Icon::Lyrics,
             PageKind::Call => Icon::Call,
             PageKind::Meeting => Icon::Clipboard,
+            PageKind::Captions => Icon::Sliders,
             PageKind::Inbox => Icon::CheckCircle,
             PageKind::Calendar => Icon::Calendar,
             PageKind::Timer => Icon::Clock,
@@ -217,7 +225,7 @@ impl PageKind {
     /// Notifications, which goes off with its tab (it's offered only where
     /// the copy can read notifications). The add-ons' pages come and go with
     /// their switches.
-    pub const HIDEABLE: [PageKind; 6] = [PageKind::Media, PageKind::Call, PageKind::Shelf, PageKind::Tasks, PageKind::Focus, PageKind::Notifications];
+    pub const HIDEABLE: [PageKind; 7] = [PageKind::Media, PageKind::Call, PageKind::Captions, PageKind::Shelf, PageKind::Tasks, PageKind::Focus, PageKind::Notifications];
 
     pub fn hideable(self) -> bool {
         Self::HIDEABLE.contains(&self)
@@ -291,6 +299,7 @@ pub fn content_height(p: PageKind, st: &AppState) -> f32 {
         PageKind::Live => live::height(st),
         PageKind::Call => call::height(st),
         PageKind::Meeting => meeting::height(st),
+        PageKind::Captions => captions::height(st),
         PageKind::Inbox => inbox::height(st),
         PageKind::Calendar => calendar::height(st),
         PageKind::Timer => tools::timer_height(st),
@@ -428,6 +437,7 @@ pub(crate) fn draw_page(ui: &mut Ui, st: &mut AppState, area: Rect, page: PageKi
         PageKind::Live => live::draw(ui, st, area),
         PageKind::Call => call::draw(ui, st, area),
         PageKind::Meeting => meeting::draw(ui, st, area),
+        PageKind::Captions => captions::draw(ui, st, area),
         PageKind::Inbox => inbox::draw(ui, st, area),
         PageKind::Calendar => calendar::draw(ui, st, area),
         PageKind::Timer => tools::draw_timer(ui, st, area),
@@ -766,7 +776,25 @@ mod tests {
         assert_eq!(st.page, Live);
         assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Addons]);
         // The tucked-away tabs are one chip away in Settings (Meeting among them).
-        assert_eq!(hideable_tabs(&st).len(), 5);
+        assert_eq!(hideable_tabs(&st).len(), 6);
+    }
+
+    #[test]
+    fn the_captions_tab_is_off_until_its_switch_and_stays_while_open() {
+        use PageKind::*;
+        let mut st = state();
+        assert!(!tabs(&st).contains(&Captions), "no new tab for an existing install");
+        assert!(st.tab_hidden(Captions) && hideable_tabs(&st).contains(&Captions), "Settings offers it");
+        st.settings.toggle_tab("captions");
+        assert_eq!(&tabs(&st)[..4], [Live, Meeting, Captions, Inbox]);
+        assert!(st.settings.hidden_tabs.is_empty(), "its switch is not a hidden-list key");
+        // Switched off while its page is open: the tab stays until the page is left.
+        st.settings.toggle_tab("captions");
+        st.page = Captions;
+        assert!(tabs(&st).contains(&Captions));
+        st.page = Live;
+        assert!(!tabs(&st).contains(&Captions));
+        assert!(content_height(Captions, &st) <= content_height(System, &st), "it fits the tallest page");
     }
 
     #[test]
@@ -876,7 +904,7 @@ mod tests {
         // The download can't read other apps' notifications: no tab, nothing listens.
         let mut st = state();
         assert!(!st.notifications_on() && !tabs(&st).contains(&PageKind::Notifications));
-        assert_eq!(hideable_tabs(&st), &PageKind::HIDEABLE[..5], "Settings doesn't offer it");
+        assert_eq!(hideable_tabs(&st), &PageKind::HIDEABLE[..6], "Settings doesn't offer it");
         // The Store copy: on for everyone, without an add-on to switch on.
         st.notify_can = true;
         assert!(st.notifications_on() && tabs(&st).contains(&PageKind::Notifications));

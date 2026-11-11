@@ -4678,6 +4678,10 @@ impl App {
                     self.save_settings();
                 }
                 Command::OpenSettings => self.show_settings(deferred),
+                Command::OpenSettingsAt(section) => {
+                    self.collapse();
+                    self.open_settings_window(Some(section), deferred);
+                }
                 Command::SaveStore => unsafe {
                     SetTimer(self.hwnd, TIMER_SAVE, 800, None);
                 },

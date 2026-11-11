@@ -174,6 +174,10 @@ pub struct Settings {
     /// while its key is here. Keys this version doesn't know are kept, so a
     /// newer Studio's choices survive a save.
     pub hidden_tabs: Vec<String>,
+    /// The optional Captions tab (PMM-022) is in the row. Off by default, and a switch of its own
+    /// rather than a `hidden_tabs` key: that list says what to hide, and a tab that starts hidden
+    /// must not appear in files written before it existed.
+    pub captions_tab: bool,
     pub pomodoro: PomodoroConfig,
     /// Keep the System page's charts going while it's closed (a light reading
     /// of the kernel counters once a second), so they're full when it opens.
@@ -276,6 +280,7 @@ impl Default for Settings {
             start_page: "media".into(),
             remember_page: true,
             hidden_tabs: Vec::new(),
+            captions_tab: false,
             pomodoro: PomodoroConfig::default(),
             system_history: true,
             addons: BTreeMap::new(),
@@ -288,6 +293,18 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// Settings › Tabs flipped the tab with this page key: Captions through its own switch, the
+    /// others in or out of `hidden_tabs`.
+    pub fn toggle_tab(&mut self, key: &str) {
+        if key == "captions" {
+            self.captions_tab = !self.captions_tab;
+        } else if let Some(i) = self.hidden_tabs.iter().position(|k| k == key) {
+            self.hidden_tabs.remove(i);
+        } else {
+            self.hidden_tabs.push(key.to_string());
+        }
+    }
+
     /// Show over games needs the island on top of full-screen apps, so the
     /// two follow each other: turning the readout on picks Stay on top, and
     /// picking Hide afterwards turns the readout off. `before` is the state
@@ -402,6 +419,21 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_captions_tab_is_off_until_switched_on_and_flips_like_the_others() {
+        let old: Settings = serde_json::from_str(r#"{"hidden_tabs":["shelf"]}"#).unwrap();
+        assert!(!old.captions_tab, "an existing install does not get a new tab by itself");
+        let mut s = Settings::default();
+        s.toggle_tab("captions");
+        assert!(s.captions_tab && s.hidden_tabs.is_empty(), "Captions has its own switch, not the hidden list");
+        s.toggle_tab("captions");
+        assert!(!s.captions_tab);
+        s.toggle_tab("shelf");
+        assert_eq!(s.hidden_tabs, ["shelf"]);
+        s.toggle_tab("shelf");
+        assert!(s.hidden_tabs.is_empty());
+    }
 
     #[test]
     fn an_old_file_gets_the_meeting_defaults() {

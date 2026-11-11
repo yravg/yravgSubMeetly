@@ -322,13 +322,7 @@ fn draw_tabs(ui: &mut Ui, st: &mut AppState, r: Rect) {
         }
     }
     if let Some(p) = flip {
-        let hidden = &mut st.settings.hidden_tabs;
-        match hidden.iter().position(|k| k == p.key()) {
-            Some(i) => {
-                hidden.remove(i);
-            }
-            None => hidden.push(p.key().to_string()),
-        }
+        st.settings.toggle_tab(p.key());
         st.cmd(Command::SaveSettings);
     }
 }

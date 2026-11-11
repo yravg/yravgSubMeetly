@@ -602,6 +602,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                     let sub = match p {
                         PageKind::Notifications => Some("Messages from WhatsApp, Telegram and your phone"),
                         PageKind::Call => Some("Shown while a meeting is running, and 10 minutes after"),
+                        PageKind::Captions => Some("Every caption and translation setting on the pill"),
                         _ => None,
                     };
                     item(Key::Tab(p), p.title(), sub, Ctl::Switch(Some(!st.tab_hidden(p))))
@@ -789,15 +790,7 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             let next = (at + step).rem_euclid(pages.len() as i32) as usize;
             st.settings.start_page = pages[next].key().to_string();
         }
-        Key::Tab(p) => {
-            let hidden = &mut s.hidden_tabs;
-            match hidden.iter().position(|k| k == p.key()) {
-                Some(i) => {
-                    hidden.remove(i);
-                }
-                None => hidden.push(p.key().to_string()),
-            }
-        }
+        Key::Tab(p) => s.toggle_tab(p.key()),
         Key::FocusMin => s.pomodoro.focus_min = step_min(s.pomodoro.focus_min, step, 1, 180),
         Key::ShortBreak => s.pomodoro.short_break_min = (s.pomodoro.short_break_min as i32 + step).clamp(1, 60) as u32,
         Key::LongBreak => s.pomodoro.long_break_min = step_min(s.pomodoro.long_break_min, step, 1, 120),
