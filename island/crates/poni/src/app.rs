@@ -2257,6 +2257,24 @@ impl App {
         }
     }
 
+    /// Look at the engine's speed tests (Settings shows them: every 10 s while open, every second
+    /// while one runs).
+    fn refresh_speed(&mut self) {
+        if self.st.speed.busy {
+            return;
+        }
+        self.st.speed.busy = true;
+        services::models::bench_fetch(self.sink.clone(), poni_core::helper::configured_port());
+    }
+
+    /// Queue a speed test (`body`: the engine's POST /models/bench request); the engine is started first.
+    fn run_speed_test(&mut self, body: String) {
+        if let Some(svc) = self.services.as_mut() {
+            svc.engine_start();
+        }
+        services::models::bench_start(self.sink.clone(), poni_core::helper::configured_port(), body);
+    }
+
     /// Ask the engine which models it has (Settings shows them, every 10 s while open).
     fn refresh_models(&mut self) {
         if self.st.models.busy {
@@ -2750,7 +2768,7 @@ impl App {
         // What the Settings window shows that a service reports.
         let shown = matches!(
             ev,
-            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. }
+            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. } | AppEvent::Speed(_) | AppEvent::SpeedStarted(_)
         );
         if let Some(w) = self.settings_win.as_mut().filter(|_| shown) {
             w.view.dirty = true;
@@ -3039,6 +3057,12 @@ impl App {
             AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
             AppEvent::ModelDeleted { id, result } => self.on_model_deleted(id, result),
             AppEvent::ModelPlaced { kind, result } => self.on_model_placed(kind, result),
+            AppEvent::Speed(r) => self.st.speed.apply(r, now),
+            AppEvent::SpeedStarted(r) => {
+                if let Err(e) = r {
+                    self.st.notify(Icon::Download, palette::ORANGE, "Speed test not started", e, 8.0, None);
+                }
+            }
             AppEvent::LyricsTr { track_key, tgt, lines, state } => {
                 // A late answer for another song or another target language is dropped.
                 if self.st.lyrics.track_key == track_key && self.st.settings.target_lang == tgt && self.st.settings.lyrics_translate {
@@ -4955,6 +4979,9 @@ impl App {
                 Command::ModelFolderReset(k) => self.place_model(k, false),
                 Command::ModelPullId(id) => self.pull_model_id(id),
                 Command::ModelDelete(id) => self.delete_model(id),
+                Command::SpeedRefresh => self.refresh_speed(),
+                Command::SpeedTest(id) => self.run_speed_test(serde_json::json!({ "id": id }).to_string()),
+                Command::SpeedTestAll => self.run_speed_test(r#"{"kind":"all"}"#.to_string()),
             }
         }
         self.sync_phone_offer();

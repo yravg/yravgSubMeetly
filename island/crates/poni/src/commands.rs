@@ -181,6 +181,12 @@ pub enum Command {
     ModelPullId(String),
     /// Model library: delete this model's files (never the one in use; the engine refuses it too).
     ModelDelete(String),
+    /// Settings › Models › Speed: look at the engine's speed tests now.
+    SpeedRefresh,
+    /// Run the speed test of this model id.
+    SpeedTest(String),
+    /// Run the speed test of every downloaded model.
+    SpeedTestAll,
     /// The Downloads page (`pages::downloads`).
     Download(DownloadCmd),
     /// A Windows language feature (`poni_core::winlang`): Settings' rows and

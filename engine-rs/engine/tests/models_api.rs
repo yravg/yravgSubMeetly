@@ -718,3 +718,36 @@ fn a_missing_model_is_a_409_at_once_and_nothing_is_downloaded() {
         "no request created a download"
     );
 }
+
+#[test]
+fn speed_tests_start_empty_refuse_what_is_not_downloaded_and_never_invent_numbers() {
+    let (app, _state, _cache) = app();
+    // Nothing tested yet: no rows, nothing running.
+    let (code, body) = call(&app, "GET", "/models/bench", Value::Null);
+    assert_eq!(code, 200);
+    assert_eq!(body["runs"], json!({}));
+    assert!(body["active"].is_null());
+    assert_eq!(body["queue"], json!([]));
+    // A catalog model that is not on disk: refused, nothing queued. (A model the developer keeps in
+    // ~/yravgSubMeetly-models counts as on disk and would really run, so skip it then.)
+    if models_row(&app, WHISPER)["downloaded"] == false {
+        let (code, body) = call(&app, "POST", "/models/bench", json!({ "id": WHISPER }));
+        assert_eq!(code, 409, "{body}");
+        assert_eq!(body["code"], "model-not-downloaded");
+    }
+    // Not a catalog id at all.
+    let (code, _) = call(
+        &app,
+        "POST",
+        "/models/bench",
+        json!({ "id": "someone/else" }),
+    );
+    assert_eq!(code, 400);
+    // A bad kind.
+    let (code, _) = call(&app, "POST", "/models/bench", json!({ "kind": "video" }));
+    assert_eq!(code, 400);
+    // Refusals wrote nothing.
+    let (_, after) = call(&app, "GET", "/models/bench", Value::Null);
+    assert_eq!(after["runs"], json!({}));
+    assert_eq!(after["queue"], json!([]));
+}

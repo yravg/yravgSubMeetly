@@ -393,6 +393,25 @@ impl Translator {
         Ok(text)
     }
 
+    /// `translate`, also counting the tokens generated (for the speed test, `bench.rs`).
+    pub fn translate_counted(
+        &mut self,
+        text: &str,
+        src: &str,
+        tgt: &str,
+        fast: bool,
+    ) -> Result<(String, usize)> {
+        let (system, user, max_tokens) = translate_prompt(text, src, tgt, fast);
+        let mut answer = String::new();
+        let mut tokens = 0usize;
+        self.run(&chat_prompt(&system, &user), max_tokens, &mut |decoded| {
+            answer = decoded.to_string();
+            tokens += 1;
+            true
+        })?;
+        Ok((first_line(&answer), tokens))
+    }
+
     /// Greedy chat answer, piece by piece. `on_piece` returns false to stop (client gone).
     pub fn chat_stream(
         &mut self,

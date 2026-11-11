@@ -1491,7 +1491,7 @@ impl App {
         self.st.now = now;
         let media_before = matches!(ev, AppEvent::Media(_) | AppEvent::MediaTimeline { .. }).then(|| self.media_snapshot());
         // What the Settings window shows that a service reports.
-        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
+        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. } | AppEvent::Speed(_) | AppEvent::SpeedStarted(_));
         if let Some(s) = self.settings_ui.as_mut().filter(|_| shown) {
             s.view.dirty = true;
         }
@@ -1652,6 +1652,12 @@ impl App {
             AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
             AppEvent::ModelDeleted { id, result } => self.on_model_deleted(id, result),
             AppEvent::ModelPlaced { kind, result } => self.on_model_placed(kind, result),
+            AppEvent::Speed(r) => self.st.speed.apply(r, now),
+            AppEvent::SpeedStarted(r) => {
+                if let Err(e) = r {
+                    self.st.notify(Icon::Download, palette::ORANGE, "Speed test not started", e, 8.0, None);
+                }
+            }
             AppEvent::Download { id, line } => self.download_line(id, line),
             AppEvent::DownloadEnded { id, ok } => self.download_ended(id, ok),
             AppEvent::Update(services::update::UpdateEvent::Checked(r)) => {
@@ -1729,6 +1735,22 @@ impl App {
     }
 
     // ------------------------------------------------------------ the engine and its models
+
+    /// Look at the engine's speed tests (Settings shows them: every 10 s while open, every second
+    /// while one runs).
+    fn refresh_speed(&mut self) {
+        if self.st.speed.busy {
+            return;
+        }
+        self.st.speed.busy = true;
+        services::models::bench_fetch(self.sink.clone(), poni_core::helper::configured_port());
+    }
+
+    /// Queue a speed test (`body`: the engine's POST /models/bench request); the engine is started first.
+    fn run_speed_test(&mut self, body: String) {
+        self.engine_start();
+        services::models::bench_start(self.sink.clone(), poni_core::helper::configured_port(), body);
+    }
 
     /// Start the engine now (Retry, a download, a first look at Settings).
     fn engine_start(&self) {
@@ -2845,6 +2867,9 @@ impl App {
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelPullId(id) => self.pull_model_id(id),
                 Command::ModelDelete(id) => self.delete_model(id),
+                Command::SpeedRefresh => self.refresh_speed(),
+                Command::SpeedTest(id) => self.run_speed_test(serde_json::json!({ "id": id }).to_string()),
+                Command::SpeedTestAll => self.run_speed_test(r#"{"kind":"all"}"#.to_string()),
                 // A model's folder is the engine's own on the Mac (no picker).
                 Command::ModelFolder(_) | Command::ModelFolderReset(_) => {}
                 Command::RestoreLiveCaptions => {} // Windows Live Captions: no such thing on macOS

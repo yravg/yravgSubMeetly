@@ -72,6 +72,14 @@ const STEP_BTN: f32 = 26.0;
 const STEP_VALUE_W: f32 = 84.0;
 /// The Appearance section's theme cards.
 const THEME_CARD_H: f32 = 154.0;
+/// Models › Speed: a model's row (name and value, bar, detail), a group's heading, the footnote.
+const SPEED_ROW_H: f32 = 62.0;
+const SPEED_GROUP_H: f32 = 26.0;
+const SPEED_FOOT_H: f32 = 36.0;
+const SPEED_BAR_H: f32 = 8.0;
+const SPEED_SPARK_W: f32 = 72.0;
+const SPEED_SPARK_H: f32 = 16.0;
+const SPEED_EMPTY_H: f32 = 52.0;
 const THEME_PREVIEW_H: f32 = 74.0;
 const THEME_GAP: f32 = 12.0;
 /// A wheel notch scrolls this far.
@@ -482,6 +490,8 @@ pub enum Block {
     Addons,
     /// A dim line of text.
     Note(&'static str),
+    /// Models › Speed: how fast each downloaded model runs on this PC, measured by the engine.
+    Speed,
 }
 
 /// What a click on a row's control did.
@@ -670,7 +680,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
             .chain([Kind::Asr, Kind::Translate].into_iter().map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k))))
-            .chain([Block::Group(Some("Library"), library_items(st))])
+            .chain([Block::Speed, Block::Group(Some("Library"), library_items(st))])
             .collect(),
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
@@ -1366,6 +1376,10 @@ fn draw(ui: &mut Ui, st: &mut AppState, section: Section, frame: Frame, light: b
     if matches!(section, Section::Speech | Section::Models) && st.models.due(st.now) {
         st.cmd(Command::ModelsRefresh);
     }
+    // The speed tests: looked at every 10 s while Models is open, every second while one runs.
+    if section == Section::Models && st.speed.due(st.now) {
+        st.cmd(Command::SpeedRefresh);
+    }
     for (bi, b) in blocks(section, st).into_iter().enumerate() {
         y = draw_block(ui, st, &b, bi, Rect::new(x, y, content.w, 0.0), view, &sf, m);
     }
@@ -1487,6 +1501,7 @@ fn block_h(st: &AppState, b: &Block) -> f32 {
         Block::Themes => GROUP_TITLE_H + THEME_CARD_H,
         Block::Addons => crate::pages::addons::height(st),
         Block::Note(_) => 18.0,
+        Block::Speed => speed_h(st),
     }
 }
 
@@ -1532,6 +1547,7 @@ fn draw_block(ui: &mut Ui, st: &mut AppState, b: &Block, bi: usize, at: Rect, vi
         Block::Themes => draw_themes(ui, st, r, view, sf, m),
         Block::Addons => crate::pages::addons::draw(ui, st, r),
         Block::Note(t) => ui.c.text(t, Rect::new(r.x + 2.0, r.y, r.w, r.h), &TextStyle::footnote().color(palette::TEXT_FAINT)),
+        Block::Speed => draw_speed(ui, st, r, view, sf),
     }
     next
 }
@@ -1858,6 +1874,147 @@ fn draw_themes(ui: &mut Ui, st: &mut AppState, r: Rect, view: Rect, sf: &Surface
         st.settings.theme = t;
         st.cmd(Command::SaveSettings);
     }
+}
+
+/// How tall the Speed block is: a title row, the card (a heading per group with models, a row per
+/// model, or a hint when nothing is downloaded) and its footnote.
+fn speed_h(st: &AppState) -> f32 {
+    let rows = poni_core::speed::rows(&st.models, &st.speed);
+    let body = if rows.is_empty() {
+        SPEED_EMPTY_H
+    } else {
+        let groups = poni_core::speed::Group::ALL.iter().filter(|g| rows.iter().any(|r| r.group == **g)).count();
+        groups as f32 * SPEED_GROUP_H + rows.len() as f32 * SPEED_ROW_H + 8.0
+    };
+    GROUP_TITLE_H + body + SPEED_FOOT_H
+}
+
+/// Models › Speed. One bar per downloaded model, scaled within its group (the units differ); the bar
+/// is the newest test, the line beside it the kept history, and a model nobody tested has no bar at
+/// all, only "Not tested yet". Colours are the window's tokens: the accent for a result, yellow for a
+/// test under way (the same yellow as a download), red for a failure.
+fn draw_speed(ui: &mut Ui, st: &mut AppState, r: Rect, view: Rect, sf: &Surfaces) {
+    use poni_core::speed::{self, Group, State};
+    let rows = speed::rows(&st.models, &st.speed);
+    let testing = st.speed.testing();
+    ui.c.text("Speed on this PC", Rect::new(r.x + 2.0, r.y, r.w, GROUP_TITLE_H - 6.0), &TextStyle::footnote().weight(Weight::Semibold).color(palette::TEXT_DIM));
+    // Test all downloaded, at the right of the title.
+    let head = if testing { "Testing\u{2026}" } else { "Test all downloaded" };
+    let hw = ui.pill_width(head, true, true);
+    let hr = Rect::new(r.right() - hw, r.y - 4.0, hw, PILL_SMALL);
+    if visible(hr, view).is_some_and(|v| v.h >= hr.h - 0.5) {
+        let resp = ui.pill(wid("settingswin.speed.all"), hr, head, Some(Icon::Gauge), PillStyle::Utility);
+        if resp.clicked && !testing && !rows.is_empty() {
+            st.cmd(Command::SpeedTestAll);
+        }
+    }
+    let card = Rect::new(r.x, r.y + GROUP_TITLE_H, r.w, r.h - GROUP_TITLE_H - SPEED_FOOT_H);
+    fill_group(ui, card, sf.group);
+    let accent = st.accent;
+    let px = 1.0 / ui.c.scale().max(0.5);
+    let (x0, x1) = (card.x + ROW_PAD, card.right() - ROW_PAD);
+    let mut y = card.y;
+    if rows.is_empty() {
+        ui.c.text("Download a model in the Library below, then test how fast it runs here.", Rect::new(x0, y, x1 - x0, SPEED_EMPTY_H), &TextStyle::body().color(palette::TEXT_DIM));
+    }
+    let mut index = 0u64;
+    for g in Group::ALL {
+        let mine: Vec<&speed::Row> = rows.iter().filter(|row| row.group == g).collect();
+        if mine.is_empty() {
+            continue;
+        }
+        // The group's name, and what a longer bar means.
+        let name = TextStyle::footnote().weight(Weight::Semibold).color(palette::TEXT);
+        let nw = ui.c.measure(g.title(), &name, 400.0).0.ceil();
+        ui.c.text(g.title(), Rect::new(x0, y + 8.0, nw + 2.0, 16.0), &name);
+        ui.c.text(g.caption(), Rect::new(x0 + nw + 10.0, y + 8.0, (x1 - x0 - nw - 10.0).max(0.0), 16.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
+        y += SPEED_GROUP_H;
+        for row in mine {
+            let rr = Rect::new(card.x, y, card.w, SPEED_ROW_H);
+            ui.c.fill_rect(Rect::new(rr.x + ROW_PAD, rr.y, rr.w - 2.0 * ROW_PAD, px), RULE);
+            y += SPEED_ROW_H;
+            index += 1;
+            if visible(rr, view).is_none() {
+                continue;
+            }
+            // The button at the right: Test, Retest or Retry; none while it runs or waits.
+            let busy = matches!(row.state, State::Testing(_) | State::Queued);
+            let label = match &row.state {
+                State::Failed(_) => "Retry",
+                State::Tested => "Retest",
+                _ => "Test",
+            };
+            let bw = if busy { 0.0 } else { ui.pill_width(label, true, true) };
+            let br = Rect::new(x1 - bw, rr.y + 6.0, bw, PILL_SMALL);
+            if !busy {
+                if visible(br, view).is_some_and(|v| v.h >= br.h - 0.5) {
+                    if ui.pill(wid_n("settingswin.speed.test", index), br, label, Some(Icon::Gauge), PillStyle::Utility).clicked && !testing {
+                        st.cmd(Command::SpeedTest(row.id.clone()));
+                    }
+                }
+            }
+            let right = if busy { x1 } else { br.x - 10.0 };
+            // The value (the newest result, or what is going on) and the model's name.
+            let bold = TextStyle::body().weight(Weight::Semibold);
+            let (value, value_color) = match (&row.state, &row.latest) {
+                (State::Testing(p), _) => (format!("Testing {:.0}%", p * 100.0), palette::YELLOW),
+                (State::Queued, _) => ("Waiting\u{2026}".to_string(), palette::TEXT_DIM),
+                (_, Some(run)) => (speed::value_text(g, run), palette::TEXT),
+                _ => (String::new(), palette::TEXT_DIM),
+            };
+            let vw = if value.is_empty() { 0.0 } else { ui.c.measure(&value, &bold.tabular(), 300.0).0.ceil() + 4.0 };
+            ui.c.text(&row.label, Rect::new(x0, rr.y + 8.0, (right - x0 - vw - 8.0).max(0.0), 19.0), &bold);
+            if vw > 0.0 {
+                ui.c.text(&value, Rect::new(right - vw, rr.y + 8.0, vw, 19.0), &bold.tabular().right().color(value_color));
+            }
+            // The bar, with the history line at its right end.
+            let spark = speed::spark(&row.history, SPEED_SPARK_W, SPEED_SPARK_H);
+            let track_w = (x1 - x0) - if spark.is_empty() { 0.0 } else { SPEED_SPARK_W + 14.0 };
+            let track = Rect::new(x0, rr.y + 34.0, track_w.max(20.0), SPEED_BAR_H);
+            match &row.state {
+                State::Testing(p) => {
+                    ui.c.fill_rrect(track, SPEED_BAR_H / 2.0, Color::white(0.08));
+                    ui.c.fill_rrect(Rect::new(track.x, track.y, (track.w * p.clamp(0.02, 1.0)).max(SPEED_BAR_H), SPEED_BAR_H), SPEED_BAR_H / 2.0, palette::YELLOW);
+                }
+                State::Failed(why) => {
+                    ui.c.text(&format!("Test failed: {why}"), Rect::new(x0, rr.y + 31.0, x1 - x0, 16.0), &TextStyle::footnote().color(palette::RED));
+                }
+                State::NotTested => {
+                    ui.c.text("Not tested yet", Rect::new(x0, rr.y + 31.0, x1 - x0, 16.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
+                }
+                State::Queued => {
+                    ui.c.fill_rrect(track, SPEED_BAR_H / 2.0, Color::white(0.08));
+                }
+                State::Tested => {
+                    ui.c.fill_rrect(track, SPEED_BAR_H / 2.0, Color::white(0.08));
+                    ui.c.fill_rrect(Rect::new(track.x, track.y, (track.w * row.ratio).max(SPEED_BAR_H), SPEED_BAR_H), SPEED_BAR_H / 2.0, accent);
+                }
+            }
+            if matches!(row.state, State::Tested | State::Queued | State::Testing(_)) && !spark.is_empty() {
+                let box_ = Rect::new(x1 - SPEED_SPARK_W, rr.y + 34.0, SPEED_SPARK_W, SPEED_SPARK_H);
+                let at = |p: (f32, f32)| Point::new(box_.x + p.0, box_.y + p.1);
+                for w in spark.windows(2) {
+                    ui.c.line(at(w[0]), at(w[1]), Color::white(0.5), 1.5);
+                }
+                if let Some(last) = spark.last() {
+                    ui.c.fill_circle(at(*last), 2.5, accent);
+                }
+            }
+            // How it was measured: the time per window or sentence, how many, which day.
+            if let Some(run) = row.latest.as_ref().filter(|_| matches!(row.state, State::Tested)) {
+                let detail = format!("{} \u{b7} {} timed \u{b7} {}", speed::latency_text(g, run), run.samples, speed::day(&run.at));
+                ui.c.text(&detail, Rect::new(x0, rr.y + 44.0, x1 - x0, 15.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
+            }
+        }
+    }
+    // The footnote: what these numbers are, or why there are none.
+    let foot = Rect::new(r.x + 2.0, card.bottom() + 6.0, r.w - 4.0, SPEED_FOOT_H - 6.0);
+    let (line, color) = match (&st.speed.error, speed::device(&st.speed)) {
+        (Some(e), _) => (e.clone(), palette::ORANGE),
+        (None, Some(dev)) => (format!("Measured by the engine on this PC ({dev}) with a short real recording and fixed sentences. Not a published benchmark; a model on another PC runs differently."), palette::TEXT_FAINT),
+        (None, None) => ("Tests run on this PC with a short real recording and fixed sentences. Nothing leaves the PC.".to_string(), palette::TEXT_FAINT),
+    };
+    ui.c.text(&line, foot, &TextStyle::footnote().color(color).wrap().top());
 }
 
 /// A theme's island on a small screen: hanging from its top edge, glass,

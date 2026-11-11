@@ -372,6 +372,35 @@ fn settings_shots() -> Vec<(crate::settings_window::Section, bool, bool)> {
     v
 }
 
+/// The Models tab's picture: five downloaded models with sample speed results (the shape of a real
+/// run of this engine on a Mac CPU, with a history), one model still being tested, one failed and one
+/// never tested, so every state of the Speed section is on one screen. Sample data, for pictures only.
+fn sample_models(st: &mut AppState) {
+    use poni_core::models::{Choice, Kind, Status};
+    use poni_core::speed::{Report, Run};
+    let on = Status { downloaded: true, bytes: 300_000_000, ..Status::default() };
+    let choice = |kind: Kind, id: &str, label: &str, st: &Status| Choice { kind, id: id.into(), label: label.into(), approx_bytes: 300_000_000, selected: false, st: st.clone() };
+    st.models.catalog = vec![
+        choice(Kind::Asr, "openai/whisper-base", "Whisper base", &on),
+        choice(Kind::Asr, "openai/whisper-small", "Whisper small", &on),
+        choice(Kind::Asr, "openai/whisper-large-v3-turbo", "Whisper large v3 turbo", &on),
+        choice(Kind::Translate, "unsloth/Qwen3-1.7B-GGUF", "Qwen3 1.7B", &on),
+        choice(Kind::Translate, "Qwen/Qwen2.5-0.5B-Instruct", "Qwen2.5 0.5B", &on),
+    ];
+    st.models.pairs = vec![choice(Kind::Translate, "Helsinki-NLP/opus-mt-en-id", "English \u{2192} Indonesian", &on), choice(Kind::Translate, "Helsinki-NLP/opus-mt-id-en", "Indonesian \u{2192} English", &on)];
+    let run = |speed: f64, unit: &str, latency_ms: f64, at: &str| Run { speed, unit: unit.into(), latency_ms, load_ms: 400.0, samples: if unit.starts_with('x') { 3 } else { 8 }, device: "cpu".into(), at: at.into() };
+    let mut report = Report::default();
+    report.runs.insert("openai/whisper-base".into(), vec![run(4.9, "x real time", 816.0, "2026-11-10T09:12:00Z"), run(5.2, "x real time", 769.0, "2026-11-11T14:03:00Z"), run(5.4, "x real time", 735.0, "2026-11-12T08:30:00Z")]);
+    report.runs.insert("openai/whisper-large-v3-turbo".into(), vec![run(0.5, "x real time", 8466.0, "2026-11-12T08:34:00Z")]);
+    report.runs.insert("unsloth/Qwen3-1.7B-GGUF".into(), vec![run(27.1, "tokens/s", 702.0, "2026-11-11T14:10:00Z"), run(29.4, "tokens/s", 647.0, "2026-11-12T08:40:00Z")]);
+    report.runs.insert("Helsinki-NLP/opus-mt-en-id".into(), vec![run(10.4, "sentences/s", 96.0, "2026-11-12T08:42:00Z")]);
+    report.active = Some(("Qwen/Qwen2.5-0.5B-Instruct".into(), 0.45));
+    report.failed.insert("Helsinki-NLP/opus-mt-id-en".into(), "no test sentences for this language pair".into());
+    // Whisper small has no result yet: "Not tested yet".
+    st.speed.report = report;
+    st.speed.checked_at = Some(NOW_MONO);
+}
+
 /// One section of the Settings window as the Mac shows it, light or dark,
 /// with the system's window buttons where macOS puts them (the real window
 /// draws those itself; the smoke test pictures that one). `on_top`: In
@@ -384,11 +413,20 @@ fn render_settings(gfx: &mut Gfx, section: crate::settings_window::Section, them
     let mut st = AppState::new(Settings { theme, hide_in_fullscreen: !on_top, ..Settings::default() }, Store::default());
     st.accent = crate::app::theme_accent(theme);
     st.ui.autostart = Some(true);
+    if section == crate::settings_window::Section::Models {
+        sample_models(&mut st);
+    }
     let mut view = crate::settings_window::View::new(section);
     let frame = crate::settings_window::Frame { card: Rect::new(0.0, 0.0, w, h), own_chrome: false, top: TITLEBAR, still: true };
     gfx.set_look(poni_core::look::glass(light));
     {
         let mut c = gfx.canvas(bmp.ctx());
+        // PONI_RENDER_SCROLL=<points>: the picture of a long section from further down (a first
+        // draw tells the view how tall the section is, then it scrolls).
+        if let Some(d) = std::env::var("PONI_RENDER_SCROLL").ok().and_then(|v| v.parse::<f32>().ok()) {
+            let _ = view.draw(&mut c, &mut st, NOW_MONO, frame, light);
+            view.scroll_by(Point::new(w * 0.65, h * 0.5), -d);
+        }
         let _ = view.draw(&mut c, &mut st, NOW_MONO, frame, light);
         // Close, minimise and zoom, 12 points across and 20 apart from 20 in.
         c.unthemed(|c| {

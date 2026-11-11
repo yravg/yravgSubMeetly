@@ -111,6 +111,10 @@ pub enum AppEvent {
     ModelDeleted { id: String, result: Result<u64, String> },
     ModelSelected { kind: poni_core::models::Kind, result: Result<(), String> },
     ModelPlaced { kind: poni_core::models::Kind, result: Result<(), String> },
+    /// What the engine says about the model speed tests (or why it could not say).
+    Speed(Result<poni_core::speed::Report, String>),
+    /// A speed test was refused by the engine (the reason).
+    SpeedStarted(Result<(), String>),
 }
 
 /// Windows' window handle, which `services::models::relocate` names; the Mac has no picker (a model's
