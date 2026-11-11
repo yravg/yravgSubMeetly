@@ -1343,3 +1343,10 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+## LiveCaptions Translator (Apache-2.0)
+
+The list of caption translation services (Google, DeepL, Youdao, Baidu, MTranServer, LibreTranslate,
+Ollama, OpenAI-compatible, OpenRouter) follows the engine list of LiveCaptions Translator
+(github.com/SakiRinn/LiveCaptions-Translator, Apache-2.0). Only the idea of the feature list was used;
+no source code was copied: the providers are our own implementation (engine-rs/engine/src/providers.rs).
