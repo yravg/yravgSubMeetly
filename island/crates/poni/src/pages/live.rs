@@ -49,12 +49,25 @@ fn picker_shown(st: &AppState, state: PageState) -> bool {
     !st.capture.running() && st.helper.following && !matches!(state, PageState::Error | PageState::Locked)
 }
 
+/// One "Recent lines" card, and the gap under it.
+const CARD_H: f32 = 20.0;
+const CARD_GAP: f32 = 3.0;
+
+/// The room the cards take above the caption: none on the offline and empty pages.
+fn cards_h(st: &AppState, state: PageState) -> f32 {
+    if matches!(state, PageState::Error | PageState::Empty) {
+        return 0.0;
+    }
+    st.helper.cards(poni_core::helper::now_ms(), st.settings.log_cards).len() as f32 * (CARD_H + CARD_GAP)
+}
+
 pub fn height(st: &AppState) -> f32 {
     if room_view(st) {
         return super::call::height(st) + SOURCE_H + 6.0 + hkit::GUIDE_H;
     }
-    let row = if picker_shown(st, st.helper.live_state()) { SOURCE_H } else { 0.0 };
-    HEIGHT + row + hkit::GUIDE_H + quick_captions::extra_height(st)
+    let state = st.helper.live_state();
+    let row = if picker_shown(st, state) { SOURCE_H } else { 0.0 };
+    HEIGHT + row + hkit::GUIDE_H + quick_captions::extra_height(st) + cards_h(st, state)
 }
 
 /// The mic chip's level moves and the session's clock ticks while Live hears the room.
@@ -319,7 +332,25 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
             st.cmd(if on { Command::Captions(false) } else { Command::LiveCaptions });
         }
         right = hold_unfollow(ui, st, b.x - PILL_GAP, cy);
+        // Pause or resume the translation of the running captions; the spoken line goes on.
+        if on {
+            let label = if st.translation_paused { "Resume translation" } else { "Pause translation" };
+            let w = ui.pill_width(label, false, true);
+            let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+            let style = if st.translation_paused { PillStyle::Primary(palette::ORANGE) } else { PillStyle::Neutral };
+            if ui.pill(wid("live.translation"), b, label, None, style).clicked {
+                st.cmd(Command::ToggleTranslationPause);
+            }
+            right = b.x - PILL_GAP;
+        }
     }
+    // One click copies the caption on screen with its translation.
+    let w = ui.pill_width("Copy", false, true);
+    let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+    if ui.pill(wid("live.copy"), b, "Copy", None, PillStyle::Utility).clicked {
+        st.cmd(Command::CopyCaption);
+    }
+    right = b.x - PILL_GAP;
     right = quick_captions::aa_button(ui, st, right, cy) - PILL_GAP;
     if state == PageState::Needs {
         let label = format!("{waiting} wait on you");
@@ -335,6 +366,8 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
         "Issued \u{b7} read-only"
     } else if paused {
         "Held"
+    } else if st.translation_paused && st.capture.running() {
+        "Translation paused"
     } else {
         "Following"
     };
@@ -345,7 +378,18 @@ fn lines(ui: &mut Ui, st: &mut AppState, area: Rect, state: PageState) {
     ui.c.text(&caption, Rect::new(head.x + 16.0, cy - 10.0, w, 20.0), &TextStyle::footnote().weight(Weight::Semibold).color(palette::TEXT_DIM));
 
     let cap = st.helper.captions();
-    let y = caption_lines(ui, st, &cap, area.x, head.bottom() + 6.0, area.w, if locked { palette::TEXT_DIM } else { palette::TEXT });
+    // "Recent lines": the lines before this one, as small cards (Settings › Log cards).
+    let mut top = head.bottom() + 6.0;
+    let cards = st.helper.cards(poni_core::helper::now_ms(), st.settings.log_cards);
+    let frame = super::card::pill_card(st, area);
+    for c in &cards {
+        let r = Rect::new(area.x, top, area.w, CARD_H);
+        super::card::fill_box(ui, frame, r, 8.0, Color::white(0.06));
+        let line = if c.translation.is_empty() { c.source.clone() } else { format!("{}  \u{b7}  {}", c.source, c.translation) };
+        ui.c.text(&line, Rect::new(r.x + 8.0, r.y + 2.0, (r.w - 16.0).max(0.0), CARD_H - 4.0), &TextStyle::caption().color(palette::TEXT_FAINT));
+        top += CARD_H + CARD_GAP;
+    }
+    let y = caption_lines(ui, st, &cap, area.x, top, area.w, if locked { palette::TEXT_DIM } else { palette::TEXT });
     if let Some(h) = st.caption_hint.filter(|_| cap.translation.is_empty() && !locked && st.capture.running()) {
         translation_hint(ui, st, area, y, h);
     }

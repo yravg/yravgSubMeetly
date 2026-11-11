@@ -126,8 +126,18 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         st.records.list = true;
         st.records.page = 0;
     }
-    let b = all;
-    let toast = st.helper_notice.as_ref().filter(|(_, until, _)| *until > ui.now).map(|(m, _, bad)| (m.clone(), *bad));
+    // The transcript as a CSV file in Downloads (Excel opens it); only when there are lines.
+    let b = if note.transcript.is_empty() {
+        all
+    } else {
+        let w = ui.pill_width("Export CSV", false, true);
+        let c = Rect::new(all.x - PILL_GAP - w, fy - PILL_SMALL / 2.0, w, PILL_SMALL);
+        if ui.pill(wid("meeting.csv"), c, "Export CSV", None, PillStyle::Utility).clicked {
+            st.cmd(Command::ExportCsv(note.id.clone()));
+        }
+        c
+    };
+    let toast =st.helper_notice.as_ref().filter(|(_, until, _)| *until > ui.now).map(|(m, _, bad)| (m.clone(), *bad));
     let status = match (&toast, locked, waiting) {
         (Some((t, _)), _, _) => t.clone(),
         (None, true, _) => "Issued \u{b7} read-only".into(),

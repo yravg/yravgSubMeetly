@@ -103,6 +103,8 @@ pub enum AppEvent {
     AdzanEnded,
     /// Free-form log line from a service thread.
     Log(String),
+    /// A CSV export ended: the file it wrote (its full path), or why it could not.
+    Exported(Result<String, String>),
     /// What the engine supervisor sees (`services::engine`).
     Engine(poni_core::engine_link::EngineInfo),
     /// The engine's models (`services::models`), and how each action on one ended.

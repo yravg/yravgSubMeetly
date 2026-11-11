@@ -62,6 +62,8 @@ pub mod meeting_probe;
 pub mod engine;
 #[path = "../services/models.rs"]
 pub mod models;
+#[path = "../services/export.rs"]
+pub mod export;
 #[path = "services/location.rs"]
 pub mod location;
 #[path = "services/login.rs"]

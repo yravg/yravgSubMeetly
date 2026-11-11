@@ -61,6 +61,8 @@ pub enum MenuCmd {
     OpenCaptionsPanel,
     StartCaptions,
     StopCaptions,
+    /// Copy the caption on screen, with its translation.
+    CopyCaption,
     Quit,
 }
 
@@ -113,6 +115,7 @@ pub fn menu_items(s: &Settings, pinned: bool, login: Login, update: UpdateLine) 
         item("Meeting", MenuCmd::OpenCall, false),
         item("Minutes", MenuCmd::OpenMeeting, false),
         item("Inbox", MenuCmd::OpenInbox, false),
+        item("Copy caption", MenuCmd::CopyCaption, false),
         MenuItem::Separator,
         MenuItem::Item { label: "Advanced settings…".into(), cmd: MenuCmd::ShowSettings, checked: false, key: "," },
         MenuItem::Separator,

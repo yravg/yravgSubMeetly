@@ -1159,6 +1159,7 @@ impl App {
             MenuCmd::OpenCall => self.open_page(PageKind::Call),
             MenuCmd::OpenMeeting => self.open_page(PageKind::Meeting),
             MenuCmd::OpenInbox => self.open_page(PageKind::Inbox),
+            MenuCmd::CopyCaption => self.copy_caption(),
             MenuCmd::StartEngine => self.engine_start(),
             MenuCmd::RestartEngine => {
                 if let Some(e) = &self.engine {
@@ -1645,6 +1646,8 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::Exported(Ok(path)) => self.st.notify(Icon::Check, palette::GREEN, "CSV saved", path, 8.0, None),
+            AppEvent::Exported(Err(e)) => self.st.notify(Icon::Download, palette::ORANGE, "CSV not saved", e, 8.0, None),
             AppEvent::Models(r) => {
                 self.st.models.apply(r, now);
             }
@@ -1729,6 +1732,17 @@ impl App {
     }
 
     // ------------------------------------------------------------ the engine and its models
+
+    /// The caption on screen and its translation, on the clipboard.
+    fn copy_caption(&mut self) {
+        let text = poni_core::history_cards::caption_text(&self.st.helper.captions());
+        if text.is_empty() {
+            self.st.notify(Icon::Lyrics, palette::ORANGE, "Nothing to copy", "No caption on screen", 4.0, None);
+        } else {
+            services::clipboard::set_text(&text);
+            self.st.notify(Icon::Check, palette::GREEN, "Caption copied", text.lines().next().unwrap_or("").to_string(), 3.0, None);
+        }
+    }
 
     /// Start the engine now (Retry, a download, a first look at Settings).
     fn engine_start(&self) {
@@ -2840,6 +2854,11 @@ impl App {
                 // Windows' language features are Windows'.
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
+                Command::CopyCaption => self.copy_caption(),
+                Command::ExportCsv(id) => services::export::csv(self.sink.clone(), poni_core::helper::configured_port(), id, crate::paths::media_downloads_dir()),
+                // Pausing a translation is the island's own captions' (Windows); the Mac app has no
+                // capture of its own, so there is nothing running to pause.
+                Command::ToggleTranslationPause => {}
                 Command::ModelsRefresh => self.refresh_models(),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),

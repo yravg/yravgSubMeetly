@@ -146,7 +146,7 @@ enum Scene {
     AddonsDownloader,
 }
 
-const SCENES: [Scene; 15] = [
+const SCENES: [Scene; 16] = [
     Scene::IdleClock,
     Scene::IdleEyes,
     Scene::Hover,
@@ -158,6 +158,8 @@ const SCENES: [Scene; 15] = [
     Scene::Page(PageKind::Tasks),
     Scene::Page(PageKind::Media),
     Scene::Page(PageKind::Shelf),
+    // Live captions with the "Recent lines" cards above the caption.
+    Scene::Page(PageKind::Live),
     // Slice 3: the pop-ups and the Shelf with real files.
     Scene::ChargingHud,
     Scene::LowBatteryHud,
@@ -757,6 +759,24 @@ fn seed(st: &mut AppState) {
     st.store.focus_sessions.insert(st.day_key(), 2);
 }
 
+/// The Live page: the engine heard five lines (Indonesian, translated into English); the newest is
+/// the caption, the earlier ones the cards (Settings > Recent lines, 3 by default).
+fn live(st: &mut AppState) {
+    use poni_core::helper::{Live, Snapshot};
+    let at = poni_core::helper::now_ms() + 600_000;
+    let lines = [
+        ("Selamat pagi, terima kasih sudah bergabung.", "Good morning, thank you for joining."),
+        ("Kita mulai dengan laporan kemajuan minggu ini.", "We start with this week's progress report."),
+        ("Tim backend sudah menyelesaikan migrasi basis data.", "The backend team has finished the database migration."),
+        ("Pengujian di lingkungan staging berjalan lancar.", "Testing in the staging environment went smoothly."),
+        ("Jadi kita bisa rilis hari Kamis, kalau tidak ada keberatan.", "So we can release on Thursday, if there are no objections."),
+    ];
+    for (i, (source, translation)) in lines.iter().enumerate() {
+        let live = Live { seq: i as u64 + 1, source: (*source).into(), translation: (*translation).into(), at: Some(at), ..Live::default() };
+        st.helper.apply(Ok((Snapshot { live: Some(live), ..Snapshot::default() }, 8)));
+    }
+}
+
 fn media(st: &mut AppState) {
     let art = ImageData::new(240, 240, make_art(240));
     let color = art.accent_color();
@@ -894,6 +914,9 @@ fn render_scene(gfx: &mut Gfx, scene: Scene, theme: Theme, notch: Option<Notch>,
         Scene::Page(p) => {
             if p == PageKind::Media {
                 media(&mut st);
+            }
+            if p == PageKind::Live {
+                live(&mut st);
             }
             if p == PageKind::Focus {
                 st.pomodoro.phase = Phase::Focus;

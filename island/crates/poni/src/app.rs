@@ -330,7 +330,7 @@ fn run_deferred(d: Deferred) {
             let Some((helper, items)) = with_app(|app| {
                 // Right-clicked on the open island (the tray's menu leaves it as it is).
                 app.menu_open = app.expanded && app.hovering;
-                (app.helper, tray::menu_items(&app.st.settings, app.st.pinned, crate::updates::menu_line(&app.st, app.updater.is_some()), &app.st.engine, app.st.capture.running()))
+                (app.helper, tray::menu_items(&app.st.settings, app.st.pinned, crate::updates::menu_line(&app.st, app.updater.is_some()), &app.st.engine, app.st.capture.running(), app.st.translation_paused))
             }) else {
                 return;
             };
@@ -1857,7 +1857,30 @@ impl App {
     /// Spoken and target language codes for captions, as Settings has them now.
     fn caption_langs(&self) -> (String, String) {
         let s = &self.st.settings;
-        (s.source_lang.clone(), poni_core::capture::caption_target(s.translate_captions, &s.target_lang).to_string())
+        // A paused translation reads as "translate captions: off" for the running session only.
+        (s.source_lang.clone(), poni_core::capture::caption_target(s.translate_captions && !self.st.translation_paused, &s.target_lang).to_string())
+    }
+
+    /// Pause or resume the translation of running captions; the spoken line goes on.
+    fn toggle_translation_pause(&mut self) {
+        self.st.translation_paused = !self.st.translation_paused;
+        if self.st.capture.running() {
+            self.retune_captions();
+        }
+        let (title, sub) = if self.st.translation_paused { ("Translation paused", "Captions go on without it") } else { ("Translation resumed", "From the next line") };
+        self.st.notify(Icon::Lyrics, palette::ORANGE, title, sub, 4.0, None);
+        self.request_frame();
+    }
+
+    /// The caption on screen and its translation, on the clipboard.
+    fn copy_caption(&mut self) {
+        let text = poni_core::history_cards::caption_text(&self.st.helper.captions());
+        if text.is_empty() {
+            self.st.notify(Icon::Lyrics, palette::ORANGE, "Nothing to copy", "No caption on screen", 4.0, None);
+            return;
+        }
+        services::clipboard::set_text(self.helper, &text);
+        self.st.notify(Icon::Check, palette::GREEN, "Caption copied", text.lines().next().unwrap_or("").to_string(), 3.0, None);
     }
 
     /// Running captions take the languages of Settings from their next window on, without a restart:
@@ -2700,6 +2723,8 @@ impl App {
             OpenCall => self.open_page(PageKind::Call),
             OpenMeeting => self.open_page(PageKind::Meeting),
             OpenInbox => self.open_page(PageKind::Inbox),
+            CopyCaption => self.copy_caption(),
+            ToggleTranslationPause => self.toggle_translation_pause(),
             OpenApp => {
                 if let Some(svc) = &self.services {
                     svc.engine_start();
@@ -2987,6 +3012,8 @@ impl App {
                 }
             }
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
+            AppEvent::Exported(Ok(path)) => self.st.notify(Icon::Check, palette::GREEN, "CSV saved", path, 8.0, None),
+            AppEvent::Exported(Err(e)) => self.st.notify(Icon::Download, palette::ORANGE, "CSV not saved", e, 8.0, None),
             AppEvent::Calendar(r) => {
                 // A fresh calendar ends the "Reading your calendar" note; an error notice stays.
                 if self.st.helper_notice.as_ref().is_some_and(|n| n.0.starts_with("Reading your calendar")) {
@@ -4926,6 +4953,9 @@ impl App {
                 Command::NextMic => self.next_mic(),
                 Command::MicPrivacy => shell::open_microphone_settings(),
                 Command::PasteTranscript => self.paste_transcript(),
+                Command::ToggleTranslationPause => self.toggle_translation_pause(),
+                Command::CopyCaption => self.copy_caption(),
+                Command::ExportCsv(id) => services::export::csv(self.sink.clone(), poni_core::helper::configured_port(), id, crate::paths::media_downloads_dir()),
                 Command::JoinMeeting(u) => self.join_meeting(&u),
                 Command::JoinPastedLink => {
                     let text = services::clipboard::read_text(self.hwnd).unwrap_or_default();

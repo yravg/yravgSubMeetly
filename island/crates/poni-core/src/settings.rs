@@ -151,6 +151,9 @@ pub struct Settings {
     pub auto_captions: bool,
     /// Captions carry a translation into `target_lang` (on by default, English); off: the spoken line only.
     pub translate_captions: bool,
+    /// "Recent lines" on the Live page: how many earlier lines stay as cards above the caption
+    /// (0 = off; [`crate::history_cards`]).
+    pub log_cards: u8,
     /// What Live captions listen to (`capture::Source::key`): `room` (default), `pc` or `both`.
     pub live_source: String,
     /// The microphone for Room and Both: a Windows endpoint id, empty for Windows' default.
@@ -285,6 +288,7 @@ impl Default for Settings {
             model_source: "huggingface".into(),
             auto_captions: true,
             translate_captions: true,
+            log_cards: crate::history_cards::DEFAULT_CARDS,
             live_source: "room".into(),
             mic_device: String::new(),
             meeting_apps: Vec::new(),
@@ -429,6 +433,7 @@ impl Settings {
         }
         self.lyrics_offset_ms = self.lyrics_offset_ms.clamp(-5000, 5000);
         self.collapse_delay_ms = self.collapse_delay_ms.min(5000);
+        self.log_cards = crate::history_cards::clamp_count(self.log_cards);
         if !self.expanded_width.is_finite() {
             self.expanded_width = 620.0;
         }

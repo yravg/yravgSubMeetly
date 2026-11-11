@@ -148,6 +148,8 @@ pub enum AppEvent {
     Helper(Result<(poni_core::helper::Snapshot, u32), String>),
     /// A decision the helper refused or could not be reached for.
     HelperNotice(String),
+    /// A CSV export ended: the file it wrote (its full path), or why it could not.
+    Exported(Result<String, String>),
     /// The engine's calendar, or why it could not be read.
     Calendar(Result<poni_core::calendar::Calendar, String>),
     /// The answer to "Open notes" on a meeting: the note's title, or why not.

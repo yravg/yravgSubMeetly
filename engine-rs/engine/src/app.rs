@@ -26,7 +26,7 @@ use crate::models::{
     ModelNotDownloaded, PullProgress, CATALOG,
 };
 use crate::notes::{
-    export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
+    export_note_csv, export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
 };
 use crate::protocol::{AskReply, Request, Response};
 use crate::state::{now_epoch_secs, now_utc_iso};
@@ -1814,11 +1814,11 @@ impl App {
             Some(Value::String(text)) if !text.is_empty() => text.to_lowercase(),
             _ => "md".to_string(),
         };
-        if format != "txt" && format != "md" {
+        if format != "txt" && format != "md" && format != "csv" {
             return self.json_response(
                 request,
                 400,
-                json!({ "error": "format must be \"txt\" or \"md\"" }),
+                json!({ "error": "format must be \"txt\", \"md\" or \"csv\"" }),
             );
         }
         let note = match payload.get("note") {
@@ -1859,7 +1859,10 @@ impl App {
             _ => note.get("id").map(py_str).unwrap_or_default(),
         };
         let safe = safe_filename(&title);
-        let content = if format == "txt" {
+        let content = if format == "csv" {
+            // UTF-8 BOM first: Excel reads accents and CJK right only with it.
+            format!("\u{feff}{}", export_note_csv(&note))
+        } else if format == "txt" {
             export_note_txt(&note)
         } else {
             export_note_md(&note)

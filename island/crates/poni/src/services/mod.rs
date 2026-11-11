@@ -27,6 +27,7 @@ pub mod lyrics;
 pub mod meeting_probe;
 pub mod media;
 pub mod meter;
+pub mod export;
 pub mod models;
 pub mod pairdrop;
 pub mod phonedrop;
