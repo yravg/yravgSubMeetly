@@ -58,3 +58,17 @@ Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private
 
 (Older note, step 4.6.) Blocker: E: has 7 MB free; build on D: (`CARGO_TARGET_DIR=D:\cargo-target\pmm-meeting`, `TMP=D:
 usttmp-pmm`, installer `/OD:\sm-dist`). Old caches in `E:\cargo-target` (about 58 GB, last used 2026-11-08..10) wait for the owner to delete them.
+
+## Moving to the Mac mini (owner, 2026-11-11)
+
+The owner continues on a Mac mini M5 Pro used as the build machine (replaces the Hostinger VPS). State at the move:
+- `main` on GitHub has everything: island 1.3.9 code (Task F: Fast = Windows Live Captions, five Captions groups, px font size, interim caret + latency readout) and engine fix `3b0c89f`.
+- Engine fix `3b0c89f`: on Windows, processes Explorer starts run with Redirection Guard, which refuses a junction a user made (os error 448). The owner's `~/.cache/huggingface` is a junction to `E:\C-moved\...`, so every model download failed in 1.3.8. The engine now pins `HF_HOME` to the real folder and resolves chosen model folders. Verified on the installed island with Redirection Guard ON.
+- Installed on the laptop: 1.3.8 with the fixed engine swapped in (old file kept as `submeetly-engine.exe.bak-1.3.8`). Models: whisper-base + Qwen3-0.6B GGUF selected and working (en->id about 2.6 s). Qwen3-1.7B download stopped on owner request (6 MB partial in the default cache); download and test it later.
+- 1.3.9 has NOT been installed or run on Windows. The VPS-built installer copy on the laptop is truncated; rebuild it.
+- VPS leftovers: worktree `/home/user/dev/yravgSubMeetly/wt/pmm` (branch `pmm-wip`, one commit there wrongly added `island/target/`; it was left out when the commits were brought to `main`), target dir `/home/user/dev/yravgSubMeetly/target-pmm`, wine prefixes `~/.wine-pmm`, `~/.wine-inno`; old tmux sessions `sm-*` from 2026-11-08/09 not ours.
+
+On the Mac:
+- The island has a macOS build (`island/crates/poni/src/mac/`); `Command::OpenSettingsAt` was added to `mac/app.rs` without compiling, so build it first: `cargo build -p poni` in `island/`.
+- Windows installer from macOS needs a cross toolchain (`cargo-xwin` for x86_64-pc-windows-msvc, or `x86_64-pc-windows-gnu` with mingw-w64 from Homebrew) and Inno Setup under wine; or keep building the Windows installer on the laptop (MSVC + ISCC, recipe in `.checkpoints/pmm-lead.md`).
+- Owner questions answered (Task F decisions are in Decisions). Open: 4 poni tests only checked under wine (addons zip, http cache x2, sysmon port); the 1.5 s first-text target is unmeasured on real audio.
