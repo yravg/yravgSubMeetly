@@ -350,17 +350,28 @@ impl Show {
     }
 }
 
-/// Captions tab › Font size: a step in px added to each caption style's size, within these ends.
-pub const FONT_MIN: i32 = -2;
-pub const FONT_MAX: i32 = 4;
+/// Captions tab › Font size (board P09): the size in px of the main caption line on Live, as drawn
+/// ("15 px"). 15 is today's Live size, so the default changes nothing; every other caption style
+/// (Meeting 13, translation 12 ...) scales by the same ratio, so one number sizes them all.
+pub const FONT_DEFAULT: u32 = 15;
+pub const FONT_MIN: u32 = 12;
+pub const FONT_MAX: u32 = 24;
 
-pub fn font_px(base: f32, step: i32) -> f32 {
-    base + step.clamp(FONT_MIN, FONT_MAX) as f32
+/// The size in px to use. A settings file from before 1.3.9 stored a step (`step` -2..4, added to
+/// the size in px) and no `px` (0): that becomes 15 + step, once; the Captions tab then writes `px`.
+pub fn resolve_px(px: u32, step: i32) -> u32 {
+    let px = if px == 0 { (FONT_DEFAULT as i32 + step).max(0) as u32 } else { px };
+    px.clamp(FONT_MIN, FONT_MAX)
 }
 
-/// One press of − (-1) or + (+1), stopping at the ends.
-pub fn step_font(step: i32, d: i32) -> i32 {
-    (step + d.signum()).clamp(FONT_MIN, FONT_MAX)
+/// A caption style's size (`base` at the default) for the chosen `px`.
+pub fn scale_px(base: f32, px: u32) -> f32 {
+    base * px.clamp(FONT_MIN, FONT_MAX) as f32 / FONT_DEFAULT as f32
+}
+
+/// One press of - (-1) or + (+1) is 1 px, stopping at the ends.
+pub fn step_px(px: u32, d: i32) -> u32 {
+    (px as i32 + d.signum()).clamp(FONT_MIN as i32, FONT_MAX as i32) as u32
 }
 
 /// The path of an interim (PMM-025): the spoken text only, so no translation model runs for a line
@@ -767,14 +778,16 @@ mod tests {
 
     #[test]
     fn the_font_step_is_clamped_and_never_shrinks_text_below_readable() {
-        assert_eq!(font_px(13.0, 0), 13.0);
-        assert_eq!(font_px(13.0, 3), 16.0);
-        assert_eq!(font_px(13.0, 99), 13.0 + FONT_MAX as f32, "the step is capped");
-        assert_eq!(font_px(12.0, -99), 12.0 + FONT_MIN as f32);
-        assert!(font_px(12.0, -99) >= 10.0);
-        assert_eq!(step_font(0, 1), 1);
-        assert_eq!(step_font(FONT_MAX, 1), FONT_MAX, "stops at the end");
-        assert_eq!(step_font(FONT_MIN, -1), FONT_MIN);
+        assert_eq!(scale_px(15.0, 15), 15.0, "the default changes nothing");
+        assert_eq!(scale_px(13.0, 15), 13.0);
+        assert_eq!(scale_px(12.0, 30), 12.0 * 24.0 / 15.0, "capped at the top");
+        assert_eq!(resolve_px(0, 0), 15, "an old file with no step is today's size");
+        assert_eq!(resolve_px(0, 3), 18, "an old step is turned into px");
+        assert_eq!(resolve_px(0, -99), FONT_MIN);
+        assert_eq!(resolve_px(20, 3), 20, "a stored px wins over an old step");
+        assert_eq!(step_px(15, 1), 16);
+        assert_eq!(step_px(FONT_MAX, 1), FONT_MAX, "stops at the end");
+        assert_eq!(step_px(FONT_MIN, -1), FONT_MIN);
     }
 
     #[test]

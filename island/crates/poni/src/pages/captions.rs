@@ -20,7 +20,7 @@ use crate::pill::quick_captions::{self, Act, Ctl, Which};
 use crate::settings_window::{self, Key, Section};
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_SMALL};
-use poni_core::capture::{lang_name, step_font, Show};
+use poni_core::capture::{lang_name, resolve_px, step_px, Show};
 use poni_core::geom::{palette, Color, Rect};
 use poni_core::meeting_source::Family;
 use poni_core::models::Kind;
@@ -180,23 +180,24 @@ fn show_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
     }
 }
 
-/// Font size (PMM-026): px added to the caption text of Live, Meeting and the Media column.
+/// Font size (board P09): the main caption line in px, "15 px" by default (Live's size today); the
+/// other caption styles scale with it. An older step in the settings file is read once into px.
 fn font_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
     let cy = r.center().y;
     ui.c.text("Font size", Rect::new(r.x + PAD, r.y, (r.w - 2.0 * STEP - NAME_W - 2.0 * PAD).max(0.0), r.h), &TextStyle::body().weight(Weight::Regular));
     let plus = Rect::new(r.right() - PAD - STEP, cy - STEP / 2.0, STEP, STEP);
     let name = Rect::new(plus.x - NAME_W, r.y, NAME_W, r.h);
     let minus = Rect::new(name.x - STEP, cy - STEP / 2.0, STEP, STEP);
-    let step = st.settings.caption_font;
+    let px = resolve_px(st.settings.caption_px, st.settings.caption_font);
     for (k, (b, icon, d)) in [(minus, Icon::Minus, -1), (plus, Icon::Plus, 1)].into_iter().enumerate() {
-        let live = step_font(step, d) != step;
+        let live = step_px(px, d) != px;
         if ui.icon_button(wid_n("cap.font", k as u64), b, icon, if live { palette::TEXT_DIM } else { palette::TEXT_FAINT }, 11.0).clicked && live {
-            st.settings.caption_font = step_font(step, d);
+            st.settings.caption_px = step_px(px, d);
+            st.settings.caption_font = 0;
             st.cmd(Command::SaveSettings);
         }
     }
-    let shown = if step == 0 { "Default".to_string() } else { format!("{step:+} px") };
-    ui.c.text(&shown, name, &TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT).center());
+    ui.c.text(&format!("{px} px"), name, &TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT).center());
 }
 
 /// Fast / Balanced / Accurate: the utterance timing, the engine's mode and the model rows each one

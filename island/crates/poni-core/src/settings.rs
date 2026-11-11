@@ -165,8 +165,15 @@ pub struct Settings {
     pub latency_mode: String,
     /// Captions tab › Show (`capture::Show::key`): `both` (default), `original` or `translation`.
     pub caption_show: String,
-    /// Captions tab › Font size: px added to the caption text (`capture::font_px`), 0 = as before.
+    /// Captions tab › Font size, before 1.3.9: a step in px. Read once into `caption_px` (`capture::resolve_px`).
     pub caption_font: i32,
+    /// Captions tab › Font size: the main caption line in px (`capture::resolve_px`). 0 = a file from
+    /// before 1.3.9, which still has `caption_font`.
+    #[serde(default = "px_unset")]
+    pub caption_px: u32,
+    /// Where Windows Live Captions was before Fast moved it off screen, "x,y"; empty when it is not
+    /// moved. Written BEFORE the move so a crash cannot lose it (`livecap::restore`).
+    pub livecap_origin: String,
     pub hud_volume: bool,
     pub hud_power: bool,
     pub hud_bluetooth: bool,
@@ -282,6 +289,8 @@ impl Default for Settings {
             latency_mode: "balanced".into(),
             caption_show: "both".into(),
             caption_font: 0,
+            caption_px: crate::capture::FONT_DEFAULT,
+            livecap_origin: String::new(),
             hud_volume: true,
             hud_power: true,
             hud_bluetooth: true,
@@ -299,6 +308,10 @@ impl Default for Settings {
             notifications: crate::notifications::NotificationSettings::default(),
         }
     }
+}
+
+fn px_unset() -> u32 {
+    0
 }
 
 impl Settings {
@@ -450,7 +463,10 @@ mod tests {
         assert!(s.meeting_apps.is_empty() && s.open_meeting_tab && s.meeting_families.slack && s.meeting_families.teams);
         assert!(!s.quick_captions_open, "the pill's caption strip starts hidden");
         assert_eq!(crate::utterance::Latency::parse(&s.latency_mode), crate::utterance::Latency::Balanced, "an old file captions as before");
-        assert_eq!((crate::capture::Show::parse(&s.caption_show), s.caption_font), (crate::capture::Show::Both, 0), "and looks as before");
+        assert_eq!((crate::capture::Show::parse(&s.caption_show), crate::capture::resolve_px(s.caption_px, s.caption_font)), (crate::capture::Show::Both, 15), "and looks as before");
+        let s: Settings = serde_json::from_str(r#"{"caption_font":3}"#).unwrap();
+        assert_eq!(crate::capture::resolve_px(s.caption_px, s.caption_font), 18, "an old step becomes px");
+        assert!(s.livecap_origin.is_empty());
         assert_eq!((s.live_source.as_str(), s.mic_device.as_str()), ("room", ""), "Live starts on the room, Windows' default mic");
         assert_eq!(s.captions_source, "pc", "captions on from an old file restart on what the PC plays");
         let s: Settings = serde_json::from_str(r#"{"captions_on":true,"captions_source":"both"}"#).unwrap();

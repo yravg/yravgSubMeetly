@@ -151,6 +151,44 @@ pub fn why_unavailable(windows_build: u32, installed: bool, source_is_pc: bool) 
     }
 }
 
+/// Where Fast parks Live Captions' window: far off every screen.
+pub const PARK: (i32, i32) = (-32000, -32000);
+/// Where it goes back to when no earlier place was recorded.
+pub const FALLBACK: (i32, i32) = (100, 100);
+
+pub fn origin_text(x: i32, y: i32) -> String {
+    format!("{x},{y}")
+}
+
+pub fn parse_origin(s: &str) -> Option<(i32, i32)> {
+    let (x, y) = s.split_once(',')?;
+    let p = (x.trim().parse().ok()?, y.trim().parse().ok()?);
+    (!is_parked(p)).then_some(p)
+}
+
+/// Off every screen (Windows also reports a minimized window at -32000: `restore` asks for that).
+pub fn is_parked(at: (i32, i32)) -> bool {
+    at.0 <= -20000 || at.1 <= -20000
+}
+
+/// What to do with Live Captions' window on an island start, or when the person asks to restore it
+/// while Fast is not using it. `origin` is `Settings::livecap_origin`, `at` the window's position,
+/// `iconic` whether it is minimized (the person's own doing: left alone).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Fix {
+    /// It is on screen, or the person's: nothing to move.
+    Nothing,
+    MoveTo(i32, i32),
+}
+
+pub fn restore(origin: &str, at: (i32, i32), iconic: bool) -> Fix {
+    if iconic || !is_parked(at) {
+        return Fix::Nothing;
+    }
+    let (x, y) = parse_origin(origin).unwrap_or(FALLBACK);
+    Fix::MoveTo(x, y)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,5 +259,16 @@ mod tests {
         assert!(why_unavailable(22631, false, true).unwrap().contains("not on this PC"));
         assert!(why_unavailable(22631, true, false).unwrap().contains("room"));
         assert_eq!(why_unavailable(22631, true, true), None);
+    }
+
+    #[test]
+    fn a_window_left_off_screen_by_a_crash_comes_back_where_it_was() {
+        assert_eq!(restore("420,60", PARK, false), Fix::MoveTo(420, 60));
+        assert_eq!(restore("", PARK, false), Fix::MoveTo(FALLBACK.0, FALLBACK.1), "no record: a place on screen");
+        assert_eq!(restore("-32000,-32000", PARK, false), Fix::MoveTo(FALLBACK.0, FALLBACK.1), "a recorded park is no place");
+        assert_eq!(restore("420,60", (420, 60), false), Fix::Nothing, "on screen: untouched");
+        assert_eq!(restore("420,60", PARK, true), Fix::Nothing, "minimized by the person: untouched");
+        assert_eq!(parse_origin(&origin_text(-300, 40)), Some((-300, 40)), "a second monitor to the left is a real place");
+        assert_eq!(parse_origin("x"), None);
     }
 }

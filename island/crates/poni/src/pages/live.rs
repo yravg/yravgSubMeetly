@@ -278,9 +278,9 @@ fn translation_hint(ui: &mut Ui, st: &mut AppState, area: Rect, y: f32, hint: Tr
 /// Returns where the translation goes.
 pub(crate) fn caption_lines(ui: &mut Ui, st: &AppState, cap: &Captions, x: f32, mut y: f32, w: f32, now: Color) -> f32 {
     // Captions tab › Show and Font size (PMM-026). A larger size grows each box by the same px.
-    let (show, step) = (poni_core::capture::Show::parse(&st.settings.caption_show), st.settings.caption_font);
-    let grow = step.max(0) as f32 * 2.0;
-    let sized = |s: TextStyle| TextStyle { size: poni_core::capture::font_px(s.size, step), ..s };
+    let (show, px) = (poni_core::capture::Show::parse(&st.settings.caption_show), poni_core::capture::resolve_px(st.settings.caption_px, st.settings.caption_font));
+    let grow = (px as f32 - poni_core::capture::FONT_DEFAULT as f32).max(0.0) * 2.0;
+    let sized = |s: TextStyle| TextStyle { size: poni_core::capture::scale_px(s.size, px), ..s };
     let (main, under) = show.parts(&cap.current, &cap.translation);
     if !cap.previous.is_empty() {
         ui.c.text(&cap.previous, Rect::new(x, y, w, 18.0), &sized(TextStyle::footnote().color(palette::TEXT_FAINT)));

@@ -187,13 +187,13 @@ fn captions(ui: &mut Ui, st: &AppState, r: Rect) {
     ui.c.clip(r);
     let mut y = r.bottom();
     // Captions tab › Show and Font size (PMM-026): which text each line prints, and how large.
-    let (show, step) = (poni_core::capture::Show::parse(&st.settings.caption_show), st.settings.caption_font);
+    let (show, px) = (poni_core::capture::Show::parse(&st.settings.caption_show), poni_core::capture::resolve_px(st.settings.caption_px, st.settings.caption_font));
     for (i, l) in st.call.lines.iter().enumerate().rev() {
         let (main, under) = show.parts(&l.source, &l.translation);
         let mut src = if i == newest { TextStyle::body().weight(Weight::Semibold) } else { TextStyle::footnote().color(palette::TEXT_DIM) }.wrap().top();
-        src.size = poni_core::capture::font_px(src.size, step);
+        src.size = poni_core::capture::scale_px(src.size, px);
         let mut tst = TextStyle::footnote().color(if i == newest { tr } else { tr.with_alpha(0.75) }).wrap().top();
-        tst.size = poni_core::capture::font_px(tst.size, step);
+        tst.size = poni_core::capture::scale_px(tst.size, px);
         let sh = ui.c.measure(main, &src, r.w).1.ceil();
         let th = under.map_or(0.0, |u| ui.c.measure(u, &tst, r.w).1.ceil() + 2.0);
         y -= sh + th;
