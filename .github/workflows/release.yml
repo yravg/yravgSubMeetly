@@ -99,11 +99,20 @@ jobs:
           .icon-venv/bin/python tools/make_mac_icon.py build/yravgSubMeetly.iconset
           iconutil -c icns build/yravgSubMeetly.iconset -o build/yravgSubMeetly.icns
 
+      # What plays, from macOS's own now playing: the MediaRemote adapter (third_party/mediaremote-adapter).
+      - name: MediaRemote adapter
+        working-directory: island
+        run: |
+          cmake -S third_party/mediaremote-adapter -B build/mediaremote -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
+          cmake --build build/mediaremote --config Release -j 4
+          lipo -info build/mediaremote/MediaRemoteAdapter.framework/MediaRemoteAdapter
+
       - name: App bundle and DMG (ad-hoc signed until a Developer ID exists)
         working-directory: island
         env:
           ENGINE_ARM: ${{ github.workspace }}/engine-rs/target/aarch64-apple-darwin/release/submeetly-engine
           ENGINE_INTEL: ${{ github.workspace }}/engine-rs/target/x86_64-apple-darwin/release/submeetly-engine
+          MEDIAREMOTE_BUILD: ${{ github.workspace }}/island/build/mediaremote
         run: tools/make_mac_app.sh target/aarch64-apple-darwin/release/poni target/x86_64-apple-darwin/release/poni build/yravgSubMeetly.icns dist
 
       - name: Update in place (the app replaces itself)
