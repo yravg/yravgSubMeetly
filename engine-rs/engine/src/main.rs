@@ -11,8 +11,41 @@ fn main() {
                 exit(1);
             }
         }
+        // `submeetly-engine mcp`: the MCP server on stdio (docs/INTEGRATIONS.md).
+        Some("mcp") => {
+            let client = match submeetly_engine::client::Client::from_env() {
+                Ok(client) => client,
+                Err(error) => {
+                    eprintln!("mcp: {error}");
+                    exit(1);
+                }
+            };
+            let stdin = std::io::stdin();
+            if let Err(error) = submeetly_engine::mcp::run(&client, stdin.lock(), std::io::stdout())
+            {
+                eprintln!("mcp: {error}");
+                exit(1);
+            }
+        }
+        // `submeetly-engine cli <command>`: scripts and terminals (docs/INTEGRATIONS.md).
+        Some("cli") => {
+            let argv: Vec<String> = std::env::args().skip(2).collect();
+            let client = match submeetly_engine::client::Client::from_env() {
+                Ok(client) => client,
+                Err(error) => {
+                    eprintln!("{error}");
+                    exit(1);
+                }
+            };
+            if let Err((code, message)) =
+                submeetly_engine::cli::run(&client, &argv, &mut std::io::stdout())
+            {
+                eprintln!("{message}");
+                exit(code);
+            }
+        }
         Some(other) => {
-            eprintln!("unknown command: {other}\nusage: submeetly-engine [native-host]");
+            eprintln!("unknown command: {other}\nusage: submeetly-engine [native-host | mcp | cli <command>]");
             exit(2);
         }
         None => {

@@ -170,6 +170,9 @@ pub enum AppEvent {
     CallNotes(Option<Vec<poni_core::live_notes::Item>>),
     /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.
     LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
+    /// The engine's webhooks (`services::integrations`), and one line about the change just made.
+    Webhooks(Result<Vec<poni_core::webhooks::Webhook>, String>),
+    WebhookNote { ok: bool, text: String },
     /// What the engine says its models are (or why it could not say), during a download too.
     Models(Result<poni_core::models::Inventory, String>),
     /// A model download ended.
