@@ -67,7 +67,17 @@ pub fn meeting_doc(id: &str, title: &str, date: &str, start: &str, locale: &str,
             "engine": { "segments": lines.len(), "durationSec": end.round() as i64 },
         },
         "items": items,
-        "transcript": lines.iter().map(|l| json!({ "t0": l.t0, "t1": l.t1, "source": l.source, "translation": l.translation })).collect::<Vec<_>>(),
+        "transcript": lines
+            .iter()
+            .map(|l| {
+                let mut v = json!({ "t0": l.t0, "t1": l.t1, "source": l.source, "translation": l.translation });
+                // Only a labelled line carries who said it; older documents have none.
+                if !l.speaker.is_empty() {
+                    v["speaker"] = json!(l.speaker);
+                }
+                v
+            })
+            .collect::<Vec<_>>(),
     }))
 }
 
@@ -169,6 +179,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_labelled_line_keeps_its_speaker_in_the_saved_document() {
+        let mut l = line(0.0, "Hello", "");
+        l.speaker = "You".into();
+        let doc = meeting_doc("MOM-1", "T", "2026-11-12", "", "", &[l, line(4.0, "Hi", "")], None).unwrap();
+        assert_eq!(doc["transcript"][0]["speaker"], "You");
+        assert!(doc["transcript"][1].get("speaker").is_none());
+    }
+
+    #[test]
     fn a_media_session_is_kept_as_a_transcript_until_saved_as_a_meeting() {
         let doc = meeting_doc("MOM-WIN-1", "macOS 27.2.1 is out", "2026-11-11", "2026-11-11T09:00", "en", &[line(0.0, "Hi", "")], None).unwrap();
         assert!(!is_transcript(&doc), "a captions session is a meeting by default");
@@ -211,7 +230,7 @@ mod tests {
     }
 
     fn line(t0: f64, source: &str, translation: &str) -> Line {
-        Line { t0, t1: t0 + 4.0, source: source.into(), translation: translation.into() }
+        Line { t0, t1: t0 + 4.0, source: source.into(), translation: translation.into(), speaker: String::new() }
     }
 
     #[test]

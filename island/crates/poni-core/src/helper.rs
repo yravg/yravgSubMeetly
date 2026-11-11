@@ -123,6 +123,8 @@ pub struct Line {
     pub t1: f64,
     pub source: String,
     pub translation: String,
+    /// Who said it ("You", "Others", "Speaker 2"); empty when the engine did not label it.
+    pub speaker: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -259,6 +261,7 @@ fn parse_note(v: &Value) -> Option<Note> {
                             t1: l.get("t1").and_then(Value::as_f64).unwrap_or(0.0),
                             source,
                             translation: text(l, "translation").unwrap_or_default(),
+                            speaker: text(l, "speaker").unwrap_or_default(),
                         })
                     })
                     .collect()
@@ -403,6 +406,8 @@ pub struct Captions {
     pub previous: String,
     pub current: String,
     pub translation: String,
+    /// Who said the current line (empty when not labelled).
+    pub speaker: String,
 }
 
 /// The lines up to and including index `at` (the newest when `None`: a
@@ -417,6 +422,7 @@ pub fn captions(note: &Note, at: Option<usize>) -> Captions {
         previous: if i > 0 { note.transcript[i - 1].source.clone() } else { String::new() },
         current: note.transcript[i].source.clone(),
         translation: note.transcript[i].translation.clone(),
+        speaker: note.transcript[i].speaker.clone(),
     }
 }
 
@@ -847,7 +853,7 @@ impl View {
             return h.clone();
         }
         match self.followed_line(now_ms) {
-            Some(l) => Captions { previous: self.prev_line.clone(), current: l.source.clone(), translation: l.translation.clone() },
+            Some(l) => Captions { previous: self.prev_line.clone(), current: l.source.clone(), translation: l.translation.clone(), speaker: String::new() },
             None => self.note().map(|n| captions(n, self.frozen)).unwrap_or_default(),
         }
     }

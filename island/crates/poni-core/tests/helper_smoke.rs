@@ -122,8 +122,8 @@ fn island_reads_and_writes_the_real_helper() {
     // A captioned session saved as a meeting: generate the draft, post the document, read it back newest first.
     use poni_core::meeting_doc::{generate_body, generated_note, meeting_doc};
     let lines = [
-        helper::Line { t0: 0.0, t1: 4.0, source: "Decision: ship on Friday.".into(), translation: "line one".into() },
-        helper::Line { t0: 4.0, t1: 8.0, source: "Action: Alya sends the plan.".into(), translation: String::new() },
+        helper::Line { t0: 0.0, t1: 4.0, source: "Decision: ship on Friday.".into(), translation: "line one".into(), speaker: "You".into() },
+        helper::Line { t0: 4.0, t1: 8.0, source: "Action: Alya sends the plan.".into(), translation: String::new(), speaker: String::new() },
     ];
     let (code, reply) = helper::request(port, "POST", "/notes/generate", Some(&generate_body("Meeting", &lines))).expect("generate");
     assert_eq!(code, 200, "{reply}");

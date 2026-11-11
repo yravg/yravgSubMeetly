@@ -69,7 +69,7 @@ impl Log {
     pub(crate) fn push(&mut self, source: String, translation: String, span_s: f64) {
         let end = self.start.get_or_insert_with(Instant::now).elapsed().as_secs_f64();
         self.interim = None;
-        self.lines.push(helper::Line { t0: (end - span_s).max(0.0), t1: end, source, translation });
+        self.lines.push(helper::Line { t0: (end - span_s).max(0.0), t1: end, source, translation, speaker: String::new() });
         self.ms.push(None);
     }
 
@@ -124,7 +124,7 @@ impl Log {
         let mut out = self.lines[self.lines.len().saturating_sub(n)..].to_vec();
         if let Some(text) = &self.interim {
             let now = self.start.map_or(0.0, |s| s.elapsed().as_secs_f64());
-            out.push(helper::Line { t0: now, t1: now, source: text.clone(), translation: String::new() });
+            out.push(helper::Line { t0: now, t1: now, source: text.clone(), translation: String::new(), speaker: String::new() });
             if out.len() > n {
                 out.remove(0);
             }

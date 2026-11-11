@@ -364,6 +364,7 @@ impl App {
             "/engine/models" => self.post_engine_models(request),
             "/engine/models/location" => self.post_models_location(request),
             "/ui-prefs" => self.post_ui_prefs(request),
+            "/diarize" => self.post_diarize(request),
             "/notes/export" => self.post_notes_export(request),
             "/notes" => self.post_notes(request),
             "/notes/generate" => self.post_notes_generate(request, false),
@@ -1801,6 +1802,33 @@ impl App {
             200,
             json!({ "ok": true, "created": true, "note": note }),
         )
+    }
+
+    /// `POST /diarize {segments:[{t0,t1,text?,channel?}], path?, maxSpeakers?}` -> the segments with a
+    /// `speaker`. A segment's `channel` ("mic" / "system") gives "You" / "Others"; the others are
+    /// grouped by voice from the audio file at `path` ("Speaker N"). See `diarize.rs` for the limits.
+    fn post_diarize(&self, request: &Request) -> Response {
+        let Some(Value::Object(payload)) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "body must be a JSON object" }));
+        };
+        let segments = match payload.get("segments") {
+            Some(Value::Array(a)) => a.clone(),
+            _ => return self.json_response(request, 400, json!({ "error": "segments must be an array" })),
+        };
+        let max = payload.get("maxSpeakers").and_then(Value::as_u64).unwrap_or(0) as usize;
+        let needs_audio = segments.iter().any(|s| s.get("channel").and_then(Value::as_str).is_none_or(|c| c.trim().is_empty()));
+        let mut turns = Vec::new();
+        if needs_audio {
+            if let Some(path) = payload.get("path").and_then(Value::as_str).filter(|p| !p.is_empty()) {
+                match crate::audio::decode_file(std::path::Path::new(path)) {
+                    Ok(pcm) => turns = crate::diarize::diarize(&pcm, max),
+                    Err(e) => return self.json_response(request, 400, json!({ "error": format!("could not read the audio: {e}") })),
+                }
+            }
+        }
+        let labelled = crate::diarize::label_segments(&segments, &turns);
+        let speakers: std::collections::BTreeSet<String> = labelled.iter().filter_map(|s| s.get("speaker").and_then(Value::as_str).map(str::to_string)).collect();
+        self.json_response(request, 200, json!({ "segments": labelled, "speakers": speakers, "method": if turns.is_empty() { "channel" } else { "acoustic" } }))
     }
 
     fn post_notes_export(&self, request: &Request) -> Response {

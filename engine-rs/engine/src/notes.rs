@@ -220,6 +220,8 @@ fn normalize_transcript(raw: Option<&Value>) -> Vec<Value> {
         out.push(json!({
             "t0": number(line, "t0"),
             "t1": number(line, "t1"),
+            // Who said it ("You", "Others", "Speaker 2"): optional, absent in older documents.
+            "speaker": opt_text(line.get("speaker"), 80),
             "source": truncate(source, 2000),
             "translation": truncate(
                 flat_text(line.get("translation").unwrap_or(&Value::Null)),

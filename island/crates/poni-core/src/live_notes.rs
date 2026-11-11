@@ -302,7 +302,7 @@ mod tests {
     use super::*;
 
     fn line(source: &str) -> Line {
-        Line { t0: 0.0, t1: 4.0, source: source.into(), translation: String::new() }
+        Line { t0: 0.0, t1: 4.0, source: source.into(), translation: String::new(), speaker: String::new() }
     }
 
     fn note() -> Value {

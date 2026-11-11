@@ -152,6 +152,8 @@ pub struct Settings {
     /// Tell me when a meeting starts (the Mac: a meeting app on the microphone, or a calendar
     /// meeting, held a few seconds; [`crate::meeting_detect`]). It only tells: nothing is recorded.
     pub detect_meetings: bool,
+    /// Name who said a caption line ("You", "Others", "Speaker 2") when the engine labelled it.
+    pub show_speakers: bool,
     /// Captions carry a translation into `target_lang` (on by default, English); off: the spoken line only.
     pub translate_captions: bool,
     /// What Live captions listen to (`capture::Source::key`): `room` (default), `pc` or `both`.
@@ -288,6 +290,7 @@ impl Default for Settings {
             model_source: "huggingface".into(),
             auto_captions: true,
             detect_meetings: true,
+            show_speakers: true,
             translate_captions: true,
             live_source: "room".into(),
             mic_device: String::new(),
