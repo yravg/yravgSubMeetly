@@ -74,6 +74,8 @@ pub enum NotifyCmd {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     Media(MediaCmd),
+    /// Settings › Models › Summaries and AI: the engine's connector and default template (`crate::ai`).
+    Ai(crate::ai::AiCmd),
     /// Open a file/folder with its default handler.
     OpenPath(String),
     /// Settings › Meeting apps: add the host of the link on the clipboard.

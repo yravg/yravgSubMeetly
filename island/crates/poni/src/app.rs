@@ -2287,6 +2287,8 @@ impl App {
 
     /// Ask the engine which models it has (Settings shows them, every 10 s while open).
     fn refresh_models(&mut self) {
+        // The connector rows share the Models poll.
+        crate::ai::run(self.sink.clone(), poni_core::helper::configured_port(), crate::ai::AiCmd::Refresh);
         if self.st.models.busy {
             return;
         }
@@ -3049,6 +3051,15 @@ impl App {
                 if self.st.call.notes.busy {
                     self.st.call.notes.answer(self.st.now, draft);
                     self.request_frame();
+                }
+            }
+            AppEvent::Ai(e) => {
+                if let Some(view) = e.view {
+                    self.st.ai = view;
+                }
+                if let Some((ok, title, sub)) = e.notice {
+                    let (icon, color) = if ok { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
+                    self.st.notify(icon, color, title, sub, 6.0, None);
                 }
             }
             AppEvent::Models(r) => {
@@ -4979,6 +4990,10 @@ impl App {
                 }
                 Command::CallNotesRefresh => self.call_refresh(),
                 Command::ModelsRefresh => self.refresh_models(),
+                Command::Ai(c) => {
+                    let hwnd = self.hwnd;
+                    crate::ai::handle(self.sink.clone(), poni_core::helper::configured_port(), c, || services::clipboard::read_text(hwnd));
+                }
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelFolder(k) => self.place_model(k, true),

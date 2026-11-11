@@ -262,6 +262,20 @@ fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     rows
 }
 
+/// Settings › Models › Summaries and AI: the engine's custom AI connector and default summary template.
+fn ai_items(ai: &crate::ai::AiView) -> Vec<Item> {
+    let set = |v: &str, empty: &'static str| if v.is_empty() { empty.to_string() } else { v.to_string() };
+    let key = if ai.has_key { if ai.key_hint.is_empty() { "Saved. Never shown again.".to_string() } else { format!("Saved, ends in {}. Never shown again.", ai.key_hint) } } else { "Not set (some local servers need none)".to_string() };
+    vec![
+        switch(Key::AiEnabled, "Use my own AI model", Some("Off: everything stays on this computer. On: transcripts and questions go to your endpoint for summaries and Ask"), ai.enabled),
+        item(Key::AiUrl, "Endpoint", Some(&set(&ai.base_url, "Copy an OpenAI-compatible URL (https://…/v1, or http://localhost:11434/v1 for Ollama), then press Paste")), Ctl::Button("Paste URL")),
+        item(Key::AiModel, "Model name", Some(&set(&ai.model, "Copy the model's name, then press Paste")), Ctl::Button("Paste name")),
+        item(Key::AiKey, "API key", Some(&key), Ctl::Button("Paste key")),
+        item(Key::AiTest, "Check the connection", Some("Sends one tiny test message"), Ctl::Button("Test")),
+        item(Key::SummaryTemplate, "Summary template", Some("How notes are laid out: General, Standup, 1:1, Sales call, Interview, Retro, Project status"), Ctl::Stepper(ai.template_name())),
+    ]
+}
+
 /// Settings › Models › Download from: Hugging Face or ModelScope (modelscope.cn mirrors the
 /// catalog and answers where huggingface.co is slow or blocked).
 fn source_item(source: &str) -> Item {
@@ -362,6 +376,13 @@ pub enum Key {
     /// Model library: the On device / All / Recommended filter.
     LibFilter,
     ModelSource,
+    /// Summaries and AI: the connector's switch, its three fields (pasted), a test, and the default template.
+    AiEnabled,
+    AiUrl,
+    AiModel,
+    AiKey,
+    AiTest,
+    SummaryTemplate,
     /// Model library: a row's buttons; the index into the filtered list.
     LibModel(u8),
     /// Languages on this PC: a line that only says something.
@@ -673,6 +694,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         ],
         Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
+            .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai))])
             .chain([Kind::Asr, Kind::Translate].into_iter().map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k))))
             .chain([Block::Group(Some("Library"), library_items(st))])
             .collect(),
@@ -850,6 +872,34 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::AutoCaptions => s.auto_captions = !s.auto_captions,
         Key::DetectMeetings => s.detect_meetings = !s.detect_meetings,
         Key::ShowSpeakers => s.show_speakers = !s.show_speakers,
+        Key::AiEnabled => {
+            let on = !st.ai.enabled;
+            st.cmd(Command::Ai(crate::ai::AiCmd::Enable(on)));
+            return;
+        }
+        Key::AiUrl => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::PasteUrl));
+            return;
+        }
+        Key::AiModel => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::PasteModel));
+            return;
+        }
+        Key::AiKey => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::PasteKey));
+            return;
+        }
+        Key::AiTest => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::Test));
+            return;
+        }
+        Key::SummaryTemplate => {
+            if step != 0 {
+                let next = st.ai.step_template(step);
+                st.cmd(Command::Ai(crate::ai::AiCmd::SetTemplate(next)));
+            }
+            return;
+        }
         Key::TranslateCaptions => s.translate_captions = !s.translate_captions,
         Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
         Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
@@ -1948,6 +1998,8 @@ mod tests {
                     Key::WinLang(_) | Key::WinLangSettings => assert!(st.cmds.iter().any(|c| matches!(c, Command::WinLang(_))), "{:?}", it.key),
                     // Paste reads the clipboard and Pick lists running apps: the app does both.
                     Key::MeetingAddLink => assert!(st.cmds.contains(&Command::MeetingAddLink)),
+                    // The AI connector's rows ask the engine through the app.
+                    Key::AiEnabled | Key::AiUrl | Key::AiModel | Key::AiKey | Key::AiTest | Key::SummaryTemplate => assert!(st.cmds.iter().any(|c| matches!(c, Command::Ai(_))), "{:?}", it.key),
                     Key::MeetingPickApps => assert!(st.cmds.contains(&Command::MeetingPickApps)),
                     // The library's filter is a view of the list, not a setting.
                     Key::LibFilter => assert!(st.cmds.is_empty()),

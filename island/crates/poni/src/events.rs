@@ -82,6 +82,8 @@ pub enum LyricsResult {
 }
 
 pub enum AppEvent {
+    /// The engine's AI connector and templates, or how a change to them ended (`crate::ai`).
+    Ai(crate::ai::AiEvent),
     /// The current media session changed (None = nothing playing / no session).
     Media(Option<MediaSession>),
     /// Only the timeline/playback state of the current track changed.
