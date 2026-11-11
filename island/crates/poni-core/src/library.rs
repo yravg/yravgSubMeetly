@@ -4,7 +4,8 @@
 //! Pure: the island's Advanced settings › Models and the pill's Captions › Models draw from it.
 
 use crate::capture::{lang_name, LANGS};
-use crate::models::{Choice, Kind, Models, OFF};
+use crate::geom::{palette, Color};
+use crate::models::{Choice, Kind, Models, Status, OFF};
 use crate::phonedrop::fmt_bytes;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -49,6 +50,68 @@ impl Action {
             Action::Confirm => "Delete",
             Action::Keep => "Keep",
         }
+    }
+}
+
+/// A model's andon light: one look says where it stands (owner 2026-11-11).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Light {
+    /// On this PC and whole.
+    Ready,
+    /// Downloading or moving now.
+    Working,
+    /// Some files are here, the rest is missing (a download that stopped).
+    Partial,
+    /// The last download failed; the row says why.
+    Failed,
+    /// Not on this PC.
+    Absent,
+}
+
+impl Light {
+    pub fn of(st: &Status) -> Light {
+        match () {
+            _ if st.pulling || st.moving => Light::Working,
+            _ if st.error.is_some() => Light::Failed,
+            _ if st.downloaded => Light::Ready,
+            _ if st.partial > 0 => Light::Partial,
+            _ => Light::Absent,
+        }
+    }
+
+    pub fn color(self) -> Color {
+        match self {
+            Light::Ready => palette::GREEN,
+            Light::Working => palette::YELLOW,
+            Light::Partial => palette::ORANGE,
+            Light::Failed => palette::RED,
+            Light::Absent => palette::TEXT_FAINT,
+        }
+    }
+}
+
+/// How far a download is, 0 to 1, while one runs; a move shows its own.
+pub fn progress(st: &Status) -> Option<f32> {
+    let pct = if st.pulling {
+        st.pct
+    } else if st.moving {
+        st.move_pct
+    } else {
+        return None;
+    };
+    Some(pct.map_or(0.0, |p| f32::from(p.min(100)) / 100.0))
+}
+
+/// Where downloads come from: the setting's value and what Settings calls it.
+pub const SOURCES: [(&str, &str); 2] = [("huggingface", "Hugging Face"), ("modelscope", "ModelScope")];
+
+/// The web page of `id`'s files on `source`, for a download by hand. ModelScope keeps
+/// Whisper under `openai-mirror` (same as the engine's `modelscope_id`).
+pub fn files_url(source: &str, id: &str) -> String {
+    match (source, id.strip_prefix("openai/")) {
+        ("modelscope", Some(name)) => format!("https://www.modelscope.cn/models/openai-mirror/{name}/files"),
+        ("modelscope", None) => format!("https://www.modelscope.cn/models/{id}/files"),
+        _ => format!("https://huggingface.co/{id}/tree/main"),
     }
 }
 
@@ -100,7 +163,8 @@ impl Entry<'_> {
             return format!("Delete {}? Frees {}.", c.label, fmt_bytes(st.bytes));
         }
         if st.pulling {
-            return st.pct.map_or("Downloading…".into(), |p| format!("Downloading {p}%"));
+            let size = if st.total > 0 { format!(" · {} of {}", fmt_bytes(st.done), fmt_bytes(st.total)) } else { String::new() };
+            return st.pct.map_or("Downloading…".into(), |p| format!("Downloading {p}%{size}"));
         }
         if let Some(e) = &st.error {
             return format!("Failed: {e}");
@@ -108,6 +172,7 @@ impl Entry<'_> {
         match (st.downloaded, self.in_use(m)) {
             (true, true) => format!("In use · on device, {}", fmt_bytes(st.bytes)),
             (true, false) => format!("On device, {}", fmt_bytes(st.bytes)),
+            _ if st.partial > 0 => format!("Part downloaded, {} of about {}", fmt_bytes(st.partial), fmt_bytes(c.approx_bytes)),
             _ => format!("Not downloaded, about {}", fmt_bytes(c.approx_bytes)),
         }
     }
@@ -303,5 +368,41 @@ mod tests {
         assert_eq!(get("Indonesian"), "Speech on device · translated by Qwen small, on device · fast pair from English: on device");
         assert_eq!(get("Chinese"), "Speech on device · translated by Qwen small, on device");
         assert_eq!(rows.len(), LANGS.len());
+    }
+
+    #[test]
+    fn each_row_has_an_andon_light_and_a_bar_while_it_downloads() {
+        let m = models();
+        let lights: Vec<Light> = entries(&m).iter().map(|e| Light::of(&e.c.st)).collect();
+        // base, small, q-small on device; q-big pulling; q-mid failed; en-id on device; ja-en absent.
+        assert!(lights.contains(&Light::Ready));
+        let at = |id: &str| entries(&m).into_iter().find(|e| e.c.id.ends_with(id)).unwrap();
+        assert_eq!(Light::of(&at("q-big").c.st), Light::Working);
+        assert_eq!(progress(&at("q-big").c.st), Some(0.42));
+        assert_eq!(Light::of(&at("q-mid").c.st), Light::Failed);
+        assert_eq!(progress(&at("q-mid").c.st), None);
+        assert_eq!(Light::of(&at("ja-en").c.st), Light::Absent);
+        assert_eq!(Light::Failed.color(), palette::RED);
+
+        let mut st = Status { partial: 120_000_000, ..Status::default() };
+        assert_eq!(Light::of(&st), Light::Partial);
+        st.pulling = true;
+        st.pct = Some(30);
+        st.done = 90_000_000;
+        st.total = 300_000_000;
+        assert_eq!(Light::of(&st), Light::Working, "a retry is yellow, not red, even after a failure");
+        let mut c = at("ja-en").c.clone();
+        c.st = st;
+        assert_eq!(Entry { c: &c, pair: true }.state(&m), "Downloading 30% · 90 MB of 300 MB");
+        c.st = Status { partial: 120_000_000, ..Status::default() };
+        assert_eq!(Entry { c: &c, pair: true }.state(&m), "Part downloaded, 120 MB of about 303 MB");
+    }
+
+    #[test]
+    fn by_hand_opens_the_files_page_of_the_chosen_source() {
+        assert_eq!(files_url("huggingface", "openai/whisper-base"), "https://huggingface.co/openai/whisper-base/tree/main");
+        assert_eq!(files_url("modelscope", "openai/whisper-base"), "https://www.modelscope.cn/models/openai-mirror/whisper-base/files");
+        assert_eq!(files_url("modelscope", "unsloth/Qwen3-0.6B-GGUF"), "https://www.modelscope.cn/models/unsloth/Qwen3-0.6B-GGUF/files");
+        assert_eq!(files_url("", "a/b"), "https://huggingface.co/a/b/tree/main", "an unknown value is Hugging Face");
     }
 }

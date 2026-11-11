@@ -29,19 +29,20 @@ fn read(port: u16) -> Result<Inventory, String> {
 }
 
 /// Download `id`; `AppEvent::Models` says how far it is, `AppEvent::ModelPulled` how it ended.
-pub fn pull(sink: EventSink, port: u16, kind: Kind, id: String) {
+/// `source`: `huggingface` or `modelscope` (Settings › Models › Download from).
+pub fn pull(sink: EventSink, port: u16, kind: Kind, id: String, source: String) {
     std::thread::Builder::new()
         .name("poni-models-pull".into())
         .spawn(move || {
-            let result = start(port, &id).and_then(|()| follow(&sink, port, &id));
+            let result = start(port, &id, &source).and_then(|()| follow(&sink, port, &id));
             sink.send(AppEvent::ModelPulled { kind, id, result });
         })
         .ok();
 }
 
 /// 200 (already on disk) and 202 (started, or already under way) both mean "watch the row".
-fn start(port: u16, id: &str) -> Result<(), String> {
-    let body = serde_json::json!({ "id": id }).to_string();
+fn start(port: u16, id: &str, source: &str) -> Result<(), String> {
+    let body = serde_json::json!({ "id": id, "source": source }).to_string();
     match helper::request(port, "POST", "/models/pull", Some(&body)) {
         Ok((200 | 202, _)) => Ok(()),
         Ok((code, reply)) => Err(sentence(&reply, code)),

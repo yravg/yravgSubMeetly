@@ -21,9 +21,9 @@ use crate::settings_window::{self, Key, Section};
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_SMALL};
 use poni_core::capture::{lang_name, resolve_px, step_px, Show, Source};
-use poni_core::library::{Action as LibAction, Filter};
+use poni_core::library::{Action as LibAction, Filter, Light};
 use poni_core::livecap;
-use poni_core::geom::{palette, Color, Rect};
+use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::meeting_source::Family;
 use poni_core::models::Kind;
 use poni_core::utterance::Latency;
@@ -327,7 +327,7 @@ fn lib_search_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
 
 /// One model: its name over kind · languages · state, its buttons at the right.
 fn lib_row(ui: &mut Ui, st: &mut AppState, r: Rect, n: usize) {
-    let Some((id, kind, pair, dir, label, sub, acts)) = settings_window::library_shown(st, &st.ui.lib_query).get(n).map(|e| (e.c.id.clone(), e.c.kind, e.pair, e.c.st.dir.clone(), e.c.label.clone(), e.sub(&st.models), e.actions(&st.models))) else { return };
+    let Some((id, kind, pair, dir, label, sub, acts, light, bar)) = settings_window::library_shown(st, &st.ui.lib_query).get(n).map(|e| (e.c.id.clone(), e.c.kind, e.pair, e.c.st.dir.clone(), e.c.label.clone(), e.sub(&st.models), e.actions(&st.models), Light::of(&e.c.st), poni_core::library::progress(&e.c.st))) else { return };
     let mut x = r.right() - PAD;
     let mut pressed = None;
     for (k, a) in acts.iter().enumerate().rev() {
@@ -340,9 +340,17 @@ fn lib_row(ui: &mut Ui, st: &mut AppState, r: Rect, n: usize) {
             pressed = Some(*a);
         }
     }
-    let tw = (x - 4.0 - r.x - PAD).max(0.0);
-    ui.c.text(&label, Rect::new(r.x + PAD, r.y + 3.0, tw, 18.0), &TextStyle::body().weight(Weight::Regular));
-    ui.c.text(&sub, Rect::new(r.x + PAD, r.y + 20.0, tw, 16.0), &TextStyle::caption().color(palette::TEXT_DIM));
+    // The andon light (as in Advanced settings › Models), then the name.
+    ui.c.fill_circle(Point::new(r.x + PAD + 4.0, r.y + 12.0), 4.0, light.color());
+    let lx = r.x + PAD + 14.0;
+    let tw = (x - 4.0 - lx).max(0.0);
+    ui.c.text(&label, Rect::new(lx, r.y + 3.0, tw, 18.0), &TextStyle::body().weight(Weight::Regular));
+    ui.c.text(&sub, Rect::new(lx, r.y + 20.0, tw, 16.0), &TextStyle::caption().color(palette::TEXT_DIM));
+    if let Some(p) = bar {
+        let track = Rect::new(lx, r.bottom() - 3.0, (r.right() - PAD - lx).max(0.0), 2.0);
+        ui.c.fill_rrect(track, 1.0, palette::TRACK);
+        ui.c.fill_rrect(Rect::new(track.x, track.y, (track.w * p.clamp(0.0, 1.0)).max(2.0), 2.0), 1.0, palette::YELLOW);
+    }
     if let Some(a) = pressed {
         settings_window::library_act(st, id, kind, pair, dir, a);
     }

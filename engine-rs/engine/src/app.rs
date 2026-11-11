@@ -1075,6 +1075,19 @@ impl App {
                 json!({ "error": "id must be one of the /models inventory ids" }),
             );
         };
+        let source = match payload.get("source").and_then(Value::as_str) {
+            None => crate::ml::Source::default(),
+            Some(s) => match crate::ml::Source::parse(s) {
+                Some(source) => source,
+                None => {
+                    return self.json_response(
+                        request,
+                        400,
+                        json!({ "error": "source must be huggingface or modelscope" }),
+                    )
+                }
+            },
+        };
         let status = |started: bool| {
             self.model_reply(&want, kind, json!({ "ok": true, "started": started }))
         };
@@ -1141,16 +1154,19 @@ impl App {
         std::thread::Builder::new()
             .name(format!("pull-{id}"))
             .spawn(move || {
-                let result = crate::models::pull(&cache, &id, kind, &progress);
+                let result = crate::ml::with_source(source, || {
+                    crate::models::pull(&cache, &id, kind, &progress)
+                });
                 let mut transfers = transfers_lock(&transfers);
                 match result {
                     Ok(()) => {
                         transfers.pulls.remove(&id);
                     }
                     Err(error) => {
-                        eprintln!("[pull] {id}: {error:#}");
+                        eprintln!("[pull] {id} from {}: {error:#}", source.label());
                         if let Some(pull) = transfers.pulls.get_mut(&id) {
-                            pull.error = Some(format!("download failed: {error:#}"));
+                            pull.error =
+                                Some(format!("download failed ({}): {error:#}", source.label()));
                         }
                     }
                 }
