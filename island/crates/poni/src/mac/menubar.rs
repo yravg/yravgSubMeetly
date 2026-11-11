@@ -28,6 +28,10 @@ pub enum MenuCmd {
     SetTheme(Theme),
     SetIdleStyle(IdleStyle),
     ToggleSounds,
+    /// The subtitle overlay: on or off, freeze or resume it, copy its newest sentence.
+    ToggleOverlay,
+    PauseOverlay,
+    CopyOverlay,
     /// true: hide in full-screen apps; false: stay on top of them.
     SetHideFullscreen(bool),
     ToggleLogin,
@@ -113,6 +117,10 @@ pub fn menu_items(s: &Settings, pinned: bool, login: Login, update: UpdateLine) 
         item("Meeting", MenuCmd::OpenCall, false),
         item("Minutes", MenuCmd::OpenMeeting, false),
         item("Inbox", MenuCmd::OpenInbox, false),
+        MenuItem::Separator,
+        item("Subtitle overlay", MenuCmd::ToggleOverlay, s.overlay.enabled),
+        item("Pause or resume the overlay", MenuCmd::PauseOverlay, false),
+        item("Copy the current caption", MenuCmd::CopyOverlay, false),
         MenuItem::Separator,
         MenuItem::Item { label: "Advanced settings…".into(), cmd: MenuCmd::ShowSettings, checked: false, key: "," },
         MenuItem::Separator,

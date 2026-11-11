@@ -23,6 +23,7 @@ use crate::notch::{self, Fit, Notch};
 use crate::pages::{self, PageKind};
 use crate::paths;
 use crate::pill;
+use crate::overlay;
 use crate::services;
 use crate::settings_host;
 use crate::settings_window::{self, Section};
@@ -280,6 +281,17 @@ pub fn on_frame_tick(timestamp: f64, target: f64) {
         window::redraw(d);
     }
     enter(|a| a.end_frame());
+}
+
+/// The overlay's own half-second beat: refreshes the strip whatever the island is doing.
+fn start_overlay_pulse() {
+    let block = block2::RcBlock::new(|_t: std::ptr::NonNull<objc2_foundation::NSTimer>| {
+        enter(|a| {
+            a.refresh_time();
+            a.overlay_tick();
+        });
+    });
+    let _ = unsafe { objc2_foundation::NSTimer::scheduledTimerWithTimeInterval_repeats_block(0.5, true, &block) };
 }
 
 pub fn draw_into(ctx: &CGContext, dirty: Rect) {
@@ -629,6 +641,9 @@ impl App {
         services::power::watch(self.sink.clone());
         services::audio::start(self.sink.clone());
         self.media = Some(services::media::MediaService::start(self.mtm, self.sink.clone()));
+        // The subtitle overlay follows the captions on its own beat: the island draws no frames while
+        // nothing moves on it (and none at all with the screens asleep).
+        start_overlay_pulse();
         match services::engine::EngineService::start(self.sink.clone()) {
             Ok(e) => self.engine = Some(e),
             Err(e) => pwarn!("engine: the supervisor did not start ({e})"),
@@ -1116,6 +1131,9 @@ impl App {
             MenuCmd::SetTheme(t) => s.theme = t,
             MenuCmd::SetIdleStyle(style) => s.idle_style = style,
             MenuCmd::ToggleSounds => s.sounds = !s.sounds,
+            MenuCmd::ToggleOverlay => s.overlay.enabled = !s.overlay.enabled,
+            MenuCmd::PauseOverlay => self.st.overlay.paused = !self.st.overlay.paused,
+            MenuCmd::CopyOverlay => self.overlay_copy(),
             MenuCmd::SetHideFullscreen(hide) => s.hide_in_fullscreen = hide,
             MenuCmd::ToggleLyrics => s.lyrics = !s.lyrics,
             MenuCmd::TogglePronunciation => s.lyrics_pronunciation = !s.lyrics_pronunciation,
@@ -1725,6 +1743,69 @@ impl App {
         let in_use = self.updater.is_some();
         if ours && status == AddonStatus::Off && !in_use && !pages::addons::OFFERED.iter().any(|a| a.downloads() && self.st.settings.addon_on(a.id)) {
             self.addons = None;
+        }
+    }
+
+    // ------------------------------------------------------------ the subtitle overlay
+
+    /// What the overlay should show now: sample captions while a preview runs, what it showed while
+    /// it is paused, else the session's newest lines.
+    fn overlay_sentences(&mut self) -> Vec<poni_core::overlay::Sentence> {
+        use poni_core::overlay::Sentence;
+        let now = self.st.now;
+        // YSM_OVERLAY_DEMO=1 (dev runs): the sample captions stay up, to look at the strip.
+        static DEMO: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        let demo = *DEMO.get_or_init(|| std::env::var_os("YSM_OVERLAY_DEMO").is_some());
+        if demo || self.st.overlay.preview_until > now {
+            let s = |o: &str, t: &str| Sentence { original: o.into(), translation: t.into(), live: false };
+            return vec![
+                s("Welcome, everyone. Let's start with the agenda.", "Selamat datang semuanya. Mari kita mulai dengan agenda."),
+                s("The first item is the release plan.", "Butir pertama adalah rencana rilis."),
+            ];
+        }
+        if self.st.overlay.paused {
+            return self.st.overlay.shown.clone();
+        }
+        let n = self.st.call.lines.len();
+        let lines: Vec<Sentence> = self
+            .st
+            .call
+            .lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| Sentence { original: l.source.clone(), translation: l.translation.clone(), live: self.st.call.interim && i + 1 == n })
+            .collect();
+        self.st.overlay.shown = lines.clone();
+        lines
+    }
+
+    /// Keep the strip as the settings and the captions say; remember where the person dragged it.
+    fn overlay_tick(&mut self) {
+        if !self.st.settings.overlay.enabled {
+            overlay::hide();
+            return;
+        }
+        let now = self.st.now;
+        if self.st.overlay.preview_until != 0.0 && now >= self.st.overlay.preview_until {
+            self.st.overlay.preview_until = 0.0;
+        }
+        if !self.st.settings.overlay.click_through {
+            if let Some(spot) = overlay::dragged_to() {
+                self.st.settings.overlay.spot = Some(spot);
+                self.st.cmds.push(Command::SaveSettings);
+            }
+        }
+        let sentences = self.overlay_sentences();
+        let settings = self.st.settings.overlay.clone();
+        let content = overlay::Content { sentences: poni_core::overlay::visible(&sentences, &settings), settings, paused: self.st.overlay.paused };
+        let Some(screen) = window::pick_screen(self.mtm) else { return };
+        overlay::show(self.mtm, &content, poni_core::geom::Rect::new(screen.x as f32, screen.y as f32, screen.w as f32, screen.h as f32));
+    }
+
+    fn overlay_copy(&mut self) {
+        if let Some(text) = poni_core::overlay::copy_text(&self.st.overlay.shown) {
+            services::clipboard::set_text(&text);
+            self.st.notify(Icon::Check, palette::GREEN, "Caption copied", "The current line is on the clipboard", 3.0, None);
         }
     }
 
@@ -2782,6 +2863,17 @@ impl App {
                         None => pages::script::note(&mut self.st, "Copy your script first"),
                     }
                 }
+                Command::OverlayPreview => {
+                    self.st.settings.overlay.enabled = true;
+                    self.st.overlay.preview_until = self.st.now + 8.0;
+                    self.st.cmds.push(Command::SaveSettings);
+                }
+                Command::OverlayToggle => {
+                    self.st.settings.overlay.enabled = !self.st.settings.overlay.enabled;
+                    self.st.cmds.push(Command::SaveSettings);
+                }
+                Command::OverlayPause => self.st.overlay.paused = !self.st.overlay.paused,
+                Command::OverlayCopy => self.overlay_copy(),
                 Command::SaveSettings => {
                     let before = self.saved_settings.clone();
                     self.settings_changed(&before);
@@ -3017,6 +3109,7 @@ impl App {
 
     fn tick(&mut self) {
         let now = self.st.now;
+        self.overlay_tick();
         // Settings shows the engine's models: asked when it opens and every 10 s while it is open.
         if self.settings_ui.is_some() && now - self.models_asked >= 10.0 {
             self.models_asked = now;

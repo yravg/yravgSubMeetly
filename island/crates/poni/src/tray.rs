@@ -65,6 +65,10 @@ pub enum MenuCmd {
     /// Show over games for a few seconds at a time instead of all along.
     ToggleGamePeek,
     ToggleSounds,
+    /// The subtitle overlay: on or off, freeze or resume it, copy its newest sentence.
+    ToggleOverlay,
+    PauseOverlay,
+    CopyOverlay,
     TogglePinned,
     /// "Move island to the centre": back from where it was dragged.
     CentreIsland,
@@ -165,6 +169,10 @@ pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &Engin
     for (label, cmd) in [("Open yravgSubMeetly", MenuCmd::OpenApp), ("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenCall), ("Minutes", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
         items.push(item(label, cmd, false));
     }
+    items.push(MenuItem::Separator);
+    items.push(item("Subtitle overlay", MenuCmd::ToggleOverlay, s.overlay.enabled));
+    items.push(item("Pause or resume the overlay", MenuCmd::PauseOverlay, false));
+    items.push(item("Copy the current caption", MenuCmd::CopyOverlay, false));
     items.push(MenuItem::Separator);
     for (label, cmd) in product_actions(engine, matches!(update, UpdateLine::Check), capturing) {
         items.push(match cmd {

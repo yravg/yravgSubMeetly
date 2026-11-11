@@ -72,6 +72,8 @@ mod version;
 #[cfg(any(windows, target_os = "macos"))]
 mod updates;
 #[cfg(windows)]
+mod overlay_win;
+#[cfg(windows)]
 mod window;
 
 // The Mac app's own modules (same names as their Windows twins, so the
@@ -100,6 +102,9 @@ mod menubar;
 #[cfg(target_os = "macos")]
 #[path = "mac/notch.rs"]
 mod notch;
+#[cfg(target_os = "macos")]
+#[path = "mac/overlay.rs"]
+mod overlay;
 #[cfg(target_os = "macos")]
 #[path = "mac/paths.rs"]
 mod paths;

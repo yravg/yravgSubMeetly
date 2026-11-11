@@ -169,6 +169,12 @@ pub enum Command {
     CallNotesRefresh,
     /// Ask the engine which models it has.
     ModelsRefresh,
+    /// The subtitle overlay: show sample captions for a few seconds; switch it on or off; freeze or
+    /// resume what it shows; copy its newest sentence.
+    OverlayPreview,
+    OverlayToggle,
+    OverlayPause,
+    OverlayCopy,
     /// Download this model.
     ModelPull(poni_core::models::Kind),
     /// Switch the engine to this model (`models::OFF` for no translation).
