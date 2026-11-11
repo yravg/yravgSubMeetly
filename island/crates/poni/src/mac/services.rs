@@ -56,6 +56,12 @@ pub mod update;
 // itself (Windows' windows and microphone users) has no Mac twin yet.
 #[path = "services/meeting_probe.rs"]
 pub mod meeting_probe;
+// The engine: kept running by `engine.rs` (the Mac copy of the Windows supervisor), asked for
+// its models by the shared `models.rs`.
+#[path = "services/engine.rs"]
+pub mod engine;
+#[path = "../services/models.rs"]
+pub mod models;
 #[path = "services/location.rs"]
 pub mod location;
 #[path = "services/login.rs"]

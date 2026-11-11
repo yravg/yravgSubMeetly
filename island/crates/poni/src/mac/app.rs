@@ -464,6 +464,10 @@ pub struct App {
     lyrics: Option<services::lyrics::LyricsService>,
     /// The add-ons' downloader: only while an add-on is switched on.
     addons: Option<services::addons::AddonService>,
+    /// The local engine (captions, translation, models): kept running while the app runs.
+    engine: Option<services::engine::EngineService>,
+    /// When Settings last asked the engine for its models (mono seconds).
+    models_asked: f64,
     /// The Downloader add-on's runner: started at the first download.
     downloader: Option<services::downloader::DownloaderService>,
     /// New versions (`crate::updates`); None in the smoke test.
@@ -590,6 +594,8 @@ impl App {
             media: None,
             lyrics: None,
             addons: None,
+            engine: None,
+            models_asked: f64::NEG_INFINITY,
             downloader: None,
             updater: None,
             adzan: Default::default(),
@@ -623,6 +629,10 @@ impl App {
         services::power::watch(self.sink.clone());
         services::audio::start(self.sink.clone());
         self.media = Some(services::media::MediaService::start(self.mtm, self.sink.clone()));
+        match services::engine::EngineService::start(self.sink.clone()) {
+            Ok(e) => self.engine = Some(e),
+            Err(e) => pwarn!("engine: the supervisor did not start ({e})"),
+        }
         self.lyrics = match services::lyrics::LyricsService::start(self.sink.clone()) {
             Ok(l) => Some(l),
             Err(e) => {
@@ -661,6 +671,10 @@ impl App {
         // Downloads under way end with the app (std::process::exit runs no
         // destructors): yt-dlp's groups get their SIGTERM now.
         self.downloader = None;
+        // The engine this app started goes with it (one it found running is left alone).
+        if let Some(e) = self.engine.take() {
+            e.stop();
+        }
         pinfo!("yravgSubMeetly exiting with code {code}");
         std::process::exit(code);
     }
@@ -1145,12 +1159,16 @@ impl App {
             MenuCmd::OpenCall => self.open_page(PageKind::Call),
             MenuCmd::OpenMeeting => self.open_page(PageKind::Meeting),
             MenuCmd::OpenInbox => self.open_page(PageKind::Inbox),
-            // The engine, the Chrome extension and the island's own captions are
-            // the Windows app's services; the Mac has no twin of them yet.
+            MenuCmd::StartEngine => self.engine_start(),
+            MenuCmd::RestartEngine => {
+                if let Some(e) = &self.engine {
+                    e.restart();
+                }
+            }
+            // The Chrome extension and the island's own captions are the Windows
+            // app's services; the Mac has no twin of them yet.
             MenuCmd::OpenApp
             | MenuCmd::OpenMinutes
-            | MenuCmd::StartEngine
-            | MenuCmd::RestartEngine
             | MenuCmd::SetupExtension
             | MenuCmd::OpenCaptionsPanel
             | MenuCmd::StartCaptions
@@ -1473,7 +1491,7 @@ impl App {
         self.st.now = now;
         let media_before = matches!(ev, AppEvent::Media(_) | AppEvent::MediaTimeline { .. }).then(|| self.media_snapshot());
         // What the Settings window shows that a service reports.
-        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_));
+        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
         if let Some(s) = self.settings_ui.as_mut().filter(|_| shown) {
             s.view.dirty = true;
         }
@@ -1626,6 +1644,14 @@ impl App {
             AppEvent::Locked(on) => self.set_away(None, Some(on)),
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
+            AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::Models(r) => {
+                self.st.models.apply(r, now);
+            }
+            AppEvent::ModelPulled { kind, id, result } => self.on_model_pulled(kind, id, result),
+            AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
+            AppEvent::ModelDeleted { id, result } => self.on_model_deleted(id, result),
+            AppEvent::ModelPlaced { kind, result } => self.on_model_placed(kind, result),
             AppEvent::Download { id, line } => self.download_line(id, line),
             AppEvent::DownloadEnded { id, ok } => self.download_ended(id, ok),
             AppEvent::Update(services::update::UpdateEvent::Checked(r)) => {
@@ -1700,6 +1726,115 @@ impl App {
         if ours && status == AddonStatus::Off && !in_use && !pages::addons::OFFERED.iter().any(|a| a.downloads() && self.st.settings.addon_on(a.id)) {
             self.addons = None;
         }
+    }
+
+    // ------------------------------------------------------------ the engine and its models
+
+    /// Start the engine now (Retry, a download, a first look at Settings).
+    fn engine_start(&self) {
+        if let Some(e) = &self.engine {
+            e.start_now();
+        }
+    }
+
+    /// Ask the engine which models it has (Settings shows them, every 10 s while open).
+    fn refresh_models(&mut self) {
+        if self.st.models.busy {
+            return;
+        }
+        self.st.models.busy = true;
+        services::models::fetch(self.sink.clone(), poni_core::helper::configured_port());
+    }
+
+    /// Download the model Settings shows for `kind` (the engine's own unless one was stepped to);
+    /// the engine is started first. One job per model: nothing starts while it already downloads.
+    fn pull_model(&mut self, kind: poni_core::models::Kind) {
+        let m = &mut self.st.models;
+        let Some(id) = m.chosen(kind).filter(|id| id != poni_core::models::OFF) else { return };
+        if m.pulling.is_some() || m.status(&id).is_some_and(|s| s.pulling) {
+            return;
+        }
+        m.pulling = Some(kind);
+        m.failed = None;
+        self.engine_start();
+        services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id, self.st.settings.model_source.clone());
+    }
+
+    /// The library's Download: any model by id, under the same one-job rule as [`Self::pull_model`].
+    fn pull_model_id(&mut self, id: String) {
+        let m = &mut self.st.models;
+        // A pair downloads like a translation model (its events carry that kind).
+        let Some(kind) = m.catalog.iter().chain(&m.pairs).find(|c| c.id == id).map(|c| c.kind) else { return };
+        if m.pulling.is_some() || m.status(&id).is_some_and(|s| s.pulling) {
+            return;
+        }
+        m.pulling = Some(kind);
+        m.failed = None;
+        self.engine_start();
+        services::models::pull(self.sink.clone(), poni_core::helper::configured_port(), kind, id, self.st.settings.model_source.clone());
+    }
+
+    /// The library's confirmed Delete. Never the model in use (the row has no Delete then, and the engine refuses).
+    fn delete_model(&mut self, id: String) {
+        let m = &mut self.st.models;
+        m.deleting = None;
+        if m.removing.is_some() || [poni_core::models::Kind::Asr, poni_core::models::Kind::Translate].iter().any(|&k| m.selected(k).as_deref() == Some(id.as_str())) {
+            return;
+        }
+        m.removing = Some(id.clone());
+        services::models::delete(self.sink.clone(), poni_core::helper::configured_port(), id);
+    }
+
+    fn on_model_deleted(&mut self, id: String, result: std::result::Result<u64, String>) {
+        self.st.models.removing = None;
+        let name = self.st.models.catalog.iter().chain(&self.st.models.pairs).find(|c| c.id == id).map_or(id.clone(), |c| c.label.clone());
+        match result {
+            Ok(freed) => self.st.notify(Icon::Check, palette::GREEN, format!("{name} deleted"), format!("{} freed", poni_core::phonedrop::fmt_bytes(freed)), 6.0, None),
+            Err(e) => self.st.notify(Icon::Download, palette::ORANGE, format!("{name} not deleted"), e, 8.0, None),
+        }
+        self.refresh_models();
+    }
+
+    fn select_model(&mut self, kind: poni_core::models::Kind, id: String) {
+        services::models::select(self.sink.clone(), poni_core::helper::configured_port(), kind, id);
+    }
+
+    fn on_model_pulled(&mut self, kind: poni_core::models::Kind, id: String, result: std::result::Result<(), String>) {
+        self.st.models.pulling = None;
+        self.st.models.failed = result.err().map(|e| (kind, e));
+        // A model stepped to and now on disk is what the person asked for: switch to it.
+        if self.st.models.failed.is_none() && self.st.models.chosen(kind).as_deref() == Some(id.as_str()) && self.st.models.selected(kind).as_deref() != Some(id.as_str()) {
+            self.select_model(kind, id.clone());
+        }
+        self.refresh_models();
+        let title = if self.st.models.failed.is_none() { format!("{} downloaded", kind.label()) } else { format!("{} download failed", kind.label()) };
+        let (icon, color) = if self.st.models.failed.is_none() { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::RED) };
+        let sub = self.st.models.failed.as_ref().map_or_else(|| "Captions start by themselves".to_string(), |(_, e)| e.clone());
+        // The full reason goes to poni.log so a failure can be read back later, not only seen.
+        match &self.st.models.failed {
+            Some((_, e)) => pinfo!("models: download {id} from {} failed: {e}", self.st.settings.model_source),
+            None => pinfo!("models: download {id} from {} finished", self.st.settings.model_source),
+        }
+        // A failure stays up longer: it has a reason to read.
+        let secs = if self.st.models.failed.is_none() { 6.0 } else { 15.0 };
+        self.st.notify(icon, color, title, sub, secs, None);
+    }
+
+    /// A model's folder is the engine's own on the Mac (no picker): nothing to move.
+    fn on_model_placed(&mut self, _kind: poni_core::models::Kind, result: std::result::Result<(), String>) {
+        self.st.models.placing = None;
+        if let Err(e) = result {
+            self.st.notify(Icon::Download, palette::ORANGE, "Model not moved", e, 8.0, None);
+        }
+        self.refresh_models();
+    }
+
+    fn on_model_selected(&mut self, kind: poni_core::models::Kind, result: std::result::Result<(), String>) {
+        if let Err(e) = result {
+            self.st.models.set_pick(kind, None);
+            self.st.notify(Icon::Download, palette::ORANGE, format!("{} not switched", kind.label()), e, 6.0, None);
+        }
+        self.refresh_models();
     }
 
     // ------------------------------------------------------------ prayer times
@@ -2705,6 +2840,13 @@ impl App {
                 // Windows' language features are Windows'.
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
+                Command::ModelsRefresh => self.refresh_models(),
+                Command::ModelPull(k) => self.pull_model(k),
+                Command::ModelSelect(k, id) => self.select_model(k, id),
+                Command::ModelPullId(id) => self.pull_model_id(id),
+                Command::ModelDelete(id) => self.delete_model(id),
+                // A model's folder is the engine's own on the Mac (no picker).
+                Command::ModelFolder(_) | Command::ModelFolderReset(_) => {}
                 Command::RestoreLiveCaptions => {} // Windows Live Captions: no such thing on macOS
                 Command::Menu(c) => self.on_menu(c),
                 // What the Windows app's engine, captions and calendar services
@@ -2875,6 +3017,11 @@ impl App {
 
     fn tick(&mut self) {
         let now = self.st.now;
+        // Settings shows the engine's models: asked when it opens and every 10 s while it is open.
+        if self.settings_ui.is_some() && now - self.models_asked >= 10.0 {
+            self.models_asked = now;
+            self.refresh_models();
+        }
         if let Some(h) = &self.st.hud {
             if now >= h.until {
                 self.st.hud = None;

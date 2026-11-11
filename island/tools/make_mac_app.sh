@@ -35,8 +35,21 @@ if [ "$icns" != "-" ]; then
   cp "$icns" "$app/Contents/Resources/yravgSubMeetly.icns"
 fi
 
-# The local engine is not in the app: the island starts submeetly-engine when it is installed, and the
-# Mac app's own on-device engines do the rest (see docs/updates.md).
+# The local engine (captions, translation, the model library): the island starts it from Contents/MacOS
+# (services/engine.rs) and stops it on quit. ENGINE_ARM / ENGINE_INTEL are its release binaries
+# (engine-rs, `cargo build -p submeetly-engine --release --target ...`). Without ENGINE_ARM the app has
+# no engine and says "Engine not found".
+if [ -n "${ENGINE_ARM:-}" ]; then
+  if [ -n "${ENGINE_INTEL:-}" ]; then
+    lipo -create -output "$app/Contents/MacOS/submeetly-engine" "$ENGINE_ARM" "$ENGINE_INTEL"
+  else
+    cp "$ENGINE_ARM" "$app/Contents/MacOS/submeetly-engine"
+  fi
+  chmod +x "$app/Contents/MacOS/submeetly-engine"
+  lipo -info "$app/Contents/MacOS/submeetly-engine"
+else
+  echo "warning: no ENGINE_ARM given, the app is built without its engine" >&2
+fi
 
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
