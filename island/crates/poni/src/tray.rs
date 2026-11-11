@@ -65,6 +65,10 @@ pub enum MenuCmd {
     /// Show over games for a few seconds at a time instead of all along.
     ToggleGamePeek,
     ToggleSounds,
+    /// The subtitle overlay: on or off, freeze or resume it, copy its newest sentence.
+    ToggleOverlay,
+    PauseOverlay,
+    CopyOverlay,
     TogglePinned,
     /// "Move island to the centre": back from where it was dragged.
     CentreIsland,
@@ -101,6 +105,10 @@ pub enum MenuCmd {
     /// Captions from what the PC plays (the island's own capture).
     StartCaptions,
     StopCaptions,
+    /// Copy the caption on screen, with its translation.
+    CopyCaption,
+    /// Pause or resume the translation of running captions.
+    ToggleTranslationPause,
     Quit,
 }
 
@@ -155,7 +163,8 @@ pub fn product_actions(engine: &EngineInfo, check: bool, capturing: bool) -> Vec
 
 /// `update`: a later version the update file offers, or Check for updates…
 /// (`crate::updates::menu_line`). `engine`: the engine link's last word.
-pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &EngineInfo, capturing: bool) -> Vec<MenuItem> {
+/// `paused`: the translation of the running captions is paused (the menu offers to resume it).
+pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &EngineInfo, capturing: bool, paused: bool) -> Vec<MenuItem> {
     // The look the theme draws is the one checked: outside Pill, Status shows the clock.
     let shown = crate::pill::status::shown(s.theme, s.idle_style);
     let style = |st: IdleStyle| item(idle_label(st), MenuCmd::ToggleIdleStyle(st), shown == st);
@@ -166,11 +175,20 @@ pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &Engin
         items.push(item(label, cmd, false));
     }
     items.push(MenuItem::Separator);
+    items.push(item("Subtitle overlay", MenuCmd::ToggleOverlay, s.overlay.enabled));
+    items.push(item("Pause or resume the overlay", MenuCmd::PauseOverlay, false));
+    items.push(item("Copy the current caption", MenuCmd::CopyOverlay, false));
+    items.push(MenuItem::Separator);
     for (label, cmd) in product_actions(engine, matches!(update, UpdateLine::Check), capturing) {
         items.push(match cmd {
             Some(cmd) => item(&label, cmd, false),
             None => MenuItem::Info { label },
         });
+    }
+    // What to do with the caption now on screen.
+    items.push(item("Copy caption", MenuCmd::CopyCaption, false));
+    if capturing {
+        items.push(item(if paused { "Resume translation" } else { "Pause translation" }, MenuCmd::ToggleTranslationPause, false));
     }
     items.push(MenuItem::Separator);
     items.push(item("Advanced settings…", MenuCmd::ShowSettings, false));
@@ -298,7 +316,7 @@ mod tests {
     use super::*;
 
     fn items(s: &Settings, update: UpdateLine, engine: &EngineInfo) -> Vec<MenuItem> {
-        menu_items(s, false, update, engine, false)
+        menu_items(s, false, update, engine, false, false)
     }
 
     /// Every command in the menu, submenus included, in order.
@@ -346,7 +364,7 @@ mod tests {
             .collect();
         assert_eq!(
             labels,
-            ["yravgSubMeetly", "Open yravgSubMeetly", "Open Minutes register", "Live captions", "Meeting", "Minutes", "Inbox", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…"]
+            ["yravgSubMeetly", "Open yravgSubMeetly", "Open Minutes register", "Live captions", "Meeting", "Minutes", "Inbox", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…", "Copy caption"]
         );
     }
 

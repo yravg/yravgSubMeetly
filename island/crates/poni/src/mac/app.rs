@@ -23,6 +23,7 @@ use crate::notch::{self, Fit, Notch};
 use crate::pages::{self, PageKind};
 use crate::paths;
 use crate::pill;
+use crate::overlay;
 use crate::services;
 use crate::settings_host;
 use crate::settings_window::{self, Section};
@@ -42,6 +43,7 @@ use objc2_core_foundation::{CGPoint, CGRect, CGSize};
 use objc2_core_graphics::CGContext;
 use objc2_foundation::{NSNotification, NSNotificationCenter, NSRunLoop, NSRunLoopCommonModes, NSTimer};
 use poni_core::addons::{Status as AddonStatus, DOWNLOADER, JAPANESE_READINGS, PRAYER_TIMES, SYSTEM};
+use poni_core::capture::Source;
 use poni_core::frametime::MotionStats;
 use poni_core::phonedrop::{Event as PhoneEvent, QrMatrix};
 use poni_core::geom::{palette, Color, Point, Rect};
@@ -282,6 +284,17 @@ pub fn on_frame_tick(timestamp: f64, target: f64) {
     enter(|a| a.end_frame());
 }
 
+/// The overlay's own half-second beat: refreshes the strip whatever the island is doing.
+fn start_overlay_pulse() {
+    let block = block2::RcBlock::new(|_t: std::ptr::NonNull<objc2_foundation::NSTimer>| {
+        enter(|a| {
+            a.refresh_time();
+            a.overlay_tick();
+        });
+    });
+    let _ = unsafe { objc2_foundation::NSTimer::scheduledTimerWithTimeInterval_repeats_block(0.5, true, &block) };
+}
+
 pub fn draw_into(ctx: &CGContext, dirty: Rect) {
     enter(|a| a.draw(ctx, dirty));
 }
@@ -466,8 +479,16 @@ pub struct App {
     addons: Option<services::addons::AddonService>,
     /// The local engine (captions, translation, models): kept running while the app runs.
     engine: Option<services::engine::EngineService>,
+    /// Which app is on the microphone (`services::meeting_probe`), and the detector that tells once per meeting.
+    meeting_probe: Option<services::meeting_probe::MeetingProbe>,
+    meeting_detector: poni_core::meeting_detect::Detector,
     /// When Settings last asked the engine for its models (mono seconds).
     models_asked: f64,
+    /// Live captions: the device reader (None = off), what the session heard, and the helper link
+    /// that reads the engine's /live, /notes and /calendar for the pill and the pages.
+    capture: Option<services::capture::CaptureService>,
+    session: services::capture::SessionLog,
+    helper_link: Option<services::helper::HelperService>,
     /// The Downloader add-on's runner: started at the first download.
     downloader: Option<services::downloader::DownloaderService>,
     /// New versions (`crate::updates`); None in the smoke test.
@@ -595,7 +616,12 @@ impl App {
             lyrics: None,
             addons: None,
             engine: None,
+            meeting_probe: None,
+            meeting_detector: Default::default(),
             models_asked: f64::NEG_INFINITY,
+            capture: None,
+            session: Default::default(),
+            helper_link: None,
             downloader: None,
             updater: None,
             adzan: Default::default(),
@@ -629,9 +655,28 @@ impl App {
         services::power::watch(self.sink.clone());
         services::audio::start(self.sink.clone());
         self.media = Some(services::media::MediaService::start(self.mtm, self.sink.clone()));
+        match services::meeting_probe::MeetingProbe::start(self.sink.clone()) {
+            Ok(p) => {
+                p.set_active(self.st.settings.detect_meetings);
+                self.meeting_probe = Some(p);
+            }
+            Err(e) => pwarn!("meetings: the probe did not start ({e})"),
+        }
+        // The subtitle overlay follows the captions on its own beat: the island draws no frames while
+        // nothing moves on it (and none at all with the screens asleep).
+        start_overlay_pulse();
         match services::engine::EngineService::start(self.sink.clone()) {
             Ok(e) => self.engine = Some(e),
             Err(e) => pwarn!("engine: the supervisor did not start ({e})"),
+        }
+        match services::helper::HelperService::start(self.sink.clone()) {
+            Ok(h) => self.helper_link = Some(h),
+            Err(e) => pwarn!("helper link: did not start ({e})"),
+        }
+        // Captions that were on when the app quit start again (as on Windows).
+        if self.st.settings.captions_on {
+            let source = Source::parse(&self.st.settings.captions_source);
+            self.set_captions(true, source);
         }
         self.lyrics = match services::lyrics::LyricsService::start(self.sink.clone()) {
             Ok(l) => Some(l),
@@ -672,6 +717,10 @@ impl App {
         // destructors): yt-dlp's groups get their SIGTERM now.
         self.downloader = None;
         // The engine this app started goes with it (one it found running is left alone).
+        // Captions running at quit: the session is saved as a meeting while the engine is still up.
+        if self.capture.take().is_some() {
+            self.end_session(true);
+        }
         if let Some(e) = self.engine.take() {
             e.stop();
         }
@@ -868,6 +917,25 @@ impl App {
 
     /// Apply side effects of a settings change (from the menu, a reload or a page).
     fn settings_changed(&mut self, before: &Settings) {
+        // Running captions pick up a new language, translation choice or latency mode at once.
+        {
+            let now = &self.st.settings;
+            let language = before.source_lang != now.source_lang || before.target_lang != now.target_lang;
+            let target = language || before.translate_captions != now.translate_captions;
+            let latency = before.latency_mode != now.latency_mode;
+            let prefs = poni_core::lang_prefs::patch_body(&now.source_lang, &now.target_lang);
+            if target && self.st.capture.running() {
+                self.retune_captions();
+            }
+            if latency {
+                self.retune_latency();
+            }
+            if language {
+                if let Some(h) = &self.helper_link {
+                    h.post_prefs(prefs);
+                }
+            }
+        }
         // The Settings window shows the change.
         if let Some(s) = self.settings_ui.as_mut() {
             s.view.dirty = true;
@@ -1116,6 +1184,9 @@ impl App {
             MenuCmd::SetTheme(t) => s.theme = t,
             MenuCmd::SetIdleStyle(style) => s.idle_style = style,
             MenuCmd::ToggleSounds => s.sounds = !s.sounds,
+            MenuCmd::ToggleOverlay => s.overlay.enabled = !s.overlay.enabled,
+            MenuCmd::PauseOverlay => self.st.overlay.paused = !self.st.overlay.paused,
+            MenuCmd::CopyOverlay => self.overlay_copy(),
             MenuCmd::SetHideFullscreen(hide) => s.hide_in_fullscreen = hide,
             MenuCmd::ToggleLyrics => s.lyrics = !s.lyrics,
             MenuCmd::TogglePronunciation => s.lyrics_pronunciation = !s.lyrics_pronunciation,
@@ -1159,6 +1230,7 @@ impl App {
             MenuCmd::OpenCall => self.open_page(PageKind::Call),
             MenuCmd::OpenMeeting => self.open_page(PageKind::Meeting),
             MenuCmd::OpenInbox => self.open_page(PageKind::Inbox),
+            MenuCmd::CopyCaption => self.copy_caption(),
             MenuCmd::StartEngine => self.engine_start(),
             MenuCmd::RestartEngine => {
                 if let Some(e) = &self.engine {
@@ -1171,8 +1243,12 @@ impl App {
             | MenuCmd::OpenMinutes
             | MenuCmd::SetupExtension
             | MenuCmd::OpenCaptionsPanel
-            | MenuCmd::StartCaptions
-            | MenuCmd::StopCaptions => {}
+            => {}
+            MenuCmd::StartCaptions => {
+                let source = self.st.live_source();
+                self.captions_by_hand(true, source);
+            }
+            MenuCmd::StopCaptions => self.captions_by_hand(false, Source::Pc),
             MenuCmd::Quit => {
                 self.quit(0);
                 return;
@@ -1491,7 +1567,7 @@ impl App {
         self.st.now = now;
         let media_before = matches!(ev, AppEvent::Media(_) | AppEvent::MediaTimeline { .. }).then(|| self.media_snapshot());
         // What the Settings window shows that a service reports.
-        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
+        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Ai(_) | AppEvent::Webhooks(_) | AppEvent::WebhookNote { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. } | AppEvent::Speed(_) | AppEvent::SpeedStarted(_) | AppEvent::Helper(_) | AppEvent::Capture(_) | AppEvent::MeetingSaved(_));
         if let Some(s) = self.settings_ui.as_mut().filter(|_| shown) {
             s.view.dirty = true;
         }
@@ -1645,6 +1721,53 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::MeetingSignals(seen) => {
+                self.st.meeting_seen = seen;
+                self.meeting_detect_step();
+            }
+            AppEvent::NoteExported(r) => self.on_note_exported(r),
+            AppEvent::Ai(e) => {
+                if let Some(view) = e.view {
+                    self.st.ai = view;
+                }
+                if let Some((ok, title, sub)) = e.notice {
+                    let (icon, color) = if ok { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
+                    self.st.notify(icon, color, title, sub, 6.0, None);
+                }
+            }
+            AppEvent::Webhooks(r) => self.st.webhooks.apply(r),
+            AppEvent::WebhookNote { ok, text } => {
+                let (icon, color) = if ok { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
+                self.st.notify(icon, color, "Webhooks", text, if ok { 4.0 } else { 8.0 }, None);
+            }
+            AppEvent::Exported(Ok(path)) => self.st.notify(Icon::Check, palette::GREEN, "CSV saved", path, 8.0, None),
+            AppEvent::Exported(Err(e)) => self.st.notify(Icon::Download, palette::ORANGE, "CSV not saved", e, 8.0, None),
+            AppEvent::Helper(r) => {
+                self.st.helper.apply(r);
+                if !self.st.models.moving().is_empty() && self.st.models.due(now) {
+                    self.refresh_models();
+                }
+            }
+            AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
+            AppEvent::Calendar(r) => self.st.helper.apply_calendar(r),
+            AppEvent::CalendarNotes(Ok(id)) => {
+                self.st.records.list = false;
+                self.st.meeting_page = 0;
+                if !id.is_empty() {
+                    self.st.helper.select(&id);
+                }
+                self.set_page(PageKind::Meeting);
+                self.request_frame();
+            }
+            AppEvent::CalendarNotes(Err(e)) => self.st.helper_notice = Some((e, now + 6.0, true)),
+            AppEvent::Capture(e) => self.on_capture(e),
+            AppEvent::MeetingSaved(r) => self.on_meeting_saved(r),
+            AppEvent::CallNotes(draft) => {
+                if self.st.call.notes.busy {
+                    self.st.call.notes.answer(self.st.now, draft);
+                    self.request_frame();
+                }
+            }
             AppEvent::Models(r) => {
                 self.st.models.apply(r, now);
             }
@@ -1652,6 +1775,12 @@ impl App {
             AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
             AppEvent::ModelDeleted { id, result } => self.on_model_deleted(id, result),
             AppEvent::ModelPlaced { kind, result } => self.on_model_placed(kind, result),
+            AppEvent::Speed(r) => self.st.speed.apply(r, now),
+            AppEvent::SpeedStarted(r) => {
+                if let Err(e) = r {
+                    self.st.notify(Icon::Download, palette::ORANGE, "Speed test not started", e, 8.0, None);
+                }
+            }
             AppEvent::Download { id, line } => self.download_line(id, line),
             AppEvent::DownloadEnded { id, ok } => self.download_ended(id, ok),
             AppEvent::Update(services::update::UpdateEvent::Checked(r)) => {
@@ -1728,7 +1857,177 @@ impl App {
         }
     }
 
+    // ------------------------------------------------------------ auto-detect meetings
+
+    /// Tell the person once when a meeting is on (a meeting app on the microphone, or a calendar
+    /// meeting), after it has held a few seconds. It only tells: nothing is recorded here, and the
+    /// notice opens the Minutes page.
+    fn meeting_detect_step(&mut self) {
+        let on = self.st.settings.detect_meetings;
+        if let Some(p) = &self.meeting_probe {
+            p.set_active(on);
+        }
+        let seen = &self.st.meeting_seen;
+        let signals = poni_core::meeting_source::Signals {
+            windows: seen.windows.clone(),
+            mic: seen.mic.clone(),
+            calendar_meeting: self.st.helper.calendar.as_ref().is_some_and(|c| poni_core::capture::meeting_now(c, self.st.unix)),
+            ..Default::default()
+        };
+        let kind = poni_core::meeting_source::source_kind(&signals, &self.st.settings.meeting_families, &self.st.settings.meeting_apps);
+        if let poni_core::meeting_detect::DetectStep::Offer { label } = self.meeting_detector.step(&kind, on, self.st.now) {
+            pinfo!("meetings: {label} detected");
+            self.st.notify(Icon::Mic, self.st.accent, "Meeting detected", format!("{label} is on. Open Minutes to take notes."), 12.0, Some(NoticeAction::OpenPage(PageKind::Meeting)));
+            self.request_frame();
+        }
+    }
+
+    // ------------------------------------------------------------ the engine's webhooks
+
+    /// Ask the engine for its webhooks (Settings › General shows them, every 10 s while open).
+    fn refresh_webhooks(&mut self) {
+        if self.st.webhooks.busy {
+            return;
+        }
+        self.st.webhooks.asking(self.st.now);
+        services::integrations::fetch(self.sink.clone(), poni_core::helper::configured_port());
+    }
+
+    fn webhook_change(&mut self, change: services::integrations::Change) {
+        services::integrations::change(self.sink.clone(), poni_core::helper::configured_port(), change);
+    }
+
+    /// Settings › Webhooks › Paste URL: the clipboard's link becomes a webhook.
+    fn add_webhook_from_clipboard(&mut self) {
+        let text = services::clipboard::read_text().unwrap_or_default();
+        match poni_core::webhooks::clipboard_url(&text) {
+            Ok(url) => {
+                self.engine_start();
+                self.webhook_change(services::integrations::Change::Add(url));
+            }
+            Err(why) => self.st.notify(Icon::Download, palette::ORANGE, "Webhooks", why, 6.0, None),
+        }
+    }
+
+    // ------------------------------------------------------------ the subtitle overlay
+
+    /// What the overlay should show now: sample captions while a preview runs, what it showed while
+    /// it is paused, else the session's newest lines.
+    fn overlay_sentences(&mut self) -> Vec<poni_core::overlay::Sentence> {
+        use poni_core::overlay::Sentence;
+        let now = self.st.now;
+        // YSM_OVERLAY_DEMO=1 (dev runs): the sample captions stay up, to look at the strip.
+        static DEMO: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        let demo = *DEMO.get_or_init(|| std::env::var_os("YSM_OVERLAY_DEMO").is_some());
+        if demo || self.st.overlay.preview_until > now {
+            let s = |o: &str, t: &str| Sentence { original: o.into(), translation: t.into(), live: false };
+            return vec![
+                s("Welcome, everyone. Let's start with the agenda.", "Selamat datang semuanya. Mari kita mulai dengan agenda."),
+                s("The first item is the release plan.", "Butir pertama adalah rencana rilis."),
+            ];
+        }
+        if self.st.overlay.paused {
+            return self.st.overlay.shown.clone();
+        }
+        let n = self.st.call.lines.len();
+        let lines: Vec<Sentence> = self
+            .st
+            .call
+            .lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| Sentence { original: l.source.clone(), translation: l.translation.clone(), live: self.st.call.interim && i + 1 == n })
+            .collect();
+        self.st.overlay.shown = lines.clone();
+        lines
+    }
+
+    /// Keep the strip as the settings and the captions say; remember where the person dragged it.
+    fn overlay_tick(&mut self) {
+        if !self.st.settings.overlay.enabled {
+            overlay::hide();
+            return;
+        }
+        let now = self.st.now;
+        if self.st.overlay.preview_until != 0.0 && now >= self.st.overlay.preview_until {
+            self.st.overlay.preview_until = 0.0;
+        }
+        if !self.st.settings.overlay.click_through {
+            if let Some(spot) = overlay::dragged_to() {
+                self.st.settings.overlay.spot = Some(spot);
+                self.st.cmds.push(Command::SaveSettings);
+            }
+        }
+        let sentences = self.overlay_sentences();
+        let settings = self.st.settings.overlay.clone();
+        let content = overlay::Content { sentences: poni_core::overlay::visible(&sentences, &settings), settings, paused: self.st.overlay.paused };
+        let Some(screen) = window::pick_screen(self.mtm) else { return };
+        overlay::show(self.mtm, &content, poni_core::geom::Rect::new(screen.x as f32, screen.y as f32, screen.w as f32, screen.h as f32));
+    }
+
+    fn overlay_copy(&mut self) {
+        if let Some(text) = poni_core::overlay::copy_text(&self.st.overlay.shown) {
+            services::clipboard::set_text(&text);
+            self.st.notify(Icon::Check, palette::GREEN, "Caption copied", "The current line is on the clipboard", 3.0, None);
+        }
+    }
+
     // ------------------------------------------------------------ the engine and its models
+
+    /// Export a meeting as Word / PDF / Markdown: the engine writes it, the file lands in
+    /// Documents › yravgSubMeetly › Exports and is shown in the file manager.
+    fn export_note(&mut self, id: String, format: &'static str) {
+        self.st.notify(Icon::Download, palette::ORANGE, "Exporting", format!("{} ...", format.to_uppercase()), 4.0, None);
+        let sink = self.sink.clone();
+        let port = poni_core::helper::configured_port();
+        std::thread::Builder::new()
+            .name("poni-note-export".into())
+            .spawn(move || {
+                let r = poni_core::note_export::save(port, &id, format);
+                if let Ok(p) = &r {
+                    poni_core::note_export::reveal(p);
+                }
+                sink.send(AppEvent::NoteExported(r));
+            })
+            .ok();
+    }
+
+    fn on_note_exported(&mut self, r: std::result::Result<std::path::PathBuf, String>) {
+        match r {
+            Ok(p) => {
+                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                self.st.notify(Icon::Check, palette::GREEN, "Exported", name, 6.0, None);
+            }
+            Err(e) => self.st.notify(Icon::Download, palette::ORANGE, "Not exported", e, 8.0, None),
+        }
+    }
+
+    /// The caption on screen and its translation, on the clipboard.
+    fn copy_caption(&mut self) {
+        let text = poni_core::history_cards::caption_text(&self.st.helper.captions());
+        if text.is_empty() {
+            self.st.notify(Icon::Lyrics, palette::ORANGE, "Nothing to copy", "No caption on screen", 4.0, None);
+        } else {
+            services::clipboard::set_text(&text);
+            self.st.notify(Icon::Check, palette::GREEN, "Caption copied", text.lines().next().unwrap_or("").to_string(), 3.0, None);
+        }
+    }
+
+    /// Look at the engine's speed tests (Settings shows them: every 10 s while open, every second
+    /// while one runs).
+    fn refresh_speed(&mut self) {
+        if self.st.speed.busy {
+            return;
+        }
+        self.st.speed.busy = true;
+        services::models::bench_fetch(self.sink.clone(), poni_core::helper::configured_port());
+    }
+
+    /// Queue a speed test (`body`: the engine's POST /models/bench request); the engine is started first.
+    fn run_speed_test(&mut self, body: String) {
+        self.engine_start();
+        services::models::bench_start(self.sink.clone(), poni_core::helper::configured_port(), body);
+    }
 
     /// Start the engine now (Retry, a download, a first look at Settings).
     fn engine_start(&self) {
@@ -1739,6 +2038,8 @@ impl App {
 
     /// Ask the engine which models it has (Settings shows them, every 10 s while open).
     fn refresh_models(&mut self) {
+        // The connector rows share the Models poll.
+        crate::ai::run(self.sink.clone(), poni_core::helper::configured_port(), crate::ai::AiCmd::Refresh);
         if self.st.models.busy {
             return;
         }
@@ -2782,6 +3083,17 @@ impl App {
                         None => pages::script::note(&mut self.st, "Copy your script first"),
                     }
                 }
+                Command::OverlayPreview => {
+                    self.st.settings.overlay.enabled = true;
+                    self.st.overlay.preview_until = self.st.now + 8.0;
+                    self.st.cmds.push(Command::SaveSettings);
+                }
+                Command::OverlayToggle => {
+                    self.st.settings.overlay.enabled = !self.st.settings.overlay.enabled;
+                    self.st.cmds.push(Command::SaveSettings);
+                }
+                Command::OverlayPause => self.st.overlay.paused = !self.st.overlay.paused,
+                Command::OverlayCopy => self.overlay_copy(),
                 Command::SaveSettings => {
                     let before = self.saved_settings.clone();
                     self.settings_changed(&before);
@@ -2840,11 +3152,41 @@ impl App {
                 // Windows' language features are Windows'.
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
+                Command::CopyCaption => self.copy_caption(),
+                Command::ExportCsv(id) => services::export::csv(self.sink.clone(), poni_core::helper::configured_port(), id, crate::paths::media_downloads_dir()),
+                // Pausing a translation is the island's own captions' (Windows); the Mac app has no
+                // capture of its own, so there is nothing running to pause.
+                Command::ToggleTranslationPause => {}
                 Command::ModelsRefresh => self.refresh_models(),
+                Command::ExportNote(id, format) => self.export_note(id, format),
+                Command::Ai(c) => crate::ai::handle(self.sink.clone(), poni_core::helper::configured_port(), c, services::clipboard::read_text),
+                Command::WebhooksRefresh => self.refresh_webhooks(),
+                Command::WebhookAddFromClipboard => self.add_webhook_from_clipboard(),
+                Command::WebhookEnable(id, on) => self.webhook_change(services::integrations::Change::Enable(id, on)),
+                Command::WebhookRemove(id) => self.webhook_change(services::integrations::Change::Remove(id)),
+                Command::WebhookTest(id) => self.webhook_change(services::integrations::Change::Test(id)),
+                Command::Captions(on) => self.captions_by_hand(on, Source::Pc),
+                Command::LiveCaptions => {
+                    let source = self.st.live_source();
+                    self.captions_by_hand(true, source);
+                }
+                Command::LiveSource(source) => self.set_live_source(source),
+                Command::HelperPoll => {
+                    if let Some(h) = &self.helper_link {
+                        h.poll();
+                    }
+                }
+                Command::CallNotesRefresh => self.call_refresh(),
+                Command::MicPrivacy => {
+                    let _ = std::process::Command::new("/usr/bin/open").arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone").spawn();
+                }
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelPullId(id) => self.pull_model_id(id),
                 Command::ModelDelete(id) => self.delete_model(id),
+                Command::SpeedRefresh => self.refresh_speed(),
+                Command::SpeedTest(id) => self.run_speed_test(serde_json::json!({ "id": id }).to_string()),
+                Command::SpeedTestAll => self.run_speed_test(r#"{"kind":"all"}"#.to_string()),
                 // A model's folder is the engine's own on the Mac (no picker).
                 Command::ModelFolder(_) | Command::ModelFolderReset(_) => {}
                 Command::RestoreLiveCaptions => {} // Windows Live Captions: no such thing on macOS
@@ -3017,6 +3359,7 @@ impl App {
 
     fn tick(&mut self) {
         let now = self.st.now;
+        self.overlay_tick();
         // Settings shows the engine's models: asked when it opens and every 10 s while it is open.
         if self.settings_ui.is_some() && now - self.models_asked >= 10.0 {
             self.models_asked = now;
@@ -4546,4 +4889,8 @@ impl Smoke {
 // The Downloads page's commands and yt-dlp's reports.
 #[path = "app_downloads.rs"]
 mod downloads;
+
+// Live captions: start and stop, what the capture reports, the session saved as a meeting.
+#[path = "app_captions.rs"]
+mod captions;
 

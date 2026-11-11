@@ -55,6 +55,8 @@ pub enum LyricsResult {
 
 #[allow(dead_code)]
 pub enum AppEvent {
+    /// The engine's AI connector and templates, or how a change to them ended (`crate::ai`).
+    Ai(crate::ai::AiEvent),
     /// The current media session changed (None = nothing playing / no session).
     Media(Option<MediaSession>),
     /// Only the timeline/playback state of the current track changed.
@@ -103,14 +105,39 @@ pub enum AppEvent {
     AdzanEnded,
     /// Free-form log line from a service thread.
     Log(String),
+    /// What the meeting probe saw (`services::meeting_probe`).
+    MeetingSignals(crate::services::meeting_probe::Seen),
+    /// A meeting exported to a file (`Command::ExportNote`), or why not.
+    NoteExported(Result<std::path::PathBuf, String>),
+    /// A CSV export ended: the file it wrote (its full path), or why it could not.
+    Exported(Result<String, String>),
     /// What the engine supervisor sees (`services::engine`).
     Engine(poni_core::engine_link::EngineInfo),
+    /// The engine's webhooks (`services::integrations`), and one line about the change just made.
+    Webhooks(Result<Vec<poni_core::webhooks::Webhook>, String>),
+    WebhookNote { ok: bool, text: String },
     /// The engine's models (`services::models`), and how each action on one ended.
     Models(Result<poni_core::models::Inventory, String>),
     ModelPulled { kind: poni_core::models::Kind, id: String, result: Result<(), String> },
     ModelDeleted { id: String, result: Result<u64, String> },
     ModelSelected { kind: poni_core::models::Kind, result: Result<(), String> },
     ModelPlaced { kind: poni_core::models::Kind, result: Result<(), String> },
+    /// What the engine says about the model speed tests (or why it could not say).
+    Speed(Result<poni_core::speed::Report, String>),
+    /// A speed test was refused by the engine (the reason).
+    SpeedStarted(Result<(), String>),
+    /// The helper link's answer (engine health, notes, the live line) with its poll counter.
+    Helper(Result<(poni_core::helper::Snapshot, u32), String>),
+    HelperNotice(String),
+    /// The calendar, as the helper link reads it once a minute.
+    Calendar(Result<poni_core::calendar::Calendar, String>),
+    CalendarNotes(Result<String, String>),
+    /// Live captions: the capture's state, a heard line, the interim (`services::capture`).
+    Capture(crate::services::capture::CaptureEvent),
+    /// The captioned session became a meeting (or why not, with its lines back).
+    MeetingSaved(crate::services::capture::Saved),
+    /// The notes so far, drafted by the engine for the Meeting view.
+    CallNotes(Option<Vec<poni_core::live_notes::Item>>),
 }
 
 /// Windows' window handle, which `services::models::relocate` names; the Mac has no picker (a model's

@@ -60,8 +60,23 @@ pub mod meeting_probe;
 // its models by the shared `models.rs`.
 #[path = "services/engine.rs"]
 pub mod engine;
+#[path = "../services/integrations.rs"]
+pub mod integrations;
 #[path = "../services/models.rs"]
 pub mod models;
+#[path = "../services/export.rs"]
+pub mod export;
+// Live captions: the shared half (the session's log, the poster to the engine's /draft), the Mac's
+// device sources (a Core Audio process tap and the microphone) and the device loop on top of them.
+#[path = "../services/capture_core.rs"]
+pub mod capture_core;
+#[path = "services/sources.rs"]
+pub mod sources;
+#[path = "services/capture.rs"]
+pub mod capture;
+// The helper link: asks the engine for /health, /notes and /live (what the pill and pages show).
+#[path = "../services/helper.rs"]
+pub mod helper;
 #[path = "services/location.rs"]
 pub mod location;
 #[path = "services/login.rs"]

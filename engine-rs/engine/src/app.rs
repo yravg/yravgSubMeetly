@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Map, Value};
 
 use crate::audio::pcm_f32_le;
+use crate::bench::{Bench, MlRunner};
 use crate::calendar::{Calendar, Fail};
 use crate::engine::{mt_engine, segments_json, Jobs, Ml, SavedModels, ASR_ENGINE};
 use crate::heuristic::heuristic_notes;
@@ -26,7 +27,7 @@ use crate::models::{
     ModelNotDownloaded, PullProgress, CATALOG,
 };
 use crate::notes::{
-    export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
+    export_note_csv, export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
 };
 use crate::protocol::{AskReply, Request, Response};
 use crate::state::{now_epoch_secs, now_utc_iso};
@@ -101,6 +102,8 @@ fn transfers_lock(transfers: &Mutex<Transfers>) -> std::sync::MutexGuard<'_, Tra
 pub struct App {
     state_dir: PathBuf,
     models_path: PathBuf,
+    /// Speed tests of the downloaded models (`bench.rs`).
+    bench: Arc<Bench>,
     transfers: SharedTransfers,
     locations: Arc<Locations>,
     notes_path: PathBuf,
@@ -113,6 +116,7 @@ pub struct App {
     shutdown: AtomicBool,
     live: Mutex<Value>,
     calendar: Calendar,
+    integrations: crate::integrations::Integrations,
 }
 
 impl App {
@@ -122,6 +126,11 @@ impl App {
         let device_pref_path = env_path("DEVICE_PREF_PATH", state_dir.join("device.json"));
         let ui_prefs_path = env_path("UI_PREFS_PATH", state_dir.join("ui-prefs.json"));
         let models_path = env_path("ENGINE_MODELS_PATH", state_dir.join("engine-models.json"));
+        let integrations_path = state_dir.join("integrations.json");
+        let bench = Arc::new(Bench::load(env_path(
+            "ENGINE_BENCH_PATH",
+            state_dir.join("bench.json"),
+        )));
         let allowed_origins = env::var("ALLOWED_ORIGINS")
             .unwrap_or_default()
             .split(',')
@@ -159,6 +168,7 @@ impl App {
         Self {
             calendar: Calendar::new(state_dir.clone()),
             state_dir,
+            bench,
             models_path,
             transfers: SharedTransfers::default(),
             notes_path,
@@ -171,6 +181,10 @@ impl App {
             jobs: Jobs::default(),
             shutdown: AtomicBool::new(false),
             live: Mutex::new(live_idle()),
+            integrations: crate::integrations::Integrations::new(env_path(
+                "INTEGRATIONS_PATH",
+                integrations_path,
+            )),
         }
     }
 
@@ -303,6 +317,9 @@ impl App {
     }
 
     fn get(&self, request: &Request) -> Response {
+        if let Some(response) = self.ai_get(request) {
+            return response;
+        }
         let path = request.path();
         match path {
             "/engine/device" => self.json_response(request, 200, self.device_state()),
@@ -313,6 +330,10 @@ impl App {
             }
             "/notes" => self.json_response(request, 200, json!({ "notes": self.load_notes() })),
             "/calendar" => self.get_calendar(request),
+            "/integrations/webhooks" => {
+                self.json_response(request, 200, self.integrations.list())
+            }
+            "/models/bench" => self.json_response(request, 200, self.bench.snapshot()),
             "/models" => self.json_response(request, 200, self.models_body()),
             "/engine/mode" => {
                 self.json_response(request, 200, json!({ "mode": self.load_engine_mode() }))
@@ -357,6 +378,9 @@ impl App {
     }
 
     fn post(&self, request: &Request) -> Response {
+        if let Some(response) = self.ai_post(request) {
+            return response;
+        }
         let path = request.path();
         match path {
             "/engine/device" => self.post_engine_device(request),
@@ -364,14 +388,18 @@ impl App {
             "/engine/models" => self.post_engine_models(request),
             "/engine/models/location" => self.post_models_location(request),
             "/ui-prefs" => self.post_ui_prefs(request),
+            "/diarize" => self.post_diarize(request),
             "/notes/export" => self.post_notes_export(request),
             "/notes" => self.post_notes(request),
             "/notes/generate" => self.post_notes_generate(request, false),
             "/notes/summarize" => self.post_notes_generate(request, true),
+            "/integrations/webhooks" => self.post_integrations(request, false),
+            "/integrations/webhooks/test" => self.post_integrations(request, true),
             "/calendar/sources" => self.post_calendar_source(request),
             "/calendar/refresh" => self.post_calendar_refresh(request),
             "/calendar/notes" => self.post_calendar_note(request),
             "/models/pull" => self.post_models_pull(request),
+            "/models/bench" => self.post_models_bench(request),
             "/shutdown" => {
                 self.shutdown.store(true, Ordering::Relaxed);
                 self.json_response(request, 200, json!({ "ok": true, "shutting_down": true }))
@@ -464,11 +492,16 @@ impl App {
                 json!({ "error": "question is required" }),
             ));
         }
-        if !self.ml.translate_available() {
-            return plain(self.json_response(request, 501, json!({ "error": NO_TRANSLATE })));
-        }
-        if let Err(error) = self.ml.require_translate() {
-            return plain(self.ml_error_response(request, &error));
+        // The person's own endpoint answers when the connector is on; otherwise the local model.
+        let connector =
+            Some(crate::connector::load(&self.state_dir)).filter(crate::connector::Config::usable);
+        if connector.is_none() {
+            if !self.ml.translate_available() {
+                return plain(self.json_response(request, 501, json!({ "error": NO_TRANSLATE })));
+            }
+            if let Err(error) = self.ml.require_translate() {
+                return plain(self.ml_error_response(request, &error));
+            }
         }
         let mut turns = Vec::new();
         for turn in payload
@@ -500,6 +533,21 @@ impl App {
         AskReply::Stream {
             headers,
             run: Box::new(move |emit| {
+                if let Some(cfg) = &connector {
+                    match crate::connector::chat(
+                        cfg,
+                        &grounding,
+                        &turns,
+                        ASK_MAX_TOKENS as u32,
+                        &mut |piece| {
+                            emit(&json!({ "delta": piece }));
+                        },
+                    ) {
+                        Ok(_) => emit(&json!({ "done": true })),
+                        Err(error) => emit(&json!({ "error": format!("{error:#}") })),
+                    };
+                    return;
+                }
                 let result = self.ml.with_translator(|mt| {
                     mt.chat_stream(&grounding, &turns, ASK_MAX_TOKENS, &mut |piece| {
                         emit(&json!({ "delta": piece }))
@@ -662,6 +710,39 @@ impl App {
                 json!({ "source": "", "translation": "", "ms": ms(), "asr_ms": asr_ms }),
             ));
         }
+        // The person's translation provider, when one is on: its answer is the caption's translation.
+        // On any failure the local model below answers and `translateError` says why.
+        let mut provider_error: Option<String> = None;
+        // Only final lines go out: an interim (the growing utterance) would call the service every second.
+        if !interim {
+            match crate::providers::try_translate(&self.state_dir, &source, src, tgt) {
+                Some(Ok((translation, via))) => {
+                    let translate_ms = ms().saturating_sub(asr_ms);
+                    self.record_live(&source, &translation, ms(), pcm.len());
+                    return Ok(self.json_response(
+                        request,
+                        200,
+                        json!({
+                            "source": source,
+                            "translation": translation,
+                            "ms": ms(),
+                            "asr_ms": asr_ms,
+                            "translate_ms": translate_ms,
+                            "translate_via": via,
+                            "translateState": "ready",
+                        }),
+                    ));
+                }
+                Some(Err(e)) => provider_error = Some(e),
+                None => {}
+            }
+        }
+        let with_err = |mut v: Value| -> Value {
+            if let Some(e) = &provider_error {
+                v["translateError"] = json!(e);
+            }
+            v
+        };
         let downloaded = self.ml.translate_downloaded();
         let (mt, state) = draft_translation(
             self.ml.translate_available(),
@@ -696,7 +777,7 @@ impl App {
                 return Ok(self.json_response(
                     request,
                     200,
-                    json!({
+                    with_err(json!({
                         "source": source,
                         "translation": translation,
                         "ms": ms(),
@@ -704,7 +785,7 @@ impl App {
                         "translate_ms": translate_ms,
                         "translate_via": "whisper",
                         "translateState": state,
-                    }),
+                    })),
                 ));
             }
             DraftMt::SourceOnly => {
@@ -716,13 +797,13 @@ impl App {
                 return Ok(self.json_response(
                     request,
                     200,
-                    json!({
+                    with_err(json!({
                         "source": source,
                         "translation": translation,
                         "ms": ms(),
                         "asr_ms": asr_ms,
                         "translateState": state,
-                    }),
+                    })),
                 ));
             }
         }
@@ -740,14 +821,14 @@ impl App {
         Ok(self.json_response(
             request,
             200,
-            json!({
+            with_err(json!({
                 "source": source,
                 "translation": translation,
                 "ms": ms(),
                 "asr_ms": asr_ms,
                 "translate_ms": translate_ms,
                 "translateState": state,
-            }),
+            })),
         ))
     }
 
@@ -862,29 +943,78 @@ impl App {
                 json!({ "error": "body needs non-empty lines[]" }),
             );
         }
-        let note = heuristic_notes(
+        let mut note = heuristic_notes(
             &lines,
             &text("title", "Notulen sesi"),
             &text("source", "helper"),
         );
+        let texts: Vec<String> = lines
+            .iter()
+            .map(crate::heuristic::line_text)
+            .filter(|t| !t.is_empty())
+            .collect();
+        let template = match crate::templates::resolve(&self.state_dir, payload.get("template")) {
+            Ok(t) => t,
+            Err(e) => return self.json_response(request, 400, json!({ "error": e.to_string() })),
+        };
+        // Summarize with the connector on: the person's endpoint writes it (and says so in `via`);
+        // any failure falls back to the local notes. Generate never leaves the device.
+        let cfg = crate::connector::load(&self.state_dir);
+        let remote = summarize && cfg.usable();
+        let template = template.or_else(|| {
+            remote
+                .then(|| crate::templates::find(&self.state_dir, "general"))
+                .flatten()
+        });
+        let mut extra = json!({});
+        if let Some(t) = &template {
+            let mut rendered = crate::templates::render_local(t, &note, &texts);
+            extra["via"] = json!("local");
+            if remote {
+                let transcript = clip_transcript(&texts);
+                match crate::connector::chat(
+                    &cfg,
+                    &crate::templates::system_prompt(t),
+                    &[("user".to_string(), transcript)],
+                    1500,
+                    &mut |_| {},
+                ) {
+                    Ok(answer) => {
+                        let sections = crate::templates::parse_markdown(t, &answer);
+                        let md = crate::templates::markdown(&t.style, &sections);
+                        by_kind(&mut note, &sections);
+                        rendered =
+                            json!({ "template": t.id, "sections": sections, "markdown": md });
+                        extra["via"] = json!("connector");
+                    }
+                    Err(e) => extra["connectorError"] = json!(format!("{e:#}")),
+                }
+            }
+            if let (Value::Object(map), Value::Object(r)) = (&mut extra, rendered) {
+                map.extend(r);
+            }
+        }
         if !summarize {
+            if let (Value::Object(n), Value::Object(x)) = (&mut note, extra) {
+                n.extend(x);
+            }
             return self.json_response(request, 200, json!({ "note": note }));
         }
         let count = |key: &str| note[key].as_array().map_or(0, Vec::len);
-        self.json_response(
-            request,
-            200,
-            json!({
-                "summary": note["summary"],
-                "decisions": note["decisions"],
-                "actions": note["actions"],
-                "counts": {
-                    "segments": lines.len(),
-                    "decisions": count("decisions"),
-                    "actions": count("actions"),
-                },
-            }),
-        )
+        let mut body = json!({
+            "summary": note["summary"],
+            "decisions": note["decisions"],
+            "actions": note["actions"],
+            "counts": {
+                "segments": lines.len(),
+                "decisions": count("decisions"),
+                "actions": count("actions"),
+            },
+        });
+        if let (Value::Object(b), Value::Object(x)) = (&mut body, extra) {
+            b.extend(x);
+        }
+        self.json_response(request, 200, body)
     }
 
     /// Cache, folder, download and move state of one model, the same fields on every row.
@@ -1056,6 +1186,79 @@ impl App {
                 (self.ml.translate_id().as_deref() == Some(id)).then_some(Kind::Translate)
             }
         })
+    }
+
+    /// The catalog models that are fully on disk (what a speed test can run).
+    fn bench_candidates(&self) -> Vec<(String, Kind)> {
+        CATALOG
+            .iter()
+            .filter(|spec| {
+                self.locations
+                    .usable_dir(spec.id)
+                    .ok()
+                    .is_some_and(|dir| cache_state(&dir, spec.id, spec.kind).downloaded)
+            })
+            .map(|spec| (spec.id.to_string(), spec.kind))
+            .collect()
+    }
+
+    /// `POST /models/bench` `{id}` | `{ids:[..]}` | `{kind:"asr"|"translate"|"pair"|"all"}`: queue
+    /// speed tests (one at a time, in the background) and answer 202 with the state. A model
+    /// that is not downloaded is refused; nothing is ever measured for a model that is not here.
+    fn post_models_bench(&self, request: &Request) -> Response {
+        let payload = parse_body(&request.body).unwrap_or_else(|| json!({}));
+        let candidates = self.bench_candidates();
+        let mut wanted: Vec<String> = Vec::new();
+        if let Some(id) = payload.get("id").and_then(Value::as_str) {
+            wanted.push(id.to_string());
+        }
+        if let Some(ids) = payload.get("ids").and_then(Value::as_array) {
+            wanted.extend(ids.iter().filter_map(Value::as_str).map(str::to_string));
+        }
+        let mut items: Vec<(String, Kind)> = Vec::new();
+        if wanted.is_empty() {
+            let which = payload.get("kind").and_then(Value::as_str).unwrap_or("all");
+            if !matches!(which, "asr" | "translate" | "pair" | "all") {
+                return self.json_response(
+                    request,
+                    400,
+                    json!({ "error": "kind must be asr, translate, pair or all" }),
+                );
+            }
+            items = candidates
+                .into_iter()
+                .filter(|(_, kind)| which == "all" || crate::bench::kind_label(*kind) == which)
+                .collect();
+        } else {
+            for id in wanted {
+                match candidates.iter().find(|(c, _)| *c == id) {
+                    Some(found) => items.push(found.clone()),
+                    None if self.model_kind(&id).is_some() => {
+                        return self.json_response(
+                            request,
+                            409,
+                            json!({ "error": format!("{id} is not downloaded, so there is nothing to test"), "code": "model-not-downloaded" }),
+                        )
+                    }
+                    None => {
+                        return self.json_response(
+                            request,
+                            400,
+                            json!({ "error": "id must be one of the /models catalog ids" }),
+                        )
+                    }
+                }
+            }
+        }
+        let runner = Arc::new(MlRunner {
+            ml: Arc::clone(&self.ml),
+        });
+        let started = self.bench.enqueue(runner, items);
+        self.json_response(
+            request,
+            202,
+            json!({ "ok": true, "started": started, "bench": self.bench.snapshot() }),
+        )
     }
 
     /// Starts the download in the background and answers 202 at once; progress is
@@ -1465,6 +1668,15 @@ impl App {
     }
 
     fn delete(&self, request: &Request) -> Response {
+        if let Some(id) = request.path().strip_prefix("/notes/templates/") {
+            return match crate::templates::delete(&self.state_dir, &percent_decode(id)) {
+                Ok(true) => self.json_response(request, 200, json!({ "ok": true })),
+                Ok(false) => {
+                    self.json_response(request, 404, json!({ "error": "template not found" }))
+                }
+                Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+            };
+        }
         let path = request.path();
         if let Some(rest) = path.strip_prefix("/models/cache/") {
             let q = query(&request.target);
@@ -1513,6 +1725,107 @@ impl App {
             return self.json_response(request, 200, json!({ "ok": true, "id": note_id }));
         }
         self.json_response(request, 404, json!({ "error": "not found" }))
+    }
+
+    /// `GET /ai/connector` (the saved connector, without its key) and `GET /notes/templates`.
+    fn ai_get(&self, request: &Request) -> Option<Response> {
+        match request.path() {
+            "/ai/connector" => Some(self.json_response(
+                request,
+                200,
+                crate::connector::load(&self.state_dir).public(),
+            )),
+            "/notes/templates" => {
+                Some(self.json_response(request, 200, crate::templates::list_json(&self.state_dir)))
+            }
+            "/translate/provider" => Some(self.json_response(
+                request,
+                200,
+                crate::providers::load(&self.state_dir).public(),
+            )),
+            _ => None,
+        }
+    }
+
+    /// `POST /ai/connector`, `/ai/connector/test` and `/notes/templates`.
+    fn ai_post(&self, request: &Request) -> Option<Response> {
+        let path = request.path();
+        if !matches!(
+            path,
+            "/ai/connector"
+                | "/ai/connector/test"
+                | "/notes/templates"
+                | "/notes/templates/default"
+                | "/translate/provider"
+                | "/translate/provider/test"
+        ) {
+            return None;
+        }
+        let Some(body) = parse_body(&request.body) else {
+            return Some(self.json_response(request, 400, json!({ "error": "invalid JSON body" })));
+        };
+        if path.starts_with("/translate/provider") {
+            return Some(self.provider_post(request, path, &body));
+        }
+        let current = crate::connector::load(&self.state_dir);
+        Some(match path {
+            "/ai/connector" => match crate::connector::apply_patch(&current, &body)
+                .and_then(|cfg| crate::connector::save(&self.state_dir, &cfg).map(|()| cfg))
+            {
+                Ok(cfg) => self.json_response(request, 200, cfg.public()),
+                Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+            },
+            "/ai/connector/test" => {
+                // The test never needs the connector to be on: it tries the saved settings plus any given here.
+                let mut probe = body.clone();
+                probe["enabled"] = json!(false);
+                match crate::connector::apply_patch(&current, &probe) {
+                    Ok(cfg) => self.json_response(request, 200, crate::connector::test(&cfg)),
+                    Err(e) => self.json_response(
+                        request,
+                        400,
+                        json!({ "ok": false, "error": e.to_string() }),
+                    ),
+                }
+            }
+            "/notes/templates/default" => match crate::templates::set_default(
+                &self.state_dir,
+                body.get("id").and_then(Value::as_str),
+            ) {
+                Ok(()) => {
+                    self.json_response(request, 200, crate::templates::list_json(&self.state_dir))
+                }
+                Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+            },
+            _ => match crate::templates::upsert(&self.state_dir, &body) {
+                Ok(t) => self.json_response(request, 200, json!({ "template": t.to_json() })),
+                Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+            },
+        })
+    }
+
+    /// `POST /translate/provider` (choose and configure the caption translation provider) and
+    /// `POST /translate/provider/test` (one sentence through it, enabled or not).
+    fn provider_post(&self, request: &Request, path: &str, body: &Value) -> Response {
+        let current = crate::providers::load(&self.state_dir);
+        if path == "/translate/provider/test" {
+            let mut probe = body.clone();
+            probe["enabled"] = json!(false);
+            let src = body.get("src").and_then(Value::as_str).unwrap_or("en");
+            let tgt = body.get("tgt").and_then(Value::as_str).unwrap_or("id");
+            return match crate::providers::apply_patch(&current, &probe) {
+                Ok(cfg) => self.json_response(request, 200, crate::providers::test(&cfg, src, tgt)),
+                Err(e) => {
+                    self.json_response(request, 400, json!({ "ok": false, "error": e.to_string() }))
+                }
+            };
+        }
+        match crate::providers::apply_patch(&current, body)
+            .and_then(|cfg| crate::providers::save(&self.state_dir, &cfg).map(|()| cfg))
+        {
+            Ok(cfg) => self.json_response(request, 200, cfg.public()),
+            Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+        }
     }
 
     fn health(&self) -> Value {
@@ -1677,11 +1990,33 @@ impl App {
         };
         let note_id = note.get("id").cloned().unwrap_or(Value::Null);
         let mut notes = self.load_notes();
+        let previous = notes
+            .iter()
+            .find(|existing| existing.get("id") == Some(&note_id))
+            .cloned();
         notes.retain(|existing| existing.get("id") != Some(&note_id));
         notes.insert(0, note.clone());
         notes.truncate(50);
         self.save_notes(&notes);
+        // Webhooks: queued on their own thread, never waited for.
+        self.integrations.note_saved(previous.as_ref(), &note);
         self.json_response(request, 200, json!({ "ok": true, "note": note }))
+    }
+
+    /// `POST /integrations/webhooks` (add, change, remove) and `/test` (one ping).
+    fn post_integrations(&self, request: &Request, test: bool) -> Response {
+        let Some(payload) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let result = if test {
+            self.integrations.test(&payload)
+        } else {
+            self.integrations.change(&payload)
+        };
+        match result {
+            Ok(body) => self.json_response(request, 200, body),
+            Err(error) => self.json_response(request, 400, json!({ "error": error })),
+        }
     }
 
     fn calendar_fail(&self, request: &Request, fail: Fail) -> Response {
@@ -1803,6 +2138,63 @@ impl App {
         )
     }
 
+    /// `POST /diarize {segments:[{t0,t1,text?,channel?}], path?, maxSpeakers?}` -> the segments with a
+    /// `speaker`. A segment's `channel` ("mic" / "system") gives "You" / "Others"; the others are
+    /// grouped by voice from the audio file at `path` ("Speaker N"). See `diarize.rs` for the limits.
+    fn post_diarize(&self, request: &Request) -> Response {
+        let Some(Value::Object(payload)) = parse_body(&request.body) else {
+            return self.json_response(
+                request,
+                400,
+                json!({ "error": "body must be a JSON object" }),
+            );
+        };
+        let segments = match payload.get("segments") {
+            Some(Value::Array(a)) => a.clone(),
+            _ => {
+                return self.json_response(
+                    request,
+                    400,
+                    json!({ "error": "segments must be an array" }),
+                )
+            }
+        };
+        let max = payload
+            .get("maxSpeakers")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as usize;
+        let needs_audio = segments.iter().any(|s| {
+            s.get("channel")
+                .and_then(Value::as_str)
+                .is_none_or(|c| c.trim().is_empty())
+        });
+        let mut turns = Vec::new();
+        if needs_audio {
+            if let Some(path) = payload
+                .get("path")
+                .and_then(Value::as_str)
+                .filter(|p| !p.is_empty())
+            {
+                match crate::audio::decode_file(std::path::Path::new(path)) {
+                    Ok(pcm) => turns = crate::diarize::diarize(&pcm, max),
+                    Err(e) => {
+                        return self.json_response(
+                            request,
+                            400,
+                            json!({ "error": format!("could not read the audio: {e}") }),
+                        )
+                    }
+                }
+            }
+        }
+        let labelled = crate::diarize::label_segments(&segments, &turns);
+        let speakers: std::collections::BTreeSet<String> = labelled
+            .iter()
+            .filter_map(|s| s.get("speaker").and_then(Value::as_str).map(str::to_string))
+            .collect();
+        self.json_response(request, 200, json!({ "segments": labelled, "speakers": speakers, "method": if turns.is_empty() { "channel" } else { "acoustic" } }))
+    }
+
     fn post_notes_export(&self, request: &Request) -> Response {
         let Some(payload) = parse_body(&request.body) else {
             return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
@@ -1814,11 +2206,11 @@ impl App {
             Some(Value::String(text)) if !text.is_empty() => text.to_lowercase(),
             _ => "md".to_string(),
         };
-        if format != "txt" && format != "md" {
+        if !matches!(format.as_str(), "txt" | "md" | "markdown" | "docx" | "pdf" | "csv") {
             return self.json_response(
                 request,
                 400,
-                json!({ "error": "format must be \"txt\" or \"md\"" }),
+                json!({ "error": "format must be \"txt\", \"md\", \"markdown\", \"docx\", \"pdf\" or \"csv\"" }),
             );
         }
         let note = match payload.get("note") {
@@ -1859,15 +2251,35 @@ impl App {
             _ => note.get("id").map(py_str).unwrap_or_default(),
         };
         let safe = safe_filename(&title);
-        let content = if format == "txt" {
+        // DOCX and PDF are binary: carried as base64 in the same JSON answer, so every client
+        // (the island's string-based helper client, the extension's fetch) reads them the same way.
+        if let Some((mime, bytes)) = crate::export_docs::binary(&format, &note) {
+            return self.json_response(
+                request,
+                200,
+                json!({
+                    "filename": format!("{safe}.{format}"),
+                    "mime": mime,
+                    "encoding": "base64",
+                    "content": crate::export_docs::base64(&bytes),
+                }),
+            );
+        }
+        let content = if format == "csv" {
+            // UTF-8 BOM first: Excel reads accents and CJK right only with it.
+            format!("\u{feff}{}", export_note_csv(&note))
+        } else if format == "txt" {
             export_note_txt(&note)
+        } else if format == "markdown" {
+            // The full register (table of actions, risks, transcript); "md" stays the short legacy form.
+            crate::export_docs::markdown(&note)
         } else {
             export_note_md(&note)
         };
         self.json_response(
             request,
             200,
-            json!({ "filename": format!("{safe}.{format}"), "content": content }),
+            json!({ "filename": format!("{safe}.{}", if format == "markdown" { "md" } else { format.as_str() }), "content": content }),
         )
     }
 
@@ -2098,6 +2510,49 @@ fn env_path(key: &str, fallback: PathBuf) -> PathBuf {
     match env::var_os(key) {
         Some(value) if !value.is_empty() => PathBuf::from(value),
         _ => fallback,
+    }
+}
+
+/// The transcript for the connector: capped (head and tail kept) so a very long meeting still fits.
+fn clip_transcript(texts: &[String]) -> String {
+    const MAX: usize = 48_000;
+    let all = texts.join("\n");
+    if all.chars().count() <= MAX {
+        return all;
+    }
+    let head: String = all.chars().take(MAX / 2).collect();
+    let tail: String = all
+        .chars()
+        .rev()
+        .take(MAX / 2)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{head}\n[...middle of the transcript left out...]\n{tail}")
+}
+
+/// Fill the note's summary, decisions and actions from a connector's sections, by section kind.
+fn by_kind(note: &mut Value, sections: &[Value]) {
+    let items = |kind: &str| -> Vec<String> {
+        sections
+            .iter()
+            .filter(|s| s["kind"] == kind)
+            .flat_map(|s| s["items"].as_array().cloned().unwrap_or_default())
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect()
+    };
+    let summary = items("summary");
+    if !summary.is_empty() {
+        note["summary"] = json!(summary.join(" "));
+    }
+    let decisions = items("decisions");
+    if !decisions.is_empty() {
+        note["decisions"] = json!(decisions);
+    }
+    let actions = items("actions");
+    if !actions.is_empty() {
+        note["actions"] = Value::Array(actions.iter().enumerate().map(|(i, t)| json!({ "id": format!("act-{}", i + 1), "text": t, "owner": null, "due": null, "status": "open" })).collect());
     }
 }
 

@@ -80,7 +80,7 @@ fn find_captures(text: &str, words: &[&str], max_tail: usize, limit: usize) -> V
     out
 }
 
-fn line_text(line: &Value) -> String {
+pub(crate) fn line_text(line: &Value) -> String {
     let Value::Object(map) = line else {
         return String::new();
     };

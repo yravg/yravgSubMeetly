@@ -28,6 +28,36 @@ fn read(port: u16) -> Result<Inventory, String> {
     models::parse(&body).ok_or_else(|| "The engine's model list was not in a shape this version reads.".into())
 }
 
+/// Look at the engine's speed tests (`GET /models/bench`); the answer is `AppEvent::Speed`.
+pub fn bench_fetch(sink: EventSink, port: u16) {
+    std::thread::Builder::new().name("poni-bench".into()).spawn(move || sink.send(AppEvent::Speed(bench_read(port)))).ok();
+}
+
+fn bench_read(port: u16) -> Result<poni_core::speed::Report, String> {
+    let (code, body) = helper::request(port, "GET", "/models/bench", None).map_err(|e| format!("The engine is not answering ({e})."))?;
+    if code == 404 {
+        return Err("This engine is too old to test model speed. Update yravgSubMeetly.".into());
+    }
+    if code != 200 {
+        return Err(format!("The engine answered {code} for /models/bench."));
+    }
+    poni_core::speed::parse(&body).ok_or_else(|| "The engine's speed report was not in a shape this version reads.".into())
+}
+
+/// Queue speed tests: `{"id": ..}` for one model, `{"kind": "all"}` for every downloaded one. The
+/// engine runs them one at a time in the background; `AppEvent::Speed` follows with the state,
+/// `AppEvent::SpeedStarted` only when the engine refused.
+pub fn bench_start(sink: EventSink, port: u16, body: String) {
+    std::thread::Builder::new()
+        .name("poni-bench-start".into())
+        .spawn(move || match helper::request(port, "POST", "/models/bench", Some(&body)) {
+            Ok((200 | 202, _)) => sink.send(AppEvent::Speed(bench_read(port))),
+            Ok((code, reply)) => sink.send(AppEvent::SpeedStarted(Err(sentence(&reply, code)))),
+            Err(e) => sink.send(AppEvent::SpeedStarted(Err(format!("The engine stopped answering ({e}).")))),
+        })
+        .ok();
+}
+
 /// Download `id`; `AppEvent::Models` says how far it is, `AppEvent::ModelPulled` how it ended.
 /// `source`: `huggingface` or `modelscope` (Settings › Models › Download from).
 pub fn pull(sink: EventSink, port: u16, kind: Kind, id: String, source: String) {

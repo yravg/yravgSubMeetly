@@ -217,15 +217,22 @@ fn normalize_transcript(raw: Option<&Value>) -> Vec<Value> {
         if source.is_empty() {
             continue;
         }
-        out.push(json!({
+        let mut entry = json!({
             "t0": number(line, "t0"),
             "t1": number(line, "t1"),
+            // Who said it ("You", "Others", "Speaker 2"): optional, absent in older documents.
+            "speaker": opt_text(line.get("speaker"), 80),
             "source": truncate(source, 2000),
             "translation": truncate(
                 flat_text(line.get("translation").unwrap_or(&Value::Null)),
                 2000
             ),
-        }));
+        });
+        // Who spoke (diarization or the capture source), only when the sender knows.
+        if let Some(who) = opt_text(line.get("speaker"), 80) {
+            entry["speaker"] = Value::String(who);
+        }
+        out.push(entry);
     }
     out
 }
@@ -559,9 +566,69 @@ pub fn safe_filename(title: &str) -> String {
     }
 }
 
+/// One CSV field, RFC 4180: quoted when it holds a comma, quote, CR or LF; quotes doubled.
+fn csv_field(text: &str) -> String {
+    if text.contains([',', '"', '\r', '\n']) {
+        format!("\"{}\"", text.replace('"', "\"\""))
+    } else {
+        text.to_string()
+    }
+}
+
+fn csv_clock(seconds: f64) -> String {
+    let total = seconds.max(0.0).round() as u64;
+    format!(
+        "{:02}:{:02}:{:02}",
+        total / 3600,
+        total % 3600 / 60,
+        total % 60
+    )
+}
+
+/// The meeting's transcript as CSV (RFC 4180, CRLF rows): start, end, speaker (empty when the
+/// line has none), original, translation. The caller adds the UTF-8 BOM Excel wants.
+pub fn export_note_csv(note: &Value) -> String {
+    let mut rows = vec!["start,end,speaker,original,translation".to_string()];
+    if let Some(Value::Array(lines)) = note.get("transcript") {
+        for line in lines {
+            let text = |key: &str| line.get(key).map(py_str).unwrap_or_default();
+            let num = |key: &str| line.get(key).and_then(Value::as_f64).unwrap_or(0.0);
+            rows.push(
+                [
+                    csv_clock(num("t0")),
+                    csv_clock(num("t1")),
+                    csv_field(&text("speaker")),
+                    csv_field(&text("source")),
+                    csv_field(&text("translation")),
+                ]
+                .join(","),
+            );
+        }
+    }
+    let mut out = rows.join("\r\n");
+    out.push_str("\r\n");
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn csv_export_escapes_and_keeps_unicode() {
+        let note = json!({ "transcript": [
+            { "t0": 0.0, "t1": 3.2, "source": "Halo, \"dunia\"", "translation": "Hello,\nworld" },
+            { "t0": 3725.0, "t1": 3730.0, "source": "日本語", "translation": "", "speaker": "Rina" }
+        ]});
+        assert_eq!(
+            export_note_csv(&note),
+            "start,end,speaker,original,translation\r\n00:00:00,00:00:03,,\"Halo, \"\"dunia\"\"\",\"Hello,\nworld\"\r\n01:02:05,01:02:10,Rina,日本語,\r\n"
+        );
+        assert_eq!(
+            export_note_csv(&json!({})),
+            "start,end,speaker,original,translation\r\n"
+        );
+    }
 
     #[test]
     fn unknown_enums_fall_back_and_metric_needs_a_number() {

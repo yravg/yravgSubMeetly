@@ -291,7 +291,7 @@ mod tests {
     /// must not hold up a model load). The repo does not exist on the Hub at all.
     #[test]
     fn a_cached_file_is_returned_without_the_network() {
-        let cache = std::env::temp_dir().join(format!("ml-cached-{}", std::process::id()));
+        let cache = std::env::temp_dir().canonicalize().unwrap().join(format!("ml-cached-{}", std::process::id()));
         let root = cache.join("models--nobody--not-a-real-repo-7f3a");
         let sha = "0123456789abcdef0123456789abcdef01234567";
         std::fs::create_dir_all(root.join("refs")).unwrap();

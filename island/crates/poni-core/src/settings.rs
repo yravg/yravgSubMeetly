@@ -146,11 +146,21 @@ pub struct Settings {
     pub captions_source: String,
     /// Where model downloads come from: `huggingface` or `modelscope` (the engine's `source`).
     pub model_source: String,
+    /// The subtitle overlay strip (`crate::overlay`).
+    pub overlay: crate::overlay::OverlaySettings,
     /// Captions start by themselves while a video plays or a calendar meeting runs, and stop after
     /// it ends ([`crate::capture::Auto`]).
     pub auto_captions: bool,
+    /// Tell me when a meeting starts (the Mac: a meeting app on the microphone, or a calendar
+    /// meeting, held a few seconds; [`crate::meeting_detect`]). It only tells: nothing is recorded.
+    pub detect_meetings: bool,
+    /// Name who said a caption line ("You", "Others", "Speaker 2") when the engine labelled it.
+    pub show_speakers: bool,
     /// Captions carry a translation into `target_lang` (on by default, English); off: the spoken line only.
     pub translate_captions: bool,
+    /// "Recent lines" on the Live page: how many earlier lines stay as cards above the caption
+    /// (0 = off; [`crate::history_cards`]).
+    pub log_cards: u8,
     /// What Live captions listen to (`capture::Source::key`): `room` (default), `pc` or `both`.
     pub live_source: String,
     /// The microphone for Room and Both: a Windows endpoint id, empty for Windows' default.
@@ -283,8 +293,12 @@ impl Default for Settings {
             captions_on: false,
             captions_source: "pc".into(),
             model_source: "huggingface".into(),
+            overlay: Default::default(),
             auto_captions: true,
+            detect_meetings: true,
+            show_speakers: true,
             translate_captions: true,
+            log_cards: crate::history_cards::DEFAULT_CARDS,
             live_source: "room".into(),
             mic_device: String::new(),
             meeting_apps: Vec::new(),
@@ -388,6 +402,7 @@ impl Settings {
 
     /// Clamp values a user may have hand-edited into nonsense.
     pub fn sanitized(mut self) -> Self {
+        self.overlay = std::mem::take(&mut self.overlay).sanitized();
         // Only untouched old defaults move.
         // v2: hover opens after a 220 ms dwell (140 ms caught pointers on
         // their way to browser tabs).
@@ -429,6 +444,7 @@ impl Settings {
         }
         self.lyrics_offset_ms = self.lyrics_offset_ms.clamp(-5000, 5000);
         self.collapse_delay_ms = self.collapse_delay_ms.min(5000);
+        self.log_cards = crate::history_cards::clamp_count(self.log_cards);
         if !self.expanded_width.is_finite() {
             self.expanded_width = 620.0;
         }

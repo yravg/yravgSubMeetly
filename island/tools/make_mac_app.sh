@@ -51,6 +51,20 @@ else
   echo "warning: no ENGINE_ARM given, the app is built without its engine" >&2
 fi
 
+# What plays, from macOS's own now playing (browsers, Spotify, Music): the MediaRemote adapter's framework
+# and script (third_party/mediaremote-adapter), which /usr/bin/perl runs for the app
+# (crates/poni/src/mac/services/mediaremote.rs). MEDIAREMOTE_BUILD is its CMake build directory
+# (release.yml); without it the app reads Music and Spotify only.
+if [ -n "${MEDIAREMOTE_BUILD:-}" ]; then
+  mkdir -p "$app/Contents/Frameworks"
+  cp -R "$MEDIAREMOTE_BUILD/MediaRemoteAdapter.framework" "$app/Contents/Frameworks/"
+  cp "$root/third_party/mediaremote-adapter/bin/mediaremote-adapter.pl" "$app/Contents/Resources/"
+  lipo -info "$app/Contents/Frameworks/MediaRemoteAdapter.framework/MediaRemoteAdapter"
+else
+  echo "warning: no MEDIAREMOTE_BUILD given, the app is built without macOS's now playing reader" >&2
+fi
+
+# Ad-hoc signature: seals the bundle, the adapter's framework too (Apple Silicon refuses unsigned code outright).
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 

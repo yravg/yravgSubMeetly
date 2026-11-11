@@ -74,6 +74,8 @@ pub enum NotifyCmd {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     Media(MediaCmd),
+    /// Settings › Models › Summaries and AI: the engine's connector and default template (`crate::ai`).
+    Ai(crate::ai::AiCmd),
     /// Open a file/folder with its default handler.
     OpenPath(String),
     /// Settings › Meeting apps: add the host of the link on the clipboard.
@@ -142,6 +144,8 @@ pub enum Command {
     Notify(NotifyCmd),
     /// `POST /notes` to the helper with this body (a decision on a page).
     HelperPost(String),
+    /// Save this meeting (its id) as `docx`, `pdf` or `markdown` in Documents (the engine writes it).
+    ExportNote(String, &'static str),
     /// A kept transcript (this id) becomes a meeting (PMM-015).
     SaveAsMeeting(String),
     /// Ask the helper again now.
@@ -151,6 +155,12 @@ pub enum Command {
     Captions(bool),
     /// Live › Start captions: from Live's source (Room, This PC or Both; PMM-019).
     LiveCaptions,
+    /// Pause or resume the translation of running captions (the caption itself goes on).
+    ToggleTranslationPause,
+    /// Copy the caption now on screen, with its translation, to the clipboard.
+    CopyCaption,
+    /// Save this meeting's transcript as a CSV file in Downloads (the engine's `format=csv`).
+    ExportCsv(String),
     /// Live › source picker: listen to this from now on.
     LiveSource(poni_core::capture::Source),
     /// Live › mic chip: the next of Windows' microphones.
@@ -169,6 +179,19 @@ pub enum Command {
     CallNotesRefresh,
     /// Ask the engine which models it has.
     ModelsRefresh,
+    /// Settings › General › Webhooks: ask the engine for them, add the URL on the clipboard, switch one,
+    /// remove one, send it a test (by the engine's id for it).
+    WebhooksRefresh,
+    WebhookAddFromClipboard,
+    WebhookEnable(String, bool),
+    WebhookRemove(String),
+    WebhookTest(String),
+    /// The subtitle overlay: show sample captions for a few seconds; switch it on or off; freeze or
+    /// resume what it shows; copy its newest sentence.
+    OverlayPreview,
+    OverlayToggle,
+    OverlayPause,
+    OverlayCopy,
     /// Download this model.
     ModelPull(poni_core::models::Kind),
     /// Switch the engine to this model (`models::OFF` for no translation).
@@ -181,6 +204,12 @@ pub enum Command {
     ModelPullId(String),
     /// Model library: delete this model's files (never the one in use; the engine refuses it too).
     ModelDelete(String),
+    /// Settings › Models › Speed: look at the engine's speed tests now.
+    SpeedRefresh,
+    /// Run the speed test of this model id.
+    SpeedTest(String),
+    /// Run the speed test of every downloaded model.
+    SpeedTestAll,
     /// The Downloads page (`pages::downloads`).
     Download(DownloadCmd),
     /// A Windows language feature (`poni_core::winlang`): Settings' rows and

@@ -126,7 +126,27 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         st.records.list = true;
         st.records.page = 0;
     }
-    let b = all;
+    // Export the meeting: PDF and Word, written by the engine into Documents (skipped when the foot is tight),
+    // and the transcript as a CSV file in Downloads (Excel opens it; only when there are lines).
+    let mut b = all;
+    if foot.w >= 520.0 {
+        for (label, fmt, id) in [("Word", "docx", "meeting.export.docx"), ("PDF", "pdf", "meeting.export.pdf")] {
+            let w = ui.pill_width(label, false, true);
+            let r = Rect::new(b.x - PILL_GAP - w, fy - PILL_SMALL / 2.0, w, PILL_SMALL);
+            if ui.pill(wid(id), r, label, None, PillStyle::Utility).clicked {
+                st.cmd(Command::ExportNote(note.id.clone(), fmt));
+            }
+            b = r;
+        }
+    }
+    if !note.transcript.is_empty() {
+        let w = ui.pill_width("Export CSV", false, true);
+        let c = Rect::new(b.x - PILL_GAP - w, fy - PILL_SMALL / 2.0, w, PILL_SMALL);
+        if ui.pill(wid("meeting.csv"), c, "Export CSV", None, PillStyle::Utility).clicked {
+            st.cmd(Command::ExportCsv(note.id.clone()));
+        }
+        b = c;
+    }
     let toast = st.helper_notice.as_ref().filter(|(_, until, _)| *until > ui.now).map(|(m, _, bad)| (m.clone(), *bad));
     let status = match (&toast, locked, waiting) {
         (Some((t, _)), _, _) => t.clone(),

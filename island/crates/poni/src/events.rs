@@ -82,6 +82,8 @@ pub enum LyricsResult {
 }
 
 pub enum AppEvent {
+    /// The engine's AI connector and templates, or how a change to them ended (`crate::ai`).
+    Ai(crate::ai::AiEvent),
     /// The current media session changed (None = nothing playing / no session).
     Media(Option<MediaSession>),
     /// Only the timeline/playback state of the current track changed.
@@ -148,6 +150,10 @@ pub enum AppEvent {
     Helper(Result<(poni_core::helper::Snapshot, u32), String>),
     /// A decision the helper refused or could not be reached for.
     HelperNotice(String),
+    /// A meeting exported to a file (`Command::ExportNote`), or why not.
+    NoteExported(Result<std::path::PathBuf, String>),
+    /// A CSV export ended: the file it wrote (its full path), or why it could not.
+    Exported(Result<String, String>),
     /// The engine's calendar, or why it could not be read.
     Calendar(Result<poni_core::calendar::Calendar, String>),
     /// The answer to "Open notes" on a meeting: the note's title, or why not.
@@ -166,6 +172,9 @@ pub enum AppEvent {
     CallNotes(Option<Vec<poni_core::live_notes::Item>>),
     /// A song's lyrics translated so far (index-aligned with the lines) and where that stands.
     LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
+    /// The engine's webhooks (`services::integrations`), and one line about the change just made.
+    Webhooks(Result<Vec<poni_core::webhooks::Webhook>, String>),
+    WebhookNote { ok: bool, text: String },
     /// What the engine says its models are (or why it could not say), during a download too.
     Models(Result<poni_core::models::Inventory, String>),
     /// A model download ended.
@@ -177,6 +186,10 @@ pub enum AppEvent {
     /// A folder request for a model ended: started (the engine moves it in the background), refused,
     /// or the picker was cancelled (`Ok`, nothing to say).
     ModelPlaced { kind: poni_core::models::Kind, result: Result<(), String> },
+    /// What the engine says about the model speed tests (or why it could not say).
+    Speed(Result<poni_core::speed::Report, String>),
+    /// A speed test was refused by the engine (the reason).
+    SpeedStarted(Result<(), String>),
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

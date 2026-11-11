@@ -72,6 +72,14 @@ const STEP_BTN: f32 = 26.0;
 const STEP_VALUE_W: f32 = 84.0;
 /// The Appearance section's theme cards.
 const THEME_CARD_H: f32 = 154.0;
+/// Models › Speed: a model's row (name and value, bar, detail), a group's heading, the footnote.
+const SPEED_ROW_H: f32 = 62.0;
+const SPEED_GROUP_H: f32 = 26.0;
+const SPEED_FOOT_H: f32 = 36.0;
+const SPEED_BAR_H: f32 = 8.0;
+const SPEED_SPARK_W: f32 = 72.0;
+const SPEED_SPARK_H: f32 = 16.0;
+const SPEED_EMPTY_H: f32 = 52.0;
 const THEME_PREVIEW_H: f32 = 74.0;
 const THEME_GAP: f32 = 12.0;
 /// A wheel notch scrolls this far.
@@ -125,6 +133,7 @@ pub enum Section {
     Island,
     Music,
     Speech,
+    Overlay,
     Models,
     Popups,
     Tabs,
@@ -135,12 +144,13 @@ pub enum Section {
 }
 
 impl Section {
-    pub const ALL: [Section; 12] = [
+    pub const ALL: [Section; 13] = [
         Section::General,
         Section::Appearance,
         Section::Island,
         Section::Music,
         Section::Speech,
+        Section::Overlay,
         Section::Models,
         Section::Popups,
         Section::Tabs,
@@ -157,6 +167,7 @@ impl Section {
             Section::Island => "Island",
             Section::Music => "Media and lyrics",
             Section::Speech => "Captions and languages",
+            Section::Overlay => "Subtitle overlay",
             Section::Models => "Models",
             Section::Popups => "Pop-ups",
             Section::Tabs => "Tabs",
@@ -175,6 +186,7 @@ impl Section {
             Section::Island => "island",
             Section::Music => "music",
             Section::Speech => "speech",
+            Section::Overlay => "overlay",
             Section::Models => "models",
             Section::Popups => "popups",
             Section::Tabs => "tabs",
@@ -192,6 +204,7 @@ impl Section {
             Section::Island => Icon::AppWindow,
             Section::Music => Icon::Music,
             Section::Speech => Icon::Lyrics,
+            Section::Overlay => Icon::AppWindow,
             Section::Models => Icon::Download,
             Section::Popups => Icon::Volume,
             Section::Tabs => Icon::App,
@@ -210,6 +223,7 @@ impl Section {
             Section::Island => palette::BLUE,
             Section::Music => palette::PINK,
             Section::Speech => palette::PURPLE,
+            Section::Overlay => Color::hex(0x5856D6),
             Section::Models => palette::YELLOW,
             Section::Popups => palette::CYAN,
             Section::Tabs => palette::GREEN,
@@ -259,6 +273,61 @@ fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
             rows.push(item(Key::ModelFolderReset(k), "Use the default folder", Some("Moves the model back"), Ctl::Button("Reset")));
         }
     }
+    rows
+}
+
+/// Settings › Models › Summaries and AI: the engine's custom AI connector and default summary template.
+fn ai_items(ai: &crate::ai::AiView) -> Vec<Item> {
+    let set = |v: &str, empty: &'static str| if v.is_empty() { empty.to_string() } else { v.to_string() };
+    let key = if ai.has_key { if ai.key_hint.is_empty() { "Saved. Never shown again.".to_string() } else { format!("Saved, ends in {}. Never shown again.", ai.key_hint) } } else { "Not set (some local servers need none)".to_string() };
+    vec![
+        switch(Key::AiEnabled, "Use my own AI model", Some("Off: everything stays on this computer. On: transcripts and questions go to your endpoint for summaries and Ask"), ai.enabled),
+        item(Key::AiUrl, "Endpoint", Some(&set(&ai.base_url, "Copy an OpenAI-compatible URL (https://…/v1, or http://localhost:11434/v1 for Ollama), then press Paste")), Ctl::Button("Paste URL")),
+        item(Key::AiModel, "Model name", Some(&set(&ai.model, "Copy the model's name, then press Paste")), Ctl::Button("Paste name")),
+        item(Key::AiKey, "API key", Some(&key), Ctl::Button("Paste key")),
+        item(Key::AiTest, "Check the connection", Some("Sends one tiny test message"), Ctl::Button("Test")),
+        item(Key::SummaryTemplate, "Summary template", Some("How notes are laid out: General, Standup, 1:1, Sales call, Interview, Retro, Project status"), Ctl::Stepper(ai.template_name())),
+    ]
+}
+
+/// Settings › Models › Caption translation service: on this device (default) or an online or
+/// self-hosted service. Only the fields the chosen provider needs are shown.
+fn provider_items(ai: &crate::ai::AiView) -> Vec<Item> {
+    let pv = &ai.provider;
+    let set = |v: &str, empty: String| if v.is_empty() { empty } else { v.to_string() };
+    let mut rows = vec![item(Key::ProviderPick, "Translate captions with", Some("On this device by default. Others send the caption text to that service"), Ctl::Stepper(pv.name()))];
+    if pv.is_local() {
+        return rows;
+    }
+    let privacy = if pv.off_device { "On: each caption line's text is sent to the service. Off: it stays on this computer" } else { "On: captions use this server (it runs on this computer)" };
+    rows.push(switch(Key::ProviderEnabled, "Use this service for captions", Some(privacy), pv.enabled));
+    if pv.needs("baseUrl") {
+        let empty = if pv.default_base_url.is_empty() { "Copy the server URL, then press Paste".to_string() } else { format!("Default {}. Copy a URL, then press Paste to change it", pv.default_base_url) };
+        rows.push(item(Key::ProviderUrl, "Server URL", Some(&set(&pv.base_url, empty)), Ctl::Button("Paste URL")));
+    }
+    if pv.needs("appId") {
+        rows.push(item(Key::ProviderAppId, "App id", Some(&set(&pv.app_id, "Copy the app id, then press Paste".to_string())), Ctl::Button("Paste id")));
+    }
+    if pv.needs("model") {
+        rows.push(item(Key::ProviderModel, "Model name", Some(&set(&pv.model, "Copy the model's name, then press Paste".to_string())), Ctl::Button("Paste name")));
+    }
+    if pv.needs("key") {
+        let t = if pv.has_key {
+            if pv.key_hint.is_empty() {
+                "Saved. Never shown again.".to_string()
+            } else {
+                format!("Saved, ends in {}. Never shown again.", pv.key_hint)
+            }
+        } else {
+            "Not set".to_string()
+        };
+        rows.push(item(Key::ProviderKey, "API key", Some(&t), Ctl::Button("Paste key")));
+    }
+    if pv.needs("secret") {
+        let t = if pv.has_secret { "Saved. Never shown again." } else { "Not set" };
+        rows.push(item(Key::ProviderSecret, "Secret", Some(t), Ctl::Button("Paste secret")));
+    }
+    rows.push(item(Key::ProviderTest, "Check the service", Some("Translates one short sentence"), Ctl::Button("Test")));
     rows
 }
 
@@ -343,7 +412,22 @@ pub enum Key {
     LyricsOffset,
     Captions,
     AutoCaptions,
+    DetectMeetings,
+    ShowSpeakers,
     TranslateCaptions,
+    LogCards,
+    /// Subtitle overlay (`poni_core::overlay`): its switch, what it shows, its look and behaviour.
+    OverlayEnabled,
+    OverlayShow,
+    OverlayBackground,
+    OverlayOpacity,
+    OverlayOriginalColor,
+    OverlayTranslationColor,
+    OverlayFont,
+    OverlaySentences,
+    OverlayClickThrough,
+    OverlayPreview,
+    OverlayHome,
     SpokenLang,
     TargetLang,
     LyricsTranslate,
@@ -360,6 +444,21 @@ pub enum Key {
     /// Model library: the On device / All / Recommended filter.
     LibFilter,
     ModelSource,
+    /// Summaries and AI: the connector's switch, its three fields (pasted), a test, and the default template.
+    AiEnabled,
+    AiUrl,
+    AiModel,
+    AiKey,
+    AiTest,
+    SummaryTemplate,
+    ProviderPick,
+    ProviderEnabled,
+    ProviderUrl,
+    ProviderAppId,
+    ProviderModel,
+    ProviderKey,
+    ProviderSecret,
+    ProviderTest,
     /// Model library: a row's buttons; the index into the filtered list.
     LibModel(u8),
     /// Languages on this PC: a line that only says something.
@@ -399,6 +498,13 @@ pub enum Key {
     /// Add the running app at this place in `AppState::meeting_pick`.
     MeetingPickApp(usize),
     OpenMeetingTab,
+    /// Webhooks (the engine's, by their place in `AppState::webhooks`): the switch, Test, Remove; Add
+    /// takes the URL on the clipboard; Info only says something.
+    Webhook(u8),
+    WebhookTest(u8),
+    WebhookRemove(u8),
+    WebhookAdd,
+    WebhookInfo,
 }
 
 /// A row's control, at its right end.
@@ -438,6 +544,24 @@ impl Item {
         self.progress = poni_core::library::progress(st);
         self
     }
+}
+
+/// Settings › General › Webhooks: the engine's list, one switch, Test and Remove each, and the Add row.
+/// The kit has no text field: Paste URL reads the clipboard (as the calendar link does).
+fn webhook_rows(st: &AppState) -> Vec<Item> {
+    let w = &st.webhooks;
+    let mut rows = Vec::new();
+    for (i, h) in w.list.iter().enumerate().take(20) {
+        let name = h.name();
+        rows.push(item(Key::Webhook(i as u8), &name, Some(&h.sub()), Ctl::Switch(Some(h.enabled))));
+        rows.push(item(Key::WebhookTest(i as u8), &format!("Send a test to {name}"), None, Ctl::Button("Test")));
+        rows.push(item(Key::WebhookRemove(i as u8), &format!("Remove {name}"), None, Ctl::Button("Remove")));
+    }
+    rows.push(item(Key::WebhookAdd, "Add a webhook", Some("Copy its URL, then press Paste URL"), Ctl::Button("Paste URL")));
+    if let Some(e) = &w.error {
+        rows.push(item(Key::WebhookInfo, "The engine's webhooks are not available", Some(e), Ctl::None));
+    }
+    rows
 }
 
 fn switch(key: Key, label: &str, sub: Option<&str>, on: bool) -> Item {
@@ -482,6 +606,8 @@ pub enum Block {
     Addons,
     /// A dim line of text.
     Note(&'static str),
+    /// Models › Speed: how fast each downloaded model runs on this PC, measured by the engine.
+    Speed,
 }
 
 /// What a click on a row's control did.
@@ -590,7 +716,12 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             if s.system_on() {
                 rows.push(switch(Key::SystemHistory, "Keep System page history", Some("The charts keep the last minute while the page is closed"), s.system_history));
             }
-            vec![Block::Version, Block::Group(None, rows)]
+            vec![
+                Block::Version,
+                Block::Group(None, rows),
+                Block::Group(Some("Webhooks"), webhook_rows(st)),
+                Block::Note("A webhook is a web address the engine calls when a meeting is saved or action items appear (signed with a secret if you set one). The MCP server and the command line are in docs/INTEGRATIONS.md."),
+            ]
         }
         Section::Appearance => {
             let looks = status::looks(s.theme);
@@ -651,8 +782,11 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 Some("Captions"),
                 vec![
                     switch(Key::Captions, "Caption what this PC plays", Some("The engine writes what it hears on the island, in the language it hears"), st.capture.running()),
+                    switch(Key::DetectMeetings, "Tell me when a meeting starts", Some("A meeting app using the microphone, or a calendar meeting; it only tells you, nothing is recorded"), s.detect_meetings),
                     switch(Key::AutoCaptions, "Start captions by themselves", Some("When the PC plays sound (a call, a video, a meeting; not a music app); they stop after it ends"), s.auto_captions),
+                    switch(Key::ShowSpeakers, "Show who is speaking", Some("Names the speaker in front of a caption line when the engine could tell (You, Others, Speaker 2); a reading aid, not exact"), s.show_speakers),
                     switch(Key::TranslateCaptions, "Translate captions", Some("A second line in the language under Translate into (English by default)"), s.translate_captions),
+                    item(Key::LogCards, "Recent lines", Some("Cards of the lines before the caption on Live; Off hides them"), Ctl::Stepper(if s.log_cards == 0 { "Off".to_string() } else { s.log_cards.to_string() })),
                 ],
             ),
             Block::Group(Some("Meeting apps"), meeting_rows(st)),
@@ -667,10 +801,12 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
             Block::Group(Some("Languages on this PC"), poni_core::library::language_rows(&st.models).into_iter().map(|(name, text)| item(Key::LibLang, name, Some(&text), Ctl::None)).collect()),
         ],
+        Section::Overlay => overlay_blocks(&s.overlay),
         Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
+            .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai)), Block::Group(Some("Caption translation service"), provider_items(&st.ai))])
             .chain([Kind::Asr, Kind::Translate].into_iter().map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k))))
-            .chain([Block::Group(Some("Library"), library_items(st))])
+            .chain([Block::Speed, Block::Group(Some("Library"), library_items(st))])
             .collect(),
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
@@ -781,6 +917,41 @@ pub fn nav_id(st: &AppState, section: Section) -> Option<u64> {
     sections(st).iter().position(|s| *s == section).map(|i| wid_n("settingswin.nav", i as u64))
 }
 
+/// Settings › Subtitle overlay: the strip over the screen that shows captions and translations
+/// (`poni_core::overlay`; the idea is LiveCaptions-Translator's).
+fn overlay_blocks(o: &poni_core::overlay::OverlaySettings) -> Vec<Block> {
+    use poni_core::overlay::{Show, BACKGROUND_PRESETS, TEXT_PRESETS};
+    let at = |presets: &[(&'static str, poni_core::overlay::Rgb)], c: poni_core::overlay::Rgb| presets.iter().position(|(_, p)| *p == c);
+    vec![
+        Block::Group(
+            Some("Overlay"),
+            vec![
+                switch(Key::OverlayEnabled, "Show the subtitle overlay", Some("A strip over the screen with the captions and their translation; also in the tray menu"), o.enabled),
+                item(Key::OverlayShow, "Shows", Some("The original, the translation or both"), Ctl::Choice(Show::ALL.iter().map(|m| m.label()).collect(), Show::ALL.iter().position(|m| *m == o.show))),
+                item(Key::OverlaySentences, "Sentences", Some("How many stay up at once"), Ctl::Stepper(o.sentences.to_string())),
+                item(Key::OverlayPreview, "Try it", Some("Shows sample captions for a few seconds"), Ctl::Button("Preview")),
+            ],
+        ),
+        Block::Group(
+            Some("Look"),
+            vec![
+                item(Key::OverlayFont, "Text size", None, Ctl::Stepper(format!("{} pt", o.font_size))),
+                item(Key::OverlayOriginalColor, "Original colour", None, Ctl::Choice(TEXT_PRESETS.iter().map(|(n, _)| *n).collect(), at(&TEXT_PRESETS, o.original_color))),
+                item(Key::OverlayTranslationColor, "Translation colour", None, Ctl::Choice(TEXT_PRESETS.iter().map(|(n, _)| *n).collect(), at(&TEXT_PRESETS, o.translation_color))),
+                item(Key::OverlayBackground, "Background", None, Ctl::Choice(BACKGROUND_PRESETS.iter().map(|(n, _)| *n).collect(), at(&BACKGROUND_PRESETS, o.background))),
+                item(Key::OverlayOpacity, "Background opacity", Some("0 leaves only the text"), Ctl::Stepper(format!("{}%", o.background_opacity))),
+            ],
+        ),
+        Block::Group(
+            Some("Behaviour"),
+            vec![
+                switch(Key::OverlayClickThrough, "Click-through", Some("The mouse goes through it, so it never gets in the way of a game or a video; off, drag it where you like"), o.click_through),
+                item(Key::OverlayHome, "Position", Some("Back to the bottom centre of the screen"), Ctl::Button("Reset")),
+            ],
+        ),
+    ]
+}
+
 /// Step a number of minutes: by 5, by 1 below 5.
 fn step_min(v: u32, d: i32, lo: u32, hi: u32) -> u32 {
     let by = if (d < 0 && v <= 5) || (d > 0 && v < 5) { 1 } else { 5 };
@@ -844,7 +1015,95 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             return;
         }
         Key::AutoCaptions => s.auto_captions = !s.auto_captions,
+        Key::DetectMeetings => s.detect_meetings = !s.detect_meetings,
+        Key::ShowSpeakers => s.show_speakers = !s.show_speakers,
+        Key::AiEnabled => {
+            let on = !st.ai.enabled;
+            st.cmd(Command::Ai(crate::ai::AiCmd::Enable(on)));
+            return;
+        }
+        Key::AiUrl => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::PasteUrl));
+            return;
+        }
+        Key::AiModel => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::PasteModel));
+            return;
+        }
+        Key::AiKey => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::PasteKey));
+            return;
+        }
+        Key::AiTest => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::Test));
+            return;
+        }
+        Key::ProviderPick => {
+            if step != 0 {
+                match st.ai.provider.step(step) {
+                    Some(id) => st.cmd(Command::Ai(crate::ai::AiCmd::ProviderPick(id))),
+                    // The engine's list isn't known yet (it is still starting): ask for it again.
+                    None => st.cmd(Command::Ai(crate::ai::AiCmd::Refresh)),
+                }
+            }
+            return;
+        }
+        Key::ProviderEnabled => {
+            let on = !st.ai.provider.enabled;
+            st.cmd(Command::Ai(crate::ai::AiCmd::ProviderEnable(on)));
+            return;
+        }
+        Key::ProviderUrl | Key::ProviderAppId | Key::ProviderModel | Key::ProviderKey | Key::ProviderSecret => {
+            use crate::ai::ProvField;
+            let field = match key {
+                Key::ProviderUrl => ProvField::Url,
+                Key::ProviderAppId => ProvField::AppId,
+                Key::ProviderModel => ProvField::Model,
+                Key::ProviderKey => ProvField::Key,
+                _ => ProvField::Secret,
+            };
+            st.cmd(Command::Ai(crate::ai::AiCmd::ProviderPaste(field)));
+            return;
+        }
+        Key::ProviderTest => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::ProviderTest));
+            return;
+        }
+        Key::SummaryTemplate => {
+            if step != 0 {
+                let next = st.ai.step_template(step);
+                st.cmd(Command::Ai(crate::ai::AiCmd::SetTemplate(next)));
+            }
+            return;
+        }
         Key::TranslateCaptions => s.translate_captions = !s.translate_captions,
+        Key::LogCards => s.log_cards = poni_core::history_cards::clamp_count((s.log_cards as i32 + step).clamp(0, poni_core::history_cards::MAX_CARDS as i32) as u8),
+        Key::OverlayEnabled => s.overlay.enabled = !s.overlay.enabled,
+        Key::OverlayShow => match act {
+            Act::Pick(i) if i < poni_core::overlay::Show::ALL.len() => s.overlay.show = poni_core::overlay::Show::ALL[i],
+            _ => return,
+        },
+        Key::OverlaySentences => s.overlay.sentences = (s.overlay.sentences as i64 + step as i64).clamp(poni_core::overlay::SENTENCES_MIN as i64, poni_core::overlay::SENTENCES_MAX as i64) as u32,
+        Key::OverlayFont => s.overlay.font_size = (s.overlay.font_size as i64 + step as i64 * 2).clamp(poni_core::overlay::FONT_MIN as i64, poni_core::overlay::FONT_MAX as i64) as u32,
+        Key::OverlayOpacity => s.overlay.background_opacity = (s.overlay.background_opacity as i64 + step as i64 * 10).clamp(0, 100) as u32,
+        Key::OverlayOriginalColor => match act {
+            Act::Pick(i) if i < poni_core::overlay::TEXT_PRESETS.len() => s.overlay.original_color = poni_core::overlay::TEXT_PRESETS[i].1,
+            _ => return,
+        },
+        Key::OverlayTranslationColor => match act {
+            Act::Pick(i) if i < poni_core::overlay::TEXT_PRESETS.len() => s.overlay.translation_color = poni_core::overlay::TEXT_PRESETS[i].1,
+            _ => return,
+        },
+        Key::OverlayBackground => match act {
+            Act::Pick(i) if i < poni_core::overlay::BACKGROUND_PRESETS.len() => s.overlay.background = poni_core::overlay::BACKGROUND_PRESETS[i].1,
+            _ => return,
+        },
+        Key::OverlayClickThrough => s.overlay.click_through = !s.overlay.click_through,
+        Key::OverlayPreview => {
+            st.cmd(Command::OverlayPreview);
+            return;
+        }
+        Key::OverlayHome => s.overlay.spot = None,
         Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
         Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
         Key::LyricsTranslate => s.lyrics_translate = !s.lyrics_translate,
@@ -968,6 +1227,29 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             st.cmd(Command::MeetingAddLink);
             return;
         }
+        Key::Webhook(i) => {
+            if let Some(h) = st.webhooks.list.get(i as usize) {
+                st.cmd(Command::WebhookEnable(h.id.clone(), !h.enabled));
+            }
+            return;
+        }
+        Key::WebhookTest(i) => {
+            if let Some(h) = st.webhooks.list.get(i as usize) {
+                st.cmd(Command::WebhookTest(h.id.clone()));
+            }
+            return;
+        }
+        Key::WebhookRemove(i) => {
+            if let Some(h) = st.webhooks.list.get(i as usize) {
+                st.cmd(Command::WebhookRemove(h.id.clone()));
+            }
+            return;
+        }
+        Key::WebhookAdd => {
+            st.cmd(Command::WebhookAddFromClipboard);
+            return;
+        }
+        Key::WebhookInfo => return,
         Key::MeetingPickApps => {
             st.cmd(Command::MeetingPickApps);
             return;
@@ -1366,6 +1648,14 @@ fn draw(ui: &mut Ui, st: &mut AppState, section: Section, frame: Frame, light: b
     if matches!(section, Section::Speech | Section::Models) && st.models.due(st.now) {
         st.cmd(Command::ModelsRefresh);
     }
+    if section == Section::General && st.webhooks.due(st.now) {
+        st.cmd(Command::WebhooksRefresh);
+    }
+
+    // The speed tests: looked at every 10 s while Models is open, every second while one runs.
+    if section == Section::Models && st.speed.due(st.now) {
+        st.cmd(Command::SpeedRefresh);
+    }
     for (bi, b) in blocks(section, st).into_iter().enumerate() {
         y = draw_block(ui, st, &b, bi, Rect::new(x, y, content.w, 0.0), view, &sf, m);
     }
@@ -1487,6 +1777,7 @@ fn block_h(st: &AppState, b: &Block) -> f32 {
         Block::Themes => GROUP_TITLE_H + THEME_CARD_H,
         Block::Addons => crate::pages::addons::height(st),
         Block::Note(_) => 18.0,
+        Block::Speed => speed_h(st),
     }
 }
 
@@ -1532,6 +1823,7 @@ fn draw_block(ui: &mut Ui, st: &mut AppState, b: &Block, bi: usize, at: Rect, vi
         Block::Themes => draw_themes(ui, st, r, view, sf, m),
         Block::Addons => crate::pages::addons::draw(ui, st, r),
         Block::Note(t) => ui.c.text(t, Rect::new(r.x + 2.0, r.y, r.w, r.h), &TextStyle::footnote().color(palette::TEXT_FAINT)),
+        Block::Speed => draw_speed(ui, st, r, view, sf),
     }
     next
 }
@@ -1860,6 +2152,147 @@ fn draw_themes(ui: &mut Ui, st: &mut AppState, r: Rect, view: Rect, sf: &Surface
     }
 }
 
+/// How tall the Speed block is: a title row, the card (a heading per group with models, a row per
+/// model, or a hint when nothing is downloaded) and its footnote.
+fn speed_h(st: &AppState) -> f32 {
+    let rows = poni_core::speed::rows(&st.models, &st.speed);
+    let body = if rows.is_empty() {
+        SPEED_EMPTY_H
+    } else {
+        let groups = poni_core::speed::Group::ALL.iter().filter(|g| rows.iter().any(|r| r.group == **g)).count();
+        groups as f32 * SPEED_GROUP_H + rows.len() as f32 * SPEED_ROW_H + 8.0
+    };
+    GROUP_TITLE_H + body + SPEED_FOOT_H
+}
+
+/// Models › Speed. One bar per downloaded model, scaled within its group (the units differ); the bar
+/// is the newest test, the line beside it the kept history, and a model nobody tested has no bar at
+/// all, only "Not tested yet". Colours are the window's tokens: the accent for a result, yellow for a
+/// test under way (the same yellow as a download), red for a failure.
+fn draw_speed(ui: &mut Ui, st: &mut AppState, r: Rect, view: Rect, sf: &Surfaces) {
+    use poni_core::speed::{self, Group, State};
+    let rows = speed::rows(&st.models, &st.speed);
+    let testing = st.speed.testing();
+    ui.c.text("Speed on this PC", Rect::new(r.x + 2.0, r.y, r.w, GROUP_TITLE_H - 6.0), &TextStyle::footnote().weight(Weight::Semibold).color(palette::TEXT_DIM));
+    // Test all downloaded, at the right of the title.
+    let head = if testing { "Testing\u{2026}" } else { "Test all downloaded" };
+    let hw = ui.pill_width(head, true, true);
+    let hr = Rect::new(r.right() - hw, r.y - 4.0, hw, PILL_SMALL);
+    if visible(hr, view).is_some_and(|v| v.h >= hr.h - 0.5) {
+        let resp = ui.pill(wid("settingswin.speed.all"), hr, head, Some(Icon::Gauge), PillStyle::Utility);
+        if resp.clicked && !testing && !rows.is_empty() {
+            st.cmd(Command::SpeedTestAll);
+        }
+    }
+    let card = Rect::new(r.x, r.y + GROUP_TITLE_H, r.w, r.h - GROUP_TITLE_H - SPEED_FOOT_H);
+    fill_group(ui, card, sf.group);
+    let accent = st.accent;
+    let px = 1.0 / ui.c.scale().max(0.5);
+    let (x0, x1) = (card.x + ROW_PAD, card.right() - ROW_PAD);
+    let mut y = card.y;
+    if rows.is_empty() {
+        ui.c.text("Download a model in the Library below, then test how fast it runs here.", Rect::new(x0, y, x1 - x0, SPEED_EMPTY_H), &TextStyle::body().color(palette::TEXT_DIM));
+    }
+    let mut index = 0u64;
+    for g in Group::ALL {
+        let mine: Vec<&speed::Row> = rows.iter().filter(|row| row.group == g).collect();
+        if mine.is_empty() {
+            continue;
+        }
+        // The group's name, and what a longer bar means.
+        let name = TextStyle::footnote().weight(Weight::Semibold).color(palette::TEXT);
+        let nw = ui.c.measure(g.title(), &name, 400.0).0.ceil();
+        ui.c.text(g.title(), Rect::new(x0, y + 8.0, nw + 2.0, 16.0), &name);
+        ui.c.text(g.caption(), Rect::new(x0 + nw + 10.0, y + 8.0, (x1 - x0 - nw - 10.0).max(0.0), 16.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
+        y += SPEED_GROUP_H;
+        for row in mine {
+            let rr = Rect::new(card.x, y, card.w, SPEED_ROW_H);
+            ui.c.fill_rect(Rect::new(rr.x + ROW_PAD, rr.y, rr.w - 2.0 * ROW_PAD, px), RULE);
+            y += SPEED_ROW_H;
+            index += 1;
+            if visible(rr, view).is_none() {
+                continue;
+            }
+            // The button at the right: Test, Retest or Retry; none while it runs or waits.
+            let busy = matches!(row.state, State::Testing(_) | State::Queued);
+            let label = match &row.state {
+                State::Failed(_) => "Retry",
+                State::Tested => "Retest",
+                _ => "Test",
+            };
+            let bw = if busy { 0.0 } else { ui.pill_width(label, true, true) };
+            let br = Rect::new(x1 - bw, rr.y + 6.0, bw, PILL_SMALL);
+            if !busy {
+                if visible(br, view).is_some_and(|v| v.h >= br.h - 0.5) {
+                    if ui.pill(wid_n("settingswin.speed.test", index), br, label, Some(Icon::Gauge), PillStyle::Utility).clicked && !testing {
+                        st.cmd(Command::SpeedTest(row.id.clone()));
+                    }
+                }
+            }
+            let right = if busy { x1 } else { br.x - 10.0 };
+            // The value (the newest result, or what is going on) and the model's name.
+            let bold = TextStyle::body().weight(Weight::Semibold);
+            let (value, value_color) = match (&row.state, &row.latest) {
+                (State::Testing(p), _) => (format!("Testing {:.0}%", p * 100.0), palette::YELLOW),
+                (State::Queued, _) => ("Waiting\u{2026}".to_string(), palette::TEXT_DIM),
+                (_, Some(run)) => (speed::value_text(g, run), palette::TEXT),
+                _ => (String::new(), palette::TEXT_DIM),
+            };
+            let vw = if value.is_empty() { 0.0 } else { ui.c.measure(&value, &bold.tabular(), 300.0).0.ceil() + 4.0 };
+            ui.c.text(&row.label, Rect::new(x0, rr.y + 8.0, (right - x0 - vw - 8.0).max(0.0), 19.0), &bold);
+            if vw > 0.0 {
+                ui.c.text(&value, Rect::new(right - vw, rr.y + 8.0, vw, 19.0), &bold.tabular().right().color(value_color));
+            }
+            // The bar, with the history line at its right end.
+            let spark = speed::spark(&row.history, SPEED_SPARK_W, SPEED_SPARK_H);
+            let track_w = (x1 - x0) - if spark.is_empty() { 0.0 } else { SPEED_SPARK_W + 14.0 };
+            let track = Rect::new(x0, rr.y + 34.0, track_w.max(20.0), SPEED_BAR_H);
+            match &row.state {
+                State::Testing(p) => {
+                    ui.c.fill_rrect(track, SPEED_BAR_H / 2.0, Color::white(0.08));
+                    ui.c.fill_rrect(Rect::new(track.x, track.y, (track.w * p.clamp(0.02, 1.0)).max(SPEED_BAR_H), SPEED_BAR_H), SPEED_BAR_H / 2.0, palette::YELLOW);
+                }
+                State::Failed(why) => {
+                    ui.c.text(&format!("Test failed: {why}"), Rect::new(x0, rr.y + 31.0, x1 - x0, 16.0), &TextStyle::footnote().color(palette::RED));
+                }
+                State::NotTested => {
+                    ui.c.text("Not tested yet", Rect::new(x0, rr.y + 31.0, x1 - x0, 16.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
+                }
+                State::Queued => {
+                    ui.c.fill_rrect(track, SPEED_BAR_H / 2.0, Color::white(0.08));
+                }
+                State::Tested => {
+                    ui.c.fill_rrect(track, SPEED_BAR_H / 2.0, Color::white(0.08));
+                    ui.c.fill_rrect(Rect::new(track.x, track.y, (track.w * row.ratio).max(SPEED_BAR_H), SPEED_BAR_H), SPEED_BAR_H / 2.0, accent);
+                }
+            }
+            if matches!(row.state, State::Tested | State::Queued | State::Testing(_)) && !spark.is_empty() {
+                let box_ = Rect::new(x1 - SPEED_SPARK_W, rr.y + 34.0, SPEED_SPARK_W, SPEED_SPARK_H);
+                let at = |p: (f32, f32)| Point::new(box_.x + p.0, box_.y + p.1);
+                for w in spark.windows(2) {
+                    ui.c.line(at(w[0]), at(w[1]), Color::white(0.5), 1.5);
+                }
+                if let Some(last) = spark.last() {
+                    ui.c.fill_circle(at(*last), 2.5, accent);
+                }
+            }
+            // How it was measured: the time per window or sentence, how many, which day.
+            if let Some(run) = row.latest.as_ref().filter(|_| matches!(row.state, State::Tested)) {
+                let detail = format!("{} \u{b7} {} timed \u{b7} {}", speed::latency_text(g, run), run.samples, speed::day(&run.at));
+                ui.c.text(&detail, Rect::new(x0, rr.y + 44.0, x1 - x0, 15.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
+            }
+        }
+    }
+    // The footnote: what these numbers are, or why there are none.
+    let foot = Rect::new(r.x + 2.0, card.bottom() + 6.0, r.w - 4.0, SPEED_FOOT_H - 6.0);
+    let (line, color) = match (&st.speed.error, speed::device(&st.speed)) {
+        (Some(e), _) => (e.clone(), palette::ORANGE),
+        (None, Some(dev)) => (format!("Measured by the engine on this PC ({dev}) with a short real recording and fixed sentences. Not a published benchmark; a model on another PC runs differently."), palette::TEXT_FAINT),
+        (None, None) => ("Tests run on this PC with a short real recording and fixed sentences. Nothing leaves the PC.".to_string(), palette::TEXT_FAINT),
+    };
+    ui.c.text(&line, foot, &TextStyle::footnote().color(color).wrap().top());
+}
+
 /// A theme's island on a small screen: hanging from its top edge, glass,
 /// or floating below it. Drawn as it is, in either mode.
 fn draw_theme_preview(c: &mut Canvas, theme: Theme, screen: Rect) {
@@ -1942,13 +2375,109 @@ mod tests {
                     Key::WinLang(_) | Key::WinLangSettings => assert!(st.cmds.iter().any(|c| matches!(c, Command::WinLang(_))), "{:?}", it.key),
                     // Paste reads the clipboard and Pick lists running apps: the app does both.
                     Key::MeetingAddLink => assert!(st.cmds.contains(&Command::MeetingAddLink)),
+                    // The AI connector's rows ask the engine through the app.
+                    Key::AiEnabled | Key::AiUrl | Key::AiModel | Key::AiKey | Key::AiTest | Key::SummaryTemplate | Key::ProviderPick | Key::ProviderEnabled | Key::ProviderUrl | Key::ProviderAppId | Key::ProviderModel | Key::ProviderKey | Key::ProviderSecret | Key::ProviderTest => assert!(st.cmds.iter().any(|c| matches!(c, Command::Ai(_))), "{:?}", it.key),
                     Key::MeetingPickApps => assert!(st.cmds.contains(&Command::MeetingPickApps)),
+                    // The webhooks live in the engine: the app asks it, nothing goes to the settings file.
+                    Key::WebhookAdd => assert!(st.cmds.contains(&Command::WebhookAddFromClipboard) && !saved),
+                    Key::Webhook(_) | Key::WebhookTest(_) | Key::WebhookRemove(_) => assert!(!st.cmds.is_empty() && !saved, "{:?}", it.key),
+                    // Try it asks the app to show sample captions.
+                    Key::OverlayPreview => assert!(st.cmds.contains(&Command::OverlayPreview)),
                     // The library's filter is a view of the list, not a setting.
                     Key::LibFilter => assert!(st.cmds.is_empty()),
                     _ => assert!(saved, "{:?} didn't save", it.key),
                 }
             }
         }
+    }
+
+    #[test]
+    fn the_provider_rows_follow_the_chosen_service_and_ask_the_engine() {
+        use crate::ai::{AiCmd, ProvField, ProviderView};
+        let mut st = state();
+        let keys = |st: &AppState| rows(Section::Models, st).iter().map(|i| i.key).collect::<Vec<_>>();
+        // On this device (the default): only the picker.
+        assert!(keys(&st).contains(&Key::ProviderPick));
+        assert!(!keys(&st).contains(&Key::ProviderEnabled), "nothing to switch on for the local model");
+        st.ai.provider = ProviderView {
+            id: "baidu".into(),
+            label: "Baidu Translate".into(),
+            needs: vec!["appId".into(), "secret".into()],
+            off_device: true,
+            providers: vec![("local".into(), "On this device".into()), ("baidu".into(), "Baidu Translate".into()), ("deepl".into(), "DeepL".into())],
+            ..ProviderView::default()
+        };
+        let k = keys(&st);
+        for want in [Key::ProviderPick, Key::ProviderEnabled, Key::ProviderAppId, Key::ProviderSecret, Key::ProviderTest] {
+            assert!(k.contains(&want), "{want:?}");
+        }
+        assert!(!k.contains(&Key::ProviderKey) && !k.contains(&Key::ProviderUrl) && !k.contains(&Key::ProviderModel), "only what Baidu needs");
+        // The stepper asks for the next provider; a switch asks to turn it on; pastes name their field.
+        apply(&mut st, Key::ProviderPick, Act::Step(1));
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::ProviderPick("deepl".into()))));
+        apply(&mut st, Key::ProviderEnabled, Act::Toggle);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::ProviderEnable(true))));
+        apply(&mut st, Key::ProviderSecret, Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::ProviderPaste(ProvField::Secret))));
+        apply(&mut st, Key::ProviderTest, Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::ProviderTest)));
+        // The row about privacy says where the text goes.
+        let enabled = rows(Section::Models, &st).into_iter().find(|i| i.key == Key::ProviderEnabled).unwrap();
+        assert!(enabled.sub.as_deref().is_some_and(|t| t.contains("sent to the service")), "{:?}", enabled.sub);
+    }
+
+    #[test]
+    fn webhook_rows_come_from_the_engines_list_and_ask_the_app() {
+        use poni_core::webhooks::Webhook;
+        let mut st = state();
+        st.webhooks.list = vec![Webhook { id: "wh-1".into(), url: "https://hooks.example.com/in".into(), enabled: true, has_secret: true, last_ok: Some(true), last_error: String::new() }];
+        let general = rows(Section::General, &st);
+        let hook = general.iter().find(|i| i.key == Key::Webhook(0)).expect("the hook's row");
+        assert_eq!(hook.label, "hooks.example.com");
+        assert_eq!(hook.sub.as_deref(), Some("On, last delivery worked. Signed with your secret"));
+        assert_eq!(hook.ctl, Ctl::Switch(Some(true)));
+        for (key, want) in [
+            (Key::Webhook(0), Command::WebhookEnable("wh-1".into(), false)),
+            (Key::WebhookTest(0), Command::WebhookTest("wh-1".into())),
+            (Key::WebhookRemove(0), Command::WebhookRemove("wh-1".into())),
+        ] {
+            st.cmds.clear();
+            apply(&mut st, key, Act::Press);
+            assert_eq!(st.cmds, vec![want]);
+        }
+        // A row for a hook that has gone does nothing.
+        st.cmds.clear();
+        apply(&mut st, Key::WebhookRemove(5), Act::Press);
+        assert!(st.cmds.is_empty());
+        st.webhooks.error = Some("The engine is not answering".into());
+        assert!(rows(Section::General, &st).iter().any(|i| i.key == Key::WebhookInfo));
+    }
+
+    fn the_overlay_rows_change_the_overlay_settings() {
+        let mut st = state();
+        assert!(!st.settings.overlay.enabled);
+        apply(&mut st, Key::OverlayEnabled, Act::Toggle);
+        assert!(st.settings.overlay.enabled);
+        apply(&mut st, Key::OverlayFont, Act::Step(1));
+        assert_eq!(st.settings.overlay.font_size, 28);
+        // The limits hold however far it is stepped.
+        for _ in 0..100 {
+            apply(&mut st, Key::OverlayFont, Act::Step(1));
+            apply(&mut st, Key::OverlaySentences, Act::Step(1));
+            apply(&mut st, Key::OverlayOpacity, Act::Step(1));
+        }
+        let o = &st.settings.overlay;
+        assert_eq!((o.font_size, o.sentences, o.background_opacity), (poni_core::overlay::FONT_MAX, poni_core::overlay::SENTENCES_MAX, 100));
+        apply(&mut st, Key::OverlayShow, Act::Pick(2));
+        assert_eq!(st.settings.overlay.show, poni_core::overlay::Show::Translation);
+        apply(&mut st, Key::OverlayTranslationColor, Act::Pick(2));
+        assert_eq!(st.settings.overlay.translation_color, poni_core::overlay::TEXT_PRESETS[2].1);
+        st.settings.overlay.spot = Some((0.2, 0.3));
+        apply(&mut st, Key::OverlayHome, Act::Press);
+        assert_eq!(st.settings.overlay.spot, None);
+        // The rows show the values.
+        let font = row(Section::Overlay, &st, Key::OverlayFont).unwrap();
+        assert_eq!(font.ctl, Ctl::Stepper(format!("{} pt", poni_core::overlay::FONT_MAX)));
     }
 
     #[test]
