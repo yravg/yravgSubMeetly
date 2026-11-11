@@ -146,6 +146,8 @@ pub struct Settings {
     pub captions_source: String,
     /// Where model downloads come from: `huggingface` or `modelscope` (the engine's `source`).
     pub model_source: String,
+    /// The subtitle overlay strip (`crate::overlay`).
+    pub overlay: crate::overlay::OverlaySettings,
     /// Captions start by themselves while a video plays or a calendar meeting runs, and stop after
     /// it ends ([`crate::capture::Auto`]).
     pub auto_captions: bool,
@@ -291,6 +293,7 @@ impl Default for Settings {
             captions_on: false,
             captions_source: "pc".into(),
             model_source: "huggingface".into(),
+            overlay: Default::default(),
             auto_captions: true,
             detect_meetings: true,
             show_speakers: true,
@@ -399,6 +402,7 @@ impl Settings {
 
     /// Clamp values a user may have hand-edited into nonsense.
     pub fn sanitized(mut self) -> Self {
+        self.overlay = std::mem::take(&mut self.overlay).sanitized();
         // Only untouched old defaults move.
         // v2: hover opens after a 220 ms dwell (140 ms caught pointers on
         // their way to browser tabs).

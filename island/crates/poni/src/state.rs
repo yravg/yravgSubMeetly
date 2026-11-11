@@ -639,6 +639,8 @@ pub struct AppState {
     pub webhooks: poni_core::webhooks::Webhooks,
     /// What the engine measured of each model's speed on this PC (Settings › Models › Speed).
     pub speed: poni_core::speed::Speed,
+    /// The subtitle overlay's run-time state (its settings are `settings.overlay`).
+    pub overlay: OverlayRun,
     /// Side effects requested during the frame.
     pub cmds: Vec<Command>,
 }
@@ -738,6 +740,7 @@ impl AppState {
             ai: Default::default(),
             webhooks: Default::default(),
             speed: Default::default(),
+            overlay: Default::default(),
             cmds: Vec::new(),
         };
         // On ones start by checking their files (the worker reports back);
@@ -1107,4 +1110,15 @@ pub struct CallSaved {
     pub dismissed: bool,
     /// An in-room session (Live shows the result too).
     pub room: bool,
+}
+
+/// What the subtitle overlay is doing right now.
+#[derive(Clone, Debug, Default)]
+pub struct OverlayRun {
+    /// Frozen: the strip keeps what it shows and says so.
+    pub paused: bool,
+    /// Sample captions are up until this time (mono seconds); 0 = none.
+    pub preview_until: f64,
+    /// The sentences the strip shows now (the last it was given), for Copy.
+    pub shown: Vec<poni_core::overlay::Sentence>,
 }

@@ -9,6 +9,7 @@ use crate::gfx::{px_rect, px_union, scale_about, union_rect, Canvas, Gfx, HitMas
 use crate::icons::Icon;
 use crate::island::{Geom, Island, SHOULDER};
 use crate::pages::{self, PageKind};
+use crate::overlay_win;
 use crate::paths;
 use crate::pill;
 use crate::services::notifications::NotifyEvent;
@@ -2353,6 +2354,65 @@ impl App {
         services::models::bench_start(self.sink.clone(), poni_core::helper::configured_port(), body);
     }
 
+    // ------------------------------------------------------------ the subtitle overlay
+
+    /// What the overlay should show now: sample captions while a preview runs, what it showed while
+    /// it is paused, else the session's newest lines.
+    fn overlay_sentences(&mut self) -> Vec<poni_core::overlay::Sentence> {
+        use poni_core::overlay::Sentence;
+        let now = self.st.now;
+        if self.st.overlay.preview_until > now {
+            let s = |o: &str, t: &str| Sentence { original: o.into(), translation: t.into(), live: false };
+            return vec![
+                s("Welcome, everyone. Let's start with the agenda.", "Selamat datang semuanya. Mari kita mulai dengan agenda."),
+                s("The first item is the release plan.", "Butir pertama adalah rencana rilis."),
+            ];
+        }
+        if self.st.overlay.paused {
+            return self.st.overlay.shown.clone();
+        }
+        let n = self.st.call.lines.len();
+        let lines: Vec<Sentence> = self
+            .st
+            .call
+            .lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| Sentence { original: l.source.clone(), translation: l.translation.clone(), live: self.st.call.interim && i + 1 == n })
+            .collect();
+        self.st.overlay.shown = lines.clone();
+        lines
+    }
+
+    /// Keep the strip as the settings and the captions say; remember where the person dragged it.
+    fn overlay_tick(&mut self) {
+        if !self.st.settings.overlay.enabled {
+            overlay_win::hide();
+            return;
+        }
+        let now = self.st.now;
+        if self.st.overlay.preview_until != 0.0 && now >= self.st.overlay.preview_until {
+            self.st.overlay.preview_until = 0.0;
+        }
+        if let Some(spot) = overlay_win::dragged_to(&self.monitor) {
+            if !self.st.settings.overlay.click_through {
+                self.st.settings.overlay.spot = Some(spot);
+                self.st.cmds.push(Command::SaveSettings);
+            }
+        }
+        let sentences = self.overlay_sentences();
+        let settings = self.st.settings.overlay.clone();
+        let content = overlay_win::Content { sentences: poni_core::overlay::visible(&sentences, &settings), settings, paused: self.st.overlay.paused };
+        overlay_win::show(&content, &self.monitor);
+    }
+
+    fn overlay_copy(&mut self) {
+        if let Some(text) = poni_core::overlay::copy_text(&self.st.overlay.shown) {
+            services::clipboard::set_text(self.helper, &text);
+            self.st.notify(Icon::Check, palette::GREEN, "Caption copied", "The current line is on the clipboard", 3.0, None);
+        }
+    }
+
     /// Ask the engine which models it has (Settings shows them, every 10 s while open).
     fn refresh_models(&mut self) {
         // The connector rows share the Models poll.
@@ -2739,6 +2799,9 @@ impl App {
             ToggleGameStats => s.game_stats = !s.game_stats,
             ToggleGamePeek => s.game_peek = !s.game_peek,
             ToggleSounds => s.sounds = !s.sounds,
+            ToggleOverlay => s.overlay.enabled = !s.overlay.enabled,
+            PauseOverlay => self.st.overlay.paused = !self.st.overlay.paused,
+            CopyOverlay => self.overlay_copy(),
             TogglePinned => self.st.pinned = !self.st.pinned,
             CentreIsland => s.island_x = None,
             ShowSettings => self.show_settings(&mut Vec::new()),
@@ -3929,6 +3992,7 @@ impl App {
     }
 
     fn tick(&mut self) {
+        self.overlay_tick();
         let now = self.st.now;
         if let Some(h) = &self.st.hud {
             if now >= h.until {
@@ -5075,6 +5139,17 @@ impl App {
                     }
                 }
                 Command::CallNotesRefresh => self.call_refresh(),
+                Command::OverlayPreview => {
+                    self.st.settings.overlay.enabled = true;
+                    self.st.overlay.preview_until = self.st.now + 8.0;
+                    self.st.cmds.push(Command::SaveSettings);
+                }
+                Command::OverlayToggle => {
+                    self.st.settings.overlay.enabled = !self.st.settings.overlay.enabled;
+                    self.st.cmds.push(Command::SaveSettings);
+                }
+                Command::OverlayPause => self.st.overlay.paused = !self.st.overlay.paused,
+                Command::OverlayCopy => self.overlay_copy(),
                 Command::ModelsRefresh => self.refresh_models(),
                 Command::Ai(c) => {
                     let hwnd = self.hwnd;

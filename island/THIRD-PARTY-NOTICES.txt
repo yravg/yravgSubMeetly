@@ -1343,3 +1343,8 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+== LiveCaptions-Translator (Apache-2.0) ==
+The subtitle overlay (island/docs/overlay.md) is modelled on the feature set of LiveCaptions-Translator by SakiRinn,
+https://github.com/SakiRinn/LiveCaptions-Translator (colours, opacity, sentence count, click-through, pause and
+copy). Only the idea is borrowed; no code.

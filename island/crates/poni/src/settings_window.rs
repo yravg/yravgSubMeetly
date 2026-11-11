@@ -133,6 +133,7 @@ pub enum Section {
     Island,
     Music,
     Speech,
+    Overlay,
     Models,
     Popups,
     Tabs,
@@ -143,12 +144,13 @@ pub enum Section {
 }
 
 impl Section {
-    pub const ALL: [Section; 12] = [
+    pub const ALL: [Section; 13] = [
         Section::General,
         Section::Appearance,
         Section::Island,
         Section::Music,
         Section::Speech,
+        Section::Overlay,
         Section::Models,
         Section::Popups,
         Section::Tabs,
@@ -165,6 +167,7 @@ impl Section {
             Section::Island => "Island",
             Section::Music => "Media and lyrics",
             Section::Speech => "Captions and languages",
+            Section::Overlay => "Subtitle overlay",
             Section::Models => "Models",
             Section::Popups => "Pop-ups",
             Section::Tabs => "Tabs",
@@ -183,6 +186,7 @@ impl Section {
             Section::Island => "island",
             Section::Music => "music",
             Section::Speech => "speech",
+            Section::Overlay => "overlay",
             Section::Models => "models",
             Section::Popups => "popups",
             Section::Tabs => "tabs",
@@ -200,6 +204,7 @@ impl Section {
             Section::Island => Icon::AppWindow,
             Section::Music => Icon::Music,
             Section::Speech => Icon::Lyrics,
+            Section::Overlay => Icon::AppWindow,
             Section::Models => Icon::Download,
             Section::Popups => Icon::Volume,
             Section::Tabs => Icon::App,
@@ -218,6 +223,7 @@ impl Section {
             Section::Island => palette::BLUE,
             Section::Music => palette::PINK,
             Section::Speech => palette::PURPLE,
+            Section::Overlay => Color::hex(0x5856D6),
             Section::Models => palette::YELLOW,
             Section::Popups => palette::CYAN,
             Section::Tabs => palette::GREEN,
@@ -369,6 +375,18 @@ pub enum Key {
     ShowSpeakers,
     TranslateCaptions,
     LogCards,
+    /// Subtitle overlay (`poni_core::overlay`): its switch, what it shows, its look and behaviour.
+    OverlayEnabled,
+    OverlayShow,
+    OverlayBackground,
+    OverlayOpacity,
+    OverlayOriginalColor,
+    OverlayTranslationColor,
+    OverlayFont,
+    OverlaySentences,
+    OverlayClickThrough,
+    OverlayPreview,
+    OverlayHome,
     SpokenLang,
     TargetLang,
     LyricsTranslate,
@@ -734,6 +752,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             Block::Group(Some("Lyrics"), vec![switch(Key::LyricsTranslate, "Translate synced lyrics", Some("A second row under the sung line; needs a translation model"), s.lyrics_translate)]),
             Block::Group(Some("Languages on this PC"), poni_core::library::language_rows(&st.models).into_iter().map(|(name, text)| item(Key::LibLang, name, Some(&text), Ctl::None)).collect()),
         ],
+        Section::Overlay => overlay_blocks(&s.overlay),
         Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
             .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai))])
@@ -849,6 +868,41 @@ pub fn nav_id(st: &AppState, section: Section) -> Option<u64> {
     sections(st).iter().position(|s| *s == section).map(|i| wid_n("settingswin.nav", i as u64))
 }
 
+/// Settings › Subtitle overlay: the strip over the screen that shows captions and translations
+/// (`poni_core::overlay`; the idea is LiveCaptions-Translator's).
+fn overlay_blocks(o: &poni_core::overlay::OverlaySettings) -> Vec<Block> {
+    use poni_core::overlay::{Show, BACKGROUND_PRESETS, TEXT_PRESETS};
+    let at = |presets: &[(&'static str, poni_core::overlay::Rgb)], c: poni_core::overlay::Rgb| presets.iter().position(|(_, p)| *p == c);
+    vec![
+        Block::Group(
+            Some("Overlay"),
+            vec![
+                switch(Key::OverlayEnabled, "Show the subtitle overlay", Some("A strip over the screen with the captions and their translation; also in the tray menu"), o.enabled),
+                item(Key::OverlayShow, "Shows", Some("The original, the translation or both"), Ctl::Choice(Show::ALL.iter().map(|m| m.label()).collect(), Show::ALL.iter().position(|m| *m == o.show))),
+                item(Key::OverlaySentences, "Sentences", Some("How many stay up at once"), Ctl::Stepper(o.sentences.to_string())),
+                item(Key::OverlayPreview, "Try it", Some("Shows sample captions for a few seconds"), Ctl::Button("Preview")),
+            ],
+        ),
+        Block::Group(
+            Some("Look"),
+            vec![
+                item(Key::OverlayFont, "Text size", None, Ctl::Stepper(format!("{} pt", o.font_size))),
+                item(Key::OverlayOriginalColor, "Original colour", None, Ctl::Choice(TEXT_PRESETS.iter().map(|(n, _)| *n).collect(), at(&TEXT_PRESETS, o.original_color))),
+                item(Key::OverlayTranslationColor, "Translation colour", None, Ctl::Choice(TEXT_PRESETS.iter().map(|(n, _)| *n).collect(), at(&TEXT_PRESETS, o.translation_color))),
+                item(Key::OverlayBackground, "Background", None, Ctl::Choice(BACKGROUND_PRESETS.iter().map(|(n, _)| *n).collect(), at(&BACKGROUND_PRESETS, o.background))),
+                item(Key::OverlayOpacity, "Background opacity", Some("0 leaves only the text"), Ctl::Stepper(format!("{}%", o.background_opacity))),
+            ],
+        ),
+        Block::Group(
+            Some("Behaviour"),
+            vec![
+                switch(Key::OverlayClickThrough, "Click-through", Some("The mouse goes through it, so it never gets in the way of a game or a video; off, drag it where you like"), o.click_through),
+                item(Key::OverlayHome, "Position", Some("Back to the bottom centre of the screen"), Ctl::Button("Reset")),
+            ],
+        ),
+    ]
+}
+
 /// Step a number of minutes: by 5, by 1 below 5.
 fn step_min(v: u32, d: i32, lo: u32, hi: u32) -> u32 {
     let by = if (d < 0 && v <= 5) || (d > 0 && v < 5) { 1 } else { 5 };
@@ -944,6 +998,32 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::TranslateCaptions => s.translate_captions = !s.translate_captions,
         Key::LogCards => s.log_cards = poni_core::history_cards::clamp_count((s.log_cards as i32 + step).clamp(0, poni_core::history_cards::MAX_CARDS as i32) as u8),
+        Key::OverlayEnabled => s.overlay.enabled = !s.overlay.enabled,
+        Key::OverlayShow => match act {
+            Act::Pick(i) if i < poni_core::overlay::Show::ALL.len() => s.overlay.show = poni_core::overlay::Show::ALL[i],
+            _ => return,
+        },
+        Key::OverlaySentences => s.overlay.sentences = (s.overlay.sentences as i64 + step as i64).clamp(poni_core::overlay::SENTENCES_MIN as i64, poni_core::overlay::SENTENCES_MAX as i64) as u32,
+        Key::OverlayFont => s.overlay.font_size = (s.overlay.font_size as i64 + step as i64 * 2).clamp(poni_core::overlay::FONT_MIN as i64, poni_core::overlay::FONT_MAX as i64) as u32,
+        Key::OverlayOpacity => s.overlay.background_opacity = (s.overlay.background_opacity as i64 + step as i64 * 10).clamp(0, 100) as u32,
+        Key::OverlayOriginalColor => match act {
+            Act::Pick(i) if i < poni_core::overlay::TEXT_PRESETS.len() => s.overlay.original_color = poni_core::overlay::TEXT_PRESETS[i].1,
+            _ => return,
+        },
+        Key::OverlayTranslationColor => match act {
+            Act::Pick(i) if i < poni_core::overlay::TEXT_PRESETS.len() => s.overlay.translation_color = poni_core::overlay::TEXT_PRESETS[i].1,
+            _ => return,
+        },
+        Key::OverlayBackground => match act {
+            Act::Pick(i) if i < poni_core::overlay::BACKGROUND_PRESETS.len() => s.overlay.background = poni_core::overlay::BACKGROUND_PRESETS[i].1,
+            _ => return,
+        },
+        Key::OverlayClickThrough => s.overlay.click_through = !s.overlay.click_through,
+        Key::OverlayPreview => {
+            st.cmd(Command::OverlayPreview);
+            return;
+        }
+        Key::OverlayHome => s.overlay.spot = None,
         Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
         Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
         Key::LyricsTranslate => s.lyrics_translate = !s.lyrics_translate,
@@ -2221,6 +2301,8 @@ mod tests {
                     // The webhooks live in the engine: the app asks it, nothing goes to the settings file.
                     Key::WebhookAdd => assert!(st.cmds.contains(&Command::WebhookAddFromClipboard) && !saved),
                     Key::Webhook(_) | Key::WebhookTest(_) | Key::WebhookRemove(_) => assert!(!st.cmds.is_empty() && !saved, "{:?}", it.key),
+                    // Try it asks the app to show sample captions.
+                    Key::OverlayPreview => assert!(st.cmds.contains(&Command::OverlayPreview)),
                     // The library's filter is a view of the list, not a setting.
                     Key::LibFilter => assert!(st.cmds.is_empty()),
                     _ => assert!(saved, "{:?} didn't save", it.key),
@@ -2254,6 +2336,33 @@ mod tests {
         assert!(st.cmds.is_empty());
         st.webhooks.error = Some("The engine is not answering".into());
         assert!(rows(Section::General, &st).iter().any(|i| i.key == Key::WebhookInfo));
+    }
+
+    fn the_overlay_rows_change_the_overlay_settings() {
+        let mut st = state();
+        assert!(!st.settings.overlay.enabled);
+        apply(&mut st, Key::OverlayEnabled, Act::Toggle);
+        assert!(st.settings.overlay.enabled);
+        apply(&mut st, Key::OverlayFont, Act::Step(1));
+        assert_eq!(st.settings.overlay.font_size, 28);
+        // The limits hold however far it is stepped.
+        for _ in 0..100 {
+            apply(&mut st, Key::OverlayFont, Act::Step(1));
+            apply(&mut st, Key::OverlaySentences, Act::Step(1));
+            apply(&mut st, Key::OverlayOpacity, Act::Step(1));
+        }
+        let o = &st.settings.overlay;
+        assert_eq!((o.font_size, o.sentences, o.background_opacity), (poni_core::overlay::FONT_MAX, poni_core::overlay::SENTENCES_MAX, 100));
+        apply(&mut st, Key::OverlayShow, Act::Pick(2));
+        assert_eq!(st.settings.overlay.show, poni_core::overlay::Show::Translation);
+        apply(&mut st, Key::OverlayTranslationColor, Act::Pick(2));
+        assert_eq!(st.settings.overlay.translation_color, poni_core::overlay::TEXT_PRESETS[2].1);
+        st.settings.overlay.spot = Some((0.2, 0.3));
+        apply(&mut st, Key::OverlayHome, Act::Press);
+        assert_eq!(st.settings.overlay.spot, None);
+        // The rows show the values.
+        let font = row(Section::Overlay, &st, Key::OverlayFont).unwrap();
+        assert_eq!(font.ctl, Ctl::Stepper(format!("{} pt", poni_core::overlay::FONT_MAX)));
     }
 
     #[test]
