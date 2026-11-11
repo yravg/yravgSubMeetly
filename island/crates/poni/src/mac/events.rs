@@ -103,6 +103,8 @@ pub enum AppEvent {
     AdzanEnded,
     /// Free-form log line from a service thread.
     Log(String),
+    /// What the meeting probe saw (`services::meeting_probe`).
+    MeetingSignals(crate::services::meeting_probe::Seen),
     /// What the engine supervisor sees (`services::engine`).
     Engine(poni_core::engine_link::EngineInfo),
     /// The engine's models (`services::models`), and how each action on one ended.

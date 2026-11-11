@@ -29,6 +29,7 @@ pub mod live_notes;
 pub mod lrclib;
 pub mod lyric_tr;
 pub mod meeting_doc;
+pub mod meeting_detect;
 pub mod meeting_source;
 pub mod mediaremote;
 pub mod library;

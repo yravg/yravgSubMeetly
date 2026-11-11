@@ -466,6 +466,9 @@ pub struct App {
     addons: Option<services::addons::AddonService>,
     /// The local engine (captions, translation, models): kept running while the app runs.
     engine: Option<services::engine::EngineService>,
+    /// Which app is on the microphone (`services::meeting_probe`), and the detector that tells once per meeting.
+    meeting_probe: Option<services::meeting_probe::MeetingProbe>,
+    meeting_detector: poni_core::meeting_detect::Detector,
     /// When Settings last asked the engine for its models (mono seconds).
     models_asked: f64,
     /// The Downloader add-on's runner: started at the first download.
@@ -595,6 +598,8 @@ impl App {
             lyrics: None,
             addons: None,
             engine: None,
+            meeting_probe: None,
+            meeting_detector: Default::default(),
             models_asked: f64::NEG_INFINITY,
             downloader: None,
             updater: None,
@@ -629,6 +634,13 @@ impl App {
         services::power::watch(self.sink.clone());
         services::audio::start(self.sink.clone());
         self.media = Some(services::media::MediaService::start(self.mtm, self.sink.clone()));
+        match services::meeting_probe::MeetingProbe::start(self.sink.clone()) {
+            Ok(p) => {
+                p.set_active(self.st.settings.detect_meetings);
+                self.meeting_probe = Some(p);
+            }
+            Err(e) => pwarn!("meetings: the probe did not start ({e})"),
+        }
         match services::engine::EngineService::start(self.sink.clone()) {
             Ok(e) => self.engine = Some(e),
             Err(e) => pwarn!("engine: the supervisor did not start ({e})"),
@@ -1645,6 +1657,10 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::MeetingSignals(seen) => {
+                self.st.meeting_seen = seen;
+                self.meeting_detect_step();
+            }
             AppEvent::Models(r) => {
                 self.st.models.apply(r, now);
             }
@@ -1725,6 +1741,31 @@ impl App {
         let in_use = self.updater.is_some();
         if ours && status == AddonStatus::Off && !in_use && !pages::addons::OFFERED.iter().any(|a| a.downloads() && self.st.settings.addon_on(a.id)) {
             self.addons = None;
+        }
+    }
+
+    // ------------------------------------------------------------ auto-detect meetings
+
+    /// Tell the person once when a meeting is on (a meeting app on the microphone, or a calendar
+    /// meeting), after it has held a few seconds. It only tells: nothing is recorded here, and the
+    /// notice opens the Minutes page.
+    fn meeting_detect_step(&mut self) {
+        let on = self.st.settings.detect_meetings;
+        if let Some(p) = &self.meeting_probe {
+            p.set_active(on);
+        }
+        let seen = &self.st.meeting_seen;
+        let signals = poni_core::meeting_source::Signals {
+            windows: seen.windows.clone(),
+            mic: seen.mic.clone(),
+            calendar_meeting: self.st.helper.calendar.as_ref().is_some_and(|c| poni_core::capture::meeting_now(c, self.st.unix)),
+            ..Default::default()
+        };
+        let kind = poni_core::meeting_source::source_kind(&signals, &self.st.settings.meeting_families, &self.st.settings.meeting_apps);
+        if let poni_core::meeting_detect::DetectStep::Offer { label } = self.meeting_detector.step(&kind, on, self.st.now) {
+            pinfo!("meetings: {label} detected");
+            self.st.notify(Icon::Mic, self.st.accent, "Meeting detected", format!("{label} is on. Open Minutes to take notes."), 12.0, Some(NoticeAction::OpenPage(PageKind::Meeting)));
+            self.request_frame();
         }
     }
 

@@ -343,6 +343,7 @@ pub enum Key {
     LyricsOffset,
     Captions,
     AutoCaptions,
+    DetectMeetings,
     TranslateCaptions,
     SpokenLang,
     TargetLang,
@@ -651,6 +652,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 Some("Captions"),
                 vec![
                     switch(Key::Captions, "Caption what this PC plays", Some("The engine writes what it hears on the island, in the language it hears"), st.capture.running()),
+                    switch(Key::DetectMeetings, "Tell me when a meeting starts", Some("A meeting app using the microphone, or a calendar meeting; it only tells you, nothing is recorded"), s.detect_meetings),
                     switch(Key::AutoCaptions, "Start captions by themselves", Some("When the PC plays sound (a call, a video, a meeting; not a music app); they stop after it ends"), s.auto_captions),
                     switch(Key::TranslateCaptions, "Translate captions", Some("A second line in the language under Translate into (English by default)"), s.translate_captions),
                 ],
@@ -844,6 +846,7 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             return;
         }
         Key::AutoCaptions => s.auto_captions = !s.auto_captions,
+        Key::DetectMeetings => s.detect_meetings = !s.detect_meetings,
         Key::TranslateCaptions => s.translate_captions = !s.translate_captions,
         Key::SpokenLang => s.source_lang = capture::step_lang(&s.source_lang, step, true).into(),
         Key::TargetLang => s.target_lang = capture::step_lang(&s.target_lang, step, false).into(),
