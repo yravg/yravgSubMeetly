@@ -149,6 +149,8 @@ pub struct Settings {
     /// Captions start by themselves while a video plays or a calendar meeting runs, and stop after
     /// it ends ([`crate::capture::Auto`]).
     pub auto_captions: bool,
+    /// Name who said a caption line ("You", "Others", "Speaker 2") when the engine labelled it.
+    pub show_speakers: bool,
     /// Captions carry a translation into `target_lang` (on by default, English); off: the spoken line only.
     pub translate_captions: bool,
     /// What Live captions listen to (`capture::Source::key`): `room` (default), `pc` or `both`.
@@ -284,6 +286,7 @@ impl Default for Settings {
             captions_source: "pc".into(),
             model_source: "huggingface".into(),
             auto_captions: true,
+            show_speakers: true,
             translate_captions: true,
             live_source: "room".into(),
             mic_device: String::new(),

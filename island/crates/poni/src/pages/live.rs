@@ -282,6 +282,14 @@ pub(crate) fn caption_lines(ui: &mut Ui, st: &AppState, cap: &Captions, x: f32, 
     let grow = (px as f32 - poni_core::capture::FONT_DEFAULT as f32).max(0.0) * 2.0;
     let sized = |s: TextStyle| TextStyle { size: poni_core::capture::scale_px(s.size, px), ..s };
     let (main, under) = show.parts(&cap.current, &cap.translation);
+    // Who is speaking, in front of the line (Settings › Captions › Show who is speaking).
+    let tagged;
+    let main = if st.settings.show_speakers && !cap.speaker.is_empty() && !main.is_empty() {
+        tagged = format!("{}: {main}", cap.speaker);
+        tagged.as_str()
+    } else {
+        main
+    };
     if !cap.previous.is_empty() {
         ui.c.text(&cap.previous, Rect::new(x, y, w, 18.0), &sized(TextStyle::footnote().color(palette::TEXT_FAINT)));
     }

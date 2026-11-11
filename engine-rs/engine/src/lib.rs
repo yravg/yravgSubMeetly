@@ -3,6 +3,7 @@
 pub mod app;
 pub mod audio;
 pub mod calendar;
+pub mod diarize;
 pub mod engine;
 pub mod heuristic;
 pub mod ics;

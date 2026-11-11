@@ -119,7 +119,7 @@ pub fn parse(text: &str) -> Pasted {
             Some(w) => format!("{w}: {words}"),
             None => words.to_string(),
         };
-        out.lines.push(Line { t0, t1: t0, source, translation: String::new() });
+        out.lines.push(Line { t0, t1: t0, source, translation: String::new(), speaker: String::new() });
     };
     let text = text.replace("\r\n", "\n").replace('\r', "\n");
     let mut who: Option<String> = None;
