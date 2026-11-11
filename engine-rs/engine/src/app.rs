@@ -303,6 +303,9 @@ impl App {
     }
 
     fn get(&self, request: &Request) -> Response {
+        if let Some(response) = self.ai_get(request) {
+            return response;
+        }
         let path = request.path();
         match path {
             "/engine/device" => self.json_response(request, 200, self.device_state()),
@@ -357,6 +360,9 @@ impl App {
     }
 
     fn post(&self, request: &Request) -> Response {
+        if let Some(response) = self.ai_post(request) {
+            return response;
+        }
         let path = request.path();
         match path {
             "/engine/device" => self.post_engine_device(request),
@@ -464,11 +470,16 @@ impl App {
                 json!({ "error": "question is required" }),
             ));
         }
-        if !self.ml.translate_available() {
-            return plain(self.json_response(request, 501, json!({ "error": NO_TRANSLATE })));
-        }
-        if let Err(error) = self.ml.require_translate() {
-            return plain(self.ml_error_response(request, &error));
+        // The person's own endpoint answers when the connector is on; otherwise the local model.
+        let connector =
+            Some(crate::connector::load(&self.state_dir)).filter(crate::connector::Config::usable);
+        if connector.is_none() {
+            if !self.ml.translate_available() {
+                return plain(self.json_response(request, 501, json!({ "error": NO_TRANSLATE })));
+            }
+            if let Err(error) = self.ml.require_translate() {
+                return plain(self.ml_error_response(request, &error));
+            }
         }
         let mut turns = Vec::new();
         for turn in payload
@@ -500,6 +511,21 @@ impl App {
         AskReply::Stream {
             headers,
             run: Box::new(move |emit| {
+                if let Some(cfg) = &connector {
+                    match crate::connector::chat(
+                        cfg,
+                        &grounding,
+                        &turns,
+                        ASK_MAX_TOKENS as u32,
+                        &mut |piece| {
+                            emit(&json!({ "delta": piece }));
+                        },
+                    ) {
+                        Ok(_) => emit(&json!({ "done": true })),
+                        Err(error) => emit(&json!({ "error": format!("{error:#}") })),
+                    };
+                    return;
+                }
                 let result = self.ml.with_translator(|mt| {
                     mt.chat_stream(&grounding, &turns, ASK_MAX_TOKENS, &mut |piece| {
                         emit(&json!({ "delta": piece }))
@@ -862,29 +888,78 @@ impl App {
                 json!({ "error": "body needs non-empty lines[]" }),
             );
         }
-        let note = heuristic_notes(
+        let mut note = heuristic_notes(
             &lines,
             &text("title", "Notulen sesi"),
             &text("source", "helper"),
         );
+        let texts: Vec<String> = lines
+            .iter()
+            .map(crate::heuristic::line_text)
+            .filter(|t| !t.is_empty())
+            .collect();
+        let template = match crate::templates::resolve(&self.state_dir, payload.get("template")) {
+            Ok(t) => t,
+            Err(e) => return self.json_response(request, 400, json!({ "error": e.to_string() })),
+        };
+        // Summarize with the connector on: the person's endpoint writes it (and says so in `via`);
+        // any failure falls back to the local notes. Generate never leaves the device.
+        let cfg = crate::connector::load(&self.state_dir);
+        let remote = summarize && cfg.usable();
+        let template = template.or_else(|| {
+            remote
+                .then(|| crate::templates::find(&self.state_dir, "general"))
+                .flatten()
+        });
+        let mut extra = json!({});
+        if let Some(t) = &template {
+            let mut rendered = crate::templates::render_local(t, &note, &texts);
+            extra["via"] = json!("local");
+            if remote {
+                let transcript = clip_transcript(&texts);
+                match crate::connector::chat(
+                    &cfg,
+                    &crate::templates::system_prompt(t),
+                    &[("user".to_string(), transcript)],
+                    1500,
+                    &mut |_| {},
+                ) {
+                    Ok(answer) => {
+                        let sections = crate::templates::parse_markdown(t, &answer);
+                        let md = crate::templates::markdown(&t.style, &sections);
+                        by_kind(&mut note, &sections);
+                        rendered =
+                            json!({ "template": t.id, "sections": sections, "markdown": md });
+                        extra["via"] = json!("connector");
+                    }
+                    Err(e) => extra["connectorError"] = json!(format!("{e:#}")),
+                }
+            }
+            if let (Value::Object(map), Value::Object(r)) = (&mut extra, rendered) {
+                map.extend(r);
+            }
+        }
         if !summarize {
+            if let (Value::Object(n), Value::Object(x)) = (&mut note, extra) {
+                n.extend(x);
+            }
             return self.json_response(request, 200, json!({ "note": note }));
         }
         let count = |key: &str| note[key].as_array().map_or(0, Vec::len);
-        self.json_response(
-            request,
-            200,
-            json!({
-                "summary": note["summary"],
-                "decisions": note["decisions"],
-                "actions": note["actions"],
-                "counts": {
-                    "segments": lines.len(),
-                    "decisions": count("decisions"),
-                    "actions": count("actions"),
-                },
-            }),
-        )
+        let mut body = json!({
+            "summary": note["summary"],
+            "decisions": note["decisions"],
+            "actions": note["actions"],
+            "counts": {
+                "segments": lines.len(),
+                "decisions": count("decisions"),
+                "actions": count("actions"),
+            },
+        });
+        if let (Value::Object(b), Value::Object(x)) = (&mut body, extra) {
+            b.extend(x);
+        }
+        self.json_response(request, 200, body)
     }
 
     /// Cache, folder, download and move state of one model, the same fields on every row.
@@ -1465,6 +1540,15 @@ impl App {
     }
 
     fn delete(&self, request: &Request) -> Response {
+        if let Some(id) = request.path().strip_prefix("/notes/templates/") {
+            return match crate::templates::delete(&self.state_dir, &percent_decode(id)) {
+                Ok(true) => self.json_response(request, 200, json!({ "ok": true })),
+                Ok(false) => {
+                    self.json_response(request, 404, json!({ "error": "template not found" }))
+                }
+                Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+            };
+        }
         let path = request.path();
         if let Some(rest) = path.strip_prefix("/models/cache/") {
             let q = query(&request.target);
@@ -1513,6 +1597,73 @@ impl App {
             return self.json_response(request, 200, json!({ "ok": true, "id": note_id }));
         }
         self.json_response(request, 404, json!({ "error": "not found" }))
+    }
+
+    /// `GET /ai/connector` (the saved connector, without its key) and `GET /notes/templates`.
+    fn ai_get(&self, request: &Request) -> Option<Response> {
+        match request.path() {
+            "/ai/connector" => Some(self.json_response(
+                request,
+                200,
+                crate::connector::load(&self.state_dir).public(),
+            )),
+            "/notes/templates" => {
+                Some(self.json_response(request, 200, crate::templates::list_json(&self.state_dir)))
+            }
+            _ => None,
+        }
+    }
+
+    /// `POST /ai/connector`, `/ai/connector/test` and `/notes/templates`.
+    fn ai_post(&self, request: &Request) -> Option<Response> {
+        let path = request.path();
+        if !matches!(
+            path,
+            "/ai/connector"
+                | "/ai/connector/test"
+                | "/notes/templates"
+                | "/notes/templates/default"
+        ) {
+            return None;
+        }
+        let Some(body) = parse_body(&request.body) else {
+            return Some(self.json_response(request, 400, json!({ "error": "invalid JSON body" })));
+        };
+        let current = crate::connector::load(&self.state_dir);
+        Some(match path {
+            "/ai/connector" => match crate::connector::apply_patch(&current, &body)
+                .and_then(|cfg| crate::connector::save(&self.state_dir, &cfg).map(|()| cfg))
+            {
+                Ok(cfg) => self.json_response(request, 200, cfg.public()),
+                Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+            },
+            "/ai/connector/test" => {
+                // The test never needs the connector to be on: it tries the saved settings plus any given here.
+                let mut probe = body.clone();
+                probe["enabled"] = json!(false);
+                match crate::connector::apply_patch(&current, &probe) {
+                    Ok(cfg) => self.json_response(request, 200, crate::connector::test(&cfg)),
+                    Err(e) => self.json_response(
+                        request,
+                        400,
+                        json!({ "ok": false, "error": e.to_string() }),
+                    ),
+                }
+            }
+            "/notes/templates/default" => match crate::templates::set_default(
+                &self.state_dir,
+                body.get("id").and_then(Value::as_str),
+            ) {
+                Ok(()) => {
+                    self.json_response(request, 200, crate::templates::list_json(&self.state_dir))
+                }
+                Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+            },
+            _ => match crate::templates::upsert(&self.state_dir, &body) {
+                Ok(t) => self.json_response(request, 200, json!({ "template": t.to_json() })),
+                Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+            },
+        })
     }
 
     fn health(&self) -> Value {
@@ -2098,6 +2249,49 @@ fn env_path(key: &str, fallback: PathBuf) -> PathBuf {
     match env::var_os(key) {
         Some(value) if !value.is_empty() => PathBuf::from(value),
         _ => fallback,
+    }
+}
+
+/// The transcript for the connector: capped (head and tail kept) so a very long meeting still fits.
+fn clip_transcript(texts: &[String]) -> String {
+    const MAX: usize = 48_000;
+    let all = texts.join("\n");
+    if all.chars().count() <= MAX {
+        return all;
+    }
+    let head: String = all.chars().take(MAX / 2).collect();
+    let tail: String = all
+        .chars()
+        .rev()
+        .take(MAX / 2)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{head}\n[...middle of the transcript left out...]\n{tail}")
+}
+
+/// Fill the note's summary, decisions and actions from a connector's sections, by section kind.
+fn by_kind(note: &mut Value, sections: &[Value]) {
+    let items = |kind: &str| -> Vec<String> {
+        sections
+            .iter()
+            .filter(|s| s["kind"] == kind)
+            .flat_map(|s| s["items"].as_array().cloned().unwrap_or_default())
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect()
+    };
+    let summary = items("summary");
+    if !summary.is_empty() {
+        note["summary"] = json!(summary.join(" "));
+    }
+    let decisions = items("decisions");
+    if !decisions.is_empty() {
+        note["decisions"] = json!(decisions);
+    }
+    let actions = items("actions");
+    if !actions.is_empty() {
+        note["actions"] = Value::Array(actions.iter().enumerate().map(|(i, t)| json!({ "id": format!("act-{}", i + 1), "text": t, "owner": null, "due": null, "status": "open" })).collect());
     }
 }
 

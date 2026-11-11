@@ -3,6 +3,7 @@
 pub mod app;
 pub mod audio;
 pub mod calendar;
+pub mod connector;
 pub mod engine;
 pub mod heuristic;
 pub mod ics;
@@ -15,6 +16,7 @@ pub mod notes;
 pub mod protocol;
 pub mod server;
 pub mod state;
+pub mod templates;
 pub mod translate;
 pub mod web;
 pub mod whisper;
