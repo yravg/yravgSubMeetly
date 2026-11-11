@@ -528,7 +528,8 @@ pub fn pull(
 mod tests {
     #[test]
     fn a_plain_path_stays_as_it_is_and_a_linked_folder_becomes_its_target() {
-        let dir = std::env::temp_dir().join(format!("sm-real-path-{}", std::process::id()));
+        // macOS keeps temp in /var, a link to /private/var: compare real paths.
+        let dir = std::env::temp_dir().canonicalize().unwrap().join(format!("sm-real-path-{}", std::process::id()));
         let target = dir.join("target");
         fs::create_dir_all(target.join("hub")).unwrap();
         assert_eq!(real_path(&target.join("hub")), target.join("hub"));
