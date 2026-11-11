@@ -120,7 +120,8 @@ pub fn split(text: &str) -> (Vec<String>, String) {
         }
         cur.push(c);
         // "3.5" and "e.g." keep going: an end mark ends a sentence when a space or the end follows.
-        if is_end(c) && chars.peek().is_none_or(|n| n.is_whitespace() || !n.is_alphanumeric() && !is_end(*n)) && !cur.trim().is_empty() {
+        let cjk = matches!(c, '\u{3002}' | '\u{ff01}' | '\u{ff1f}');
+        if is_end(c) && (cjk || chars.peek().is_none_or(|n| n.is_whitespace() || !n.is_alphanumeric() && !is_end(*n))) && !cur.trim().is_empty() {
             while chars.peek().is_some_and(|n| is_end(*n)) {
                 cur.push(chars.next().unwrap_or(' '));
             }
