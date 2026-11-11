@@ -874,11 +874,11 @@ impl AppState {
         poni_core::capture::Source::parse(&self.settings.live_source)
     }
 
-    /// The Meeting tab belongs in the row: a meeting runs, or its session was saved in the last
-    /// 10 minutes (PMM-005). Settings › Tabs can still take it off.
+    /// The Meeting tab belongs in the row. Settings › Tabs can still take it off.
     pub fn call_tab_on(&self) -> bool {
-        // An in-room session's result shows on Live, not here.
-        poni_core::live_notes::shows_tab(self.meeting_now() || self.call_live(), self.call.saved.as_ref().filter(|s| !s.room).map(|s| s.at), self.now)
+        // Owner 2026-11-11: the Meeting tab is always in the row (board P03), not only while a
+        // meeting runs; with no meeting it offers Paste a meeting link / Start captions / Today.
+        true
     }
 
     /// Settings took this page's tab off the header's row (Music, Shelf,

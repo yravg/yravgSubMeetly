@@ -226,6 +226,12 @@ impl Section {
     }
 }
 
+/// Where the engine reads a model downloaded by hand (`models::manual_dir` in the engine):
+/// `%USERPROFILE%\yravgSubMeetly-models\<owner>--<name>`.
+fn manual_model_dir(id: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(std::env::var_os("USERPROFILE").unwrap_or_default()).join("yravgSubMeetly-models").join(id.replace('/', "--"))
+}
+
 /// A model's rows: the choice (steps through what the engine offers, with what is true of it
 /// underneath) and, when downloading helps, a Download or Retry button.
 fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
@@ -234,6 +240,11 @@ fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     let mut rows = vec![item(Key::ModelPick(k), k.label(), Some(&d.text), value.map_or(Ctl::None, Ctl::Stepper))];
     if let Some(b) = d.button {
         rows.push(item(Key::ModelPull(k), &format!("{} download", k.label()), None, Ctl::Button(b)));
+    }
+    // A download that keeps failing (slow or blocked link): the files by hand from the browser.
+    if let Some(id) = m.chosen(k) {
+        let dir = manual_model_dir(&id);
+        rows.push(item(Key::ModelManual(k), "Download by hand", Some(&format!("Opens the files page and this folder: save the model's files into {}", dir.display())), Ctl::Button("Open page")));
     }
     if let Some(p) = m.place(k) {
         rows.push(item(Key::ModelFolder(k), &format!("{} folder", k.label()), Some(&p.text), if p.change { Ctl::Button("Choose…") } else { Ctl::None }));
@@ -285,6 +296,8 @@ pub enum Key {
     ModelFolder(poni_core::models::Kind),
     /// Move a model back to the default folder.
     ModelFolderReset(poni_core::models::Kind),
+    /// Download by hand: the model's files page and the folder the engine reads them from.
+    ModelManual(poni_core::models::Kind),
     HudVolume,
     HudPower,
     HudBluetooth,
@@ -771,6 +784,15 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::ModelFolder(k) => {
             st.cmd(Command::ModelFolder(k));
+            return;
+        }
+        Key::ModelManual(k) => {
+            if let Some(id) = st.models.chosen(k) {
+                let dir = manual_model_dir(&id);
+                let _ = std::fs::create_dir_all(&dir);
+                st.cmd(Command::OpenUrl(format!("https://huggingface.co/{id}/tree/main")));
+                st.cmd(Command::OpenPath(dir.display().to_string()));
+            }
             return;
         }
         Key::ModelFolderReset(k) => {

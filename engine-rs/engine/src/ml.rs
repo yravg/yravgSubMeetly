@@ -85,6 +85,10 @@ pub fn hub_file_with(
     filename: &str,
     progress: Option<Progress>,
 ) -> Result<PathBuf> {
+    let by_hand = crate::models::manual_dir(repo_id).join(filename);
+    if by_hand.is_file() {
+        return Ok(by_hand);
+    }
     let (owner, name) = split_id(repo_id);
     // A chosen folder behind a junction fails the same way as the default (os error 448).
     let cache = &crate::models::real_path(cache);

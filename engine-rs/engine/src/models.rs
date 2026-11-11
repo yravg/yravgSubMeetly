@@ -388,6 +388,13 @@ pub fn model_root(cache: &Path, repo_id: &str) -> PathBuf {
     cache.join(format!("models--{}", repo_id.replace('/', "--")))
 }
 
+/// Files of `repo_id` the person downloaded by hand from its Hugging Face page:
+/// `~/yravgSubMeetly-models/<owner>--<name>/<file>` (Settings › Models › Download by hand).
+/// They count as downloaded and are used before the hub cache.
+pub fn manual_dir(repo_id: &str) -> PathBuf {
+    home_dir().unwrap_or_default().join("yravgSubMeetly-models").join(repo_id.replace('/', "--"))
+}
+
 pub fn cache_state(cache: &Path, repo_id: &str, kind: Kind) -> CacheState {
     let root = model_root(cache, repo_id);
     let (mut bytes, mut partial_bytes) = (0, 0);
@@ -412,7 +419,8 @@ pub fn cache_state(cache: &Path, repo_id: &str, kind: Kind) -> CacheState {
         .flatten()
         .map(|entry| entry.path())
         .collect();
-    let have = |name: &str| snapshot_file(&snapshots, name).is_some();
+    let manual = manual_dir(repo_id);
+    let have = |name: &str| snapshot_file(&snapshots, name).is_some() || manual.join(name).is_file();
     let gguf = crate::translate::gguf_file(repo_id).filter(|_| kind == Kind::Translate);
     let downloaded = match kind {
         // A GGUF carries its config and tokenizer inside.
