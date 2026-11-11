@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn the_list_names_every_page_in_board_order_then_settings() {
         let mut st = state();
-        assert_eq!(pages(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Shelf, Tasks, Focus, Addons, Settings]);
+        assert_eq!(pages(&st), [Live, Call, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Shelf, Tasks, Focus, Addons, Settings]);
         // An add-on's page joins the list when it is on, as it joins the row.
         st.addons.insert(poni_core::addons::SYSTEM.id, poni_core::addons::Status::Ready);
         assert!(pages(&st).contains(&System));

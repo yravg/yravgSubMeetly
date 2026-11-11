@@ -759,12 +759,12 @@ mod tests {
     fn the_row_is_the_island_s_own_pages_then_the_add_ons_then_the_plus() {
         use PageKind::*;
         let mut st = state();
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Shelf, Tasks, Focus, Addons]);
+        assert_eq!(tabs(&st), [Live, Call, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Shelf, Tasks, Focus, Addons]);
         // Switched-on add-ons show after Focus, before the "+".
         for id in ["system", "script"] {
             st.addons.insert(id, poni_core::addons::Status::Ready);
         }
-        assert_eq!(&tabs(&st)[11..], [System, Script, Addons]);
+        assert_eq!(&tabs(&st)[12..], [System, Script, Addons]);
         // Clipboard left the app: an island last open there opens on the first tab.
         assert_eq!(PageKind::from_key("clipboard"), PageKind::ALL[0]);
     }
@@ -774,7 +774,7 @@ mod tests {
         use PageKind::*;
         let st = AppState::new(poni_core::settings::Settings::default().fresh_install(), Store::default());
         assert_eq!(st.page, Live);
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Addons]);
+        assert_eq!(tabs(&st), [Live, Call, Meeting, Inbox, Calendar, Timer, Talk, Engine, Addons]);
         // The tucked-away tabs are one chip away in Settings (Meeting among them).
         assert_eq!(hideable_tabs(&st).len(), 6);
     }
@@ -786,7 +786,7 @@ mod tests {
         assert!(!tabs(&st).contains(&Captions), "no new tab for an existing install");
         assert!(st.tab_hidden(Captions) && hideable_tabs(&st).contains(&Captions), "Settings offers it");
         st.settings.toggle_tab("captions");
-        assert_eq!(&tabs(&st)[..4], [Live, Meeting, Captions, Inbox]);
+        assert_eq!(&tabs(&st)[..5], [Live, Call, Meeting, Captions, Inbox]);
         assert!(st.settings.hidden_tabs.is_empty(), "its switch is not a hidden-list key");
         // Switched off while its page is open: the tab stays until the page is left.
         st.settings.toggle_tab("captions");
@@ -810,11 +810,11 @@ mod tests {
         let mut st = state();
         st.settings.hidden_tabs = vec!["shelf".into(), "tasks".into()];
         st.page = Focus;
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Focus, Addons]);
+        assert_eq!(tabs(&st), [Live, Call, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Focus, Addons]);
         // Opened from elsewhere (a dropped file opens the Shelf): its tab
         // shows while it's open, and stepping on leaves it behind.
         st.page = Shelf;
-        assert_eq!(tabs(&st), [Live, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Shelf, Focus, Addons]);
+        assert_eq!(tabs(&st), [Live, Call, Meeting, Inbox, Calendar, Timer, Talk, Engine, Media, Shelf, Focus, Addons]);
         st.page = step_tab(Shelf, &st, true);
         assert_eq!(st.page, Focus);
         assert!(!tabs(&st).contains(&Shelf));
@@ -826,28 +826,13 @@ mod tests {
     }
 
     #[test]
-    fn the_meeting_tab_follows_live_while_a_meeting_runs_and_ten_minutes_after_its_save() {
-        use poni_core::meeting_source::SourceKind;
+    fn the_meeting_tab_is_always_in_the_row_unless_settings_hides_it() {
+        // Owner 2026-11-11 (board P03): shown with or without a meeting.
         use PageKind::*;
         let mut st = state();
-        st.now = 1000.0;
-        assert!(!tabs(&st).contains(&Call), "no meeting");
-        st.meeting_source = SourceKind::Meeting { label: "Teams".into(), via: "ms-teams.exe".into() };
         assert_eq!(&tabs(&st)[..3], [Live, Call, Meeting]);
         assert_eq!((Call.title(), Meeting.title()), ("Meeting", "Minutes"));
-        // Switched off in Settings › Tabs: never shown.
         st.settings.hidden_tabs = vec!["call".into()];
-        assert!(!tabs(&st).contains(&Call));
-        st.settings.hidden_tabs.clear();
-        // A joined link marks a meeting before any sound.
-        st.meeting_source = SourceKind::None;
-        st.joined.joined("meeting.tencent.com", 990.0);
-        assert!(tabs(&st).contains(&Call));
-        st.joined = Default::default();
-        // Saved: 10 minutes, then gone (unless it is the page open).
-        st.call.saved = Some(crate::state::CallSaved { id: "MOM-WIN-1".into(), title: "Site".into(), minutes: 38, counts: Default::default(), at: 600.0, dismissed: false, room: false });
-        assert!(tabs(&st).contains(&Call));
-        st.now = 1200.0;
         assert!(!tabs(&st).contains(&Call));
         st.page = Call;
         assert!(tabs(&st).contains(&Call));
@@ -875,7 +860,6 @@ mod tests {
         // Its saved result shows on Live: the Meeting tab does not come up for it.
         st.capture = CaptureState::Off;
         st.call.saved = Some(crate::state::CallSaved { id: "MOM-WIN-2".into(), title: "In-room meeting".into(), minutes: 12, counts: Default::default(), at: 90.0, dismissed: false, room: true });
-        assert!(!tabs(&st).contains(&PageKind::Call));
     }
 
     #[test]
