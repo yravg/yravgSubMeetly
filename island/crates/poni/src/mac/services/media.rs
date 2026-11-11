@@ -66,7 +66,7 @@ const FIRST_WORD: Duration = Duration::from_secs(2);
 /// of those the app stops asking for the run.
 const FAILED_START: Duration = Duration::from_secs(5);
 const MAX_FAILS: u32 = 3;
-const USER_AGENT: &str = "Poni/0.1 (+https://github.com/lucacadalora/oyenza-studio)";
+const USER_AGENT: &str = "yravgSubMeetly (+https://github.com/yravg/yravgSubMeetly)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Player {

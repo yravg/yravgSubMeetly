@@ -112,6 +112,12 @@ mod services;
 #[cfg(target_os = "macos")]
 #[path = "mac/window.rs"]
 mod window;
+// The shared pages and commands name `crate::tray` (the Windows tray's menu
+// commands); on the Mac that is the menu bar's.
+#[cfg(target_os = "macos")]
+mod tray {
+    pub use crate::menubar::{product_actions, MenuCmd};
+}
 
 #[cfg(any(windows, target_os = "macos"))]
 fn main() {

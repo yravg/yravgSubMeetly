@@ -2,21 +2,14 @@
 //! macOS's own now playing, or Music and Spotify themselves), lyrics, the add-ons (Japanese readings, and Prayer times'
 //! location and adzan), power, volume, system stats, the System page's
 //! readings, the clipboard, Shelf tiles, Phone drop, full-screen apps,
-//! start at login and the AI tab's keychain reads (one file each), plus a
-//! few direct calls (the accent colour, opening and revealing files,
-//! sounds). Oyenza sign-in is the Windows app's worker, shared as is.
+//! and start at login (one file each), plus a few direct calls (the accent
+//! colour, opening and revealing files, sounds).
 
 // This file is loaded with #[path], so its modules sit in services/ by path.
 #[path = "services/adzan.rs"]
 pub mod adzan;
-// Antigravity's `agy`, run for the AI tab.
-#[path = "services/agy.rs"]
-pub mod agy;
 #[path = "services/audio.rs"]
 pub mod audio;
-// Meeting notes' two sources (the microphone, and the Mac's own sound).
-#[path = "services/capture.rs"]
-pub mod capture;
 #[path = "services/cf.rs"]
 mod cf;
 #[path = "services/clipboard.rs"]
@@ -25,14 +18,10 @@ pub mod clipboard;
 pub mod fullscreen;
 #[path = "services/http.rs"]
 pub mod http;
-#[path = "services/keychain.rs"]
-pub mod keychain;
 #[path = "services/media.rs"]
 pub mod media;
 #[path = "services/mediaremote.rs"]
 mod mediaremote;
-#[path = "services/mic.rs"]
-pub mod mic;
 #[path = "services/romanize.rs"]
 pub mod romanize;
 #[path = "services/secret.rs"]
@@ -52,29 +41,21 @@ pub mod addons;
 // And the Downloader add-on's runner (a process group per download here).
 #[path = "../services/downloader.rs"]
 pub mod downloader;
-// And the IELTS coach's calls (its microphone and voice are the Mac's: mic.rs, voice.rs).
-#[path = "../services/ielts.rs"]
-pub mod ielts;
-// And Meeting notes' recording and handing over (its sources: capture.rs).
-#[path = "../services/notes.rs"]
-pub mod notes;
 #[cfg(test)]
 #[path = "../services/downloader_live.rs"]
 mod downloader_live;
 #[path = "../services/cities.rs"]
 pub mod cities;
-// And Oyenza sign-in: its key goes through secret.rs above.
-#[path = "../services/oyenza.rs"]
-pub mod oyenza;
-// And the update file's reader, which runs on the add-ons' thread.
+// And the update file's reader, which runs on the add-ons' thread, with the
+// file's signature check it believes by.
+#[path = "../services/feed.rs"]
+pub mod feed;
 #[path = "../services/update.rs"]
 pub mod update;
-// And the Stocks page's prices from oyenza.trade.
-#[path = "../services/stocks.rs"]
-pub mod stocks;
-// And the AI tab's worker (`studio_usage` does the reading).
-#[path = "../services/usage.rs"]
-pub mod usage;
+// What could be a meeting: only the type the shared state names; the probe
+// itself (Windows' windows and microphone users) has no Mac twin yet.
+#[path = "services/meeting_probe.rs"]
+pub mod meeting_probe;
 #[path = "services/location.rs"]
 pub mod location;
 #[path = "services/login.rs"]
@@ -83,19 +64,15 @@ pub mod login;
 pub mod phonedrop;
 #[path = "services/power.rs"]
 pub mod power;
-#[path = "services/recorder.rs"]
-pub mod recorder;
 #[path = "services/sysmon.rs"]
 pub mod sysmon;
 #[path = "services/sysstats.rs"]
 pub mod sysstats;
 #[path = "services/thumbs.rs"]
 pub mod thumbs;
-#[path = "services/voice.rs"]
-pub mod voice;
 
 use objc2_app_kit::{NSColor, NSColorSpace, NSSound, NSWorkspace};
-use objc2_foundation::{NSArray, NSFileManager, NSString, NSURL};
+use objc2_foundation::{NSArray, NSString, NSURL};
 use poni_core::geom::Color;
 
 pub mod imaging {
@@ -134,37 +111,6 @@ pub fn system_accent() -> Option<Color> {
 pub fn reveal(path: &str) {
     let url = NSURL::fileURLWithPath(&NSString::from_str(path));
     NSWorkspace::sharedWorkspace().activateFileViewerSelectingURLs(&NSArray::from_retained_slice(&[url]));
-}
-
-/// The app was called Oyen Poni before 0.2.0, and a copy from then has the same
-/// bundle id, so Spotlight or the login item could start it instead of this one.
-/// Moves "Oyen Poni.app" from /Applications or ~/Applications to the Trash, where
-/// it can be put back, and returns the folder it was in.
-pub fn trash_app_from_before_rename() -> Option<String> {
-    let running = std::env::current_exe().ok()?;
-    let mut dirs = vec![std::path::PathBuf::from("/Applications")];
-    if let Some(home) = std::env::var_os("HOME") {
-        dirs.push(std::path::PathBuf::from(home).join("Applications"));
-    }
-    for dir in dirs {
-        let old = dir.join("Oyen Poni.app");
-        if running.starts_with(&old) {
-            continue;
-        }
-        let plist = std::fs::read_to_string(old.join("Contents/Info.plist")).unwrap_or_default();
-        if !plist.contains("<string>com.oyenza.poni</string>") {
-            continue;
-        }
-        let url = NSURL::fileURLWithPath(&NSString::from_str(&old.to_string_lossy()));
-        match NSFileManager::defaultManager().trashItemAtURL_resultingItemURL_error(&url, None) {
-            Ok(()) => {
-                pinfo!("moved {} to the Trash (the app from before the rename)", old.display());
-                return Some(dir.to_string_lossy().into_owned());
-            }
-            Err(e) => pwarn!("couldn't move {} to the Trash: {}", old.display(), e.localizedDescription()),
-        }
-    }
-    None
 }
 
 /// Open a URL (or a file path) with its default app. System Settings'

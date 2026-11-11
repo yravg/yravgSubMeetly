@@ -12,15 +12,14 @@
 
 use crate::activities::{self, Mode};
 use crate::clock;
-use crate::commands::{Command, MediaCmd, OyenzaCmd, PhoneCmd, Sound, UsageCmd};
-use crate::events::{AppEvent, EventSink, OyenzaEvent};
+use crate::commands::{Command, MediaCmd, PhoneCmd, Sound};
+use crate::events::{AppEvent, EventSink};
 use crate::gfx::{scale_about, union_rect, Canvas, Gfx, Matrix3x2};
 use crate::glass;
 use crate::icons::Icon;
 use crate::island::{Geom, Island, HIT_MARGIN, SHOULDER};
 use crate::menubar::{Login, MenuBar, MenuCmd};
 use crate::notch::{self, Fit, Notch};
-use crate::oyen;
 use crate::pages::{self, PageKind};
 use crate::paths;
 use crate::pill;
@@ -29,7 +28,7 @@ use crate::settings_host;
 use crate::settings_window::{self, Section};
 use crate::events::{AppleMusicStatus, LyricsResult};
 use crate::state::{
-    AppState, HudKind, InlineAction, Locate, LyricsState, LyricsStatus, Notice, NoticeAction, OyenzaLink, PhoneAsk, PhoneDrop, PhoneTransfer, PrayerState,
+    AppState, HudKind, InlineAction, Locate, LyricsState, LyricsStatus, NoticeAction, PhoneAsk, PhoneDrop, PhoneTransfer, PrayerState,
     VolumeState,
 };
 use crate::ui::{wid, CursorKind, Hit, Input, KeyInput, MouseButton, Ui};
@@ -42,12 +41,11 @@ use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSApplicationD
 use objc2_core_foundation::{CGPoint, CGRect, CGSize};
 use objc2_core_graphics::CGContext;
 use objc2_foundation::{NSNotification, NSNotificationCenter, NSRunLoop, NSRunLoopCommonModes, NSTimer};
-use poni_core::addons::{Status as AddonStatus, DOWNLOADER, HEALTH, JAPANESE_READINGS, PRAYER_TIMES, SYSTEM};
+use poni_core::addons::{Status as AddonStatus, DOWNLOADER, JAPANESE_READINGS, PRAYER_TIMES, SYSTEM};
 use poni_core::frametime::MotionStats;
 use poni_core::phonedrop::{Event as PhoneEvent, QrMatrix};
 use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::look::{Look, Material};
-use poni_core::oyenza;
 use poni_core::prayer::{Due, PlaceList, Prayer, PrayerMoment};
 use poni_core::settings::{IdleStyle, PrayerSound, Settings, Theme};
 use poni_core::spot;
@@ -59,8 +57,10 @@ use std::ptr::NonNull;
 use std::sync::mpsc::{self, Receiver};
 
 /// Steps for copying the Apple Music token (README).
-const APPLE_MUSIC_HELP_URL: &str = "https://github.com/lucacadalora/oyenza-studio#apple-music-lyrics";
+const APPLE_MUSIC_HELP_URL: &str = "https://github.com/yravg/yravgSubMeetly#apple-music-lyrics";
 
+/// How long a revealed notice subtitle stays (seconds).
+const SHOWN_S: f64 = 5.0;
 /// The grow springs overshoot by about 3 %; the window leaves 5 %.
 const OVERSHOOT: f32 = 1.05;
 /// How long outgoing content takes to fade (seconds).
@@ -86,17 +86,6 @@ const PHONE_IDLE_S: f64 = 600.0;
 /// one is when it has faded all the way in.
 const HIDDEN_SLIVER: f32 = 5.0;
 const HIDDEN_FADE: f32 = 24.0;
-/// Record pressed: how long the Record page says "Opening the recorder"
-/// without word from it (a cold start of the recorder takes a few seconds).
-/// The recorder's `show` in that time is the launch Record caused: the
-/// island takes it without opening, so it doesn't sit over the recorder's
-/// window or area picker.
-const REC_OPENING_S: f64 = 15.0;
-/// How long the Record page shows why a recording didn't start.
-const REC_ERROR_S: f64 = 8.0;
-/// While a recording is under way, how often the island asks macOS whether
-/// the recorder is still running (at most; only on frames that come anyway).
-const REC_ALIVE_S: f64 = 2.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Timer {
@@ -116,9 +105,6 @@ thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
     /// Mouse monitors and observers stay registered for the app's life.
     static KEEP: RefCell<Vec<Retained<AnyObject>>> = const { RefCell::new(Vec::new()) };
-    /// Recorder messages that came while the app was busy (re-entered): the
-    /// next `drain_events` hands them over.
-    static REC_MISSED: RefCell<Vec<poni_core::recorder::Message>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Work that must run without the app borrowed (AppKit may call back in).
@@ -359,27 +345,8 @@ pub fn drain_events() {
         while let Ok(ev) = a.rx.try_recv() {
             a.on_event(ev);
         }
-        for m in REC_MISSED.with(|q| std::mem::take(&mut *q.borrow_mut())) {
-            a.on_recorder_message(m);
-        }
         a.request_frame();
     });
-}
-
-/// A message from yravgSubMeetly Recorder through the island's message port
-/// (`services::recorder::listen`), read while the recorder waits for the
-/// reply: true tells it the island shows the recording (or its Record page),
-/// so it keeps its own bar and controls hidden; false, that it should show
-/// them.
-pub fn recorder_message(m: poni_core::recorder::Message) -> bool {
-    match enter(|a| a.on_recorder_message(m.clone())) {
-        Some(taken) => taken,
-        None => {
-            REC_MISSED.with(|q| q.borrow_mut().push(m));
-            dispatch2::DispatchQueue::main().exec_async(drain_events);
-            false
-        }
-    }
 }
 
 // ---------------------------------------------------------------- the app
@@ -462,7 +429,7 @@ pub struct App {
     settings_writable: bool,
     store_writable: bool,
     first_run: bool,
-    /// The Today page's stats are being sampled (once a second).
+    /// The System page's stats are being sampled (once a second).
     stats_on: bool,
     /// The System page's sampler thread: from the start while its history is
     /// kept (`Settings::system_history_on`: System on, its history kept),
@@ -477,18 +444,6 @@ pub struct App {
     /// A full-screen app is in front and Hide is picked: the island is closed
     /// and draws nothing until it's back (`apply_fullscreen`).
     fullscreen_hidden: bool,
-    /// Oyenza sign-in's worker: from the start when this Mac is signed in (or
-    /// a sign-out still has to reach the server), else from the first sign-in.
-    oyenza: Option<services::oyenza::OyenzaService>,
-    /// The Oyenza page is on screen: its day list stays live (`services::oyenza`).
-    oyenza_watch: bool,
-    /// The Today page is on screen: the worker asks for the day (`services::oyenza`).
-    today_watch: bool,
-    /// The Health page is on screen (it asks for the phone's steps as it opens).
-    health_shown: bool,
-    /// The IELTS or Add-ons page is on screen (it asks whether the account
-    /// has Studio Pro as it opens).
-    pro_shown: bool,
     /// Files are being dragged over the island.
     drag_hover: bool,
     /// The right-click menu is open over the open island: the pointer on
@@ -511,30 +466,6 @@ pub struct App {
     addons: Option<services::addons::AddonService>,
     /// The Downloader add-on's runner: started at the first download.
     downloader: Option<services::downloader::DownloaderService>,
-    /// The IELTS coach's calls, microphone and voice, each only while needed.
-    ielts: services::ielts::Kit,
-    /// The IELTS coach paused the music playing as its session began.
-    ielts_music: bool,
-    /// The IELTS page was on screen at the last tick.
-    ielts_shown: bool,
-    /// The IELTS page held the island open at the last tick.
-    ielts_held: bool,
-    /// The Notes page's meeting while it is recorded (only then).
-    notes_rec: Option<services::notes::Recording>,
-    /// The meeting's audio once stopped, kept until its notes are saved (or
-    /// it is thrown away), for Try again.
-    notes_take: Option<services::notes::Take>,
-    /// When the meeting being taken down began (local time, for its notes).
-    notes_started: poni_core::datetime::LocalDateTime,
-    /// The Stocks page's prices: started the first time the page opens.
-    stocks: Option<services::stocks::StocksService>,
-    /// The Stocks page was on screen at the last look (`set_stocks_watch`).
-    stocks_open: bool,
-    /// The AI tab's worker: started the first time the tab opens or its
-    /// notices are on (`set_usage_watch`).
-    usage: Option<services::usage::UsageService>,
-    /// What it was last told.
-    usage_watch: services::usage::Watch,
     /// New versions (`crate::updates`); None in the smoke test.
     updater: Option<crate::updates::Updater>,
     /// Prayer times' adzan, while it plays.
@@ -557,24 +488,8 @@ pub struct App {
     smoke_devices: Option<(u32, Result<(), i32>)>,
     /// The smoke run's full-screen window (a second copy of the app).
     smoke_full_screen: Option<std::process::Child>,
-    /// The Oyenza step's POST through the Mac's HTTP client: (arrived and answered, what happened).
-    smoke_post: Option<(bool, String)>,
-    /// The IELTS coach's voice steps: the line playing and how it went.
-    smoke_voice: Option<SmokeVoice>,
-    /// Its microphone steps: what `Mic::start` gave, then what `stop` gave
-    /// (whether that's right, and what happened).
-    smoke_mic: Option<Result<services::mic::Mic, services::mic::MicError>>,
-    smoke_mic_stop: Option<(bool, String)>,
-    /// Meeting notes' recording step: the recording (or why none), then
-    /// what stopping it gave.
-    smoke_notes: Option<Result<(services::notes::Recording, bool, bool), poni_core::notes::CaptureIssue>>,
-    smoke_notes_stop: Option<(bool, String)>,
     /// The island floated on the last frame (Pill letting go of the notch).
     was_floating: bool,
-    /// The port yravgSubMeetly Recorder writes to (`services::recorder`).
-    rec_port: Option<services::recorder::Port>,
-    /// When the island next asks whether the recorder still runs (mono seconds).
-    rec_alive_at: f64,
 }
 
 /// A press on the closed island: let go where it was, it opens the island;
@@ -665,11 +580,6 @@ impl App {
             away: (false, false),
             front_full_screen: false,
             fullscreen_hidden: false,
-            oyenza: None,
-            oyenza_watch: false,
-            today_watch: false,
-            health_shown: false,
-            pro_shown: false,
             drag_hover: false,
             menu_open: false,
             script_held: false,
@@ -681,17 +591,6 @@ impl App {
             lyrics: None,
             addons: None,
             downloader: None,
-            ielts: Default::default(),
-            ielts_music: false,
-            ielts_shown: false,
-            ielts_held: false,
-            notes_rec: None,
-            notes_take: None,
-            notes_started: Default::default(),
-            stocks: None,
-            stocks_open: false,
-            usage: None,
-            usage_watch: services::usage::Watch::default(),
             updater: None,
             adzan: Default::default(),
             motion: None,
@@ -705,15 +604,7 @@ impl App {
             smoke_point: None,
             smoke_devices: None,
             smoke_full_screen: None,
-            smoke_post: None,
-            smoke_voice: None,
-            smoke_mic: None,
-            smoke_mic_stop: None,
-            smoke_notes: None,
-            smoke_notes_stop: None,
             was_floating: false,
-            rec_port: None,
-            rec_alive_at: 0.0,
         }
     }
 
@@ -727,7 +618,7 @@ impl App {
             self.updater = Some(crate::updates::Updater::start(paths::data_dir().join("update.json"), &mut self.st, crate::updates::unix_now()));
         }
         let line = crate::updates::menu_line(&self.st, self.updater.is_some());
-        self.menubar = Some(MenuBar::add(self.mtm, &self.menu_settings(), self.st.pinned, services::login::status(), &self.st.oyenza.link, line));
+        self.menubar = Some(MenuBar::add(self.mtm, &self.menu_settings(), self.st.pinned, services::login::status(), line));
         self.st.power = services::power::query();
         services::power::watch(self.sink.clone());
         services::audio::start(self.sink.clone());
@@ -740,22 +631,8 @@ impl App {
             }
         };
         self.sync_addons();
-        // A meeting the app closed on, waiting to be written up.
-        if self.st.notes_on() && self.smoke.is_none() {
-            self.notes_restore();
-        }
         self.schedule_update();
         self.fetch_setup();
-        // yravgSubMeetly Recorder installed: the Record tab can show (one
-        // Launch Services question); its port is open either way, for the
-        // recorder installed later.
-        if self.smoke.is_none() {
-            self.st.recorder = services::recorder::installed();
-        }
-        self.rec_port = services::recorder::listen();
-        if self.rec_port.is_none() {
-            pwarn!("recorder: the island's message port couldn't open");
-        }
         // Shelf tiles for what was left on the Shelf.
         for p in self.st.store.shelf.paths() {
             self.st.cmds.push(Command::LoadThumb(p));
@@ -763,22 +640,12 @@ impl App {
         self.schedule_minute_timer();
         services::sysmon::watch_away(self.mtm, self.sink.clone());
         services::fullscreen::watch(self.mtm, self.sink.clone());
-        // Signed in to Oyenza (or a sign-out still to tell it): the worker says
-        // who, then asks at its pace. Never signed in: nothing starts.
-        if paths::oyenza_link_path().exists() || paths::oyenza_revoke_path().exists() {
-            self.start_oyenza();
-        }
         if self.st.settings.system_history_on() {
             self.start_sysmon();
         }
         if self.first_run && self.smoke.is_none() {
             let place = if self.screen.notch.is_some() { "Point at the notch to open it" } else { "Point at the island to open it" };
             self.st.notify(Icon::CheckCircle, self.st.accent, "yravgSubMeetly is on", place, 6.0, None);
-        }
-        if self.smoke.is_none() {
-            if let Some(dir) = services::trash_app_from_before_rename() {
-                self.st.notify(Icon::Trash, self.st.accent, "Oyen Poni is now yravgSubMeetly", format!("The old copy in {dir} is in the Trash"), 8.0, None);
-            }
         }
         if self.smoke.is_some() {
             self.set_timer(Timer::Smoke, 600);
@@ -939,13 +806,6 @@ impl App {
         if let Some(b) = self.st.pomodoro.next_second_boundary(now).filter(|_| !hidden) {
             consider(now + b + 0.005);
         }
-        // A recording's time, on the closed island and its page: a frame for
-        // each new second while it records (none while paused), resting while
-        // the island is hidden or nobody can see the screen.
-        let watched_rec = !hidden && !self.away.0 && !self.away.1 && self.st.record_on();
-        if let Some(b) = self.st.rec_next_second().filter(|_| watched_rec) {
-            consider(now + b + 0.005);
-        }
         if let poni_core::pomodoro::RunState::Running { ends_at } = self.st.pomodoro.run {
             consider(ends_at + 0.005);
         }
@@ -1054,16 +914,6 @@ impl App {
         if before.addon_on(DOWNLOADER.id) && !self.st.settings.addon_on(DOWNLOADER.id) {
             self.downloads_off();
         }
-        // IELTS off: a session ends, the microphone and voice stop, the files go.
-        let ielts_id = poni_core::addons::IELTS.id;
-        if before.addon_on(ielts_id) && !self.st.settings.addon_on(ielts_id) {
-            self.ielts_off();
-        }
-        // Meeting notes off: a recording stops and its audio goes.
-        let notes_id = poni_core::addons::MEETING_NOTES.id;
-        if before.addon_on(notes_id) && !self.st.settings.addon_on(notes_id) {
-            self.notes_off();
-        }
         // An add-on switched on downloads its files; off deletes them.
         let mut addons_changed = false;
         for a in pages::addons::OFFERED {
@@ -1077,18 +927,6 @@ impl App {
         if addons_changed {
             self.sync_addons();
         }
-        // Health on or off: the Oyenza worker asks for the steps only while
-        // it's on, and off forgets the ones it had.
-        if before.addon_on(HEALTH.id) != self.st.settings.addon_on(HEALTH.id) {
-            if !self.st.settings.addon_on(HEALTH.id) {
-                self.st.health = None;
-            }
-            self.tell_oyenza_activity();
-        }
-        // The AI tab's heads-up notices: its worker reads every few minutes only while they're on.
-        if before.usage.notices != self.st.settings.usage.notices {
-            self.set_usage_watch();
-        }
     }
 
     /// Hand the add-on switches to the downloader, starting it when one is
@@ -1098,7 +936,7 @@ impl App {
     /// add-on's files (the Downloader's tools) wait for Pro (`pro_changed`).
     fn sync_addons(&mut self) {
         let on: Vec<&'static str> = pages::addons::OFFERED.iter().filter(|a| a.downloads() && self.st.settings.addon_on(a.id)).map(|a| a.id).collect();
-        let pro = self.st.studio_pro() == Some(true);
+        let pro = true;
         match &self.addons {
             Some(svc) => {
                 for a in pages::addons::OFFERED {
@@ -1145,10 +983,6 @@ impl App {
                 pinfo!("settings window: open");
             }
         }
-        // Add-ons lists IELTS and Meeting notes by the account's Pro, as its tab does.
-        if self.settings_ui.as_ref().is_some_and(|s| s.view.section == Section::Addons) {
-            self.oyenza(OyenzaCmd::CheckPro);
-        }
         self.pending.push(Deferred::ShowSettings);
     }
 
@@ -1167,7 +1001,6 @@ impl App {
             top: settings_host::TITLEBAR,
             still: settings_host::reduce_motion() || !settings_host::has_frames(),
         };
-        let before = ui.view.section;
         let started = std::time::Instant::now();
         let out = {
             let mut canvas = ui.gfx.canvas(ctx);
@@ -1175,7 +1008,6 @@ impl App {
         };
         ui.draw_ms = started.elapsed().as_secs_f32() * 1000.0;
         ui.draw_max_ms = ui.draw_max_ms.max(ui.draw_ms);
-        let after = ui.view.section;
         // A switch sliding, a highlight gliding: frames at the screen's rate until it arrives.
         if out.moving {
             settings_host::set_frames(true);
@@ -1185,9 +1017,6 @@ impl App {
         }
         if out.again {
             settings_host::redraw();
-        }
-        if after != before && after == Section::Addons {
-            self.oyenza(OyenzaCmd::CheckPro);
         }
         if !self.st.cmds.is_empty() {
             self.request_frame();
@@ -1279,11 +1108,6 @@ impl App {
             MenuCmd::AppleMusicToken => self.use_apple_music_token(),
             MenuCmd::AppleMusicHelp => services::open(APPLE_MUSIC_HELP_URL),
             MenuCmd::AppleMusicForget => self.forget_apple_music_token(),
-            MenuCmd::OyenzaSignIn => self.oyenza(OyenzaCmd::SignIn),
-            MenuCmd::OyenzaCancel => self.oyenza(OyenzaCmd::Cancel),
-            MenuCmd::OyenzaDisconnect => self.oyenza(OyenzaCmd::Disconnect),
-            MenuCmd::OyenzaOpen => services::open(oyenza::WEB),
-            MenuCmd::ToggleOyenzaAmounts => s.oyenza_show_amounts = !s.oyenza_show_amounts,
             MenuCmd::ToggleLogin => self.toggle_login(),
             MenuCmd::OpenSettings => {
                 if !paths::settings_path().exists() {
@@ -1316,7 +1140,21 @@ impl App {
                 self.expand();
             }
             MenuCmd::CheckForUpdates => self.check_for_updates(),
-            MenuCmd::RecordScreen => services::recorder::record_screen(self.mtm),
+            MenuCmd::LyricsCredit => services::open("https://lrclib.net"),
+            MenuCmd::OpenLive => self.open_page(PageKind::Live),
+            MenuCmd::OpenCall => self.open_page(PageKind::Call),
+            MenuCmd::OpenMeeting => self.open_page(PageKind::Meeting),
+            MenuCmd::OpenInbox => self.open_page(PageKind::Inbox),
+            // The engine, the Chrome extension and the island's own captions are
+            // the Windows app's services; the Mac has no twin of them yet.
+            MenuCmd::OpenApp
+            | MenuCmd::OpenMinutes
+            | MenuCmd::StartEngine
+            | MenuCmd::RestartEngine
+            | MenuCmd::SetupExtension
+            | MenuCmd::OpenCaptionsPanel
+            | MenuCmd::StartCaptions
+            | MenuCmd::StopCaptions => {}
             MenuCmd::Quit => {
                 self.quit(0);
                 return;
@@ -1328,12 +1166,18 @@ impl App {
         self.request_frame();
     }
 
+    /// Open the island on page `p` (the menu's entries for our own pages).
+    fn open_page(&mut self, p: PageKind) {
+        self.set_page(p);
+        self.expand();
+    }
+
     fn refresh_menu(&mut self) {
         let login = services::login::status();
         let line = crate::updates::menu_line(&self.st, self.updater.is_some());
         let s = self.menu_settings();
         if let Some(m) = self.menubar.as_mut() {
-            m.refresh(self.mtm, &s, self.st.pinned, login, &self.st.oyenza.link, line);
+            m.refresh(self.mtm, &s, self.st.pinned, login, line);
         }
     }
 
@@ -1594,9 +1438,6 @@ impl App {
             // Back: a read of the update file that came due meanwhile.
             self.update_due();
         }
-        self.tell_oyenza_activity();
-        self.set_stocks_watch();
-        self.set_usage_watch();
         self.apply_fullscreen();
     }
 
@@ -1606,11 +1447,6 @@ impl App {
     fn apply_fullscreen(&mut self) {
         let away = self.away.0 || self.away.1;
         let hide = self.front_full_screen && !away && self.st.settings.hide_in_fullscreen;
-        // Money and bill notices held back wait for the full-screen app to leave.
-        if !hide && !self.front_full_screen && self.st.oyenza.held.is_some() {
-            self.show_held_notice(clock::mono());
-            self.request_frame();
-        }
         if hide == self.fullscreen_hidden {
             return;
         }
@@ -1637,7 +1473,7 @@ impl App {
         self.st.now = now;
         let media_before = matches!(ev, AppEvent::Media(_) | AppEvent::MediaTimeline { .. }).then(|| self.media_snapshot());
         // What the Settings window shows that a service reports.
-        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Oyenza(_) | AppEvent::Addon { .. } | AppEvent::Usage(_) | AppEvent::Located(_));
+        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_));
         if let Some(s) = self.settings_ui.as_mut().filter(|_| shown) {
             s.view.dirty = true;
         }
@@ -1731,8 +1567,6 @@ impl App {
             AppEvent::Power(p) => {
                 let old = self.st.power;
                 self.st.power = p;
-                self.tell_oyenza_activity();
-                self.set_usage_watch();
                 if old.saver && !p.saver {
                     self.update_due();
                 }
@@ -1794,16 +1628,6 @@ impl App {
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Download { id, line } => self.download_line(id, line),
             AppEvent::DownloadEnded { id, ok } => self.download_ended(id, ok),
-            AppEvent::Ielts(reply) => self.ielts_reply(*reply),
-            AppEvent::VoiceEnded => {
-                if let Some(v) = self.smoke_voice.as_mut() {
-                    v.ended.get_or_insert(now);
-                }
-                self.ielts_voice_ended();
-            }
-            AppEvent::MicFailed(why) => self.ielts_mic_failed(why),
-            AppEvent::Notes(reply) => self.notes_reply(*reply),
-            AppEvent::NotesStopped(issue) => self.notes_stopped(issue),
             AppEvent::Update(services::update::UpdateEvent::Checked(r)) => {
                 let open = self.updater.as_mut().is_some_and(|u| u.checked(&mut self.st, r, crate::updates::unix_now()));
                 self.schedule_update();
@@ -1825,8 +1649,6 @@ impl App {
             }
             AppEvent::Located(found) => self.on_located(found),
             AppEvent::Cities { file, got } => pages::prayer::cities_came(&mut self.st, file, got),
-            AppEvent::Stocks(ev) => self.st.stocks.apply(ev, self.st.unix),
-            AppEvent::Usage(ev) => self.on_usage(ev),
             AppEvent::AdzanEnded => self.adzan_ended(),
             AppEvent::Log(s) => pinfo!("{s}"),
             AppEvent::Bluetooth { name, connected, battery, audio } => {
@@ -1838,7 +1660,6 @@ impl App {
                 self.front_full_screen = on;
                 self.apply_fullscreen();
             }
-            AppEvent::Oyenza(ev) => self.on_oyenza(ev),
         }
         if let Some(before) = media_before {
             self.after_media_change(before, now);
@@ -2644,85 +2465,12 @@ impl App {
         if !self.expanded {
             self.expanded = true;
             self.cancel_hover();
-            // A recorder installed or removed since the last look.
-            if self.smoke.is_none() {
-                self.st.recorder = services::recorder::installed();
-            }
-            self.check_recorder_alive(true);
-            // A recording under way opens on its page: Pause and Stop are there.
-            if self.st.rec_live() && self.st.record_on() {
-                self.st.page = PageKind::Record;
-            } else if self.st.page == PageKind::Record && !self.st.record_on() {
-                self.st.page = pages::first_tab(&self.st);
-            } else if self.mode == Mode::Activity(activities::Activity::Download) {
+            if self.mode == Mode::Activity(activities::Activity::Download) {
                 // The download pill opens on its page.
                 self.st.page = PageKind::Downloads;
             }
         }
         self.request_frame();
-    }
-
-    /// yravgSubMeetly Recorder's word on its recording, or "show yourself"
-    /// (`recorder_message`). True when the island takes it: it shows the
-    /// recording, or opened on its Record page.
-    fn on_recorder_message(&mut self, m: poni_core::recorder::Message) -> bool {
-        use poni_core::recorder::{Message, Phase};
-        let now = clock::mono();
-        self.st.now = now;
-        // Only an installed recorder that reads the Record page's links
-        // writes: the Record tab can show from now on (remembered).
-        self.st.recorder = true;
-        if !self.st.store.recorder_island {
-            self.st.store.recorder_island = true;
-            self.st.cmd(Command::SaveStore);
-        }
-        if !self.st.record_on() {
-            return false;
-        }
-        let taken = match m {
-            // Hidden for a full-screen app, the island can't be the recorder's face.
-            Message::Show if self.fullscreen_hidden => false,
-            // A Mac app can't tell a link launch from a plain one, so the
-            // recorder Record started says show too: taken, the island as it is.
-            Message::Show if self.st.rec.opening_until > now => true,
-            Message::Show => {
-                self.set_page(PageKind::Record);
-                self.expand();
-                true
-            }
-            Message::State { phase, elapsed_ms, error } => {
-                let rec = &mut self.st.rec;
-                rec.opening_until = 0.0;
-                if phase == Phase::Idle {
-                    rec.phase = None;
-                    rec.error = error.map(|e| (e, now + REC_ERROR_S));
-                } else {
-                    rec.phase = Some(phase);
-                    rec.elapsed_ms = elapsed_ms;
-                    rec.at = now;
-                    rec.error = None;
-                }
-                self.rec_alive_at = now + REC_ALIVE_S;
-                true
-            }
-        };
-        self.request_frame();
-        taken
-    }
-
-    /// A recorder gone mid-recording (quit, crashed) leaves no recording
-    /// behind on the island. Asked of macOS only while one is under way, at
-    /// most every `REC_ALIVE_S` (`now`: as the island opens).
-    fn check_recorder_alive(&mut self, now: bool) {
-        if !self.st.rec_live() || self.smoke.is_some() || (!now && self.st.now < self.rec_alive_at) {
-            return;
-        }
-        self.rec_alive_at = self.st.now + REC_ALIVE_S;
-        if !services::recorder::running() {
-            pinfo!("recorder: it quit mid-recording");
-            self.st.rec = crate::state::RecView::default();
-            self.request_frame();
-        }
     }
 
     /// (Re)start the hover dwell from `p`.
@@ -2744,8 +2492,6 @@ impl App {
             }
             self.set_stats(false);
             self.set_sysmon(false);
-            // Oyen arrives in his tab again at the next opening.
-            self.st.ui.oyen_tab = None;
             // Settings closes with the island: it opens again on the page it was opened from.
             if self.st.page == PageKind::Settings {
                 self.st.page = self.st.ui.before_settings.take().filter(|p| pages::tabs(&self.st).contains(p)).unwrap_or_else(|| pages::first_tab(&self.st));
@@ -2840,7 +2586,7 @@ impl App {
         }
         if a == InlineAction::ShowAmount {
             // The sum and sender take the subtitle's place for a few seconds.
-            let until = st.now + poni_core::oyenza::SHOWN_S;
+            let until = st.now + SHOWN_S;
             if let Some(n) = st.notice.as_mut() {
                 if let Some(text) = n.reveal.take() {
                     n.subtitle = text;
@@ -2894,21 +2640,6 @@ impl App {
                 }
                 Command::FocusText => self.focus_text(),
                 Command::BlurText => self.blur_text(),
-                Command::RecordScreen => services::recorder::record_screen(self.mtm),
-                Command::Record => {
-                    let rec = self.st.settings.record;
-                    services::recorder::record(self.mtm, rec.target, rec.inputs());
-                    self.st.rec.opening_until = self.st.now + REC_OPENING_S;
-                    self.st.rec.error = None;
-                    // A window or an area is picked on the recorder's overlay:
-                    // the open island would sit over it.
-                    if rec.target != poni_core::recorder::Target::Screen {
-                        self.collapse();
-                    }
-                }
-                Command::RecordPause => services::recorder::pause(),
-                Command::RecordResume => services::recorder::resume(),
-                Command::RecordStop => services::recorder::stop(),
                 Command::ScriptPaste => {
                     let text = services::clipboard::read_text().map(|t| poni_core::script::clean(&t)).filter(|t| !t.is_empty());
                     match text {
@@ -2967,7 +2698,6 @@ impl App {
                 // Paired phones come to the Mac in a later slice (its Shelf
                 // shows no Pair a phone yet).
                 Command::Pair(_) => {}
-                Command::Oyenza(c) => self.oyenza(c),
                 Command::GetCities(file) => services::cities::fetch(file, self.sink.clone()),
                 Command::Download(c) => self.download_cmd(c),
                 // Notifications is a Windows add-on: a Mac can't read other apps' notifications.
@@ -2976,415 +2706,15 @@ impl App {
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
                 Command::RestoreLiveCaptions => {} // Windows Live Captions: no such thing on macOS
-                Command::Usage(c) => self.usage_cmd(c),
-                Command::Ielts(c) => self.ielts_cmd(c),
-                Command::Notes(c) => self.notes_cmd(c),
+                Command::Menu(c) => self.on_menu(c),
+                // What the Windows app's engine, captions and calendar services
+                // answer to (the helper's engine, PC-sound capture, meeting
+                // pages): the Mac has no twin of them yet, and its pages never
+                // send them.
+                _ => {}
             }
         }
         self.sync_phone_offer();
-    }
-
-    // ------------------------------------------------------------ AI usage
-
-    /// The AI tab's worker reads while the tab is on screen, or every few
-    /// minutes for the person who switched on its heads-up notices; both rest
-    /// while nobody can see the screen, the notices also on Low Power Mode.
-    /// Its thread starts the first time either wants it.
-    fn set_usage_watch(&mut self) {
-        let here = !(self.away.0 || self.away.1);
-        let open = here && self.mode == Mode::Expanded(PageKind::Ai);
-        // A keychain read may bring up macOS's prompt only while the tab is
-        // on screen; what it read stays while the notices are switched on,
-        // resting or not, so they go on once someone is back
-        // (services::keychain). Told before the worker; nothing while it
-        // stays the same.
-        let notices = self.st.settings.usage.notices && self.st.ai_usage_on();
-        services::keychain::set_watch(open, notices);
-        // The smoke run shows made-up readings (and checks the keychain on
-        // its own): nothing is read, even from inside a step.
-        if self.smoke_run {
-            return;
-        }
-        let w = services::usage::Watch {
-            open,
-            notices: here && notices && !self.st.power.saver,
-            near_pct: self.st.settings.usage.near_pct,
-            use_24h: self.st.settings.use_24h,
-            hidden: services::usage::picked(&self.st.settings.usage.hidden),
-            added: services::usage::picked(&self.st.settings.usage.added),
-        };
-        // Already told: nothing to do, every frame.
-        if w == self.usage_watch {
-            return;
-        }
-        self.usage_watch = w;
-        if self.usage.is_none() && (w.open || w.notices) {
-            self.start_usage();
-        }
-        if let Some(s) = &self.usage {
-            s.set_watch(w);
-        }
-    }
-
-    fn start_usage(&mut self) {
-        match services::usage::UsageService::start(self.sink.clone()) {
-            Ok(s) => self.usage = Some(s),
-            Err(e) => pwarn!("service usage: unavailable ({e})"),
-        }
-    }
-
-    /// Hide and Show change the AI tab's settings; the rest is its worker's
-    /// (started by the first one if need be).
-    fn usage_cmd(&mut self, c: UsageCmd) {
-        match c {
-            UsageCmd::Hide(id) | UsageCmd::Show(id) => {
-                let u = &mut self.st.settings.usage;
-                u.hidden.retain(|k| k != id.key());
-                u.added.retain(|k| k != id.key());
-                let list = if matches!(c, UsageCmd::Show(_)) { &mut u.added } else { &mut u.hidden };
-                list.push(id.key().into());
-                let before = self.saved_settings.clone();
-                self.settings_changed(&before);
-                self.save_settings();
-            }
-            c => {
-                // The person asked: the keychain may ask macOS again, even after a no.
-                if matches!(c, UsageCmd::Refresh) {
-                    services::keychain::ask_again();
-                }
-                if self.usage.is_none() {
-                    self.start_usage();
-                }
-                if let Some(s) = &self.usage {
-                    s.command(c);
-                }
-            }
-        }
-    }
-
-    /// What the AI tab's worker found goes into `st.usage`. Its heads-up
-    /// notices wait their turn for the island (`tick` puts them up one at a
-    /// time once it is free); the frame `on_event` asks for looks at once.
-    fn on_usage(&mut self, ev: services::usage::UsageEvent) {
-        match ev {
-            services::usage::UsageEvent::Alerts(alerts) => self.st.hold_usage_alerts(alerts),
-            ev => self.st.usage.apply(ev),
-        }
-    }
-
-    // ------------------------------------------------------------ Oyenza
-
-    /// How the Oyenza worker should pace itself: in use (unlocked, displays
-    /// awake) and the power source.
-    fn oyenza_activity(&self) -> services::oyenza::Activity {
-        let p = self.st.power;
-        services::oyenza::Activity {
-            in_use: !self.away.0 && !self.away.1,
-            on_ac: p.on_ac || !p.has_battery,
-            saver: p.saver,
-            watching: self.oyenza_watch,
-            today: self.today_watch,
-            health: self.st.health_on(),
-        }
-    }
-
-    /// The Oyenza page came on screen or went: the worker keeps its list live only meanwhile.
-    fn set_oyenza_watch(&mut self, on: bool) {
-        if on != self.oyenza_watch {
-            self.oyenza_watch = on;
-            self.tell_oyenza_activity();
-        }
-    }
-
-    /// The Stocks page asks oyenza.trade for prices only while it is on
-    /// screen and someone is at the Mac (`pages::stocks::watch`); the worker
-    /// starts the first time it opens.
-    fn set_stocks_watch(&mut self) {
-        let away = self.away.0 || self.away.1;
-        let open = self.mode == Mode::Expanded(PageKind::Stocks) && !away;
-        // Closed, and the worker already told so: nothing to do, every frame.
-        if !open && !self.stocks_open {
-            return;
-        }
-        self.stocks_open = open;
-        let w = pages::stocks::watch(&self.st, open);
-        if self.stocks.is_none() && w.open {
-            match services::stocks::StocksService::start(self.sink.clone()) {
-                Ok(s) => self.stocks = Some(s),
-                Err(e) => pwarn!("service stocks: unavailable ({e})"),
-            }
-        }
-        if let Some(s) = &self.stocks {
-            s.set_watch(w);
-        }
-    }
-
-    /// The Today page came on screen or went: the worker asks for the day only meanwhile.
-    fn set_today_watch(&mut self, on: bool) {
-        if on != self.today_watch {
-            self.today_watch = on;
-            self.tell_oyenza_activity();
-        }
-    }
-
-    /// The Health page came on screen: the steps from the phone, now (unless
-    /// just asked for). Never signed in: nothing starts.
-    fn set_health_shown(&mut self, on: bool) {
-        if on != self.health_shown {
-            self.health_shown = on;
-            if let (true, Some(o)) = (on, &self.oyenza) {
-                o.send(OyenzaCmd::RefreshHealth);
-            }
-        }
-    }
-
-    /// The IELTS, Notes, Add-ons or AI page came on screen: whether the account has
-    /// Studio Pro, now (unless just asked). Never signed in: nothing starts.
-    fn set_pro_shown(&mut self, on: bool) {
-        if on != self.pro_shown {
-            self.pro_shown = on;
-            if let (true, Some(o)) = (on, &self.oyenza) {
-                o.send(OyenzaCmd::CheckPro);
-            }
-        }
-    }
-
-    fn tell_oyenza_activity(&self) {
-        if let Some(o) = &self.oyenza {
-            o.set_activity(self.oyenza_activity());
-        }
-    }
-
-    fn start_oyenza(&mut self) {
-        match services::oyenza::OyenzaService::start(self.sink.clone(), self.oyenza_activity()) {
-            Ok(o) => self.oyenza = Some(o),
-            Err(e) => pwarn!("oyenza: unavailable ({e})"),
-        }
-    }
-
-    /// A sign-in, cancel, disconnect, note or undo for the worker (started by the first one).
-    fn oyenza(&mut self, c: OyenzaCmd) {
-        if self.oyenza.is_none() {
-            self.start_oyenza();
-        }
-        if let Some(o) = &self.oyenza {
-            o.send(c);
-        }
-    }
-
-    fn on_oyenza(&mut self, ev: OyenzaEvent) {
-        let now = self.st.now;
-        let link_before = self.st.oyenza.link.clone();
-        let pro_before = self.st.studio_pro() == Some(true);
-        match ev {
-            OyenzaEvent::Restored { account } => {
-                self.st.oyenza.link = OyenzaLink::Connected { account };
-                self.ask_pro();
-            }
-            OyenzaEvent::Connecting { code, url, expires_in_s } => {
-                self.st.oyenza.link = OyenzaLink::Connecting { code, url, until: now + expires_in_s as f64 };
-                // Keep the code on screen while the person goes to oyenza.app.
-                if self.st.oyenza.pinned_before.is_none() {
-                    self.st.oyenza.pinned_before = Some(self.st.pinned);
-                }
-                self.st.pinned = true;
-                self.set_page(PageKind::Oyenza);
-                self.expand();
-            }
-            OyenzaEvent::Connected { account } => {
-                self.end_sign_in();
-                self.st.notify(Icon::Check, palette::GREEN, "Connected to yravgSubMeetly", format!("as {account}"), 6.0, Some(NoticeAction::OpenPage(PageKind::Oyenza)));
-                self.st.oyenza.link = OyenzaLink::Connected { account };
-                self.ask_pro();
-                // Signed in from the Today page: back to it, where the day comes in.
-                if std::mem::take(&mut self.st.oyenza.from_today) {
-                    self.st.page = PageKind::Today;
-                    self.expand();
-                }
-            }
-            OyenzaEvent::ConnectFailed(code) => {
-                self.st.oyenza.from_today = false;
-                self.end_sign_in();
-                self.st.oyenza.link = OyenzaLink::Off;
-                let (title, subtitle) = oyenza::connect_failure_text(&code);
-                self.st.notify(Icon::Unlink, palette::ORANGE, title, subtitle, 6.0, None);
-            }
-            OyenzaEvent::ConnectCancelled => {
-                self.st.oyenza.from_today = false;
-                self.end_sign_in();
-                self.st.oyenza.link = OyenzaLink::Off;
-            }
-            OyenzaEvent::Money { arrived } => {
-                let o = &mut self.st.oyenza;
-                o.updated_unix = Some(self.st.unix);
-                let fresh = oyenza::unseen(&mut o.shown, &arrived);
-                if let Some(n) = oyenza::money_notice(&fresh) {
-                    let (icon, color) = match n.flow {
-                        Some(oyenza::Flow::In) => (Icon::MoneyIn, palette::GREEN),
-                        Some(oyenza::Flow::Out) => (Icon::MoneyOut, palette::BLUE),
-                        _ => (Icon::Wallet, palette::BLUE),
-                    };
-                    self.oyenza_notice(icon, color, n.title, n.shown, Some(n.hidden));
-                }
-            }
-            OyenzaEvent::Activity(a) => {
-                let o = &mut self.st.oyenza;
-                o.seen.note(&a.days, now);
-                o.activity = Some(a);
-                o.updated_unix = Some(self.st.unix);
-            }
-            OyenzaEvent::ActivityChecked => self.st.oyenza.updated_unix = Some(self.st.unix),
-            OyenzaEvent::Bills { today, bills } => {
-                let day = if today.is_empty() { self.st.day_key() } else { today };
-                self.st.oyenza.bills = bills;
-                self.st.oyenza.bills_today = day.clone();
-                self.st.oyenza.updated_unix = Some(self.st.unix);
-                self.remind_bills(&day);
-            }
-            OyenzaEvent::Day(day) => {
-                let o = &mut self.st.oyenza;
-                o.agenda = Some(day);
-                o.agenda_unix = Some(self.st.unix);
-                o.agenda_state = crate::state::AgendaState::Ready;
-            }
-            OyenzaEvent::DayUnavailable => {
-                self.st.oyenza.agenda = None;
-                self.st.oyenza.agenda_state = crate::state::AgendaState::Unavailable;
-            }
-            OyenzaEvent::DayFailed => self.st.oyenza.agenda_state = crate::state::AgendaState::Failed,
-            OyenzaEvent::Pro(pro) => self.st.oyenza.pro = Some(pro),
-            // Steps asked for before Health was switched off stay out.
-            OyenzaEvent::Health(next) if self.st.health_on() => {
-                if let Some(steps) = self.st.take_health(next) {
-                    let notice = pages::health::goal_notice(steps, now + oyenza::NOTICE_S);
-                    self.st.show_or_hold(notice, self.fullscreen_hidden);
-                }
-            }
-            OyenzaEvent::Health(_) => {}
-            OyenzaEvent::NoteSaved(saved) => {
-                let o = &mut self.st.oyenza;
-                o.saving = false;
-                o.input.clear();
-                o.error = None;
-                o.saved = Some((saved, now + oyenza::UNDO_S));
-            }
-            OyenzaEvent::NoteFailed { text, code } => {
-                let o = &mut self.st.oyenza;
-                o.saving = false;
-                if o.input.trim().is_empty() {
-                    o.input = text;
-                }
-                o.error = Some(oyenza::note_error_text(&code).into());
-            }
-            OyenzaEvent::Undone => self.st.oyenza.flash = Some(("Taken back".into(), now + 3.0)),
-            OyenzaEvent::UndoFailed(code) => {
-                let line = if code == "too_late" { "Too late to undo here. Change it in oyenza.app" } else { "Couldn't undo. Change it in oyenza.app" };
-                self.st.oyenza.flash = Some((line.into(), now + 5.0));
-            }
-            OyenzaEvent::Disconnected { by_server } => {
-                self.end_sign_in();
-                self.st.oyenza = crate::state::OyenzaState::default();
-                self.st.health = None;
-                // Signed out: an IELTS session ends, and the ladder was the account's.
-                self.ielts_off();
-                let (title, subtitle) =
-                    if by_server { ("yravgSubMeetly disconnected", "Sign in again in Settings") } else { ("Disconnected from yravgSubMeetly", "Sign in again any time in Settings") };
-                self.st.notify(Icon::Unlink, palette::TEXT_DIM, title, subtitle, 6.0, None);
-            }
-        }
-        // The Oyenza tab came or went: the menu changes with it, and the
-        // window makes room for its page (or no longer has to).
-        if self.st.oyenza.link != link_before {
-            self.refresh_menu();
-            self.layout_surface();
-        }
-        if (self.st.studio_pro() == Some(true)) != pro_before {
-            self.pro_changed();
-        }
-    }
-
-    /// Signed in (at start, or just now) with the Downloader switched on:
-    /// whether the account has Studio Pro, now, so its tab doesn't wait for
-    /// the Add-ons page to open (`pages::addons::pro_wanted`).
-    fn ask_pro(&self) {
-        if let (true, Some(o)) = (pages::addons::pro_wanted(&self.st), &self.oyenza) {
-            o.send(OyenzaCmd::CheckPro);
-        }
-    }
-
-    /// Studio Pro came, or went (the server's word, or signing out): the
-    /// Downloader's downloads stop as it goes, and its files come with it
-    /// (`AddonService::set_pro`). Its tab follows by itself (`downloader_on`),
-    /// and its page on screen leaves for Add-ons (`tick`).
-    fn pro_changed(&mut self) {
-        let pro = self.st.studio_pro() == Some(true);
-        if !pro {
-            self.downloads_off();
-        }
-        if let Some(a) = self.addons.as_ref() {
-            a.set_pro(pro);
-        }
-    }
-
-    /// The code is gone (signed in, refused, cancelled): the island stops
-    /// staying open for it.
-    fn end_sign_in(&mut self) {
-        if let Some(p) = self.st.oyenza.pinned_before.take() {
-            self.st.pinned = p;
-            if !p {
-                self.maybe_schedule_collapse();
-            }
-        }
-    }
-
-    /// A money or bill notice. Its sum waits for Show unless the menu's
-    /// "Show amounts on the island" is on (`hidden` None: nothing to hide).
-    /// While a full-screen app hides the island it waits, and shows when the
-    /// island is back if it isn't old by then.
-    fn oyenza_notice(&mut self, icon: Icon, color: Color, title: String, shown: String, hidden: Option<String>) {
-        let now = self.st.now;
-        let hide = hidden.is_some() && !self.st.settings.oyenza_show_amounts;
-        let notice = Notice {
-            icon,
-            color,
-            title,
-            title_dim: String::new(),
-            subtitle: if hide { hidden.unwrap_or_default() } else { shown.clone() },
-            until: now + oyenza::NOTICE_S,
-            action: Some(NoticeAction::OpenPage(PageKind::Oyenza)),
-            inline: hide.then_some(InlineAction::ShowAmount),
-            reveal: hide.then_some(shown),
-        };
-        if self.fullscreen_hidden {
-            self.st.oyenza.held = Some((notice, now));
-        } else {
-            self.st.notice = Some(notice);
-        }
-    }
-
-    fn show_held_notice(&mut self, now: f64) {
-        if let Some((mut n, at)) = self.st.oyenza.held.take() {
-            if now - at <= oyenza::HELD_MAX_S {
-                n.until = now + oyenza::NOTICE_S;
-                self.st.notice = Some(n);
-            }
-        }
-    }
-
-    /// One reminder per bill, the day before it (or on the day, if the Mac was
-    /// off), from the morning on; the rest come with the next look.
-    fn remind_bills(&mut self, today: &str) {
-        let st = &mut self.st;
-        oyenza::prune_noticed(&mut st.store.oyenza_noticed, today);
-        if st.local.hour < oyenza::BILL_HOUR {
-            return;
-        }
-        let Some(b) = oyenza::bills_to_remind(&st.oyenza.bills, today, &st.store.oyenza_noticed).first().map(|b| (*b).clone()) else { return };
-        st.store.oyenza_noticed.push(oyenza::notice_key(&b));
-        st.save();
-        let (shown, hidden) = oyenza::bill_subtitles(&b);
-        let icon = if b.is_card() { Icon::Card } else { Icon::Calendar };
-        self.oyenza_notice(icon, palette::ORANGE, oyenza::bill_title(&b, today), shown, hidden);
     }
 
     // ------------------------------------------------------------ phone drop
@@ -3560,21 +2890,12 @@ impl App {
         if self.updater.as_mut().is_some_and(|u| u.announce(&mut self.st, free)) {
             self.request_frame();
         }
-        // The AI tab's heads-up notices wait the same way, one at a time, and
-        // while a full-screen app hides the island.
-        if self.st.show_usage_notice(free && !self.fullscreen_hidden, self.expanded && self.st.page == PageKind::Ai) {
-            self.request_frame();
-        }
         if let Some(ended) = self.st.pomodoro.tick(now) {
             pages::focus::on_phase_ended(&mut self.st, ended);
         }
         // The Script page: a reading pauses while its page isn't on screen,
-        // and the island may close once nothing holds it. Whether Record
-        // shows is asked as the page comes on screen.
+        // and the island may close once nothing holds it.
         let shown = self.expanded && self.st.page == PageKind::Script && !self.away.0 && !self.away.1;
-        if shown && !self.script_shown {
-            self.st.recorder = services::recorder::installed();
-        }
         self.script_shown = shown;
         if !shown && self.st.script.playing() {
             self.st.script.pause(now);
@@ -3585,21 +2906,11 @@ impl App {
         }
         self.script_held = held;
         self.prayer_tick();
-        self.ielts_tick();
-        self.notes_tick();
-        self.check_recorder_alive(false);
-        // Prayer times, System, Health, Stocks, Screen recorder, AI usage, IELTS
-        // or Downloader switched off: its tab is gone.
+        // Prayer times, System or Downloader switched off: its tab is gone.
         let gone = match self.st.page {
             PageKind::Prayer => !self.st.prayer_on(),
             PageKind::System => !self.st.system_on(),
-            PageKind::Health => !self.st.health_on(),
-            PageKind::Stocks => !self.st.stocks_on(),
-            PageKind::Record => !self.st.record_on(),
-            PageKind::Ielts => !self.st.ielts_on(),
             PageKind::Downloads => !self.st.downloader_on(),
-            PageKind::Notes => !self.st.notes_on(),
-            PageKind::Ai => !self.st.ai_usage_on(),
             _ => false,
         };
         if gone {
@@ -3658,15 +2969,7 @@ impl App {
             dt = dt.min(period);
         }
         let dt = dt.clamp(0.0, 0.05) as f32;
-        // Today's tiles need the readings only while they show (signed out it has the sign-in card, signed in the day).
-        self.set_stats(self.mode == Mode::Expanded(PageKind::Today) && pages::today::shows_tiles(&self.st));
         self.set_sysmon(self.mode == Mode::Expanded(PageKind::System));
-        self.set_oyenza_watch(self.mode == Mode::Expanded(PageKind::Oyenza));
-        self.set_today_watch(self.mode == Mode::Expanded(PageKind::Today));
-        self.set_health_shown(self.mode == Mode::Expanded(PageKind::Health));
-        self.set_pro_shown(matches!(self.mode, Mode::Expanded(PageKind::Ielts | PageKind::Notes | PageKind::Addons | PageKind::Ai)));
-        self.set_stocks_watch();
-        self.set_usage_watch();
         // The Pill theme floats the island below the top edge (below the menu
         // bar for what hangs under a notch).
         self.island.set_floating(self.gap_target(&self.mode));
@@ -3753,7 +3056,7 @@ impl App {
         self.gfx.set_look(look);
         let mut hits = std::mem::take(&mut self.hits);
         hits.clear();
-        let mut body_s = 0.0;
+        let body_s: f64;
         let (repaint, anim, focus, live) = {
             let mut canvas = self.gfx.canvas(ctx);
             let body_started = started.map(|_| std::time::Instant::now());
@@ -4019,7 +3322,6 @@ impl App {
                 self.st.page = PageKind::Focus;
                 self.expand();
             }
-            "open-today" => self.st.cmds.push(Command::SetPage(PageKind::Today)),
             // System is an add-on, off by default: on, as its row in Add-ons
             // does. Its tab comes, and the reader starts its light readings
             // for the kept minute while the page is still closed.
@@ -4221,83 +3523,6 @@ impl App {
                     let _ = c.wait();
                 }
             }
-            // Oyenza sign-in: its worker starts (this home has no key, so it
-            // asks nothing), one POST goes through the Mac's HTTP client the
-            // way signing in sends it, then the island follows what the worker
-            // would report: a code, a week on the page, money in, signing out.
-            "oyenza-post" => {
-                self.st.notice = None;
-                self.collapse();
-                self.start_oyenza();
-                self.smoke_post = Some(smoke_post());
-            }
-            "oyenza-code" => {
-                let url = "https://oyenza.app/connect?code=KPJX-TMNQ".to_string();
-                self.on_oyenza(OyenzaEvent::Connecting { code: "KPJX-TMNQ".into(), url, expires_in_s: 600 });
-            }
-            "oyenza-page" => {
-                let fake = crate::render::fake_oyenza(&self.st, false);
-                self.on_oyenza(OyenzaEvent::Connected { account: "a\u{2022}\u{2022}\u{2022}@example.com".into() });
-                if let Some(a) = fake.activity {
-                    self.on_oyenza(OyenzaEvent::Activity(a));
-                }
-                self.on_oyenza(OyenzaEvent::Bills { today: fake.bills_today, bills: fake.bills });
-                self.st.notice = None;
-                self.set_page(PageKind::Oyenza);
-                self.expand();
-            }
-            "oyenza-money" => {
-                self.collapse();
-                let wallet = Some(poni_core::oyenza::WalletRef { name: "BCA".into(), color: "#0060AF".into() });
-                let arrived = vec![poni_core::oyenza::Arrival {
-                    id: "smoke-1".into(),
-                    kind: "income".into(),
-                    amount: 1_250_000.0,
-                    currency: "IDR".into(),
-                    text: "Rp 1.250.000".into(),
-                    title: "Gaji Oktober".into(),
-                    wallet,
-                    at: String::new(),
-                }];
-                self.on_oyenza(OyenzaEvent::Money { arrived });
-            }
-            "oyenza-off" => {
-                self.st.notice = None;
-                self.on_oyenza(OyenzaEvent::Disconnected { by_server: false });
-                self.oyenza = None;
-            }
-            // The AI tab (its worker never starts in the smoke run: nothing
-            // of this Mac is read), then its keychain reader on test items.
-            "ai-page" => {
-                self.st.notice = None;
-                // AI usage is part of Studio Pro: signed in with it for the AI
-                // steps ("ai-secret" ends them).
-                self.st.oyenza.link = OyenzaLink::Connected { account: "a\u{2022}\u{2022}\u{2022}@example.com".into() };
-                self.st.oyenza.pro = Some(true);
-                let now = self.st.now;
-                pages::usage::picture(&mut self.st, pages::usage::Picture::Plans, now);
-                self.set_page(PageKind::Ai);
-                self.expand();
-            }
-            // With the notices on and a keychain reading in hand (the tab is
-            // open), the Mac locks, then unlocks on the AI tab.
-            "ai-locked" => {
-                self.st.settings.usage.notices = true;
-                // The reader's gate as the island has it again (the keychain
-                // step set its own, and a resting island draws no frame).
-                self.set_usage_watch();
-                if std::env::var_os("PONI_SMOKE_KEYCHAIN").is_some() {
-                    let _ = services::keychain::read(SMOKE_KEYCHAIN.0, Some("plain"));
-                }
-                self.set_away(None, Some(true));
-            }
-            "ai-back" => {
-                self.set_away(None, Some(false));
-                self.set_page(PageKind::Ai);
-                self.expand();
-            }
-            // The last AI step: signed out again for the ones after it.
-            "ai-secret" => self.st.oyenza = Default::default(),
             // macOS's own now playing, as a browser tab reaches it: the
             // stream stops, tools/mac-smoke.sh starts the MediaRemote
             // adapter's test player, and sound (CI's Macs play none) starts
@@ -4318,15 +3543,15 @@ impl App {
                 services::media::smoke_rest();
             }
             "now-playing-browser" => services::media::smoke_sound(),
-            // The themes on the real window: Glass, then Oyen and Glass
+            // The themes on the real window: Glass, then Glass
             // around a notch (one the screen pretends to have; CI's Macs
             // have none), open and resting in the menu bar's line.
             "glass-open" => {
                 self.on_menu(MenuCmd::SetTheme(Theme::Glass));
-                self.st.page = PageKind::Today;
+                self.st.page = PageKind::Focus;
                 self.expand();
             }
-            "glass-collapsed" | "notch-oyen-collapsed" | "pill-collapsed" => self.collapse(),
+            "glass-collapsed" | "pill-collapsed" => self.collapse(),
             // Around the notch Pill's music floats below the menu bar even with
             // no line to sing (as in an intro, a break or a pause): the song
             // plays on with its lyrics dropped, and no timer.
@@ -4373,7 +3598,7 @@ impl App {
             // notch it rests inside it and opens below it.
             "pill-open" | "notch-pill-open" => {
                 self.on_menu(MenuCmd::SetTheme(Theme::Pill));
-                self.st.page = PageKind::Today;
+                self.st.page = PageKind::Focus;
                 self.expand();
             }
             // The pointer in the gap above the resting pill: it hovers (the
@@ -4382,38 +3607,11 @@ impl App {
                 self.on_pointer(Point::new(self.cx, pill::TOP_GAP / 2.0));
                 self.cancel_hover();
             }
-            "notch-oyen-open" => {
-                // The pointer from pill-hover leaves first, and the timer set
-                // aside for pill-music-cost comes back.
-                self.leave();
-                if let Some(p) = self.smoke_timer.take() {
-                    self.st.pomodoro = p;
-                }
-                window::fake_notch(Some(Notch::MACBOOK));
-                self.refresh_screen();
-                self.on_menu(MenuCmd::SetTheme(Theme::Oyen));
-                self.st.page = PageKind::Today;
-                self.expand();
-            }
             "notch-glass-open" => {
                 self.on_menu(MenuCmd::SetTheme(Theme::Glass));
-                self.st.page = PageKind::Today;
+                self.st.page = PageKind::Focus;
                 self.expand();
             }
-            // yravgSubMeetly Recorder's word through the island's message port,
-            // sent from another process as the recorder sends it
-            // (tools/mac-smoke.sh), around a notch: the recording rests in its
-            // ears; then its end.
-            "record-port" => {
-                self.leave();
-                window::fake_notch(Some(Notch::MACBOOK));
-                self.refresh_screen();
-                self.on_menu(MenuCmd::SetTheme(Theme::Classic));
-                self.st.hud = None;
-                self.st.notice = None;
-                self.collapse();
-            }
-            "record-check" | "record-stop" | "record-gone" => {}
             // The Settings window, from Advanced settings' command: dark, then light, then closed.
             "settings-window" => {
                 self.leave();
@@ -4428,44 +3626,6 @@ impl App {
                 settings_host::redraw();
             }
             "settings-window-closed" => self.pending.push(Deferred::CloseSettings),
-            // The IELTS coach's voice (services::voice): a short tone as a
-            // 16 kHz WAV, then, when CI passes one, a short mp3 like the
-            // server's, each to its end.
-            "ielts-voice" | "ielts-voice-mp3" => {
-                let file = if name == "ielts-voice" {
-                    let p = paths::data_dir().join("ielts").join("smoke-voice.wav");
-                    smoke_tone_wav(&p, 0.5).map(|()| Some(p)).map_err(|e| e.to_string())
-                } else {
-                    Ok(std::env::var_os("PONI_SMOKE_MP3").map(PathBuf::from))
-                };
-                let started = clock::mono();
-                self.smoke_voice = match file {
-                    Ok(Some(file)) => {
-                        let mut player = services::voice::VoicePlayer::default();
-                        let played = player.play(&file, &self.sink);
-                        Some(SmokeVoice { player, file, started, played, ended: None })
-                    }
-                    Ok(None) => None,
-                    Err(e) => Some(SmokeVoice { player: Default::default(), file: PathBuf::new(), started, played: Err(e), ended: None }),
-                };
-            }
-            // Its microphone (services::mic): whatever this Mac allows (a
-            // microphone or none; macOS's yes, no or a question nobody
-            // answers), start answers at once. The stop step comes after.
-            "ielts-mic" => {
-                self.smoke_voice = None;
-                let out = paths::data_dir().join("ielts").join("smoke-answer.wav");
-                self.smoke_mic = Some(services::mic::Mic::start(&out, &self.sink));
-            }
-            "ielts-mic-stop" => self.smoke_mic_stop = Some(self.smoke_mic_stopped()),
-            // Meeting notes' recording (services::notes with capture.rs): the
-            // microphone and the Mac's own sound through a Core Audio tap, for
-            // two seconds, whatever this Mac allows; the stop step follows.
-            "notes-capture" => {
-                let started = self.st.local;
-                self.smoke_notes = Some(services::notes::Recording::start(&paths::notes_audio_dir(), &started, &self.sink));
-            }
-            "notes-capture-stop" => self.smoke_notes_stop = Some(self.smoke_notes_stopped()),
             "menu" => {
                 // The pointer from notch-pill-ear leaves.
                 self.leave();
@@ -4484,8 +3644,6 @@ impl App {
     /// service arriving), on top of the island resting.
     fn smoke_ready(&self, name: &str, waited: f64) -> bool {
         match name {
-            // Signed out, Today shows its sign-in card (no stat tiles, no readings).
-            "open-today" => waited > 0.5,
             // Full readings list the apps (their CPU from the second one on);
             // the apps' icons follow from Finder.
             "system-on" => services::sysmon::cost()[0].0 > 0 || waited > 5.0,
@@ -4528,22 +3686,11 @@ impl App {
             "fullscreen-hide" => self.fullscreen_hidden || waited > 12.0,
             "fullscreen-stay" => (!self.fullscreen_hidden && window::is_shown() && waited > 1.0) || waited > 6.0,
             "fullscreen-back" => (!self.front_full_screen && !self.fullscreen_hidden && window::is_shown() && waited > 1.0) || waited > 8.0,
-            "oyenza-code" | "oyenza-page" => (self.expanded && self.st.page == PageKind::Oyenza && waited > 0.6) || waited > 4.0,
-            "oyenza-money" => self.st.notice.is_some() || waited > 4.0,
-            "ai-page" | "ai-back" => (self.expanded && self.st.page == PageKind::Ai && waited > 0.6) || waited > 4.0,
             "now-playing" => self.st.media.as_ref().is_some_and(|m| m.title == SMOKE_SERVICE_TRACK) || std::env::var_os("PONI_SMOKE_NOW_PLAYING").is_none() || waited > 15.0,
             "now-playing-browser" => self.st.media.as_ref().is_some_and(|m| m.title == SMOKE_BROWSER_TRACK) || std::env::var_os("PONI_SMOKE_BROWSER").is_none() || waited > 25.0,
             "menu" => waited > 1.0,
-            // The line plays to its end (half a second).
-            "ielts-voice" | "ielts-voice-mp3" => self.smoke_voice.as_ref().is_none_or(|v| v.ended.is_some() || v.played.is_err()) || waited > 5.0,
-            // A second and a half of whatever the microphone hears.
-            "ielts-mic" => waited > 1.5,
-            // Two seconds of a meeting.
-            "notes-capture" => waited > 2.0,
             "settings-window" | "settings-window-light" => (settings_host::is_open() && waited > 0.8) || waited > 5.0,
             "settings-window-closed" => !settings_host::is_open() || waited > 3.0,
-            "record-check" => self.mode == Mode::Activity(activities::Activity::Recording) || waited > 5.0,
-            "record-gone" => self.st.rec.phase.is_none() || waited > 5.0,
             // About two seconds of frames at rest.
             "music-cost" | "pill-music-cost" => waited > 2.5,
             _ => true,
@@ -4572,7 +3719,7 @@ impl App {
 
     fn pill_report(&self) -> (&'static str, bool, String) {
         let body = self.island.body_rect_at(self.cx);
-        let look = *self.look() == poni_core::look::PILL && !glass::shown();
+        let look = *self.look() == *poni_core::look::of(Theme::Pill) && !glass::shown();
         let at = |x: f32, y: f32| self.hovering_inside(Point::new(x, y));
         let (ok, place) = match self.screen.notch {
             None => {
@@ -4613,7 +3760,6 @@ impl App {
 
     /// What each new part of the app did on a real Mac.
     fn smoke_check(&self, name: &str) -> Option<(&'static str, bool, String)> {
-        let gib = |b: u64| b as f64 / (1u64 << 30) as f64;
         match name {
             "settings-window" => {
                 let open = settings_host::is_open() && self.settings_ui.is_some();
@@ -4626,43 +3772,6 @@ impl App {
             "settings-window-closed" => {
                 let gone = !settings_host::is_open() && self.settings_ui.is_none();
                 Some(("settings-window-closed", gone, format!("window {}, content {}", if settings_host::is_open() { "still open" } else { "gone" }, if self.settings_ui.is_some() { "kept" } else { "dropped" })))
-            }
-            "record-check" | "record-gone" => {
-                let showing = self.mode == Mode::Activity(activities::Activity::Recording);
-                let recording = self.st.rec.phase == Some(poni_core::recorder::Phase::Recording);
-                let g = self.island.current();
-                let d = format!(
-                    "{:?}, {:.0}x{:.0} DIP, recorder said {:?} at {}, Record tab {}, notch {:?}",
-                    self.mode,
-                    g.w,
-                    g.h,
-                    self.st.rec.phase,
-                    poni_core::recorder::fmt_length(self.st.rec_elapsed()),
-                    if self.st.record_on() { "on" } else { "off" },
-                    self.screen.notch
-                );
-                if name == "record-check" {
-                    Some(("recording-pill", showing && recording, d))
-                } else {
-                    Some(("recording-ended", !showing && self.st.rec.phase.is_none(), d))
-                }
-            }
-            // Signed out, Today shows the sign-in card, so its tiles' once-a-second
-            // readings stay off; the readings still work for when the tiles show
-            // (a server without the day): one taken here.
-            "open-today" => {
-                let s = services::sysstats::sample();
-                let ok = s.valid && s.mem_total > 0 && s.disk_total > 0 && s.uptime_s > 0 && !self.stats_on && !pages::today::shows_tiles(&self.st);
-                let d = format!(
-                    "one reading: memory {:.1} of {:.1} GiB, disk {:.0} GiB free of {:.0}, up {} min; Today's readings {} (sign-in card)",
-                    gib(s.mem_used),
-                    gib(s.mem_total),
-                    gib(s.disk_free),
-                    gib(s.disk_total),
-                    s.uptime_s / 60,
-                    if self.stats_on { "on" } else { "off" },
-                );
-                Some(("system-stats", ok, d))
             }
             "system-on" => {
                 let tab = pages::tabs(&self.st).contains(&PageKind::System);
@@ -4715,11 +3824,6 @@ impl App {
                 let notch = self.screen.notch.map_or("no notch".to_string(), |n| format!("a {:.0}x{:.0} notch with a black brow", n.w, n.h));
                 let what = glass::kind().unwrap_or("no glass view");
                 Some(("glass-theme", glass::shown() && self.look().material == Material::Glass, format!("{what} under the open island, {notch}")))
-            }
-            "notch-oyen-open" | "notch-oyen-collapsed" => {
-                let look = self.look();
-                let ok = self.screen.notch.is_some() && *look == poni_core::look::OYEN_NIGHT && !glass::shown();
-                Some(("oyen-around-notch", ok, format!("ground {:?}, ink {:?}, font {:?}", look.ground, look.ink, look.font)))
             }
             "pill-open" | "pill-collapsed" | "notch-pill-open" | "notch-pill-collapsed" => Some(self.pill_report()),
             "notch-pill-music" => {
@@ -4944,66 +4048,6 @@ impl App {
                 let ok = !self.front_full_screen && !self.fullscreen_hidden && window::is_shown();
                 Some(("fullscreen-back", ok, format!("full-screen app in front: {}; island on the screen: {}", self.front_full_screen, window::is_shown())))
             }
-            "oyenza-post" => {
-                let (ok, d) = self.smoke_post.clone().unwrap_or((false, "not run".into()));
-                Some(("oyenza-post", ok && self.oyenza.is_some(), format!("worker {}; {d}", if self.oyenza.is_some() { "running" } else { "not started" })))
-            }
-            "oyenza-code" => {
-                let code = matches!(&self.st.oyenza.link, OyenzaLink::Connecting { code, .. } if code == "KPJX-TMNQ");
-                let ok = code && self.st.pinned && self.st.page == PageKind::Oyenza && pages::tabs(&self.st).contains(&PageKind::Oyenza);
-                Some(("oyenza-code", ok, format!("code shown: {code}; island kept open: {}; page {:?}", self.st.pinned, self.st.page)))
-            }
-            "oyenza-page" => {
-                let o = &self.st.oyenza;
-                let rows = o.activity.as_ref().map_or(0, |a| a.days.iter().map(|d| d.rows.len()).sum::<usize>());
-                let ok = matches!(o.link, OyenzaLink::Connected { .. }) && rows > 0 && !o.bills.is_empty() && self.st.oyenza.pinned_before.is_none();
-                Some(("oyenza-page", ok, format!("{:?}; {rows} transactions, {} bills; island no longer held open: {}", o.link, o.bills.len(), o.pinned_before.is_none())))
-            }
-            "oyenza-money" => {
-                let n = self.st.notice.as_ref();
-                let ok = n.is_some_and(|n| n.title == "Money in \u{b7} BCA" && n.inline == Some(InlineAction::ShowAmount) && n.reveal.is_some());
-                Some(("oyenza-money", ok, format!("notice: {:?} / {:?}, sum held back for Show: {}", n.map(|n| &n.title), n.map(|n| &n.subtitle), n.is_some_and(|n| n.reveal.is_some()))))
-            }
-            "ai-page" => {
-                let tab = pages::tabs(&self.st).contains(&PageKind::Ai);
-                let asked = services::keychain::asked();
-                let ok = tab && self.expanded && self.st.page == PageKind::Ai && self.usage.is_none() && asked == 0;
-                let worker = if self.usage.is_none() { "not started" } else { "running" };
-                Some(("ai-page", ok, format!("AI tab: {tab}; page {:?}; worker {worker}; keychain asked {asked} times", self.st.page)))
-            }
-            "ai-keychain" => {
-                let (ok, d) = smoke_keychain();
-                Some(("keychain", ok, d))
-            }
-            // Locked, the notices rest, but what the keychain read stays for
-            // when someone is back; macOS is asked nothing meanwhile.
-            "ai-locked" => {
-                let (ask, keep) = services::keychain::watching();
-                let before = services::keychain::asked();
-                let read = services::keychain::read(SMOKE_KEYCHAIN.0, Some("plain"));
-                let asked = services::keychain::asked() - before;
-                let kept = std::env::var_os("PONI_SMOKE_KEYCHAIN").is_none() || read == studio_usage::Got::Text(SMOKE_KEYCHAIN.1.into());
-                let ok = self.away.1 && !ask && keep && kept && asked == 0;
-                Some(("keychain-locked", ok, format!("locked, notices on: may ask macOS {ask}, keeps what it read {keep}; a read now: {read:?}, macOS asked {asked} times")))
-            }
-            "ai-back" => {
-                let (ask, keep) = services::keychain::watching();
-                services::keychain::ask_again();
-                // Locking and unlocking went through set_usage_watch: still no worker.
-                let ok = !self.away.1 && self.mode == Mode::Expanded(PageKind::Ai) && ask && keep && self.usage.is_none();
-                let worker = if self.usage.is_none() { "not started" } else { "running" };
-                Some(("keychain-back", ok, format!("unlocked, on the AI tab: may ask macOS {ask}, keeps what it read {keep}; worker {worker}")))
-            }
-            "ai-secret" => {
-                let (ok, d) = smoke_secret();
-                Some(("secret-backups", ok, d))
-            }
-            "oyenza-off" => {
-                // Signed out, the tab stays: it is where to sign in again.
-                let tab = pages::tabs(&self.st).contains(&PageKind::Oyenza);
-                let ok = self.st.oyenza.link == OyenzaLink::Off && tab;
-                Some(("oyenza-off", ok, format!("{:?}; Oyenza tab: {tab}", self.st.oyenza.link)))
-            }
             "ja-off" => {
                 let status = self.st.addon(JAPANESE_READINGS.id);
                 let gone = !ja_folder().exists();
@@ -5011,275 +4055,8 @@ impl App {
                 let d = format!("{status:?}; files {}; downloader {}", if gone { "deleted" } else { "still there" }, if self.addons.is_none() { "stopped" } else { "still running" });
                 Some(("ja-readings-off", ok, d))
             }
-            "ielts-voice" | "ielts-voice-mp3" => {
-                let check = if name == "ielts-voice" { "ielts-voice-wav" } else { "ielts-voice-mp3" };
-                let Some(v) = &self.smoke_voice else { return Some((check, true, "skipped: no mp3 on this run".into())) };
-                let ended = v.ended.map_or("never".to_string(), |t| format!("after {:.2} s", t - v.started));
-                let ok = v.played.is_ok() && v.ended.is_some() && !v.player.playing();
-                Some((check, ok, format!("{}: play {:?}, VoiceEnded {ended}", v.file.display(), v.played)))
-            }
-            "ielts-mic" => {
-                use services::mic::MicError;
-                let (ok, gave) = match &self.smoke_mic {
-                    Some(Ok(mic)) => (true, format!("Ok ({mic:?}, level {:.3})", mic.level())),
-                    Some(Err(MicError::NoDevice)) => (true, "NoDevice (no microphone on this Mac)".to_string()),
-                    Some(Err(MicError::Denied)) => (true, "Denied (macOS says no)".to_string()),
-                    Some(Err(MicError::Failed(e))) => (false, format!("Failed: {e}")),
-                    None => (false, "nothing".to_string()),
-                };
-                Some(("ielts-mic-start", ok, format!("Mic::start gave {gave}")))
-            }
-            "ielts-mic-stop" => {
-                let (ok, d) = self.smoke_mic_stop.clone().unwrap_or((false, "not run".into()));
-                Some(("ielts-mic-stop", ok, d))
-            }
-            "notes-capture-stop" => {
-                let (ok, d) = self.smoke_notes_stop.clone().unwrap_or((false, "not run".into()));
-                Some(("notes-capture", ok, d))
-            }
             _ => None,
         }
-    }
-
-    /// The microphone's stop step: what `Mic::stop` gave, and whether that's
-    /// right for what `start` gave.
-    fn smoke_mic_stopped(&mut self) -> (bool, String) {
-        match self.smoke_mic.take() {
-            Some(Ok(mic)) => {
-                let was = format!("{mic:?}");
-                match mic.stop() {
-                    Ok((path, secs)) => match smoke_wav_format(&path) {
-                        Some((rate, channels, bits, at, bytes)) => {
-                            let ok = rate == 16_000 && channels == 1 && bits == 16 && secs > 1.0 && bytes >= 32_000;
-                            (ok, format!("{secs:.2} s in {}: {rate} Hz, {channels} channel(s), {bits}-bit, {bytes} bytes of samples from byte {at}", path.display()))
-                        }
-                        None => (false, format!("{secs:.2} s, but {} isn't a WAV file", path.display())),
-                    },
-                    // macOS's question still up (nobody answers it on CI), or
-                    // the person said no meanwhile: nothing was recorded.
-                    Err(e) if was == "asking macOS" || was == "turned down" => (true, format!("{e:?} (it was {was})")),
-                    Err(e) => (false, format!("{e:?} (it was {was})")),
-                }
-            }
-            Some(Err(e)) => (true, format!("nothing to stop: start gave {e:?}")),
-            None => (false, "Mic::start didn't run".into()),
-        }
-    }
-
-    /// Meeting notes' stop step: a recording that started stops into WAV
-    /// parts of 16 kHz mono; one that couldn't start says why. Either is
-    /// fine on a runner (no microphone, nobody to answer macOS's questions);
-    /// what fails is a crash, a hang, or parts in the wrong format.
-    fn smoke_notes_stopped(&mut self) -> (bool, String) {
-        match self.smoke_notes.take() {
-            Some(Ok((rec, mic, pc))) => {
-                let (lm, lp) = rec.levels();
-                match rec.stop() {
-                    Ok(take) => {
-                        let formats: Vec<_> = take.parts.iter().map(|p| smoke_wav_format(p).map(|(r, c, b, _, n)| (r, c, b, n))).collect();
-                        let ok = formats.iter().all(|f| matches!(f, Some((16_000, 1, 16, _))));
-                        let _ = std::fs::remove_dir_all(&take.dir);
-                        (ok, format!("microphone {mic}, the Mac's sound {pc}; levels {lm:.3}/{lp:.3}; {:.2} s in {} part(s) {formats:?}", take.secs, take.parts.len()))
-                    }
-                    Err(issue) => (true, format!("microphone {mic}, the Mac's sound {pc}; stop gave {issue:?}")),
-                }
-            }
-            // No microphone, or macOS saying no, is the runner's business; a
-            // recording that fails to start (a source hanging) is ours.
-            Some(Err(issue)) => (issue != poni_core::notes::CaptureIssue::Failed, format!("no recording: {issue:?}")),
-            None => (false, "Recording::start didn't run".into()),
-        }
-    }
-}
-
-/// The IELTS coach's voice step: the player, its file, when the line
-/// started, what `play` said and when `AppEvent::VoiceEnded` came.
-struct SmokeVoice {
-    player: services::voice::VoicePlayer,
-    file: PathBuf,
-    started: f64,
-    played: Result<(), String>,
-    ended: Option<f64>,
-}
-
-/// The voice step's line: a quiet 440 Hz tone, `secs` long, as a 16 kHz mono
-/// 16-bit WAV (the microphone's format too).
-fn smoke_tone_wav(path: &std::path::Path, secs: f32) -> std::io::Result<()> {
-    let n = (16_000.0 * secs) as u32;
-    let mut b = Vec::with_capacity(44 + 2 * n as usize);
-    b.extend_from_slice(b"RIFF");
-    b.extend_from_slice(&(36 + 2 * n).to_le_bytes());
-    b.extend_from_slice(b"WAVEfmt ");
-    b.extend_from_slice(&16u32.to_le_bytes());
-    b.extend_from_slice(&1u16.to_le_bytes()); // PCM
-    b.extend_from_slice(&1u16.to_le_bytes()); // mono
-    b.extend_from_slice(&16_000u32.to_le_bytes());
-    b.extend_from_slice(&32_000u32.to_le_bytes()); // bytes a second
-    b.extend_from_slice(&2u16.to_le_bytes()); // bytes a frame
-    b.extend_from_slice(&16u16.to_le_bytes()); // bits
-    b.extend_from_slice(b"data");
-    b.extend_from_slice(&(2 * n).to_le_bytes());
-    for i in 0..n {
-        let s = (i as f32 / 16_000.0 * 440.0 * std::f32::consts::TAU).sin() * 0.1 * i16::MAX as f32;
-        b.extend_from_slice(&(s as i16).to_le_bytes());
-    }
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    std::fs::write(path, b)
-}
-
-/// A WAV file's rate, channels, bits, and where its samples start and how
-/// many bytes they take (chunks such as Apple's FLLR padding skipped).
-fn smoke_wav_format(path: &std::path::Path) -> Option<(u32, u16, u16, usize, usize)> {
-    let b = std::fs::read(path).ok()?;
-    if b.get(0..4)? != b"RIFF" || b.get(8..12)? != b"WAVE" {
-        return None;
-    }
-    let u16_at = |i: usize| Some(u16::from_le_bytes(b.get(i..i + 2)?.try_into().ok()?));
-    let u32_at = |i: usize| Some(u32::from_le_bytes(b.get(i..i + 4)?.try_into().ok()?));
-    let (mut at, mut fmt) = (12, None);
-    while at + 8 <= b.len() {
-        let (id, len) = (&b[at..at + 4], u32_at(at + 4)? as usize);
-        if id == b"fmt " {
-            fmt = Some((u32_at(at + 12)?, u16_at(at + 10)?, u16_at(at + 22)?));
-        } else if id == b"data" {
-            let (rate, channels, bits) = fmt?;
-            return Some((rate, channels, bits, at + 8, len.min(b.len() - at - 8)));
-        }
-        at += 8 + len + (len & 1);
-    }
-    None
-}
-
-/// The keychain items tools/mac-smoke.sh adds for the AI tab's reader: their
-/// service, and the passwords of the accounts "plain" and "accent" (an accent
-/// and a line break, which `security` prints as hex). "absent" is never added.
-const SMOKE_KEYCHAIN: (&str, &str, &str) = ("yravgSubMeetly smoke", "{\"claudeAiOauth\":{\"accessToken\":\"test-token\"}}", "caf\u{e9}\nnext");
-
-/// The smoke test of the AI tab's keychain reader (`services::keychain`) on
-/// the items above, with the tab closed, open, then closed with the notices
-/// on and with nothing watching: whether each read gave what it should and
-/// how often macOS was asked. The worker never runs in the smoke run, so the
-/// reader's gate is this test's alone.
-fn smoke_keychain() -> (bool, String) {
-    use studio_usage::Got;
-    use services::keychain as k;
-    if std::env::var_os("PONI_SMOKE_KEYCHAIN").is_none() {
-        return (true, "skipped: no test items in the keychain".into());
-    }
-    let (svc, plain, accent) = SMOKE_KEYCHAIN;
-    let text = |s: &str| Got::Text(s.to_string());
-    k::set_watch(false, false);
-    k::ask_again();
-    let before = k::asked();
-    let asked = || k::asked() - before;
-    // Closed and never read: nothing, and macOS isn't asked.
-    let closed = k::read(svc, Some("plain"));
-    let closed_ok = closed == Got::Missing && asked() == 0;
-    k::set_watch(true, false);
-    let t = std::time::Instant::now();
-    let open = [k::read(svc, Some("plain")), k::read(svc, Some("accent")), k::read(svc, Some("absent"))];
-    let ms = t.elapsed().as_millis();
-    let open_ok = open == [text(plain), text(accent), Got::Missing] && asked() == 3;
-    // Once an opening: the next read is the one kept.
-    let again = k::read(svc, Some("plain"));
-    let again_ok = again == text(plain) && asked() == 3;
-    // Closed with the notices on: what was read while it was open.
-    k::set_watch(false, true);
-    let notices = k::read(svc, Some("plain"));
-    let notices_ok = notices == text(plain) && asked() == 3;
-    // Nobody watching: forgotten.
-    k::set_watch(false, false);
-    let gone = k::read(svc, Some("plain"));
-    let gone_ok = gone == Got::Missing && asked() == 3;
-    k::ask_again();
-    let ok = closed_ok && open_ok && again_ok && notices_ok && gone_ok;
-    // Got's Debug shows a text's length, never the text.
-    let d = format!("tab closed: {closed:?}; open: {open:?} in {ms} ms; again: {again:?}; notices only: {notices:?}; nobody watching: {gone:?}; macOS asked {} times", asked());
-    (ok, d)
-}
-
-/// The smoke test of a key saved the way the AI tab saves one (into this
-/// run's own home): it reads back, and Time Machine leaves it out (tmutil's
-/// own answer, and the attribute that says so).
-fn smoke_secret() -> (bool, String) {
-    let path = paths::usage_key_path("smoke-test");
-    if let Err(e) = services::secret::save(&path, "test-key") {
-        return (false, format!("not saved: {e}"));
-    }
-    let out = |cmd: &str, args: &[&std::ffi::OsStr]| {
-        std::process::Command::new(cmd).args(args).output().map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default()
-    };
-    let tm = out("/usr/bin/tmutil", &["isexcluded".as_ref(), path.as_os_str()]);
-    let attr = out("/usr/bin/xattr", &[path.as_os_str()]).contains("com.apple.metadata:com_apple_backup_excludeItem");
-    let back = services::secret::load(&path);
-    let _ = services::secret::delete(&path);
-    let verdict = if tm.contains("[Excluded]") {
-        "excluded"
-    } else if tm.contains("[Included]") {
-        "included"
-    } else {
-        "no answer"
-    };
-    let ok = attr && verdict != "included" && back.as_deref() == Some("test-key");
-    (ok, format!("tmutil: {verdict}; exclusion attribute: {}; read back: {}", if attr { "set" } else { "missing" }, back.is_some()))
-}
-
-/// The smoke test: one POST with a JSON body and a key through the Mac's
-/// HTTP client (what signing in to Oyenza and saving a spend send), to a
-/// listener of its own on this Mac. Whether it arrived whole and its answer
-/// came back, and what happened.
-fn smoke_post() -> (bool, String) {
-    use std::io::{Read, Write};
-    use std::time::{Duration, Instant};
-    let listener = match std::net::TcpListener::bind("127.0.0.1:0") {
-        Ok(l) => l,
-        Err(e) => return (false, format!("no listener ({e})")),
-    };
-    let port = listener.local_addr().map(|a| a.port()).unwrap_or(0);
-    let _ = listener.set_nonblocking(true);
-    let server = std::thread::spawn(move || -> String {
-        let deadline = Instant::now() + Duration::from_secs(6);
-        let mut conn = None;
-        while conn.is_none() && Instant::now() < deadline {
-            match listener.accept() {
-                Ok((c, _)) => conn = Some(c),
-                Err(_) => std::thread::sleep(Duration::from_millis(20)),
-            }
-        }
-        let Some(mut c) = conn else { return String::new() };
-        let _ = c.set_nonblocking(false);
-        let _ = c.set_read_timeout(Some(Duration::from_secs(5)));
-        let mut buf = Vec::new();
-        let mut chunk = [0u8; 4096];
-        // The headers, then as much body as Content-Length says.
-        loop {
-            match c.read(&mut chunk) {
-                Ok(0) | Err(_) => break,
-                Ok(n) => buf.extend_from_slice(&chunk[..n]),
-            }
-            let text = String::from_utf8_lossy(&buf).into_owned();
-            if let Some(end) = text.find("\r\n\r\n") {
-                let len = text.lines().find_map(|l| l.to_ascii_lowercase().strip_prefix("content-length:").map(|v| v.trim().parse::<usize>().unwrap_or(0))).unwrap_or(0);
-                if buf.len() >= end + 4 + len {
-                    break;
-                }
-            }
-        }
-        let body = "{\"ok\":true}";
-        let _ = c.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes());
-        String::from_utf8_lossy(&buf).into_owned()
-    });
-    let json = "{\"app\":\"poni\",\"name\":\"Smoke Mac\"}";
-    let answer = services::http::Client::new("OyenzaStudio smoke").and_then(|c| {
-        c.send(services::http::Method::Post, &format!("http://127.0.0.1:{port}/connect/start"), &[("Authorization", "Bearer oyzd_smoke")], Some(json), Duration::from_secs(5))
-    });
-    let seen = server.join().unwrap_or_default();
-    let arrived = seen.starts_with("POST /connect/start ") && seen.contains("Bearer oyzd_smoke") && seen.to_ascii_lowercase().contains("content-type: application/json") && seen.ends_with(json);
-    match answer {
-        Ok(r) => (arrived && r.status == 200 && r.body.contains("\"ok\":true"), format!("request arrived whole: {arrived}; answer {} {}", r.status, r.body)),
-        Err(e) => (false, format!("request arrived whole: {arrived}; no answer ({e})")),
     }
 }
 
@@ -5408,13 +4185,9 @@ fn system_report(st: &AppState) -> (bool, String) {
     (ok, detail)
 }
 
-/// Oyen's orange in his theme, the Mac's accent colour otherwise.
-pub(crate) fn theme_accent(theme: Theme) -> Color {
-    if oyen::on(theme) {
-        oyen::ORANGE
-    } else {
-        services::system_accent().unwrap_or(palette::BLUE)
-    }
+/// The Mac's accent colour (the same in every theme).
+pub(crate) fn theme_accent(_theme: Theme) -> Color {
+    services::system_accent().unwrap_or(palette::BLUE)
 }
 
 /// Three things to drop on the Shelf in the smoke test: a picture, a text
@@ -5491,11 +4264,10 @@ pub fn draw_content(
 
 // ---------------------------------------------------------------- smoke test bookkeeping
 
-const SMOKE_STEPS: [&str; 83] = [
+const SMOKE_STEPS: [&str; 60] = [
     "idle",
     "hover",
     "open-focus",
-    "open-today",
     "system-on",
     "open-system",
     "system-gpu",
@@ -5521,8 +4293,6 @@ const SMOKE_STEPS: [&str; 83] = [
     "pill-drag",
     "pill-drag-open",
     "pill-drag-centre",
-    "notch-oyen-open",
-    "notch-oyen-collapsed",
     "notch-glass-open",
     "notch-pill-open",
     "notch-pill-music",
@@ -5547,33 +4317,13 @@ const SMOKE_STEPS: [&str; 83] = [
     "fullscreen-hide",
     "fullscreen-stay",
     "fullscreen-back",
-    "oyenza-post",
-    "oyenza-code",
-    "oyenza-page",
-    "oyenza-money",
-    "oyenza-off",
-    "ai-page",
-    "ai-keychain",
-    "ai-locked",
-    "ai-back",
-    "ai-secret",
     "now-playing-start",
     "now-playing",
     "now-playing-browser-start",
     "now-playing-browser",
-    "record-port",
-    "record-check",
-    "record-stop",
-    "record-gone",
     "settings-window",
     "settings-window-light",
     "settings-window-closed",
-    "ielts-voice",
-    "ielts-voice-mp3",
-    "ielts-mic",
-    "ielts-mic-stop",
-    "notes-capture",
-    "notes-capture-stop",
     "menu",
 ];
 /// The track CI announces as Spotify's own notification would.
@@ -5650,10 +4400,3 @@ impl Smoke {
 #[path = "app_downloads.rs"]
 mod downloads;
 
-// The IELTS coach's page, worker, microphone and voice.
-#[path = "app_ielts.rs"]
-mod ielts;
-
-// Meeting notes: the recording and the handing over.
-#[path = "app_notes.rs"]
-mod notes;
