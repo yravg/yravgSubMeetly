@@ -5,8 +5,8 @@
 ;
 ; Build with tools\build-installer.ps1 (builds poni.exe and submeetly-engine.exe, then
 ; runs ISCC with the right paths and version), or by hand:
-;   iscc /DAppVersion=1.3.8 /DExeSource=...\poni.exe /DEngineSource=...\submeetly-engine.exe installer\yravgsubmeetly.iss
-;   -> dist\yravgSubMeetly-Setup-1.3.8.exe   (the name tools/make_update_feed.py looks for)
+;   iscc /DAppVersion=1.3.9 /DExeSource=...\poni.exe /DEngineSource=...\submeetly-engine.exe installer\yravgsubmeetly.iss
+;   -> dist\yravgSubMeetly-Setup-1.3.9.exe   (the name tools/make_update_feed.py looks for)
 ;
 ; Per-user install: no admin rights, no UAC prompt. The app goes to
 ; %LOCALAPPDATA%\Programs\yravgSubMeetly. The person's own data stays when uninstalling:
@@ -19,7 +19,7 @@
 ; version when done (/reopen).
 
 #ifndef AppVersion
-  #define AppVersion "1.3.8"
+  #define AppVersion "1.3.9"
 #endif
 #ifndef ExeSource
   #define ExeSource "..\target\release\poni.exe"

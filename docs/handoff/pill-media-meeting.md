@@ -32,6 +32,12 @@ Claude Design canvas: https://claude.ai/artifact/TT3DHVZ8QvKkvidzuCPhTo (private
 
 - Canvas: Before and After where a real Before exists (owner screenshots of the Music page and Advanced settings; the island window is left out of screen capture, so other Before frames are drawn from today's code and labelled so). No reference strips (no public Teams Facilitator frames). Claude Design only. Taken from the owner's earlier canvas answers (Before+After, Design only) and the "no check-ins" rule.
 
+- Owner 2026-11-11 (answers to the four REPORT.md questions; newer than the canvas, they win), built in island 1.3.9:
+  1. **Fast latency = Windows Live Captions** (board P09, Windows 11). Its text is read with UI Automation and shown in OUR pill; translation is still our engine. Windows' own caption bar is moved off screen while Fast runs and put back when Fast stops or the island quits. Missing Live Captions (Windows 10, feature absent, closed, not opened) falls back to our own captions with the Fast timing, and the Captions tab says why. The place the bar came from is saved in `settings.livecap_origin` BEFORE the move; every island start, and Captions tab > Speed > "Restore Windows captions", put it back if it is off screen.
+  2. **The pill can be as tall as it needs**: the Captions tab has the five groups of P09 (Sources, Speed, Translation, Display, Apps), its height follows the open group. Every setting of the single page stays.
+  3. **Font size is absolute px as drawn** (13-24 on the board; built 12-24, default 15 = Live's size today; the other caption styles scale by the same ratio). An old stored step (`caption_font`) is read into px once.
+  4. **Interim line lighter with a caret, and the latency readout "[ 820 ms ]"** (Display > Latency readout, off by default), both as P12.
+
 ## Known gaps in the canvas
 
 - P03-P06 Before panes are drawn from code (the island window is excluded from screen capture); P01, P02, P07 use owner screenshots.
