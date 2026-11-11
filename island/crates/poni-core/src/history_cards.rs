@@ -58,7 +58,7 @@ mod tests {
     use super::*;
 
     fn line(s: &str, t: &str) -> Line {
-        Line { t0: 0.0, t1: 1.0, source: s.into(), translation: t.into() }
+        Line { t0: 0.0, t1: 1.0, source: s.into(), translation: t.into(), speaker: String::new() }
     }
 
     #[test]
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn copy_text_is_the_line_then_its_translation() {
-        let cap = |c: &str, t: &str| Captions { previous: "x".into(), current: c.into(), translation: t.into() };
+        let cap = |c: &str, t: &str| Captions { previous: "x".into(), current: c.into(), translation: t.into(), speaker: String::new() };
         assert_eq!(caption_text(&cap("Halo", "Hello")), "Halo\nHello");
         assert_eq!(caption_text(&cap("Halo", "  ")), "Halo");
         assert_eq!(caption_text(&cap("", "Hello")), "");
