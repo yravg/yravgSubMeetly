@@ -630,6 +630,8 @@ pub struct AppState {
     pub caption_hint: Option<poni_core::capture::TranslateHint>,
     /// The engine's models and the download under way (Settings, the Live page).
     pub models: poni_core::models::Models,
+    /// The engine's AI connector and templates (Settings › Models).
+    pub ai: crate::ai::AiView,
     /// Side effects requested during the frame.
     pub cmds: Vec<Command>,
 }
@@ -725,6 +727,7 @@ impl AppState {
             meeting_pick: None,
             caption_hint: None,
             models: Default::default(),
+            ai: Default::default(),
             cmds: Vec::new(),
         };
         // On ones start by checking their files (the worker reports back);

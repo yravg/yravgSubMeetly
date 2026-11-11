@@ -1491,7 +1491,7 @@ impl App {
         self.st.now = now;
         let media_before = matches!(ev, AppEvent::Media(_) | AppEvent::MediaTimeline { .. }).then(|| self.media_snapshot());
         // What the Settings window shows that a service reports.
-        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
+        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Ai(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
         if let Some(s) = self.settings_ui.as_mut().filter(|_| shown) {
             s.view.dirty = true;
         }
@@ -1645,6 +1645,15 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::Ai(e) => {
+                if let Some(view) = e.view {
+                    self.st.ai = view;
+                }
+                if let Some((ok, title, sub)) = e.notice {
+                    let (icon, color) = if ok { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
+                    self.st.notify(icon, color, title, sub, 6.0, None);
+                }
+            }
             AppEvent::Models(r) => {
                 self.st.models.apply(r, now);
             }
@@ -1739,6 +1748,8 @@ impl App {
 
     /// Ask the engine which models it has (Settings shows them, every 10 s while open).
     fn refresh_models(&mut self) {
+        // The connector rows share the Models poll.
+        crate::ai::run(self.sink.clone(), poni_core::helper::configured_port(), crate::ai::AiCmd::Refresh);
         if self.st.models.busy {
             return;
         }
@@ -2841,6 +2852,7 @@ impl App {
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
                 Command::ModelsRefresh => self.refresh_models(),
+                Command::Ai(c) => crate::ai::handle(self.sink.clone(), poni_core::helper::configured_port(), c, services::clipboard::read_text),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelPullId(id) => self.pull_model_id(id),
