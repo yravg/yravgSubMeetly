@@ -11,6 +11,7 @@ pub mod addons;
 pub mod applemusic;
 pub mod calendar;
 pub mod capture;
+pub mod livecap;
 pub mod utterance;
 pub mod datetime;
 pub mod downloads;
