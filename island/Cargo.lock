@@ -1168,6 +1168,7 @@ name = "poni-core"
 version = "1.3.12"
 dependencies = [
  "hmac",
+ "p256",
  "qrcodegen",
  "ruzstd",
  "serde",

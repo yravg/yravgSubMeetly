@@ -7,10 +7,7 @@
 
 use crate::gfx::Image;
 use crate::state::{MediaSession, PowerState, SysStats};
-use poni_core::health::HealthSnapshot;
 use poni_core::lrc::Lyrics;
-use poni_core::agenda;
-use poni_core::oyenza::{Activity, Arrival, Bill, Saved};
 use poni_core::romanize::Ruby;
 use poni_core::timeline::Timeline;
 use std::sync::mpsc::Sender;
@@ -56,47 +53,6 @@ pub enum LyricsResult {
     Error(String),
 }
 
-/// What the Oyenza worker reports (`services::oyenza`, shared with Windows).
-#[derive(Clone, Debug)]
-pub enum OyenzaEvent {
-    /// The sign-in saved on this Mac was found at start (no notice).
-    Restored { account: String },
-    /// A sign-in code to show, the oyenza.app address that takes it, and how long it lasts.
-    Connecting { code: String, url: String, expires_in_s: u64 },
-    Connected { account: String },
-    /// Signing in stopped without a key: `expired`, `denied`, `offline` or `other`.
-    ConnectFailed(String),
-    ConnectCancelled,
-    /// Money that just arrived or went out by itself (oldest first).
-    Money { arrived: Vec<Arrival> },
-    /// The last 7 days of transactions, for the Oyenza page (while it's open).
-    Activity(Activity),
-    /// Asked again while the page is open: nothing changed.
-    ActivityChecked,
-    /// Bills due in the next 30 days, and the server's today (YYYY-MM-DD).
-    Bills { today: String, bills: Vec<Bill> },
-    /// The steps the phone sent, for the Health page; None: none to show (off in
-    /// Oyenza on the phone, or a server from before steps).
-    Health(Option<HealthSnapshot>),
-    /// The day for the Today page, from the apps switched on in oyenza.app (asked
-    /// while the page is on screen).
-    Day(agenda::Answer),
-    /// The server has no day for the Today page (a server from before it, or
-    /// switched off there): the page stays as it was before signing in mattered.
-    DayUnavailable,
-    /// Whether the account has Studio Pro (a server from before Pro: no).
-    Pro(bool),
-    /// The day couldn't be read just now (offline, a server error).
-    DayFailed,
-    NoteSaved(Vec<Saved>),
-    /// The note wasn't saved; the island puts `text` back and says why (`code`).
-    NoteFailed { text: String, code: String },
-    Undone,
-    UndoFailed(String),
-    /// Signed out: from the menu or Settings, or by the server (disconnected in oyenza.app).
-    Disconnected { by_server: bool },
-}
-
 #[allow(dead_code)]
 pub enum AppEvent {
     /// The current media session changed (None = nothing playing / no session).
@@ -107,7 +63,6 @@ pub enum AppEvent {
     MediaArt { track_key: String, art: Option<Image> },
     Lyrics { track_key: String, result: LyricsResult },
     AppleMusic(AppleMusicStatus),
-    Oyenza(OyenzaEvent),
     /// Master volume changed (0..=1). `switched`: the output device changed
     /// (headphones connected, say), not its volume.
     Volume { level: f32, muted: bool, switched: bool },
@@ -144,24 +99,8 @@ pub enum AppEvent {
     Located(crate::services::location::Located),
     /// One of Prayer times' online city files (`services::cities`).
     Cities { file: String, got: Result<poni_core::prayer::World, String> },
-    /// The Stocks page's prices, names and years (`services::stocks`).
-    Stocks(crate::services::stocks::StocksEvent),
-    /// The AI tab's readings, typed keys, inference.oyenza.com's link and
-    /// heads-up notices (`services::usage`).
-    Usage(crate::services::usage::UsageEvent),
     /// Prayer times' adzan played to its end (`services::adzan`).
     AdzanEnded,
     /// Free-form log line from a service thread.
     Log(String),
-    /// The IELTS worker's answer (`services::ielts`).
-    Ielts(Box<poni_core::ielts::Reply>),
-    /// The meeting being handed over, as it goes (`services::notes`).
-    Notes(Box<poni_core::notes::Reply>),
-    /// The meeting's recording stopped by itself (the longest meeting taken,
-    /// or the disk): why (`services::notes`).
-    NotesStopped(poni_core::notes::CaptureIssue),
-    /// The IELTS coach's voice played a line to its end, or couldn't play on (`services::voice`).
-    VoiceEnded,
-    /// The IELTS coach's microphone stopped by itself, or the person said no to macOS's question (`services::mic`).
-    MicFailed(String),
 }

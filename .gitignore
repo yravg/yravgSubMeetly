@@ -51,3 +51,7 @@ engine-rs/target/
 qa/.pw-output/
 qa/evidence/*
 !qa/evidence/.gitkeep
+
+# Rust build output of the island
+island/target/
+island/build/
