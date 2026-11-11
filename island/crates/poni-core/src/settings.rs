@@ -149,6 +149,9 @@ pub struct Settings {
     /// Captions start by themselves while a video plays or a calendar meeting runs, and stop after
     /// it ends ([`crate::capture::Auto`]).
     pub auto_captions: bool,
+    /// Tell me when a meeting starts (the Mac: a meeting app on the microphone, or a calendar
+    /// meeting, held a few seconds; [`crate::meeting_detect`]). It only tells: nothing is recorded.
+    pub detect_meetings: bool,
     /// Captions carry a translation into `target_lang` (on by default, English); off: the spoken line only.
     pub translate_captions: bool,
     /// What Live captions listen to (`capture::Source::key`): `room` (default), `pc` or `both`.
@@ -284,6 +287,7 @@ impl Default for Settings {
             captions_source: "pc".into(),
             model_source: "huggingface".into(),
             auto_captions: true,
+            detect_meetings: true,
             translate_captions: true,
             live_source: "room".into(),
             mic_device: String::new(),
