@@ -4,6 +4,7 @@ pub mod app;
 pub mod audio;
 pub mod calendar;
 pub mod engine;
+pub mod export_docs;
 pub mod heuristic;
 pub mod ics;
 pub mod locations;

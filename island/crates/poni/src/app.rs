@@ -2191,6 +2191,34 @@ impl App {
 
     /// "Save as meeting" on a kept transcript (PMM-015): the same document, its marker cleared,
     /// posted back; it then lists in the register like any meeting.
+    /// Export a meeting as Word / PDF / Markdown: the engine writes it, the file lands in
+    /// Documents › yravgSubMeetly › Exports and is shown in the file manager.
+    fn export_note(&mut self, id: String, format: &'static str) {
+        self.st.notify(Icon::Download, palette::ORANGE, "Exporting", format!("{} ...", format.to_uppercase()), 4.0, None);
+        let sink = self.sink.clone();
+        let port = poni_core::helper::configured_port();
+        std::thread::Builder::new()
+            .name("poni-note-export".into())
+            .spawn(move || {
+                let r = poni_core::note_export::save(port, &id, format);
+                if let Ok(p) = &r {
+                    poni_core::note_export::reveal(p);
+                }
+                sink.send(AppEvent::NoteExported(r));
+            })
+            .ok();
+    }
+
+    fn on_note_exported(&mut self, r: std::result::Result<std::path::PathBuf, String>) {
+        match r {
+            Ok(p) => {
+                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                self.st.notify(Icon::Check, palette::GREEN, "Exported", name, 6.0, None);
+            }
+            Err(e) => self.st.notify(Icon::Download, palette::ORANGE, "Not exported", e, 8.0, None),
+        }
+    }
+
     fn save_as_meeting(&mut self, id: &str) {
         let doc = self.st.helper.snap.notes.iter().find(|n| n.id == id).and_then(|n| poni_core::meeting_doc::promote(&n.raw));
         let Some(doc) = doc else {
@@ -2987,6 +3015,7 @@ impl App {
                 }
             }
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
+            AppEvent::NoteExported(r) => self.on_note_exported(r),
             AppEvent::Calendar(r) => {
                 // A fresh calendar ends the "Reading your calendar" note; an error notice stays.
                 if self.st.helper_notice.as_ref().is_some_and(|n| n.0.starts_with("Reading your calendar")) {
@@ -4910,6 +4939,7 @@ impl App {
                     }
                 }
                 Command::SaveAsMeeting(id) => self.save_as_meeting(&id),
+                Command::ExportNote(id, format) => self.export_note(id, format),
                 Command::HelperPoll => {
                     if let Some(s) = self.services.as_ref() {
                         s.engine_start(); // Try again also starts the engine

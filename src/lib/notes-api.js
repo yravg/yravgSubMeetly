@@ -57,3 +57,24 @@ export async function cancelJob(url, jobId) {
   if (!r.ok) throw new Error(`cancel ${r.status}`);
   return r.json();
 }
+
+/**
+ * A note exported by the engine: `docx`, `pdf` (binary, base64 in the JSON) or `markdown` (the full
+ * register). Returns { filename, blob } ready to download.
+ */
+export async function notesExport(url, note, format) {
+  const r = await fetch(`${base(url)}/notes/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note, format }),
+  });
+  if (!r.ok) throw new Error(`notes/export ${r.status}`);
+  const j = await r.json();
+  if (j.encoding === 'base64') {
+    const bin = atob(j.content);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { filename: j.filename, blob: new Blob([bytes], { type: j.mime || 'application/octet-stream' }) };
+  }
+  return { filename: j.filename, blob: new Blob([j.content], { type: 'text/markdown;charset=utf-8' }) };
+}

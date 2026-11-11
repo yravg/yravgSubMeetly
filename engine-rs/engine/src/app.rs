@@ -1814,11 +1814,11 @@ impl App {
             Some(Value::String(text)) if !text.is_empty() => text.to_lowercase(),
             _ => "md".to_string(),
         };
-        if format != "txt" && format != "md" {
+        if !matches!(format.as_str(), "txt" | "md" | "markdown" | "docx" | "pdf") {
             return self.json_response(
                 request,
                 400,
-                json!({ "error": "format must be \"txt\" or \"md\"" }),
+                json!({ "error": "format must be \"txt\", \"md\", \"markdown\", \"docx\" or \"pdf\"" }),
             );
         }
         let note = match payload.get("note") {
@@ -1859,15 +1859,32 @@ impl App {
             _ => note.get("id").map(py_str).unwrap_or_default(),
         };
         let safe = safe_filename(&title);
+        // DOCX and PDF are binary: carried as base64 in the same JSON answer, so every client
+        // (the island's string-based helper client, the extension's fetch) reads them the same way.
+        if let Some((mime, bytes)) = crate::export_docs::binary(&format, &note) {
+            return self.json_response(
+                request,
+                200,
+                json!({
+                    "filename": format!("{safe}.{format}"),
+                    "mime": mime,
+                    "encoding": "base64",
+                    "content": crate::export_docs::base64(&bytes),
+                }),
+            );
+        }
         let content = if format == "txt" {
             export_note_txt(&note)
+        } else if format == "markdown" {
+            // The full register (table of actions, risks, transcript); "md" stays the short legacy form.
+            crate::export_docs::markdown(&note)
         } else {
             export_note_md(&note)
         };
         self.json_response(
             request,
             200,
-            json!({ "filename": format!("{safe}.{format}"), "content": content }),
+            json!({ "filename": format!("{safe}.{}", if format == "markdown" { "md" } else { format.as_str() }), "content": content }),
         )
     }
 

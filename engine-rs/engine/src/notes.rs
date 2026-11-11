@@ -217,7 +217,7 @@ fn normalize_transcript(raw: Option<&Value>) -> Vec<Value> {
         if source.is_empty() {
             continue;
         }
-        out.push(json!({
+        let mut entry = json!({
             "t0": number(line, "t0"),
             "t1": number(line, "t1"),
             "source": truncate(source, 2000),
@@ -225,7 +225,12 @@ fn normalize_transcript(raw: Option<&Value>) -> Vec<Value> {
                 flat_text(line.get("translation").unwrap_or(&Value::Null)),
                 2000
             ),
-        }));
+        });
+        // Who spoke (diarization or the capture source), only when the sender knows.
+        if let Some(who) = opt_text(line.get("speaker"), 80) {
+            entry["speaker"] = Value::String(who);
+        }
+        out.push(entry);
     }
     out
 }

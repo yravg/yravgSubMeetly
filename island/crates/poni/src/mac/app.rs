@@ -1645,6 +1645,7 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::NoteExported(r) => self.on_note_exported(r),
             AppEvent::Models(r) => {
                 self.st.models.apply(r, now);
             }
@@ -1729,6 +1730,34 @@ impl App {
     }
 
     // ------------------------------------------------------------ the engine and its models
+
+    /// Export a meeting as Word / PDF / Markdown: the engine writes it, the file lands in
+    /// Documents › yravgSubMeetly › Exports and is shown in the file manager.
+    fn export_note(&mut self, id: String, format: &'static str) {
+        self.st.notify(Icon::Download, palette::ORANGE, "Exporting", format!("{} ...", format.to_uppercase()), 4.0, None);
+        let sink = self.sink.clone();
+        let port = poni_core::helper::configured_port();
+        std::thread::Builder::new()
+            .name("poni-note-export".into())
+            .spawn(move || {
+                let r = poni_core::note_export::save(port, &id, format);
+                if let Ok(p) = &r {
+                    poni_core::note_export::reveal(p);
+                }
+                sink.send(AppEvent::NoteExported(r));
+            })
+            .ok();
+    }
+
+    fn on_note_exported(&mut self, r: std::result::Result<std::path::PathBuf, String>) {
+        match r {
+            Ok(p) => {
+                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                self.st.notify(Icon::Check, palette::GREEN, "Exported", name, 6.0, None);
+            }
+            Err(e) => self.st.notify(Icon::Download, palette::ORANGE, "Not exported", e, 8.0, None),
+        }
+    }
 
     /// Start the engine now (Retry, a download, a first look at Settings).
     fn engine_start(&self) {
@@ -2841,6 +2870,7 @@ impl App {
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
                 Command::ModelsRefresh => self.refresh_models(),
+                Command::ExportNote(id, format) => self.export_note(id, format),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelPullId(id) => self.pull_model_id(id),

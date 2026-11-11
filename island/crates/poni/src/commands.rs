@@ -142,6 +142,8 @@ pub enum Command {
     Notify(NotifyCmd),
     /// `POST /notes` to the helper with this body (a decision on a page).
     HelperPost(String),
+    /// Save this meeting (its id) as `docx`, `pdf` or `markdown` in Documents (the engine writes it).
+    ExportNote(String, &'static str),
     /// A kept transcript (this id) becomes a meeting (PMM-015).
     SaveAsMeeting(String),
     /// Ask the helper again now.

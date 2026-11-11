@@ -29,6 +29,8 @@ import { serializeMeetingMarkdown, serializeMeetingCsv } from './lib/notes-expor
 import { slidingNumber, autoHeight, highlight } from './lib/motion.js';
 import { mountExtras } from './minutes-extras.js';
 import { startEngineSync, engineOrigin } from './lib/engine-sync.js';
+import { notesExport } from './lib/notes-api.js';
+import { meetingToDoc } from './lib/notes-sync.js';
 import { mountDraftOptions } from './minutes-draft.js';
 import { mountDock } from './minutes-dock.js';
 import { mountThreads, renderThreads } from './minutes-threads.js';
@@ -1531,6 +1533,20 @@ function doExport(format) {
     syncTabs();
     paint();
     setTimeout(() => window.print(), 50);
+    return;
+  }
+  if (format === 'docx' || format === 'pdf') {
+    // The engine writes these (src/export_docs.rs in engine-rs); it needs to be running.
+    notesExport(engineOrigin() || undefined, meetingToDoc(m, state.lang), format)
+      .then(({ filename, blob }) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename || `${safe}.${format}`;
+        a.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch(() => toast('Start the engine to export Word or PDF (or use Print / PDF).', true));
     return;
   }
   if (format === 'json') downloadText(`${safe}.json`, JSON.stringify(m, null, 2));
