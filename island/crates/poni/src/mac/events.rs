@@ -105,6 +105,8 @@ pub enum AppEvent {
     Log(String),
     /// What the meeting probe saw (`services::meeting_probe`).
     MeetingSignals(crate::services::meeting_probe::Seen),
+    /// A meeting exported to a file (`Command::ExportNote`), or why not.
+    NoteExported(Result<std::path::PathBuf, String>),
     /// What the engine supervisor sees (`services::engine`).
     Engine(poni_core::engine_link::EngineInfo),
     /// The engine's models (`services::models`), and how each action on one ended.

@@ -30,6 +30,7 @@ pub mod lrclib;
 pub mod lyric_tr;
 pub mod meeting_doc;
 pub mod meeting_detect;
+pub mod note_export;
 pub mod meeting_source;
 pub mod mediaremote;
 pub mod library;
