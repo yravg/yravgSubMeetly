@@ -20,15 +20,14 @@ use crate::pill::quick_captions::{self, Act, Ctl, Which};
 use crate::settings_window::{self, Key, Section};
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_SMALL};
-use poni_core::capture::{lang_name, resolve_px, step_px, Show};
+use poni_core::capture::{lang_name, resolve_px, step_px, Show, Source};
+use poni_core::livecap;
 use poni_core::geom::{palette, Color, Rect};
 use poni_core::meeting_source::Family;
 use poni_core::models::Kind;
 use poni_core::utterance::Latency;
 
 const ROW_H: f32 = 30.0;
-const ROWS: usize = 6;
-const COL_GAP: f32 = 28.0;
 const SOURCE_GAP: f32 = 10.0;
 const SOURCE_LABEL_W: f32 = 112.0;
 const SW_W: f32 = 24.0;
@@ -36,10 +35,86 @@ const SW_H: f32 = 14.0;
 const STEP: f32 = 22.0;
 const NAME_W: f32 = 104.0;
 const PAD: f32 = 4.0;
+/// The group row under the guide.
+const SUB_H: f32 = 28.0;
+/// A sentence under a row, up to two lines.
+const NOTE_H: f32 = 34.0;
 
+/// The five groups of board P09, in order.
+const SUBS: [&str; 5] = ["Sources", "Speed", "Translation", "Display", "Apps"];
+
+/// One row of a group. Every setting the single page had is in exactly one group.
+#[derive(Clone, Debug, PartialEq)]
+enum Row {
+    Source,
+    Mic,
+    Spoken,
+    Latency,
+    /// What Fast does, or why it cannot.
+    Note(String),
+    Restore,
+    On,
+    Auto,
+    Translate,
+    Into,
+    Lyrics,
+    Model,
+    Offer,
+    Show,
+    Font,
+    Readout,
+    Apps,
+    OpenTab,
+}
+
+impl Row {
+    fn h(&self) -> f32 {
+        match self {
+            Row::Source => SOURCE_H + 4.0,
+            Row::Note(_) => NOTE_H,
+            Row::Offer => SOURCE_H + 4.0,
+            _ => ROW_H,
+        }
+    }
+}
+
+/// What Fast says: how it works, or in plain words why it falls back.
+fn fast_note(st: &AppState) -> String {
+    if let Some(why) = &st.livecap_why {
+        return format!("{why} Fast uses the quicker timing of our own captions instead.");
+    }
+    match livecap::why_unavailable(st.livecap_installed, Source::parse(&st.settings.captions_source) == Source::Pc) {
+        Some(why) => why.to_string(),
+        None => "Reads Windows Live Captions: first words in under a second. Its own caption bar is moved off screen while Fast runs.".to_string(),
+    }
+}
+
+fn rows(st: &AppState, sub: u8) -> Vec<Row> {
+    match sub {
+        0 => vec![Row::Source, Row::Mic, Row::Spoken],
+        1 => {
+            let mut v = vec![Row::On, Row::Latency];
+            if Latency::parse(&st.settings.latency_mode) == Latency::Fast {
+                v.push(Row::Note(fast_note(st)));
+            }
+            v.push(Row::Restore);
+            v
+        }
+        2 => {
+            let mut v = vec![Row::Translate, Row::Into, Row::Lyrics, Row::Model];
+            if offer(st).is_some() {
+                v.push(Row::Offer);
+            }
+            v
+        }
+        3 => vec![Row::Show, Row::Font, Row::Readout],
+        _ => vec![Row::Auto, Row::Apps, Row::OpenTab],
+    }
+}
+
+/// The pill is as tall as the group needs (no height limit, owner 2026-11-11).
 pub fn height(st: &AppState) -> f32 {
-    let line = if offer(st).is_some() { SOURCE_GAP + SOURCE_H } else { 0.0 };
-    hkit::GUIDE_H + ROWS as f32 * ROW_H + SOURCE_GAP + SOURCE_H + line + 6.0
+    hkit::GUIDE_H + SUB_H + 6.0 + rows(st, st.ui.captions_sub.min(4)).iter().map(Row::h).sum::<f32>() + 6.0
 }
 
 /// How many meeting apps count: the built-in families still on and the ones the person added.
@@ -93,79 +168,144 @@ fn lang_row(ui: &mut Ui, st: &AppState, n: u64, r: Rect, w: Which, label: &str) 
 
 pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let area = hkit::guide(ui, st, area, PageKind::Captions, "Every caption and translation setting. The Aa strip on Live keeps the quick ones.");
-    let col_w = (area.w - COL_GAP) / 2.0;
-    let left = |i: usize| Rect::new(area.x, area.y + i as f32 * ROW_H, col_w, ROW_H);
-    let right = |i: usize| Rect::new(area.x + col_w + COL_GAP, area.y + i as f32 * ROW_H, col_w, ROW_H);
-    let accent = st.accent;
-    let s = st.settings.clone();
-    let running = st.capture.running();
+    let sub = st.ui.captions_sub.min(4);
+    sub_tabs(ui, st, Rect::new(area.x, area.y, area.w, SUB_H), sub);
+    let mut y = area.y + SUB_H + 6.0;
     let mut clicked = false;
-
-    // Left: the switches, in the order of Advanced settings.
-    let switches: [(&str, bool); 5] = [
-        ("Captions on", running),
-        ("Start by themselves", s.auto_captions),
-        ("Translate captions", s.translate_captions),
-        ("Translate lyrics", s.lyrics_translate),
-        ("Meeting tab opens", s.open_meeting_tab),
-    ];
-    let mut flip = None;
-    for (i, (label, on)) in switches.into_iter().enumerate() {
-        if switch_row(ui, accent, i as u64, left(i), label, on) {
-            flip = Some(i);
-        }
+    for row in rows(st, sub) {
+        let r = Rect::new(area.x, y, area.w, row.h());
+        y += row.h();
+        clicked |= draw_row(ui, st, &row, r);
     }
-    match flip {
-        Some(0) => st.cmd(Command::Captions(!running)),
-        Some(1) => quick_captions::run(st, Act::Toggle(Ctl::Auto)),
-        Some(2) => quick_captions::run(st, Act::Toggle(Ctl::Translate)),
-        Some(i) => {
-            settings_window::apply(st, if i == 3 { Key::LyricsTranslate } else { Key::OpenMeetingTab }, settings_window::Act::Toggle);
-            st.cmd(Command::SaveSettings);
-        }
-        None => {}
-    }
-
-    // Right: the languages, and the meeting apps.
-    for (i, (w, label)) in [(Which::Spoken, "Spoken language"), (Which::Into, "Translate into")].into_iter().enumerate() {
-        match lang_row(ui, st, i as u64, right(i), w, label) {
-            Some(Lang::Step(d)) => {
-                clicked = true;
-                quick_captions::run(st, Act::Step(w, d));
-            }
-            Some(Lang::Name) => {
-                clicked = true;
-                st.ui.quick.press_name(w, &s);
-                st.ui.quick.notice = false;
-            }
-            None => {}
-        }
-    }
-    let r = right(2);
-    ui.c.text("Meeting apps", Rect::new(r.x + PAD, r.y, r.w * 0.5, r.h), &TextStyle::body().weight(Weight::Regular));
-    let w = ui.pill_width("Manage", false, true);
-    let b = Rect::new(r.right() - PAD - w, r.center().y - PILL_SMALL / 2.0, w, PILL_SMALL);
-    if ui.pill(wid("cap.apps"), b, "Manage", None, PillStyle::Utility).clicked {
-        st.cmd(Command::OpenSettingsAt(Section::Speech));
-    }
-    let count = format!("{} on", meeting_apps_on(st));
-    ui.c.text(&count, Rect::new(r.x + r.w * 0.5, r.y, (b.x - 8.0 - r.x - r.w * 0.5).max(0.0), r.h), &TextStyle::caption().color(palette::TEXT_DIM).right());
-    latency_row(ui, st, right(3));
-    model_row(ui, st, right(4));
-    show_row(ui, st, left(5));
-    font_row(ui, st, right(5));
-
-    // Bottom: what Live listens to, and the microphone.
-    let row = Rect::new(area.x, area.y + ROWS as f32 * ROW_H + SOURCE_GAP, area.w, SOURCE_H);
-    ui.c.text("Live listens to", Rect::new(row.x + PAD, row.y, SOURCE_LABEL_W, row.h), &TextStyle::body().weight(Weight::Regular));
-    source_row(ui, st, Rect::new(row.x + SOURCE_LABEL_W, row.y, row.w - SOURCE_LABEL_W, row.h));
-    offer_row(ui, st, Rect::new(area.x, row.bottom() + SOURCE_GAP, area.w, SOURCE_H));
-
     // The models' state is read while this page is open, as Advanced settings does.
     if st.models.due(st.now) {
         st.cmd(Command::ModelsRefresh);
     }
     quick_captions::language_list(ui, st, area, area.bottom(), clicked);
+}
+
+/// The group names, the open one underlined in the accent.
+fn sub_tabs(ui: &mut Ui, st: &mut AppState, r: Rect, sub: u8) {
+    let mut x = r.x + PAD;
+    for (i, name) in SUBS.iter().enumerate() {
+        let on = i as u8 == sub;
+        let style = TextStyle::caption().weight(if on { Weight::Semibold } else { Weight::Regular }).color(if on { st.accent } else { palette::TEXT_DIM });
+        let w = ui.c.measure(name, &style, 200.0).0.ceil();
+        let b = Rect::new(x - 6.0, r.y, w + 12.0, r.h);
+        let resp = ui.button(wid_n("cap.sub", i as u64), b);
+        ui.c.text(name, Rect::new(x, r.y, w + 1.0, r.h), &if resp.hovered && !on { style.color(palette::TEXT) } else { style });
+        if on {
+            ui.c.fill_rrect(Rect::new(x, r.bottom() - 2.0, w, 2.0), 1.0, st.accent);
+        }
+        if resp.clicked && !on {
+            st.ui.captions_sub = i as u8;
+            st.ui.quick.list = None;
+        }
+        x += w + 22.0;
+    }
+}
+
+/// Draw one row; true when the press belongs to the language list (it must not close it at once).
+fn draw_row(ui: &mut Ui, st: &mut AppState, row: &Row, r: Rect) -> bool {
+    let accent = st.accent;
+    let s = st.settings.clone();
+    let running = st.capture.running();
+    let sw = |ui: &mut Ui, n: u64, label: &str, on: bool| switch_row(ui, accent, n, r, label, on);
+    match row {
+        Row::Source => {
+            ui.c.text("Live listens to", Rect::new(r.x + PAD, r.y, SOURCE_LABEL_W, r.h), &TextStyle::body().weight(Weight::Regular));
+            source_row(ui, st, Rect::new(r.x + SOURCE_LABEL_W, r.y, r.w - SOURCE_LABEL_W, SOURCE_H));
+        }
+        Row::Mic => {
+            ui.c.text("Microphone", Rect::new(r.x + PAD, r.y, r.w * 0.4, r.h), &TextStyle::body().weight(Weight::Regular));
+            let w = ui.pill_width("Change", false, true);
+            let b = Rect::new(r.right() - PAD - w, r.center().y - PILL_SMALL / 2.0, w, PILL_SMALL);
+            if ui.pill(wid("cap.mic"), b, "Change", None, PillStyle::Utility).clicked {
+                st.cmd(Command::OpenSettingsAt(Section::Speech));
+            }
+            let now = if s.mic_device.is_empty() { "Windows' default, used by Room and Both" } else { "The one chosen in Settings" };
+            ui.c.text(now, Rect::new(r.x + r.w * 0.3, r.y, (b.x - 8.0 - r.x - r.w * 0.3).max(0.0), r.h), &TextStyle::caption().color(palette::TEXT_DIM).right());
+        }
+        Row::Spoken => return lang(ui, st, r, 0, Which::Spoken, "Spoken language"),
+        Row::Into => return lang(ui, st, r, 1, Which::Into, "Translate into"),
+        Row::Latency => latency_row(ui, st, r),
+        Row::Note(text) => {
+            ui.c.text(text, Rect::new(r.x + PAD, r.y, r.w - 2.0 * PAD, r.h), &TextStyle::caption().color(palette::TEXT_DIM).wrap().top());
+        }
+        Row::Restore => {
+            ui.c.text("Windows caption bar", Rect::new(r.x + PAD, r.y, r.w * 0.45, r.h), &TextStyle::body().weight(Weight::Regular));
+            let w = ui.pill_width("Restore Windows captions", false, true);
+            let b = Rect::new(r.right() - PAD - w, r.center().y - PILL_SMALL / 2.0, w, PILL_SMALL);
+            if ui.pill(wid("cap.restore"), b, "Restore Windows captions", None, PillStyle::Utility).clicked {
+                st.cmd(Command::RestoreLiveCaptions);
+            }
+        }
+        Row::On => {
+            if sw(ui, 0, "Captions on", running) {
+                st.cmd(Command::Captions(!running));
+            }
+        }
+        Row::Auto => {
+            if sw(ui, 1, "Start by themselves", s.auto_captions) {
+                quick_captions::run(st, Act::Toggle(Ctl::Auto));
+            }
+        }
+        Row::Translate => {
+            if sw(ui, 2, "Translate captions", s.translate_captions) {
+                quick_captions::run(st, Act::Toggle(Ctl::Translate));
+            }
+        }
+        Row::Lyrics => {
+            if sw(ui, 3, "Translate lyrics", s.lyrics_translate) {
+                settings_window::apply(st, Key::LyricsTranslate, settings_window::Act::Toggle);
+                st.cmd(Command::SaveSettings);
+            }
+        }
+        Row::OpenTab => {
+            if sw(ui, 4, "Meeting tab opens", s.open_meeting_tab) {
+                settings_window::apply(st, Key::OpenMeetingTab, settings_window::Act::Toggle);
+                st.cmd(Command::SaveSettings);
+            }
+        }
+        Row::Readout => {
+            if sw(ui, 5, "Latency readout [ 820 ms ]", s.caption_readout) {
+                st.settings.caption_readout = !s.caption_readout;
+                st.cmd(Command::SaveSettings);
+            }
+        }
+        Row::Apps => {
+            ui.c.text("Meeting apps", Rect::new(r.x + PAD, r.y, r.w * 0.5, r.h), &TextStyle::body().weight(Weight::Regular));
+            let w = ui.pill_width("Manage", false, true);
+            let b = Rect::new(r.right() - PAD - w, r.center().y - PILL_SMALL / 2.0, w, PILL_SMALL);
+            if ui.pill(wid("cap.apps"), b, "Manage", None, PillStyle::Utility).clicked {
+                st.cmd(Command::OpenSettingsAt(Section::Speech));
+            }
+            let count = format!("{} on", meeting_apps_on(st));
+            ui.c.text(&count, Rect::new(r.x + r.w * 0.5, r.y, (b.x - 8.0 - r.x - r.w * 0.5).max(0.0), r.h), &TextStyle::caption().color(palette::TEXT_DIM).right());
+        }
+        Row::Model => model_row(ui, st, r),
+        Row::Offer => offer_row(ui, st, r),
+        Row::Show => show_row(ui, st, r),
+        Row::Font => font_row(ui, st, r),
+    }
+    false
+}
+
+/// A language row (the step buttons, the name that opens the list); true when the list was touched.
+fn lang(ui: &mut Ui, st: &mut AppState, r: Rect, n: u64, w: Which, label: &str) -> bool {
+    let s = st.settings.clone();
+    match lang_row(ui, st, n, r, w, label) {
+        Some(Lang::Step(d)) => {
+            quick_captions::run(st, Act::Step(w, d));
+            true
+        }
+        Some(Lang::Name) => {
+            st.ui.quick.press_name(w, &s);
+            st.ui.quick.notice = false;
+            true
+        }
+        None => false,
+    }
 }
 
 /// Show (PMM-026): Original, Translation or Both, for Live, Meeting and the Media caption column.
@@ -255,5 +395,53 @@ fn offer_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
             st.models.set_pick(Kind::Translate, Some(id));
         }
         st.cmd(Command::ModelPull(Kind::Translate));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use poni_core::store::Store;
+
+    fn state() -> AppState {
+        AppState::new(poni_core::settings::Settings::default(), Store::default())
+    }
+
+    #[test]
+    fn every_setting_of_the_single_page_is_in_one_of_the_five_groups() {
+        let st = state();
+        let all: Vec<Row> = (0..5).flat_map(|g| rows(&st, g)).collect();
+        for want in [Row::Source, Row::Mic, Row::Spoken, Row::Latency, Row::On, Row::Auto, Row::Translate, Row::Into, Row::Lyrics, Row::Model, Row::Show, Row::Font, Row::Readout, Row::Apps, Row::OpenTab, Row::Restore] {
+            assert_eq!(all.iter().filter(|r| **r == want).count(), 1, "{want:?} is in exactly one group");
+        }
+    }
+
+    #[test]
+    fn fast_says_why_it_falls_back_and_only_fast_has_a_note() {
+        let mut st = state();
+        assert!(!rows(&st, 1).iter().any(|r| matches!(r, Row::Note(_))), "Balanced has no note");
+        st.settings.latency_mode = "fast".into();
+        st.livecap_installed = false;
+        let note = rows(&st, 1).into_iter().find_map(|r| if let Row::Note(t) = r { Some(t) } else { None }).expect("Fast explains itself");
+        assert!(note.contains("not on this PC"), "{note}");
+        st.livecap_installed = true;
+        st.settings.captions_source = "pc".into();
+        let note = rows(&st, 1).into_iter().find_map(|r| if let Row::Note(t) = r { Some(t) } else { None }).unwrap();
+        assert!(note.contains("under a second"), "{note}");
+        st.livecap_why = Some("The Windows Live Captions window was closed.".into());
+        let note = rows(&st, 1).into_iter().find_map(|r| if let Row::Note(t) = r { Some(t) } else { None }).unwrap();
+        assert!(note.contains("was closed") && note.contains("our own captions"), "{note}");
+    }
+
+    #[test]
+    fn the_pill_grows_with_the_group_and_has_no_cap() {
+        let mut st = state();
+        let h: Vec<f32> = (0..5u8).map(|g| { st.ui.captions_sub = g; height(&st) }).collect();
+        assert!(h.iter().all(|h| *h > hkit::GUIDE_H + SUB_H), "{h:?}");
+        assert!(h[2] > h[0], "Translation has more rows than Sources: {h:?}");
+        st.ui.captions_sub = 1;
+        let balanced = height(&st);
+        st.settings.latency_mode = "fast".into();
+        assert!(height(&st) > balanced, "Fast adds its note, so the pill grows");
     }
 }

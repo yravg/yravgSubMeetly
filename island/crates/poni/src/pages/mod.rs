@@ -794,7 +794,14 @@ mod tests {
         assert!(tabs(&st).contains(&Captions));
         st.page = Live;
         assert!(!tabs(&st).contains(&Captions));
-        assert!(content_height(Captions, &st) <= content_height(System, &st), "it fits the tallest page");
+        // No height limit (owner, 2026-11-11): the pill grows to what the open group needs, and the
+        // five groups each fit their rows.
+        for sub in 0..5 {
+            st.ui.captions_sub = sub;
+            let h = content_height(Captions, &st);
+            assert!(h > 100.0 && h < 520.0, "group {sub} is {h} tall");
+        }
+        st.ui.captions_sub = 0;
     }
 
     #[test]

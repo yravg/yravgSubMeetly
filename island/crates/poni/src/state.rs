@@ -340,6 +340,8 @@ impl PhoneDrop {
 /// Transient per-page UI state (scroll offsets, text being typed, …).
 #[derive(Clone, Debug, Default)]
 pub struct PageUiState {
+    /// The Captions tab's group: 0 Sources, 1 Speed, 2 Translation, 3 Display, 4 Apps.
+    pub captions_sub: u8,
     pub task_input: String,
     pub task_scroll: f32,
     pub shelf_scroll: f32,
@@ -521,6 +523,11 @@ pub struct AppState {
     /// Icons of the apps the System page lists, by executable path (None = loading or none).
     pub app_icons: HashMap<String, Option<Image>>,
     pub ui: PageUiState,
+    /// `LiveCaptions.exe` is on this PC (Windows 11 22H2+): Fast can read Windows Live Captions.
+    pub livecap_installed: bool,
+    /// Why Fast could not read Windows Live Captions the last time (it was closed, did not open); the
+    /// Captions tab says it. Cleared when Fast is left.
+    pub livecap_why: Option<String>,
     /// System accent colour (falls back to blue).
     pub accent: Color,
     /// The page currently shown when expanded.
@@ -668,6 +675,8 @@ impl AppState {
             shelf_thumbs: HashMap::new(),
             app_icons: HashMap::new(),
             ui: PageUiState::default(),
+            livecap_installed: false,
+            livecap_why: None,
             accent: palette::BLUE,
             page,
             held: None,
@@ -1038,6 +1047,10 @@ pub struct CallState {
     pub started: Option<f64>,
     /// The session's newest lines, oldest first, and how many it has.
     pub lines: Vec<poni_core::helper::Line>,
+    /// The last of `lines` is the utterance still being spoken (drawn lighter, with a caret).
+    pub interim: bool,
+    /// The latency readout of each of `lines` (ms), when it was measured.
+    pub ms: Vec<Option<u32>>,
     pub heard: usize,
     /// "Notes so far": the engine's draft and the person's items.
     pub notes: poni_core::live_notes::LiveNotes,

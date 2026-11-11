@@ -722,6 +722,9 @@ impl App {
             // Which Windows language features the island can use (off the UI
             // thread; Settings and the Music page show the answer).
             services::winlang::check(self.sink.clone());
+            self.st.livecap_installed = services::livecap::installed();
+            // Fast is not running yet: a caption bar left off screen by a crash comes back first.
+            self.restore_live_captions();
             self.try_add_tray();
             services::power::register_session(self.helper);
             if self.st.settings.captions_on {
@@ -1778,6 +1781,11 @@ impl App {
     /// in the languages of Settings. On or off and the source are remembered (`captions_on`,
     /// `captions_source`): the next start of the island picks them up again.
     fn set_captions(&mut self, on: bool, source: Source) {
+        self.set_captions_via(on, source, true);
+    }
+
+    /// `livecap`: Fast may read Windows Live Captions (false after it could not be reached).
+    fn set_captions_via(&mut self, on: bool, source: Source, livecap: bool) {
         let sink = self.sink.clone();
         let (src, tgt) = self.caption_langs();
         self.st.settings.captions_on = on;
@@ -1786,12 +1794,28 @@ impl App {
         }
         self.save_settings();
         self.st.caption_hint = None;
+        let latency = poni_core::utterance::Latency::parse(&self.st.settings.latency_mode);
+        let fast_win = on && livecap && latency == poni_core::utterance::Latency::Fast && poni_core::livecap::why_unavailable(self.st.livecap_installed, source == Source::Pc).is_none();
+        if fast_win {
+            // Where Windows' caption bar is now goes into the settings BEFORE it is moved off screen,
+            // so a crash cannot lose it (restored at every island start).
+            if let Some(at) = services::livecap::on_screen_origin() {
+                self.st.settings.livecap_origin = poni_core::livecap::origin_text(at.0, at.1);
+                self.save_settings();
+            }
+        }
+        let origin = poni_core::livecap::parse_origin(&self.st.settings.livecap_origin);
         let Some(svc) = self.services.as_mut() else { return };
         if on {
             svc.engine_start();
             let mic = self.st.settings.mic_device.clone();
-            let latency = poni_core::utterance::Latency::parse(&self.st.settings.latency_mode);
-            self.st.capture = match svc.capture_start(&sink, poni_core::helper::configured_port(), &src, &tgt, source, &mic, latency) {
+            let port = poni_core::helper::configured_port();
+            let started = if fast_win {
+                svc.livecap_start(&sink, port, &src, &tgt, origin, latency.timing().hang_s)
+            } else {
+                svc.capture_start(&sink, port, &src, &tgt, source, &mic, latency)
+            };
+            self.st.capture = match started {
                 Ok(()) => poni_core::capture::CaptureState::On,
                 Err(e) => poni_core::capture::CaptureState::Failed(e),
             };
@@ -1805,8 +1829,29 @@ impl App {
             self.st.capture = poni_core::capture::CaptureState::Off;
             self.end_session(false);
         }
+        self.forget_origin_if_back();
         self.st.helper.capturing = self.st.capture.running();
         self.request_frame();
+    }
+
+    /// Windows' caption bar is on screen again: the place saved for a crash is no longer needed.
+    fn forget_origin_if_back(&mut self) {
+        let back = services::livecap::position().is_none_or(|(at, iconic)| iconic || !poni_core::livecap::is_parked(at));
+        if back && !self.st.settings.livecap_origin.is_empty() && !self.services.as_ref().is_some_and(|s| s.livecap_running()) {
+            self.st.settings.livecap_origin.clear();
+            self.save_settings();
+        }
+    }
+
+    /// Put Windows Live Captions' window back on screen when it is off it (the island start, and the
+    /// Captions tab's "Restore Windows captions"). Returns whether it was moved.
+    fn restore_live_captions(&mut self) -> bool {
+        let moved = services::livecap::restore_stranded(&self.st.settings.livecap_origin).is_some();
+        if moved {
+            pinfo!("livecap: Windows' caption bar was off screen and is back");
+        }
+        self.forget_origin_if_back();
+        moved
     }
 
     /// Spoken and target language codes for captions, as Settings has them now.
@@ -1838,6 +1883,18 @@ impl App {
         let l = poni_core::utterance::Latency::parse(&self.st.settings.latency_mode);
         if let Some(svc) = self.services.as_ref() {
             svc.capture_latency(l);
+        }
+        // Fast reads Windows Live Captions, the others our own audio: running captions switch over.
+        if self.st.capture.running() {
+            let source = Source::parse(&self.st.settings.captions_source);
+            let want = l == poni_core::utterance::Latency::Fast && poni_core::livecap::why_unavailable(self.st.livecap_installed, source == Source::Pc).is_none() && self.st.livecap_why.is_none();
+            if self.services.as_ref().is_some_and(|s| s.livecap_running() != want) {
+                self.st.livecap_why = None;
+                self.set_captions(true, source);
+            }
+        }
+        if l != poni_core::utterance::Latency::Fast {
+            self.st.livecap_why = None;
         }
         let port = poni_core::helper::configured_port();
         let body = format!(r#"{{"mode":"{}"}}"#, l.key());
@@ -2042,6 +2099,7 @@ impl App {
         let (n, tail) = svc.session_tail(crate::pages::call::LINES);
         if !(self.st.call.room && self.st.helper.paused()) {
             self.st.call.lines = tail;
+            (self.st.call.interim, self.st.call.ms) = svc.session_extras(crate::pages::call::LINES);
         }
         Some(n)
     }
@@ -2323,6 +2381,16 @@ impl App {
                 self.call_heard();
             }
             CaptureEvent::Hint(h) => self.st.caption_hint = h,
+            // Windows Live Captions could not be read: our own captions take over with the Fast timing.
+            CaptureEvent::LiveCapGone(why) => {
+                if self.services.as_ref().is_some_and(|s| s.livecap_running()) {
+                    pinfo!("livecap: {why}");
+                    self.st.livecap_why = Some(why.clone());
+                    self.st.notify(Icon::Lyrics, palette::ORANGE, "Windows captions unavailable", "Using our own fast captions", 6.0, None);
+                    let source = Source::parse(&self.st.settings.captions_source);
+                    self.set_captions_via(true, source, false);
+                }
+            }
             // The utterance still being spoken: the pages' lines are read again and painted; the count
             // of lines heard, and the notes that follow it, wait for a kept line.
             CaptureEvent::Interim => {
@@ -4722,6 +4790,15 @@ impl App {
                     self.save_settings();
                 }
                 Command::OpenSettings => self.show_settings(deferred),
+                Command::RestoreLiveCaptions => {
+                    if self.services.as_ref().is_some_and(|s| s.livecap_running()) {
+                        self.st.notify(Icon::Lyrics, palette::ORANGE, "Fast is using Windows captions", "Switch Latency to Balanced to bring the bar back", 6.0, None);
+                    } else if self.restore_live_captions() {
+                        self.st.notify(Icon::Lyrics, palette::GREEN, "Windows captions are back", "The bar is on screen again", 5.0, None);
+                    } else {
+                        self.st.notify(Icon::Lyrics, palette::BLUE, "Nothing to restore", "Windows captions are not hidden", 4.0, None);
+                    }
+                }
                 Command::OpenSettingsAt(section) => {
                     self.collapse();
                     self.open_settings_window(Some(section), deferred);

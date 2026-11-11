@@ -9,6 +9,7 @@ pub mod audio;
 pub mod backdrop;
 pub mod bluetooth;
 pub mod capture;
+pub mod livecap;
 pub mod engine;
 pub mod clipboard;
 pub mod frames;
@@ -65,6 +66,8 @@ pub struct Services {
     addons: Option<addons::AddonService>,
     helper: Option<helper::HelperService>,
     capture: Option<capture::CaptureService>,
+    /// Fast latency: Windows Live Captions as the caption source (instead of `capture`).
+    livecap: Option<livecap::LiveCapService>,
     /// What captions heard since the last Stop, for the meeting saved then.
     session: capture::SessionLog,
     engine: Option<engine::EngineService>,
@@ -125,6 +128,7 @@ impl Services {
             addons,
             helper,
             capture: None,
+            livecap: None,
             session: Default::default(),
             engine,
             downloader: std::cell::OnceCell::new(),
@@ -196,9 +200,25 @@ impl Services {
     /// say why not. Restarts a running one.
     pub fn capture_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str, source: poni_core::capture::Source, mic: &str, latency: poni_core::utterance::Latency) -> Result<(), String> {
         self.capture = None; // the old one stops first: one device reader at a time
+        self.livecap = None;
         self.session.lock().unwrap_or_else(|e| e.into_inner()).begin();
         self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into(), self.session.clone(), source, mic.into(), latency).map_err(|e| format!("Captions could not start ({e})."))?);
         Ok(())
+    }
+
+    /// Start Fast latency: read Windows Live Captions instead of the PC's audio. `origin` is where its
+    /// window was (saved by the caller before this moves it).
+    pub fn livecap_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str, origin: Option<(i32, i32)>, hang_s: f32) -> Result<(), String> {
+        self.capture = None;
+        self.livecap = None;
+        self.session.lock().unwrap_or_else(|e| e.into_inner()).begin();
+        self.livecap = Some(livecap::LiveCapService::start(sink.clone(), port, src.into(), tgt.into(), self.session.clone(), origin, hang_s).map_err(|e| format!("Captions could not start ({e})."))?);
+        Ok(())
+    }
+
+    /// Captions run from Windows Live Captions (Fast), not from our own audio capture.
+    pub fn livecap_running(&self) -> bool {
+        self.livecap.is_some()
     }
 
     /// A new Latency mode for the running captions (PMM-026); false when none run.
@@ -213,11 +233,16 @@ impl Services {
 
     /// New languages for running captions, without stopping them. False when none run.
     pub fn capture_langs(&self, src: &str, tgt: &str) -> bool {
+        if let Some(l) = &self.livecap {
+            l.set_langs(src.into(), tgt.into());
+            return true;
+        }
         self.capture.as_ref().inspect(|c| c.set_langs(src.into(), tgt.into())).is_some()
     }
 
     pub fn capture_stop(&mut self) {
         self.capture = None;
+        self.livecap = None;
     }
 
     /// The lines captions heard since the last time: the session ends here (shortcut: a window the
@@ -229,6 +254,13 @@ impl Services {
     /// How many lines the running session has and its newest `n` (the Meeting tab).
     pub fn session_tail(&self, n: usize) -> (usize, Vec<poni_core::helper::Line>) {
         self.session.lock().unwrap_or_else(|e| e.into_inner()).tail(n)
+    }
+
+    /// Whether the last of `session_tail` is the utterance still being spoken, and the latency readout
+    /// of each line of `session_tail(n)`.
+    pub fn session_extras(&self, n: usize) -> (bool, Vec<Option<u32>>) {
+        let l = self.session.lock().unwrap_or_else(|e| e.into_inner());
+        (l.interim_shown(), l.tail_ms(n))
     }
 
     /// The running session's lines so far, for a notes refresh.

@@ -138,12 +138,10 @@ pub fn norm(s: &str) -> String {
 }
 
 /// Why Fast cannot use Windows Live Captions, in plain words, for the Captions tab. `None` when it can.
-pub fn why_unavailable(windows_build: u32, installed: bool, source_is_pc: bool) -> Option<&'static str> {
-    // Live Captions arrived with Windows 11 22H2 (build 22621).
-    if windows_build < 22621 {
-        Some("Windows Live Captions needs Windows 11 (22H2 or newer). Fast uses the quicker timing of our own captions instead.")
-    } else if !installed {
-        Some("Windows Live Captions is not on this PC. Fast uses the quicker timing of our own captions instead.")
+/// `installed`: `LiveCaptions.exe` is in System32 (it ships with Windows 11 22H2 and newer).
+pub fn why_unavailable(installed: bool, source_is_pc: bool) -> Option<&'static str> {
+    if !installed {
+        Some("Windows Live Captions is not on this PC (it comes with Windows 11 22H2 or newer). Fast uses the quicker timing of our own captions instead.")
     } else if !source_is_pc {
         Some("Windows Live Captions hears what this PC plays, not the room. Fast uses the quicker timing of our own captions for this source.")
     } else {
@@ -255,10 +253,10 @@ mod tests {
 
     #[test]
     fn why_it_is_unavailable() {
-        assert!(why_unavailable(19045, true, true).unwrap().contains("Windows 11"));
-        assert!(why_unavailable(22631, false, true).unwrap().contains("not on this PC"));
-        assert!(why_unavailable(22631, true, false).unwrap().contains("room"));
-        assert_eq!(why_unavailable(22631, true, true), None);
+        assert!(why_unavailable(false, true).unwrap().contains("Windows 11"));
+        assert!(why_unavailable(false, true).unwrap().contains("not on this PC"));
+        assert!(why_unavailable(true, false).unwrap().contains("room"));
+        assert_eq!(why_unavailable(true, true), None);
     }
 
     #[test]

@@ -101,6 +101,8 @@ pub enum Command {
     OpenSettings,
     /// The same, on one section (the Captions tab's "Manage" opens Captions and languages).
     OpenSettingsAt(crate::settings_window::Section),
+    /// Captions tab › Speed › Restore Windows captions: put Live Captions' window back on screen.
+    RestoreLiveCaptions,
     SetPage(PageKind),
     /// A menu entry chosen in the island's Menu list (same as the tray menu).
     Menu(crate::tray::MenuCmd),

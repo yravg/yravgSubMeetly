@@ -174,6 +174,8 @@ pub struct Settings {
     /// Where Windows Live Captions was before Fast moved it off screen, "x,y"; empty when it is not
     /// moved. Written BEFORE the move so a crash cannot lose it (`livecap::restore`).
     pub livecap_origin: String,
+    /// Captions tab › Display › Latency readout: "[ 820 ms ]" after each line (off by default).
+    pub caption_readout: bool,
     pub hud_volume: bool,
     pub hud_power: bool,
     pub hud_bluetooth: bool,
@@ -291,6 +293,7 @@ impl Default for Settings {
             caption_font: 0,
             caption_px: crate::capture::FONT_DEFAULT,
             livecap_origin: String::new(),
+            caption_readout: false,
             hud_volume: true,
             hud_power: true,
             hud_bluetooth: true,

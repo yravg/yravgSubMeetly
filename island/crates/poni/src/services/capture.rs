@@ -51,6 +51,8 @@ pub struct Log {
     /// The utterance still being spoken (PMM-025): its text so far, shown after the kept lines and
     /// replaced by the next interim or, at last, by the line that is kept. Never saved, never counted.
     interim: Option<String>,
+    /// How long each kept line took to come back (the latency readout), aligned with `lines`.
+    ms: Vec<Option<u32>>,
 }
 
 pub type SessionLog = Arc<Mutex<Log>>;
@@ -64,10 +66,51 @@ impl Log {
     }
 
     /// A line is kept: `span_s` of audio ended now. It ends the interim that led up to it.
-    fn push(&mut self, source: String, translation: String, span_s: f64) {
+    pub(crate) fn push(&mut self, source: String, translation: String, span_s: f64) {
         let end = self.start.get_or_insert_with(Instant::now).elapsed().as_secs_f64();
         self.interim = None;
         self.lines.push(helper::Line { t0: (end - span_s).max(0.0), t1: end, source, translation });
+        self.ms.push(None);
+    }
+
+    /// A line kept with its readout (Fast: the translation's round trip).
+    pub(crate) fn push_with_ms(&mut self, source: String, translation: String, span_s: f64, ms: u32) {
+        self.push(source, translation, span_s);
+        self.set_last_ms(ms);
+    }
+
+    /// The interim, but only when it differs from what is shown: true when it changed.
+    pub(crate) fn set_interim_if_changed(&mut self, text: Option<String>) -> bool {
+        let text = text.filter(|t| !t.trim().is_empty());
+        if self.interim == text {
+            return false;
+        }
+        self.interim = text;
+        true
+    }
+
+    /// How long the newest kept line took (the readout "[ 820 ms ]").
+    fn set_last_ms(&mut self, ms: u32) {
+        if let Some(last) = self.ms.last_mut() {
+            *last = Some(ms);
+        }
+    }
+
+    /// The readout of each line `tail(n)` returns, in the same order (the interim has none).
+    pub fn tail_ms(&self, n: usize) -> Vec<Option<u32>> {
+        let mut out = self.ms[self.ms.len().saturating_sub(n)..].to_vec();
+        if self.interim.is_some() {
+            out.push(None);
+            if out.len() > n {
+                out.remove(0);
+            }
+        }
+        out
+    }
+
+    /// The last line of `tail` is the utterance still being spoken, not a kept line.
+    pub fn interim_shown(&self) -> bool {
+        self.interim.is_some()
     }
 
     /// The utterance so far; `None` (or empty) when the engine heard nothing in it.
@@ -96,11 +139,13 @@ impl Log {
 
     pub fn take(&mut self) -> Vec<helper::Line> {
         self.interim = None;
+        self.ms.clear();
         std::mem::take(&mut self.lines)
     }
 
     /// Lines whose save failed go back in front of what came since.
     pub fn restore(&mut self, mut lines: Vec<helper::Line>) {
+        self.ms.splice(0..0, std::iter::repeat_n(None, lines.len()));
         lines.append(&mut self.lines);
         self.lines = lines;
     }
@@ -181,6 +226,9 @@ pub enum CaptureEvent {
     Heard,
     /// The utterance still being spoken changed (PMM-025): repaint; nothing is counted as heard.
     Interim,
+    /// Windows Live Captions cannot be read (closed, not opened): the app falls back to our own
+    /// captions with the Fast timing and says why.
+    LiveCapGone(String),
     /// The translation is missing or loading (or no longer is): a note under the source line.
     Hint(Option<poni_core::capture::TranslateHint>),
 }
@@ -377,6 +425,7 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
             health.engine(Some(poni_core::capture::SPEECH_MISSING.into()));
             continue;
         }
+        let asked = Instant::now();
         match helper::post_draft(port, src, tgt, !last, &pcm_bytes(&window)) {
             Ok(d) if !last => {
                 // An interim carries the spoken text only: it shows, and the next post replaces it.
@@ -395,7 +444,10 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
                     health.interim();
                 } else {
                     let span = window.len() as f64 / poni_core::capture::RATE as f64;
-                    log.lock().unwrap_or_else(|e| e.into_inner()).push(poni_core::capture::tagged(side, &d.source), d.translation, span);
+                    let mut l = log.lock().unwrap_or_else(|e| e.into_inner());
+                    l.push(poni_core::capture::tagged(side, &d.source), d.translation, span);
+                    l.set_last_ms(asked.elapsed().as_millis().min(u32::MAX as u128) as u32);
+                    drop(l);
                     health.heard();
                 }
             }
@@ -763,6 +815,22 @@ mod tests {
         assert!(saved.iter().all(|l| l.source != "next"), "the interim is never saved");
         assert_eq!(saved.len(), 2);
         assert_eq!(log.tail(5), (0, Vec::new()));
+        assert!(log.tail_ms(5).is_empty());
+    }
+
+    #[test]
+    fn the_readout_of_each_line_stays_aligned_with_the_lines() {
+        let mut log = Log::default();
+        log.push("a".into(), String::new(), 1.0);
+        log.set_last_ms(820);
+        log.push("b".into(), String::new(), 1.0);
+        log.set_interim(Some("c".into()));
+        assert!(log.interim_shown());
+        assert_eq!(log.tail_ms(5), vec![Some(820), None, None], "the interim has no readout");
+        assert_eq!(log.tail_ms(2), vec![None, None], "a window of 2 keeps the newest line and the interim");
+        let saved = log.take();
+        log.restore(saved);
+        assert_eq!(log.tail_ms(5), vec![None, None], "after a failed save the lines come back with no readout");
     }
 
     #[test]

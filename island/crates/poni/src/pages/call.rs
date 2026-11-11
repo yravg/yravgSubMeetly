@@ -190,7 +190,17 @@ fn captions(ui: &mut Ui, st: &AppState, r: Rect) {
     let (show, px) = (poni_core::capture::Show::parse(&st.settings.caption_show), poni_core::capture::resolve_px(st.settings.caption_px, st.settings.caption_font));
     for (i, l) in st.call.lines.iter().enumerate().rev() {
         let (main, under) = show.parts(&l.source, &l.translation);
-        let mut src = if i == newest { TextStyle::body().weight(Weight::Semibold) } else { TextStyle::footnote().color(palette::TEXT_DIM) }.wrap().top();
+        // The utterance still being spoken (board P12): lighter than a kept line, with a caret.
+        let interim = st.call.interim && i == newest;
+        let mut src = if interim {
+            TextStyle::body().weight(Weight::Medium).color(palette::TEXT_DIM)
+        } else if i == newest {
+            TextStyle::body().weight(Weight::Semibold)
+        } else {
+            TextStyle::footnote().color(palette::TEXT_DIM)
+        }
+        .wrap()
+        .top();
         src.size = poni_core::capture::scale_px(src.size, px);
         let mut tst = TextStyle::footnote().color(if i == newest { tr } else { tr.with_alpha(0.75) }).wrap().top();
         tst.size = poni_core::capture::scale_px(tst.size, px);
@@ -199,7 +209,23 @@ fn captions(ui: &mut Ui, st: &AppState, r: Rect) {
         y -= sh + th;
         ui.c.text(main, Rect::new(r.x, y, r.w, sh), &src);
         if let Some(u) = under {
-            ui.c.text(u, Rect::new(r.x, y + sh + 2.0, r.w, th), &tst);
+            ui.c.text(u, Rect::new(r.x + 0.0, y + sh + 2.0, r.w, th), &tst);
+        }
+        let ms = st.call.ms.get(i).copied().flatten().filter(|_| st.settings.caption_readout && !interim);
+        if interim || ms.is_some() {
+            let (ex, ey) = end_of_text(ui, main, &src, r.w);
+            if interim {
+                // Blinks once a second; a caret that is not drawn this half-second leaves the line as it is.
+                if st.now.fract() < 0.5 {
+                    ui.c.fill_rrect(Rect::new((r.x + ex + 2.0).min(r.right() - 2.0), y + ey + 2.0, 2.0, src.size), 1.0, st.accent);
+                }
+            } else if let Some(ms) = ms {
+                let label = poni_core::capture::readout(ms);
+                let rs = TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT_DIM);
+                let w = ui.c.measure(&label, &rs, 200.0).0.ceil();
+                let x = (r.x + ex + 8.0).min(r.right() - w);
+                ui.c.text(&label, Rect::new(x, y + ey, w + 1.0, src.size + 4.0), &rs);
+            }
         }
         y -= 8.0;
         if y < r.y {
@@ -207,6 +233,17 @@ fn captions(ui: &mut Ui, st: &AppState, r: Rect) {
         }
     }
     ui.c.unclip();
+}
+
+/// Where the last row of `text` (wrapped in `w`) ends: (x from the left, y from the top of the block).
+fn end_of_text(ui: &mut Ui, text: &str, style: &TextStyle, w: f32) -> (f32, f32) {
+    let (tw, th) = ui.c.measure(text, style, w);
+    let one = ui.c.measure("Ag", style, w).1.max(1.0);
+    let rows = (th / one).round().max(1.0);
+    // The last row's width is not measured by the text engine: a single row is exact, a wrapped
+    // text puts it at the remainder (shortcut: a caret or readout on a wrapped line can sit a few px off).
+    let x = if rows <= 1.0 { tw } else { tw % w };
+    (x, (rows - 1.0) * one)
 }
 
 fn ago(secs: f64) -> String {

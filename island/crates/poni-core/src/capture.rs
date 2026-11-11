@@ -374,6 +374,11 @@ pub fn step_px(px: u32, d: i32) -> u32 {
     (px as i32 + d.signum()).clamp(FONT_MIN as i32, FONT_MAX as i32) as u32
 }
 
+/// The latency readout printed after a line, as on board P12: "[ 820 ms ]".
+pub fn readout(ms: u32) -> String {
+    format!("[ {ms} ms ]")
+}
+
 /// The path of an interim (PMM-025): the spoken text only, so no translation model runs for a line
 /// that the next post replaces, and the engine does not keep it as its live caption.
 pub fn interim_draft_path(src: &str) -> String {
@@ -785,6 +790,13 @@ mod tests {
         assert_eq!(resolve_px(0, 3), 18, "an old step is turned into px");
         assert_eq!(resolve_px(0, -99), FONT_MIN);
         assert_eq!(resolve_px(20, 3), 20, "a stored px wins over an old step");
+        assert_eq!(readout(820), "[ 820 ms ]");
+        // The interim is lighter than a kept line (dim vs full text) and still reads: WCAG 3:1 for the
+        // dim colour, 4.5:1 for the text, against the darkest and the lightest ground the pill has.
+        for ground in [[0.04f32; 3], [0.15; 3]] {
+            assert!(crate::glass::contrast([0.62; 3], ground) >= 3.0, "interim text");
+            assert!(crate::glass::contrast([0.96; 3], ground) >= 4.5, "text");
+        }
         assert_eq!(step_px(15, 1), 16);
         assert_eq!(step_px(FONT_MAX, 1), FONT_MAX, "stops at the end");
         assert_eq!(step_px(FONT_MIN, -1), FONT_MIN);
