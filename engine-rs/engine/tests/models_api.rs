@@ -160,6 +160,80 @@ fn sharded_weights_count_only_when_every_shard_is_there() {
     assert_eq!(row(&body, "catalog", id)["downloaded"], true);
 }
 
+/// The translation row of `GET /models`.
+fn translate_row(body: &Value) -> &Value {
+    body["models"]
+        .as_array()
+        .and_then(|rows| rows.iter().find(|row| row["key"] == "translate"))
+        .expect("translate row")
+}
+
+#[test]
+fn an_older_translation_model_keeps_translating_until_the_default_is_pulled() {
+    let (app, _, cache) = app();
+    let default = "unsloth/Qwen3-1.7B-GGUF";
+    // Nothing downloaded: the default stays selected, and the recommendation says it is not there.
+    let (_, body) = call(&app, "GET", "/models", Value::Null);
+    assert_eq!(translate_row(&body)["id"], default);
+    assert_eq!(translate_row(&body)["engine"], "candle-qwen3-gguf");
+    assert_eq!(
+        body["recommended"],
+        json!({ "id": default, "downloaded": false })
+    );
+
+    // An install made under the old default: the 0.5B is on disk, the new default is not.
+    let old = [
+        ("config.json", 10),
+        ("tokenizer.json", 20),
+        ("model.safetensors", 300),
+    ];
+    cache_files(&cache, "Qwen/Qwen2.5-0.5B-Instruct", &old);
+    let (_, body) = call(&app, "GET", "/models", Value::Null);
+    assert_eq!(translate_row(&body)["id"], "Qwen/Qwen2.5-0.5B-Instruct");
+    assert_eq!(translate_row(&body)["engine"], "candle-qwen2");
+    assert_eq!(translate_row(&body)["downloaded"], true);
+    assert_eq!(
+        row(&body, "catalog", "Qwen/Qwen2.5-0.5B-Instruct")["selected"],
+        true
+    );
+    assert_eq!(row(&body, "catalog", default)["selected"], false);
+    assert_eq!(
+        body["recommended"],
+        json!({ "id": default, "downloaded": false })
+    );
+
+    // The default arrives: it takes over with no restart.
+    cache_files(&cache, default, &[("Qwen3-1.7B-Q4_K_M.gguf", 400)]);
+    let (_, body) = call(&app, "GET", "/models", Value::Null);
+    assert_eq!(translate_row(&body)["id"], default);
+    assert_eq!(
+        body["recommended"],
+        json!({ "id": default, "downloaded": true })
+    );
+}
+
+#[test]
+fn a_translation_model_chosen_on_purpose_is_not_swapped_for_the_one_on_disk() {
+    let (app, _, cache) = app();
+    let old = [
+        ("config.json", 10),
+        ("tokenizer.json", 20),
+        ("model.safetensors", 300),
+    ];
+    cache_files(&cache, "Qwen/Qwen2.5-0.5B-Instruct", &old);
+    // Choosing the default itself, still not downloaded, is a choice: it stays and reads as missing.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/engine/models",
+        json!({ "translate": "unsloth/Qwen3-1.7B-GGUF" }),
+    );
+    assert_eq!(status, 200);
+    let (_, body) = call(&app, "GET", "/models", Value::Null);
+    assert_eq!(translate_row(&body)["id"], "unsloth/Qwen3-1.7B-GGUF");
+    assert_eq!(translate_row(&body)["downloaded"], false);
+}
+
 #[test]
 fn catalog_lists_the_fixed_choices_and_marks_the_selected_ones() {
     let (app, _, _) = app();

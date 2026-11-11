@@ -15,7 +15,7 @@ use serde_json::{json, Map, Value};
 
 use crate::audio::pcm_f32_le;
 use crate::calendar::{Calendar, Fail};
-use crate::engine::{segments_json, Jobs, Ml, SavedModels, ASR_ENGINE, MT_ENGINE};
+use crate::engine::{mt_engine, segments_json, Jobs, Ml, SavedModels, ASR_ENGINE};
 use crate::heuristic::heuristic_notes;
 use crate::locations::{
     dir_status, free_bytes, legacy_hubs, migrate_legacy, move_model, move_needs, probe_dir,
@@ -946,7 +946,10 @@ impl App {
             "key": "translate",
             "kind": "translate",
             "id": translate,
-            "engine": if mt { Value::from(MT_ENGINE) } else { Value::Null },
+            "engine": match &translate {
+                Some(id) if mt => Value::from(mt_engine(id)),
+                _ => Value::Null,
+            },
             "device": device,
             "available": mt,
             "loaded": self.ml.translate_loaded(),
@@ -994,10 +997,14 @@ impl App {
     }
 
     fn models_body(&self) -> Value {
+        // The translation model to offer first, and whether it is on disk: when it is not, a
+        // picker shows its download even though an older model may be translating meanwhile.
+        let (recommended, downloaded) = self.ml.translate_recommended();
         json!({
             "models": self.model_inventory(),
             "catalog": self.catalog_rows(),
             "cached": self.cached_rows(),
+            "recommended": { "id": recommended, "downloaded": downloaded },
         })
     }
 

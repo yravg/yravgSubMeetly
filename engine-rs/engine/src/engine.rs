@@ -14,13 +14,24 @@ use serde_json::{json, Value};
 use crate::audio::{self, MonoStream, Windows, SAMPLE_RATE};
 use crate::locations::Locations;
 use crate::marian::{pair_repo, MarianMt};
-use crate::models::{cache_state, catalog_spec, Kind, ModelNotDownloaded};
+use crate::models::{cache_state, catalog_spec, Kind, ModelNotDownloaded, CATALOG};
 use crate::translate::{Translator, DEFAULT_TRANSLATE_MODEL};
 use crate::whisper::DEFAULT_ASR_MODEL;
 use crate::whisper::{repo_for, Segment, Task, WhisperAsr};
 
 pub const ASR_ENGINE: &str = "candle-whisper";
 pub const MT_ENGINE: &str = "candle-qwen2";
+/// The label of a q4_k_m GGUF translation model (the Qwen3 rows), which runs on candle's quantized path.
+pub const MT_ENGINE_GGUF: &str = "candle-qwen3-gguf";
+
+/// What `/models` calls the engine that runs translation model `id`.
+pub fn mt_engine(id: &str) -> &'static str {
+    if crate::translate::gguf_file(id).is_some() {
+        MT_ENGINE_GGUF
+    } else {
+        MT_ENGINE
+    }
+}
 
 fn env_f64(key: &str, fallback: f64) -> f64 {
     env::var(key)
@@ -32,6 +43,8 @@ fn env_f64(key: &str, fallback: f64) -> f64 {
 pub struct Ml {
     asr_model: RwLock<String>,
     translate_model: RwLock<Option<String>>,
+    /// Nobody chose the translation model: it is the default, which gives way to one already on disk.
+    translate_default: AtomicBool,
     /// Env vars win over the saved choice, so `POST /engine/models` cannot move these.
     asr_from_env: bool,
     translate_from_env: bool,
@@ -79,6 +92,24 @@ fn fallback_translate(downloaded: &dyn Fn(&str) -> bool) -> Option<&'static str>
         .filter(|spec| spec.kind == Kind::Translate && spec.id != DEFAULT_TRANSLATE_MODEL)
         .map(|spec| spec.id)
         .find(|id| downloaded(id))
+}
+
+/// The translation model to run now. A model somebody chose (`is_default` false) runs as chosen,
+/// downloaded or not. The default nobody chose runs when it is on disk; until then an install made
+/// under an older default keeps translating with a model it already has (`fallback_translate`),
+/// and with none the default stays so the caption says "missing" and the picker offers the pull.
+fn resolve_translate(
+    chosen: Option<&str>,
+    is_default: bool,
+    downloaded: &dyn Fn(&str) -> bool,
+) -> Option<String> {
+    let chosen = chosen?;
+    if is_default && chosen == DEFAULT_TRANSLATE_MODEL && !downloaded(chosen) {
+        if let Some(id) = fallback_translate(downloaded) {
+            return Some(id.to_string());
+        }
+    }
+    Some(chosen.to_string())
 }
 
 fn pick_models(env: &dyn Fn(&str) -> Option<String>, saved: &SavedModels) -> Picked {
@@ -145,6 +176,7 @@ impl Ml {
         Self {
             asr_model: RwLock::new(picked.asr),
             translate_model: RwLock::new(picked.translate),
+            translate_default: AtomicBool::new(picked.translate_default),
             asr_from_env: picked.asr_from_env,
             translate_from_env: picked.translate_from_env,
             device,
@@ -170,8 +202,22 @@ impl Ml {
         read(&self.asr_model).clone()
     }
 
+    /// The translation model that runs now (see `resolve_translate`); `None` = off.
     pub fn translate_id(&self) -> Option<String> {
-        read(&self.translate_model).clone()
+        let chosen = read(&self.translate_model).clone();
+        resolve_translate(
+            chosen.as_deref(),
+            self.translate_default.load(Ordering::Relaxed),
+            &|id| self.downloaded_dir(id, Kind::Translate).is_ok(),
+        )
+    }
+
+    /// The recommended translation model and whether it is on disk, so a picker can offer its download.
+    pub fn translate_recommended(&self) -> (&'static str, bool) {
+        let downloaded = self
+            .downloaded_dir(DEFAULT_TRANSLATE_MODEL, Kind::Translate)
+            .is_ok();
+        (DEFAULT_TRANSLATE_MODEL, downloaded)
     }
 
     pub fn asr_from_env(&self) -> bool {
@@ -197,6 +243,8 @@ impl Ml {
             return false;
         }
         *write(&self.translate_model) = id.map(str::to_string);
+        // A choice, even of the default itself, is somebody's: it is no longer swapped for another.
+        self.translate_default.store(false, Ordering::Relaxed);
         true
     }
 
@@ -673,6 +721,61 @@ mod tests {
 
         let picked = pick_models(&env(&[("TRANSLATE_MODEL", "acme/mt")]), &mine);
         assert_eq!(picked.translate.as_deref(), Some("acme/mt"));
+    }
+
+    fn on_disk<'a>(ids: &'a [&'a str]) -> impl Fn(&str) -> bool + 'a {
+        move |id| ids.contains(&id)
+    }
+
+    #[test]
+    fn the_default_runs_when_it_is_downloaded_even_if_older_models_are_too() {
+        let disk = on_disk(&[DEFAULT_TRANSLATE_MODEL, "Qwen/Qwen2.5-0.5B-Instruct"]);
+        let id = resolve_translate(Some(DEFAULT_TRANSLATE_MODEL), true, &disk);
+        assert_eq!(id.as_deref(), Some(DEFAULT_TRANSLATE_MODEL));
+    }
+
+    #[test]
+    fn an_install_with_only_an_older_model_keeps_translating_with_it() {
+        // The 0.5B the old default pulled wins over a bigger one that is also there.
+        let both = on_disk(&["Qwen/Qwen2.5-1.5B-Instruct", "Qwen/Qwen2.5-0.5B-Instruct"]);
+        let id = resolve_translate(Some(DEFAULT_TRANSLATE_MODEL), true, &both);
+        assert_eq!(id.as_deref(), Some("Qwen/Qwen2.5-0.5B-Instruct"));
+        // Any other downloaded language model row will do when 0.5B is not there.
+        let only = on_disk(&["Qwen/Qwen2.5-3B-Instruct"]);
+        let id = resolve_translate(Some(DEFAULT_TRANSLATE_MODEL), true, &only);
+        assert_eq!(id.as_deref(), Some("Qwen/Qwen2.5-3B-Instruct"));
+        // An OPUS-MT pair is not a language model: it never stands in for the default.
+        let pair = on_disk(&["Helsinki-NLP/opus-mt-en-id"]);
+        let id = resolve_translate(Some(DEFAULT_TRANSLATE_MODEL), true, &pair);
+        assert_eq!(id.as_deref(), Some(DEFAULT_TRANSLATE_MODEL));
+    }
+
+    #[test]
+    fn with_nothing_downloaded_the_default_stays_so_the_state_says_missing() {
+        let id = resolve_translate(Some(DEFAULT_TRANSLATE_MODEL), true, &on_disk(&[]));
+        assert_eq!(id.as_deref(), Some(DEFAULT_TRANSLATE_MODEL));
+        assert_eq!(
+            resolve_translate(None, true, &on_disk(&[])),
+            None,
+            "translation off stays off"
+        );
+    }
+
+    #[test]
+    fn a_model_somebody_chose_is_never_swapped_for_another() {
+        let disk = on_disk(&["Qwen/Qwen2.5-0.5B-Instruct"]);
+        // Chosen on purpose (saved, or env): not downloaded means missing, not a quiet swap.
+        let id = resolve_translate(Some(DEFAULT_TRANSLATE_MODEL), false, &disk);
+        assert_eq!(id.as_deref(), Some(DEFAULT_TRANSLATE_MODEL));
+        let id = resolve_translate(Some("Qwen/Qwen2.5-3B-Instruct"), true, &disk);
+        assert_eq!(id.as_deref(), Some("Qwen/Qwen2.5-3B-Instruct"));
+    }
+
+    #[test]
+    fn the_gguf_models_report_their_own_engine() {
+        assert_eq!(mt_engine("unsloth/Qwen3-1.7B-GGUF"), "candle-qwen3-gguf");
+        assert_eq!(mt_engine("unsloth/Qwen3-0.6B-GGUF"), "candle-qwen3-gguf");
+        assert_eq!(mt_engine("Qwen/Qwen2.5-0.5B-Instruct"), MT_ENGINE);
     }
 
     #[test]

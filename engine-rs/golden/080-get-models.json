@@ -23,6 +23,7 @@
   },
   "mask": [
     "models",
-    "catalog"
+    "catalog",
+    "recommended"
   ]
 }
