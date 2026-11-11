@@ -133,7 +133,12 @@ pub fn relocate(sink: EventSink, port: u16, kind: Kind, id: String, pick: bool, 
             Err(e) => Err(format!("The engine stopped answering ({e}).")),
         }
     };
+    // A folder picker is Windows' (the Mac leaves a model where the engine put it).
+    let pick = pick && cfg!(windows);
+    #[cfg(not(windows))]
+    let _ = &owner;
     if pick {
+        #[cfg(windows)]
         // Cancelled: no request (a null dir would mean "the default folder"), only the event that frees the row.
         crate::shell::pick_folder(&format!("Folder for the {}", kind.label().to_lowercase()), owner, move |dir| match dir.filter(|d| !d.trim().is_empty()) {
             Some(d) => finish(post(Some(d))),

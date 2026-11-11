@@ -38,10 +38,12 @@ jobs:
       - name: Install the extension's dependencies
         run: npm ci
 
-      - name: Tests
-        working-directory: island
-        run: cargo test -p poni-core
+      # The installer's wizard images need Inno Setup 6.5+ (the runner image may carry an older 6.x).
+      - name: Inno Setup 6.5+
+        shell: pwsh
+        run: choco upgrade innosetup -y --no-progress
 
+      # (build-installer.ps1 runs the add-on pin tests of poni-core itself.)
       # Builds poni.exe and submeetly-engine.exe, then runs ISCC (Inno Setup 6 is on the runner image).
       - name: Build the Setup
         shell: pwsh
@@ -68,7 +70,9 @@ jobs:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: island
+          workspaces: |
+            island
+            engine-rs
 
       - name: Tests
         working-directory: island
@@ -80,6 +84,13 @@ jobs:
           cargo build -p poni --release --target aarch64-apple-darwin
           cargo build -p poni --release --target x86_64-apple-darwin
 
+      # The local engine (captions, translation, the model library) goes inside the app.
+      - name: Build the engine (Apple Silicon and Intel)
+        working-directory: engine-rs
+        run: |
+          cargo build -p submeetly-engine --release --target aarch64-apple-darwin
+          cargo build -p submeetly-engine --release --target x86_64-apple-darwin
+
       - name: App icon
         working-directory: island
         run: |
@@ -90,6 +101,9 @@ jobs:
 
       - name: App bundle and DMG (ad-hoc signed until a Developer ID exists)
         working-directory: island
+        env:
+          ENGINE_ARM: ${{ github.workspace }}/engine-rs/target/aarch64-apple-darwin/release/submeetly-engine
+          ENGINE_INTEL: ${{ github.workspace }}/engine-rs/target/x86_64-apple-darwin/release/submeetly-engine
         run: tools/make_mac_app.sh target/aarch64-apple-darwin/release/poni target/x86_64-apple-darwin/release/poni build/yravgSubMeetly.icns dist
 
       - name: Update in place (the app replaces itself)

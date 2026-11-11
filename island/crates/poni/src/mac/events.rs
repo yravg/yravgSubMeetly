@@ -103,4 +103,16 @@ pub enum AppEvent {
     AdzanEnded,
     /// Free-form log line from a service thread.
     Log(String),
+    /// What the engine supervisor sees (`services::engine`).
+    Engine(poni_core::engine_link::EngineInfo),
+    /// The engine's models (`services::models`), and how each action on one ended.
+    Models(Result<poni_core::models::Inventory, String>),
+    ModelPulled { kind: poni_core::models::Kind, id: String, result: Result<(), String> },
+    ModelDeleted { id: String, result: Result<u64, String> },
+    ModelSelected { kind: poni_core::models::Kind, result: Result<(), String> },
+    ModelPlaced { kind: poni_core::models::Kind, result: Result<(), String> },
 }
+
+/// Windows' window handle, which `services::models::relocate` names; the Mac has no picker (a model's
+/// folder is the engine's own), so it is never made.
+pub struct SendHwnd(pub isize);
