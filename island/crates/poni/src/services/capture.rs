@@ -758,8 +758,10 @@ mod tests {
         // The window the tail asks for is kept with an interim in it.
         log.set_interim(Some("next".into()));
         assert_eq!(log.tail(2).1.iter().map(|l| l.source.as_str()).collect::<Vec<_>>(), ["hello how are you", "next"]);
-        // Stop clears it with the rest.
-        log.take();
+        // Stop clears it with the rest, and what a save receives holds finals only.
+        let saved = log.take();
+        assert!(saved.iter().all(|l| l.source != "next"), "the interim is never saved");
+        assert_eq!(saved.len(), 2);
         assert_eq!(log.tail(5), (0, Vec::new()));
     }
 

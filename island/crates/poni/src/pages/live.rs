@@ -277,15 +277,20 @@ fn translation_hint(ui: &mut Ui, st: &mut AppState, area: Rect, y: f32, hint: Tr
 /// person's colour, from `y` in a column `w` wide (Live, and the Media page's caption column).
 /// Returns where the translation goes.
 pub(crate) fn caption_lines(ui: &mut Ui, st: &AppState, cap: &Captions, x: f32, mut y: f32, w: f32, now: Color) -> f32 {
+    // Captions tab › Show and Font size (PMM-026). A larger size grows each box by the same px.
+    let (show, step) = (poni_core::capture::Show::parse(&st.settings.caption_show), st.settings.caption_font);
+    let grow = step.max(0) as f32 * 2.0;
+    let sized = |s: TextStyle| TextStyle { size: poni_core::capture::font_px(s.size, step), ..s };
+    let (main, under) = show.parts(&cap.current, &cap.translation);
     if !cap.previous.is_empty() {
-        ui.c.text(&cap.previous, Rect::new(x, y, w, 18.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
+        ui.c.text(&cap.previous, Rect::new(x, y, w, 18.0), &sized(TextStyle::footnote().color(palette::TEXT_FAINT)));
     }
     y += 22.0;
-    ui.c.text(&cap.current, Rect::new(x, y, w, 46.0), &TextStyle::headline().color(now).wrap().top());
-    y += 50.0;
-    if !cap.translation.is_empty() {
+    ui.c.text(main, Rect::new(x, y, w, 46.0 + grow), &sized(TextStyle::headline().color(now).wrap().top()));
+    y += 50.0 + grow;
+    if let Some(u) = under {
         let color = hkit::translation_color(ui, st.settings.translation_color);
-        ui.c.text(&cap.translation, Rect::new(x, y, w, 40.0), &TextStyle::body().color(color).wrap().top());
+        ui.c.text(u, Rect::new(x, y, w, 40.0 + grow), &sized(TextStyle::body().color(color).wrap().top()));
     }
     y
 }

@@ -163,6 +163,10 @@ pub struct Settings {
     pub quick_captions_open: bool,
     /// Captions tab › Latency (`utterance::Latency::key`): `fast`, `balanced` (default) or `accurate`.
     pub latency_mode: String,
+    /// Captions tab › Show (`capture::Show::key`): `both` (default), `original` or `translation`.
+    pub caption_show: String,
+    /// Captions tab › Font size: px added to the caption text (`capture::font_px`), 0 = as before.
+    pub caption_font: i32,
     pub hud_volume: bool,
     pub hud_power: bool,
     pub hud_bluetooth: bool,
@@ -276,6 +280,8 @@ impl Default for Settings {
             open_meeting_tab: true,
             quick_captions_open: false,
             latency_mode: "balanced".into(),
+            caption_show: "both".into(),
+            caption_font: 0,
             hud_volume: true,
             hud_power: true,
             hud_bluetooth: true,
@@ -444,6 +450,7 @@ mod tests {
         assert!(s.meeting_apps.is_empty() && s.open_meeting_tab && s.meeting_families.slack && s.meeting_families.teams);
         assert!(!s.quick_captions_open, "the pill's caption strip starts hidden");
         assert_eq!(crate::utterance::Latency::parse(&s.latency_mode), crate::utterance::Latency::Balanced, "an old file captions as before");
+        assert_eq!((crate::capture::Show::parse(&s.caption_show), s.caption_font), (crate::capture::Show::Both, 0), "and looks as before");
         assert_eq!((s.live_source.as_str(), s.mic_device.as_str()), ("room", ""), "Live starts on the room, Windows' default mic");
         assert_eq!(s.captions_source, "pc", "captions on from an old file restart on what the PC plays");
         let s: Settings = serde_json::from_str(r#"{"captions_on":true,"captions_source":"both"}"#).unwrap();

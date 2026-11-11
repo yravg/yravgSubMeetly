@@ -186,15 +186,20 @@ fn captions(ui: &mut Ui, st: &AppState, r: Rect) {
     let newest = st.call.lines.len() - 1;
     ui.c.clip(r);
     let mut y = r.bottom();
+    // Captions tab › Show and Font size (PMM-026): which text each line prints, and how large.
+    let (show, step) = (poni_core::capture::Show::parse(&st.settings.caption_show), st.settings.caption_font);
     for (i, l) in st.call.lines.iter().enumerate().rev() {
-        let src = if i == newest { TextStyle::body().weight(Weight::Semibold) } else { TextStyle::footnote().color(palette::TEXT_DIM) }.wrap().top();
-        let tst = TextStyle::footnote().color(if i == newest { tr } else { tr.with_alpha(0.75) }).wrap().top();
-        let sh = ui.c.measure(&l.source, &src, r.w).1.ceil();
-        let th = if l.translation.is_empty() { 0.0 } else { ui.c.measure(&l.translation, &tst, r.w).1.ceil() + 2.0 };
+        let (main, under) = show.parts(&l.source, &l.translation);
+        let mut src = if i == newest { TextStyle::body().weight(Weight::Semibold) } else { TextStyle::footnote().color(palette::TEXT_DIM) }.wrap().top();
+        src.size = poni_core::capture::font_px(src.size, step);
+        let mut tst = TextStyle::footnote().color(if i == newest { tr } else { tr.with_alpha(0.75) }).wrap().top();
+        tst.size = poni_core::capture::font_px(tst.size, step);
+        let sh = ui.c.measure(main, &src, r.w).1.ceil();
+        let th = under.map_or(0.0, |u| ui.c.measure(u, &tst, r.w).1.ceil() + 2.0);
         y -= sh + th;
-        ui.c.text(&l.source, Rect::new(r.x, y, r.w, sh), &src);
-        if th > 0.0 {
-            ui.c.text(&l.translation, Rect::new(r.x, y + sh + 2.0, r.w, th), &tst);
+        ui.c.text(main, Rect::new(r.x, y, r.w, sh), &src);
+        if let Some(u) = under {
+            ui.c.text(u, Rect::new(r.x, y + sh + 2.0, r.w, th), &tst);
         }
         y -= 8.0;
         if y < r.y {

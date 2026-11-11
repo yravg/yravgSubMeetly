@@ -20,14 +20,14 @@ use crate::pill::quick_captions::{self, Act, Ctl, Which};
 use crate::settings_window::{self, Key, Section};
 use crate::state::AppState;
 use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_SMALL};
-use poni_core::capture::lang_name;
+use poni_core::capture::{lang_name, step_font, Show};
 use poni_core::geom::{palette, Color, Rect};
 use poni_core::meeting_source::Family;
 use poni_core::models::Kind;
 use poni_core::utterance::Latency;
 
-const ROW_H: f32 = 34.0;
-const ROWS: usize = 5;
+const ROW_H: f32 = 30.0;
+const ROWS: usize = 6;
 const COL_GAP: f32 = 28.0;
 const SOURCE_GAP: f32 = 10.0;
 const SOURCE_LABEL_W: f32 = 112.0;
@@ -102,7 +102,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let mut clicked = false;
 
     // Left: the switches, in the order of Advanced settings.
-    let switches: [(&str, bool); ROWS] = [
+    let switches: [(&str, bool); 5] = [
         ("Captions on", running),
         ("Start by themselves", s.auto_captions),
         ("Translate captions", s.translate_captions),
@@ -152,8 +152,8 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     ui.c.text(&count, Rect::new(r.x + r.w * 0.5, r.y, (b.x - 8.0 - r.x - r.w * 0.5).max(0.0), r.h), &TextStyle::caption().color(palette::TEXT_DIM).right());
     latency_row(ui, st, right(3));
     model_row(ui, st, right(4));
-    // Not built yet: show original / translation / both, and the pill's font size. They are pill
-    // rendering options with no engine side; no control stands in for them until they exist.
+    show_row(ui, st, left(5));
+    font_row(ui, st, right(5));
 
     // Bottom: what Live listens to, and the microphone.
     let row = Rect::new(area.x, area.y + ROWS as f32 * ROW_H + SOURCE_GAP, area.w, SOURCE_H);
@@ -166,6 +166,37 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         st.cmd(Command::ModelsRefresh);
     }
     quick_captions::language_list(ui, st, area, area.bottom(), clicked);
+}
+
+/// Show (PMM-026): Original, Translation or Both, for Live, Meeting and the Media caption column.
+fn show_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
+    ui.c.text("Show", Rect::new(r.x + PAD, r.y, r.w * 0.3, r.h), &TextStyle::body().weight(Weight::Regular));
+    let names: Vec<&str> = Show::ALL.iter().map(|s| s.label()).collect();
+    let sel = Show::ALL.iter().position(|s| *s == Show::parse(&st.settings.caption_show)).unwrap_or(2);
+    let pw = picker_width(ui, &names);
+    if let Some(i) = picker(ui, "cap.show", r.right() - PAD - pw, r.y + 3.0, r.h - 6.0, &names, sel) {
+        st.settings.caption_show = Show::ALL[i].key().to_string();
+        st.cmd(Command::SaveSettings);
+    }
+}
+
+/// Font size (PMM-026): px added to the caption text of Live, Meeting and the Media column.
+fn font_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
+    let cy = r.center().y;
+    ui.c.text("Font size", Rect::new(r.x + PAD, r.y, (r.w - 2.0 * STEP - NAME_W - 2.0 * PAD).max(0.0), r.h), &TextStyle::body().weight(Weight::Regular));
+    let plus = Rect::new(r.right() - PAD - STEP, cy - STEP / 2.0, STEP, STEP);
+    let name = Rect::new(plus.x - NAME_W, r.y, NAME_W, r.h);
+    let minus = Rect::new(name.x - STEP, cy - STEP / 2.0, STEP, STEP);
+    let step = st.settings.caption_font;
+    for (k, (b, icon, d)) in [(minus, Icon::Minus, -1), (plus, Icon::Plus, 1)].into_iter().enumerate() {
+        let live = step_font(step, d) != step;
+        if ui.icon_button(wid_n("cap.font", k as u64), b, icon, if live { palette::TEXT_DIM } else { palette::TEXT_FAINT }, 11.0).clicked && live {
+            st.settings.caption_font = step_font(step, d);
+            st.cmd(Command::SaveSettings);
+        }
+    }
+    let shown = if step == 0 { "Default".to_string() } else { format!("{step:+} px") };
+    ui.c.text(&shown, name, &TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT).center());
 }
 
 /// Fast / Balanced / Accurate: the utterance timing, the engine's mode and the model rows each one

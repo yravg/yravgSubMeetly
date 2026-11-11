@@ -304,6 +304,65 @@ pub fn draft_path(src: &str, tgt: &str) -> String {
     format!("/draft?src={src}&tgt={tgt}")
 }
 
+/// Captions tab › Show (PMM-026): what the pill prints for each caption line.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Show {
+    /// The spoken line, its translation under it (as before).
+    #[default]
+    Both,
+    Original,
+    Translation,
+}
+
+impl Show {
+    pub const ALL: [Show; 3] = [Show::Original, Show::Translation, Show::Both];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Show::Both => "both",
+            Show::Original => "original",
+            Show::Translation => "translation",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Show::Both => "Both",
+            Show::Original => "Original",
+            Show::Translation => "Translation",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        Self::ALL.into_iter().find(|v| v.key() == s.trim()).unwrap_or_default()
+    }
+
+    /// (the main line, the line under it) for one caption. A missing translation never leaves a
+    /// blank page: the spoken line stands in.
+    pub fn parts<'a>(self, source: &'a str, translation: &'a str) -> (&'a str, Option<&'a str>) {
+        let has = !translation.trim().is_empty();
+        match self {
+            Show::Original => (source, None),
+            Show::Translation if has => (translation, None),
+            Show::Translation => (source, None),
+            Show::Both => (source, has.then_some(translation)),
+        }
+    }
+}
+
+/// Captions tab › Font size: a step in px added to each caption style's size, within these ends.
+pub const FONT_MIN: i32 = -2;
+pub const FONT_MAX: i32 = 4;
+
+pub fn font_px(base: f32, step: i32) -> f32 {
+    base + step.clamp(FONT_MIN, FONT_MAX) as f32
+}
+
+/// One press of − (-1) or + (+1), stopping at the ends.
+pub fn step_font(step: i32, d: i32) -> i32 {
+    (step + d.signum()).clamp(FONT_MIN, FONT_MAX)
+}
+
 /// The path of an interim (PMM-025): the spoken text only, so no translation model runs for a line
 /// that the next post replaces, and the engine does not keep it as its live caption.
 pub fn interim_draft_path(src: &str) -> String {
@@ -690,6 +749,32 @@ mod tests {
     #[test]
     fn the_request_body_is_little_endian_f32() {
         assert_eq!(pcm_bytes(&[1.0, -2.0]), [0, 0, 0x80, 0x3f, 0, 0, 0, 0xc0]);
+    }
+
+    #[test]
+    fn show_picks_the_main_line_and_the_one_under_it() {
+        // Both is today's look: the spoken line, its translation under it.
+        assert_eq!(Show::Both.parts("hello", "hola"), ("hello", Some("hola")));
+        assert_eq!(Show::Original.parts("hello", "hola"), ("hello", None));
+        assert_eq!(Show::Translation.parts("hello", "hola"), ("hola", None));
+        // No translation yet (off, loading, an interim): never a blank line, the spoken one stands.
+        assert_eq!(Show::Translation.parts("hello", ""), ("hello", None));
+        assert_eq!(Show::Both.parts("hello", ""), ("hello", None));
+        assert_eq!(Show::parse("original"), Show::Original);
+        assert_eq!(Show::parse("junk"), Show::Both);
+        assert!(Show::ALL.iter().all(|s| Show::parse(s.key()) == *s));
+    }
+
+    #[test]
+    fn the_font_step_is_clamped_and_never_shrinks_text_below_readable() {
+        assert_eq!(font_px(13.0, 0), 13.0);
+        assert_eq!(font_px(13.0, 3), 16.0);
+        assert_eq!(font_px(13.0, 99), 13.0 + FONT_MAX as f32, "the step is capped");
+        assert_eq!(font_px(12.0, -99), 12.0 + FONT_MIN as f32);
+        assert!(font_px(12.0, -99) >= 10.0);
+        assert_eq!(step_font(0, 1), 1);
+        assert_eq!(step_font(FONT_MAX, 1), FONT_MAX, "stops at the end");
+        assert_eq!(step_font(FONT_MIN, -1), FONT_MIN);
     }
 
     #[test]
