@@ -113,6 +113,7 @@ pub struct App {
     shutdown: AtomicBool,
     live: Mutex<Value>,
     calendar: Calendar,
+    integrations: crate::integrations::Integrations,
 }
 
 impl App {
@@ -122,6 +123,7 @@ impl App {
         let device_pref_path = env_path("DEVICE_PREF_PATH", state_dir.join("device.json"));
         let ui_prefs_path = env_path("UI_PREFS_PATH", state_dir.join("ui-prefs.json"));
         let models_path = env_path("ENGINE_MODELS_PATH", state_dir.join("engine-models.json"));
+        let integrations_path = state_dir.join("integrations.json");
         let allowed_origins = env::var("ALLOWED_ORIGINS")
             .unwrap_or_default()
             .split(',')
@@ -171,6 +173,10 @@ impl App {
             jobs: Jobs::default(),
             shutdown: AtomicBool::new(false),
             live: Mutex::new(live_idle()),
+            integrations: crate::integrations::Integrations::new(env_path(
+                "INTEGRATIONS_PATH",
+                integrations_path,
+            )),
         }
     }
 
@@ -313,6 +319,9 @@ impl App {
             }
             "/notes" => self.json_response(request, 200, json!({ "notes": self.load_notes() })),
             "/calendar" => self.get_calendar(request),
+            "/integrations/webhooks" => {
+                self.json_response(request, 200, self.integrations.list())
+            }
             "/models" => self.json_response(request, 200, self.models_body()),
             "/engine/mode" => {
                 self.json_response(request, 200, json!({ "mode": self.load_engine_mode() }))
@@ -368,6 +377,8 @@ impl App {
             "/notes" => self.post_notes(request),
             "/notes/generate" => self.post_notes_generate(request, false),
             "/notes/summarize" => self.post_notes_generate(request, true),
+            "/integrations/webhooks" => self.post_integrations(request, false),
+            "/integrations/webhooks/test" => self.post_integrations(request, true),
             "/calendar/sources" => self.post_calendar_source(request),
             "/calendar/refresh" => self.post_calendar_refresh(request),
             "/calendar/notes" => self.post_calendar_note(request),
@@ -1677,11 +1688,33 @@ impl App {
         };
         let note_id = note.get("id").cloned().unwrap_or(Value::Null);
         let mut notes = self.load_notes();
+        let previous = notes
+            .iter()
+            .find(|existing| existing.get("id") == Some(&note_id))
+            .cloned();
         notes.retain(|existing| existing.get("id") != Some(&note_id));
         notes.insert(0, note.clone());
         notes.truncate(50);
         self.save_notes(&notes);
+        // Webhooks: queued on their own thread, never waited for.
+        self.integrations.note_saved(previous.as_ref(), &note);
         self.json_response(request, 200, json!({ "ok": true, "note": note }))
+    }
+
+    /// `POST /integrations/webhooks` (add, change, remove) and `/test` (one ping).
+    fn post_integrations(&self, request: &Request, test: bool) -> Response {
+        let Some(payload) = parse_body(&request.body) else {
+            return self.json_response(request, 400, json!({ "error": "invalid JSON body" }));
+        };
+        let result = if test {
+            self.integrations.test(&payload)
+        } else {
+            self.integrations.change(&payload)
+        };
+        match result {
+            Ok(body) => self.json_response(request, 200, body),
+            Err(error) => self.json_response(request, 400, json!({ "error": error })),
+        }
     }
 
     fn calendar_fail(&self, request: &Request, fail: Fail) -> Response {

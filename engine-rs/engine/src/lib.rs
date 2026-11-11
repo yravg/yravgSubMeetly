@@ -3,11 +3,15 @@
 pub mod app;
 pub mod audio;
 pub mod calendar;
+pub mod cli;
+pub mod client;
 pub mod engine;
 pub mod heuristic;
 pub mod ics;
+pub mod integrations;
 pub mod locations;
 pub mod marian;
+pub mod mcp;
 pub mod ml;
 pub mod models;
 pub mod native_host;

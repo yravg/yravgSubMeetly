@@ -1491,7 +1491,7 @@ impl App {
         self.st.now = now;
         let media_before = matches!(ev, AppEvent::Media(_) | AppEvent::MediaTimeline { .. }).then(|| self.media_snapshot());
         // What the Settings window shows that a service reports.
-        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
+        let shown = matches!(ev, AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Engine(_) | AppEvent::Webhooks(_) | AppEvent::WebhookNote { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. });
         if let Some(s) = self.settings_ui.as_mut().filter(|_| shown) {
             s.view.dirty = true;
         }
@@ -1645,6 +1645,11 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::Webhooks(r) => self.st.webhooks.apply(r),
+            AppEvent::WebhookNote { ok, text } => {
+                let (icon, color) = if ok { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
+                self.st.notify(icon, color, "Webhooks", text, if ok { 4.0 } else { 8.0 }, None);
+            }
             AppEvent::Models(r) => {
                 self.st.models.apply(r, now);
             }
@@ -1725,6 +1730,33 @@ impl App {
         let in_use = self.updater.is_some();
         if ours && status == AddonStatus::Off && !in_use && !pages::addons::OFFERED.iter().any(|a| a.downloads() && self.st.settings.addon_on(a.id)) {
             self.addons = None;
+        }
+    }
+
+    // ------------------------------------------------------------ the engine's webhooks
+
+    /// Ask the engine for its webhooks (Settings › General shows them, every 10 s while open).
+    fn refresh_webhooks(&mut self) {
+        if self.st.webhooks.busy {
+            return;
+        }
+        self.st.webhooks.asking(self.st.now);
+        services::integrations::fetch(self.sink.clone(), poni_core::helper::configured_port());
+    }
+
+    fn webhook_change(&mut self, change: services::integrations::Change) {
+        services::integrations::change(self.sink.clone(), poni_core::helper::configured_port(), change);
+    }
+
+    /// Settings › Webhooks › Paste URL: the clipboard's link becomes a webhook.
+    fn add_webhook_from_clipboard(&mut self) {
+        let text = services::clipboard::read_text().unwrap_or_default();
+        match poni_core::webhooks::clipboard_url(&text) {
+            Ok(url) => {
+                self.engine_start();
+                self.webhook_change(services::integrations::Change::Add(url));
+            }
+            Err(why) => self.st.notify(Icon::Download, palette::ORANGE, "Webhooks", why, 6.0, None),
         }
     }
 
@@ -2841,6 +2873,11 @@ impl App {
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
                 Command::ModelsRefresh => self.refresh_models(),
+                Command::WebhooksRefresh => self.refresh_webhooks(),
+                Command::WebhookAddFromClipboard => self.add_webhook_from_clipboard(),
+                Command::WebhookEnable(id, on) => self.webhook_change(services::integrations::Change::Enable(id, on)),
+                Command::WebhookRemove(id) => self.webhook_change(services::integrations::Change::Remove(id)),
+                Command::WebhookTest(id) => self.webhook_change(services::integrations::Change::Test(id)),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelPullId(id) => self.pull_model_id(id),

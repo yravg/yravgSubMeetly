@@ -105,6 +105,9 @@ pub enum AppEvent {
     Log(String),
     /// What the engine supervisor sees (`services::engine`).
     Engine(poni_core::engine_link::EngineInfo),
+    /// The engine's webhooks (`services::integrations`), and one line about the change just made.
+    Webhooks(Result<Vec<poni_core::webhooks::Webhook>, String>),
+    WebhookNote { ok: bool, text: String },
     /// The engine's models (`services::models`), and how each action on one ended.
     Models(Result<poni_core::models::Inventory, String>),
     ModelPulled { kind: poni_core::models::Kind, id: String, result: Result<(), String> },

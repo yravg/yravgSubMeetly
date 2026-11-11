@@ -630,6 +630,8 @@ pub struct AppState {
     pub caption_hint: Option<poni_core::capture::TranslateHint>,
     /// The engine's models and the download under way (Settings, the Live page).
     pub models: poni_core::models::Models,
+    /// The engine's webhooks, for Settings › General.
+    pub webhooks: poni_core::webhooks::Webhooks,
     /// Side effects requested during the frame.
     pub cmds: Vec<Command>,
 }
@@ -725,6 +727,7 @@ impl AppState {
             meeting_pick: None,
             caption_hint: None,
             models: Default::default(),
+            webhooks: Default::default(),
             cmds: Vec::new(),
         };
         // On ones start by checking their files (the worker reports back);

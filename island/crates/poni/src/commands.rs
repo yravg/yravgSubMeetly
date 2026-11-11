@@ -169,6 +169,13 @@ pub enum Command {
     CallNotesRefresh,
     /// Ask the engine which models it has.
     ModelsRefresh,
+    /// Settings › General › Webhooks: ask the engine for them, add the URL on the clipboard, switch one,
+    /// remove one, send it a test (by the engine's id for it).
+    WebhooksRefresh,
+    WebhookAddFromClipboard,
+    WebhookEnable(String, bool),
+    WebhookRemove(String),
+    WebhookTest(String),
     /// Download this model.
     ModelPull(poni_core::models::Kind),
     /// Switch the engine to this model (`models::OFF` for no translation).

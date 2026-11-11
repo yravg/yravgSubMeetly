@@ -60,6 +60,8 @@ pub mod meeting_probe;
 // its models by the shared `models.rs`.
 #[path = "services/engine.rs"]
 pub mod engine;
+#[path = "../services/integrations.rs"]
+pub mod integrations;
 #[path = "../services/models.rs"]
 pub mod models;
 #[path = "services/location.rs"]

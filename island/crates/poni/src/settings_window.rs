@@ -399,6 +399,13 @@ pub enum Key {
     /// Add the running app at this place in `AppState::meeting_pick`.
     MeetingPickApp(usize),
     OpenMeetingTab,
+    /// Webhooks (the engine's, by their place in `AppState::webhooks`): the switch, Test, Remove; Add
+    /// takes the URL on the clipboard; Info only says something.
+    Webhook(u8),
+    WebhookTest(u8),
+    WebhookRemove(u8),
+    WebhookAdd,
+    WebhookInfo,
 }
 
 /// A row's control, at its right end.
@@ -438,6 +445,24 @@ impl Item {
         self.progress = poni_core::library::progress(st);
         self
     }
+}
+
+/// Settings › General › Webhooks: the engine's list, one switch, Test and Remove each, and the Add row.
+/// The kit has no text field: Paste URL reads the clipboard (as the calendar link does).
+fn webhook_rows(st: &AppState) -> Vec<Item> {
+    let w = &st.webhooks;
+    let mut rows = Vec::new();
+    for (i, h) in w.list.iter().enumerate().take(20) {
+        let name = h.name();
+        rows.push(item(Key::Webhook(i as u8), &name, Some(&h.sub()), Ctl::Switch(Some(h.enabled))));
+        rows.push(item(Key::WebhookTest(i as u8), &format!("Send a test to {name}"), None, Ctl::Button("Test")));
+        rows.push(item(Key::WebhookRemove(i as u8), &format!("Remove {name}"), None, Ctl::Button("Remove")));
+    }
+    rows.push(item(Key::WebhookAdd, "Add a webhook", Some("Copy its URL, then press Paste URL"), Ctl::Button("Paste URL")));
+    if let Some(e) = &w.error {
+        rows.push(item(Key::WebhookInfo, "The engine's webhooks are not available", Some(e), Ctl::None));
+    }
+    rows
 }
 
 fn switch(key: Key, label: &str, sub: Option<&str>, on: bool) -> Item {
@@ -590,7 +615,12 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             if s.system_on() {
                 rows.push(switch(Key::SystemHistory, "Keep System page history", Some("The charts keep the last minute while the page is closed"), s.system_history));
             }
-            vec![Block::Version, Block::Group(None, rows)]
+            vec![
+                Block::Version,
+                Block::Group(None, rows),
+                Block::Group(Some("Webhooks"), webhook_rows(st)),
+                Block::Note("A webhook is a web address the engine calls when a meeting is saved or action items appear (signed with a secret if you set one). The MCP server and the command line are in docs/INTEGRATIONS.md."),
+            ]
         }
         Section::Appearance => {
             let looks = status::looks(s.theme);
@@ -968,6 +998,29 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             st.cmd(Command::MeetingAddLink);
             return;
         }
+        Key::Webhook(i) => {
+            if let Some(h) = st.webhooks.list.get(i as usize) {
+                st.cmd(Command::WebhookEnable(h.id.clone(), !h.enabled));
+            }
+            return;
+        }
+        Key::WebhookTest(i) => {
+            if let Some(h) = st.webhooks.list.get(i as usize) {
+                st.cmd(Command::WebhookTest(h.id.clone()));
+            }
+            return;
+        }
+        Key::WebhookRemove(i) => {
+            if let Some(h) = st.webhooks.list.get(i as usize) {
+                st.cmd(Command::WebhookRemove(h.id.clone()));
+            }
+            return;
+        }
+        Key::WebhookAdd => {
+            st.cmd(Command::WebhookAddFromClipboard);
+            return;
+        }
+        Key::WebhookInfo => return,
         Key::MeetingPickApps => {
             st.cmd(Command::MeetingPickApps);
             return;
@@ -1365,6 +1418,9 @@ fn draw(ui: &mut Ui, st: &mut AppState, section: Section, frame: Frame, light: b
     let x = content.x;
     if matches!(section, Section::Speech | Section::Models) && st.models.due(st.now) {
         st.cmd(Command::ModelsRefresh);
+    }
+    if section == Section::General && st.webhooks.due(st.now) {
+        st.cmd(Command::WebhooksRefresh);
     }
     for (bi, b) in blocks(section, st).into_iter().enumerate() {
         y = draw_block(ui, st, &b, bi, Rect::new(x, y, content.w, 0.0), view, &sf, m);
@@ -1943,12 +1999,42 @@ mod tests {
                     // Paste reads the clipboard and Pick lists running apps: the app does both.
                     Key::MeetingAddLink => assert!(st.cmds.contains(&Command::MeetingAddLink)),
                     Key::MeetingPickApps => assert!(st.cmds.contains(&Command::MeetingPickApps)),
+                    // The webhooks live in the engine: the app asks it, nothing goes to the settings file.
+                    Key::WebhookAdd => assert!(st.cmds.contains(&Command::WebhookAddFromClipboard) && !saved),
+                    Key::Webhook(_) | Key::WebhookTest(_) | Key::WebhookRemove(_) => assert!(!st.cmds.is_empty() && !saved, "{:?}", it.key),
                     // The library's filter is a view of the list, not a setting.
                     Key::LibFilter => assert!(st.cmds.is_empty()),
                     _ => assert!(saved, "{:?} didn't save", it.key),
                 }
             }
         }
+    }
+
+    #[test]
+    fn webhook_rows_come_from_the_engines_list_and_ask_the_app() {
+        use poni_core::webhooks::Webhook;
+        let mut st = state();
+        st.webhooks.list = vec![Webhook { id: "wh-1".into(), url: "https://hooks.example.com/in".into(), enabled: true, has_secret: true, last_ok: Some(true), last_error: String::new() }];
+        let general = rows(Section::General, &st);
+        let hook = general.iter().find(|i| i.key == Key::Webhook(0)).expect("the hook's row");
+        assert_eq!(hook.label, "hooks.example.com");
+        assert_eq!(hook.sub.as_deref(), Some("On, last delivery worked. Signed with your secret"));
+        assert_eq!(hook.ctl, Ctl::Switch(Some(true)));
+        for (key, want) in [
+            (Key::Webhook(0), Command::WebhookEnable("wh-1".into(), false)),
+            (Key::WebhookTest(0), Command::WebhookTest("wh-1".into())),
+            (Key::WebhookRemove(0), Command::WebhookRemove("wh-1".into())),
+        ] {
+            st.cmds.clear();
+            apply(&mut st, key, Act::Press);
+            assert_eq!(st.cmds, vec![want]);
+        }
+        // A row for a hook that has gone does nothing.
+        st.cmds.clear();
+        apply(&mut st, Key::WebhookRemove(5), Act::Press);
+        assert!(st.cmds.is_empty());
+        st.webhooks.error = Some("The engine is not answering".into());
+        assert!(rows(Section::General, &st).iter().any(|i| i.key == Key::WebhookInfo));
     }
 
     #[test]

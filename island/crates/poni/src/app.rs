@@ -2257,6 +2257,33 @@ impl App {
         }
     }
 
+    /// Ask the engine for its webhooks (Settings › General shows them, every 10 s while open).
+    fn refresh_webhooks(&mut self) {
+        if self.st.webhooks.busy {
+            return;
+        }
+        self.st.webhooks.asking(self.st.now);
+        services::integrations::fetch(self.sink.clone(), poni_core::helper::configured_port());
+    }
+
+    fn webhook_change(&mut self, change: services::integrations::Change) {
+        services::integrations::change(self.sink.clone(), poni_core::helper::configured_port(), change);
+    }
+
+    /// Settings › Webhooks › Paste URL: the clipboard's link becomes a webhook (the engine is started first).
+    fn add_webhook_from_clipboard(&mut self) {
+        let text = services::clipboard::read_text(self.hwnd).unwrap_or_default();
+        match poni_core::webhooks::clipboard_url(&text) {
+            Ok(url) => {
+                if let Some(svc) = self.services.as_mut() {
+                    svc.engine_start();
+                }
+                self.webhook_change(services::integrations::Change::Add(url));
+            }
+            Err(why) => self.st.notify(Icon::Download, palette::ORANGE, "Webhooks", why, 6.0, None),
+        }
+    }
+
     /// Ask the engine which models it has (Settings shows them, every 10 s while open).
     fn refresh_models(&mut self) {
         if self.st.models.busy {
@@ -2750,7 +2777,7 @@ impl App {
         // What the Settings window shows that a service reports.
         let shown = matches!(
             ev,
-            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. }
+            AppEvent::Autostart(_) | AppEvent::Update(_) | AppEvent::Addon { .. } | AppEvent::Located(_) | AppEvent::Notify(_) | AppEvent::WinLang { .. } | AppEvent::Webhooks(_) | AppEvent::WebhookNote { .. } | AppEvent::Models(_) | AppEvent::ModelPulled { .. } | AppEvent::ModelSelected { .. } | AppEvent::ModelDeleted { .. } | AppEvent::ModelPlaced { .. }
         );
         if let Some(w) = self.settings_win.as_mut().filter(|_| shown) {
             w.view.dirty = true;
@@ -3021,6 +3048,11 @@ impl App {
                     self.st.call.notes.answer(self.st.now, draft);
                     self.request_frame();
                 }
+            }
+            AppEvent::Webhooks(r) => self.st.webhooks.apply(r),
+            AppEvent::WebhookNote { ok, text } => {
+                let (icon, color) = if ok { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
+                self.st.notify(icon, color, "Webhooks", text, if ok { 4.0 } else { 8.0 }, None);
             }
             AppEvent::Models(r) => {
                 let was = self.st.models.moving();
@@ -4949,6 +4981,11 @@ impl App {
                 }
                 Command::CallNotesRefresh => self.call_refresh(),
                 Command::ModelsRefresh => self.refresh_models(),
+                Command::WebhooksRefresh => self.refresh_webhooks(),
+                Command::WebhookAddFromClipboard => self.add_webhook_from_clipboard(),
+                Command::WebhookEnable(id, on) => self.webhook_change(services::integrations::Change::Enable(id, on)),
+                Command::WebhookRemove(id) => self.webhook_change(services::integrations::Change::Remove(id)),
+                Command::WebhookTest(id) => self.webhook_change(services::integrations::Change::Test(id)),
                 Command::ModelPull(k) => self.pull_model(k),
                 Command::ModelSelect(k, id) => self.select_model(k, id),
                 Command::ModelFolder(k) => self.place_model(k, true),
