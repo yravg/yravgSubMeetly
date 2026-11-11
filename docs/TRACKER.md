@@ -130,24 +130,27 @@ Columns: **Win** = island on Windows · **Mac** = Rust island on macOS (v1.3.13)
 
 | Feature | Branch | Status |
 | --- | --- | --- |
-| Speaker diarization ("who said what") | `feat/diarization` | in progress |
-| Custom AI model connector (OpenAI-compatible / Ollama / OpenRouter) | `feat/connector-templates` | in progress |
-| Custom summary templates | `feat/connector-templates` | in progress |
-| Auto-detect meetings (Mac equivalent + notification) | `feat/auto-detect` | in progress |
-| Advanced exports (PDF, DOCX, Markdown) | `feat/exports` | in progress |
-| AI assistant & script integrations (MCP, webhooks, CLI) | `feat/integrations` | in progress |
-| Mac now-playing reader (MediaRemote adapter vendored, bundled, CI-built) | `feat/mac-nowplaying` | in progress |
+| Speaker diarization ("who said what") | `feat/diarization` | merged in 1.4.0 (tests green; not seen live) |
+| Custom AI model connector (OpenAI-compatible / Ollama / OpenRouter) | `feat/connector-templates` | merged in 1.4.0 (tests green; not seen live) |
+| Custom summary templates | `feat/connector-templates` | merged in 1.4.0 (tests green; not seen live) |
+| Auto-detect meetings (Mac equivalent + notification) | `feat/auto-detect` | merged in 1.4.0 (tests green; not seen live) |
+| Advanced exports (PDF, DOCX, Markdown) | `feat/exports` | merged in 1.4.0 (tests green; not seen live) |
+| AI assistant & script integrations (MCP, webhooks, CLI) | `feat/integrations` | merged in 1.4.0 (tests green; not seen live) |
+| Mac now-playing reader (MediaRemote adapter vendored, bundled, CI-built) | `feat/mac-nowplaying` | merged in 1.4.0 (tests green; not seen live) |
+
+| Mac live captions (Core Audio tap + mic → engine → pill, saved as MOM-MAC) | `feat/mac-captions` | merged in 1.4.0 (engine round trip verified; real tap capture needs macOS permissions, not verified) |
+| Model speed tests + charts on Models | `feat/model-bench` | merged in 1.4.0 (real measurements on this Mac; rendered picture checked) |
 
 ### D2. LiveCaptions-Translator parity (Apache-2.0; features only)
 
 | Feature (upstream README) | Ours today | Branch / status |
 | --- | --- | --- |
-| Translation engines: Ollama, OpenAI-compatible, OpenRouter | none (local only) | `feat/connector-templates` (in progress) |
-| Translation engines: Google, DeepL, Youdao, Baidu, MTranServer, LibreTranslate | none | **not started** (queued after the connector merges; cloud providers need a clear "not offline" label) |
-| Overlay window: borderless, transparent, colours/size/opacity, sentences count, click-through | missing | planned (`feat/overlay`) — check `docs/design/overlay-revamp` first |
-| Always-on-top, pause/resume, one-click copy | partial (pill pins) | planned (`feat/history-cards`) |
-| History as CSV export | missing | planned (`feat/history-cards`) |
-| Log cards (recent lines as cards) | missing | planned (`feat/history-cards`) |
+| Translation engines: Ollama, OpenAI-compatible, OpenRouter | none (local only) | merged in 1.4.0 via `feat/connector-templates` + `feat/providers` (tests green; not seen live) |
+| Translation engines: Google, DeepL, Youdao, Baidu, MTranServer, LibreTranslate | none | merged in 1.4.0 (tests green; not seen live) |
+| Overlay window: borderless, transparent, colours/size/opacity, sentences count, click-through | missing | merged in 1.4.0 (tests green; not seen live) |
+| Always-on-top, pause/resume, one-click copy | partial (pill pins) | merged in 1.4.0 (tests green; not seen live) |
+| History as CSV export | missing | merged in 1.4.0 (tests green; not seen live) |
+| Log cards (recent lines as cards) | missing | merged in 1.4.0 (tests green; not seen live) |
 | Windows Live Captions integration | built (1.3.9), unverified | needs a real Win11 PC |
 | Light/dark auto theme | done | — |
 
