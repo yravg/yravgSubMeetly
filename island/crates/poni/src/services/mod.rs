@@ -194,11 +194,16 @@ impl Services {
 
     /// Start capturing `source` (the PC's audio, the microphone `mic`, or both) for captions, or
     /// say why not. Restarts a running one.
-    pub fn capture_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str, source: poni_core::capture::Source, mic: &str) -> Result<(), String> {
+    pub fn capture_start(&mut self, sink: &EventSink, port: u16, src: &str, tgt: &str, source: poni_core::capture::Source, mic: &str, latency: poni_core::utterance::Latency) -> Result<(), String> {
         self.capture = None; // the old one stops first: one device reader at a time
         self.session.lock().unwrap_or_else(|e| e.into_inner()).begin();
-        self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into(), self.session.clone(), source, mic.into()).map_err(|e| format!("Captions could not start ({e})."))?);
+        self.capture = Some(capture::CaptureService::start(sink.clone(), port, src.into(), tgt.into(), self.session.clone(), source, mic.into(), latency).map_err(|e| format!("Captions could not start ({e})."))?);
         Ok(())
+    }
+
+    /// A new Latency mode for the running captions (PMM-026); false when none run.
+    pub fn capture_latency(&self, latency: poni_core::utterance::Latency) -> bool {
+        self.capture.as_ref().inspect(|c| c.set_latency(latency)).is_some()
     }
 
     /// The microphone's level while captions hear the room (0 otherwise).

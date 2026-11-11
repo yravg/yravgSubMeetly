@@ -135,18 +135,49 @@ Load: 262 ms including the first sentence. OPUS-MT is only used when its pair is
 it by default yet, so whether onboarding pulls the user's pair is an island decision.
 Not measured: id-en, en-zh, zh-en, ja-en pairs (weights not downloaded), CPU %.
 
-## Island benchmark (to fill at build)
+## Island benchmark (1.3.7, VPS build)
 
-Same recording (2 min English speech, 1 min Chinese), laptop, Whisper base + Qwen 0.5B:
+**What was measured and what was not.** The VPS has no Whisper model, no audio device and no real
+engine run, so no end-to-end figure for the island exists yet. Two things are measured: the buffer's
+own timing (unit tests in `poni-core/src/utterance.rs`, audio time, no engine), and the engine's ASR
+time per window from the benchmark above. The island figures below must be taken on the laptop with
+the same recording (2 min English speech, 1 min Chinese) before 1.3.7 is called faster.
 
-| Metric | 1.2.9 | After A+C | Windows captions (B) |
+Buffer timing, measured in tests (seconds of audio fed until the post comes out):
+
+| Metric | 1.3.6 (fixed 4 s windows) | 1.3.7 Balanced | Fast | Accurate |
+| --- | --- | --- | --- | --- |
+| Speech start -> first post to the engine | 4.0 s | 1.2 s (interim) | 0.8 s (interim) | whole utterance only |
+| Speech stops -> final post | up to 4.0 s (next window edge) | 0.7 s | 0.5 s | 1.0 s |
+| Longest utterance before a final | 4.0 s (cut mid-sentence) | 15 s | 10 s | 20 s |
+
+Expected first text on the pill = post time + the engine's ASR time. With the measured 1.0-1.7 s
+(whisper-base, 4 s window, CPU) that is about **2.2-2.9 s**, not the 1.5 s target. Whisper pads every
+clip to 30 s of mel frames, so a 1.2 s clip probably costs about what a 4 s one does; that is an
+unverified reading of the code, not a measurement. Reaching 1.5 s needs either a faster ASR row or
+Windows Live Captions as the source (idea B, not built). Compared with 1.3.6 (5.1-5.7 s measured:
+4 s window + ASR) the first text should still come about 2.5-3 s sooner.
+
+Cost to watch: every interim re-sends the whole utterance, so ASR work per utterance grows with its
+length (at most 15 s in Balanced) and the engine is busy more of the time. One post is in flight
+and the newest waits (an interim never replaces a final that waits). CPU % average: not measured.
+
+| Metric (laptop, to fill) | 1.3.6 | 1.3.7 | Windows captions (B) |
 | --- | --- | --- | --- |
-| Speech start -> first text on pill | | | |
-| Sentence end -> final line | | | |
-| Final line -> translation | | | |
-| CPU % average | | | |
+| Speech start -> first text on pill | 5.1-5.7 s (engine bench) | not measured | not built |
+| Sentence end -> final line | not measured | not measured | not built |
+| Final line -> translation | 0.6-1.0 s (engine bench) | not measured | not built |
+| CPU % average | not measured | not measured | not built |
 
-Target (PMM-025): first text under 1.5 s.
+What the island does with it: an interim goes to `/draft?src=..&tgt=none&interim=1` (the spoken text
+only, so no translation model runs for a line the next post replaces, and the engine does not keep it
+as its live caption). It shows as the newest line of the Meeting tab and of Live's room view (the
+session log's `tail`, read by `call::live`), replaced by the next interim and then by the final line,
+which is translated and kept. The pages that read the engine's `/live` (Live for a This-PC session,
+the Media caption column) hold finals only, so they show no interim text, only their final line
+sooner. Both (room and PC mixed) keeps its 4 s windows as final lines.
+
+Target (PMM-025): first text under 1.5 s. **Not met by the arithmetic above; not yet measured.**
 
 ## Not verified
 

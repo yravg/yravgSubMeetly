@@ -640,6 +640,9 @@ impl App {
     ) -> anyhow::Result<Response> {
         let started = std::time::Instant::now();
         let ms = || started.elapsed().as_millis() as u64;
+        // An interim (the island's growing utterance) is shown by whoever asked; only a final is the
+        // caption `GET /live` follows, so the page's previous-line history stays whole sentences.
+        let interim = q.get("interim").is_some_and(|v| v == "1");
         let pcm = pcm_f32_le(&request.body);
         if pcm.len() < 1600 {
             return Ok(self.json_response(
@@ -687,7 +690,9 @@ impl App {
                 let mt_start = std::time::Instant::now();
                 let translation = self.ml.text(&pcm, language, Task::Translate)?;
                 let translate_ms = mt_start.elapsed().as_millis() as u64;
-                self.record_live(&source, &translation, ms(), pcm.len());
+                if !interim {
+                    self.record_live(&source, &translation, ms(), pcm.len());
+                }
                 return Ok(self.json_response(
                     request,
                     200,
@@ -705,7 +710,9 @@ impl App {
             DraftMt::SourceOnly => {
                 // Same language needs no translation; otherwise the translation is empty.
                 let translation = if src == tgt { source.as_str() } else { "" };
-                self.record_live(&source, translation, ms(), pcm.len());
+                if !interim {
+                    self.record_live(&source, translation, ms(), pcm.len());
+                }
                 return Ok(self.json_response(
                     request,
                     200,
@@ -727,7 +734,9 @@ impl App {
             self.ml.translate_fast(&source, src, tgt)?
         };
         let translate_ms = mt_start.elapsed().as_millis() as u64;
-        self.record_live(&source, &translation, ms(), pcm.len());
+        if !interim {
+            self.record_live(&source, &translation, ms(), pcm.len());
+        }
         Ok(self.json_response(
             request,
             200,

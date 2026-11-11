@@ -14,7 +14,7 @@ use super::live::{source_row, SOURCE_H};
 use crate::commands::Command;
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
-use crate::pages::settings::draw_switch;
+use crate::pages::settings::{draw_switch, picker, picker_width};
 use crate::pages::PageKind;
 use crate::pill::quick_captions::{self, Act, Ctl, Which};
 use crate::settings_window::{self, Key, Section};
@@ -23,6 +23,8 @@ use crate::ui::{wid, wid_n, PillStyle, Ui, PILL_SMALL};
 use poni_core::capture::lang_name;
 use poni_core::geom::{palette, Color, Rect};
 use poni_core::meeting_source::Family;
+use poni_core::models::Kind;
+use poni_core::utterance::Latency;
 
 const ROW_H: f32 = 34.0;
 const ROWS: usize = 5;
@@ -35,8 +37,9 @@ const STEP: f32 = 22.0;
 const NAME_W: f32 = 104.0;
 const PAD: f32 = 4.0;
 
-pub fn height(_st: &AppState) -> f32 {
-    hkit::GUIDE_H + ROWS as f32 * ROW_H + SOURCE_GAP + SOURCE_H + 6.0
+pub fn height(st: &AppState) -> f32 {
+    let line = if offer(st).is_some() { SOURCE_GAP + SOURCE_H } else { 0.0 };
+    hkit::GUIDE_H + ROWS as f32 * ROW_H + SOURCE_GAP + SOURCE_H + line + 6.0
 }
 
 /// How many meeting apps count: the built-in families still on and the ones the person added.
@@ -147,14 +150,78 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     }
     let count = format!("{} on", meeting_apps_on(st));
     ui.c.text(&count, Rect::new(r.x + r.w * 0.5, r.y, (b.x - 8.0 - r.x - r.w * 0.5).max(0.0), r.h), &TextStyle::caption().color(palette::TEXT_DIM).right());
-    // PMM-026 (step 4.7 island half): latency mode, translation engine, original / translation / both
-    // and font size go in right(3) and right(4). Nothing is drawn there until each one is wired to
-    // what the engine can really do; no control stands in for it.
+    latency_row(ui, st, right(3));
+    model_row(ui, st, right(4));
+    // Not built yet: show original / translation / both, and the pill's font size. They are pill
+    // rendering options with no engine side; no control stands in for them until they exist.
 
     // Bottom: what Live listens to, and the microphone.
     let row = Rect::new(area.x, area.y + ROWS as f32 * ROW_H + SOURCE_GAP, area.w, SOURCE_H);
     ui.c.text("Live listens to", Rect::new(row.x + PAD, row.y, SOURCE_LABEL_W, row.h), &TextStyle::body().weight(Weight::Regular));
     source_row(ui, st, Rect::new(row.x + SOURCE_LABEL_W, row.y, row.w - SOURCE_LABEL_W, row.h));
+    offer_row(ui, st, Rect::new(area.x, row.bottom() + SOURCE_GAP, area.w, SOURCE_H));
 
+    // The models' state is read while this page is open, as Advanced settings does.
+    if st.models.due(st.now) {
+        st.cmd(Command::ModelsRefresh);
+    }
     quick_captions::language_list(ui, st, area, area.bottom(), clicked);
+}
+
+/// Fast / Balanced / Accurate: the utterance timing, the engine's mode and the model rows each one
+/// runs best on (`Latency`). A change applies to running captions at their next utterance.
+fn latency_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
+    ui.c.text("Latency", Rect::new(r.x + PAD, r.y, r.w * 0.4, r.h), &TextStyle::body().weight(Weight::Regular));
+    let names: Vec<&str> = Latency::ALL.iter().map(|l| l.label()).collect();
+    let sel = Latency::ALL.iter().position(|l| *l == Latency::parse(&st.settings.latency_mode)).unwrap_or(1);
+    let pw = picker_width(ui, &names);
+    if let Some(i) = picker(ui, "cap.latency", r.right() - PAD - pw, r.y + 3.0, r.h - 6.0, &names, sel) {
+        st.settings.latency_mode = Latency::ALL[i].key().to_string();
+        st.cmd(Command::SaveSettings);
+    }
+}
+
+/// The translation model of Advanced settings › Models: stepped here, switched at once when it is
+/// on disk, otherwise named here with its Download on the line below.
+fn model_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
+    let cy = r.center().y;
+    ui.c.text("Translation model", Rect::new(r.x + PAD, r.y, (r.w - 2.0 * STEP - NAME_W - 2.0 * PAD).max(0.0), r.h), &TextStyle::body().weight(Weight::Regular));
+    let plus = Rect::new(r.right() - PAD - STEP, cy - STEP / 2.0, STEP, STEP);
+    let name = Rect::new(plus.x - NAME_W, r.y, NAME_W, r.h);
+    let minus = Rect::new(name.x - STEP, cy - STEP / 2.0, STEP, STEP);
+    let can_step = st.models.step(Kind::Translate, 1).is_some();
+    for (k, (b, icon, d)) in [(minus, Icon::Minus, -1), (plus, Icon::Plus, 1)].into_iter().enumerate() {
+        if ui.icon_button(wid_n("cap.model.step", k as u64), b, icon, if can_step { palette::TEXT_DIM } else { palette::TEXT_FAINT }, 11.0).clicked && can_step {
+            settings_window::apply(st, Key::ModelPick(Kind::Translate), settings_window::Act::Step(d));
+        }
+    }
+    let shown = st.models.chosen(Kind::Translate).map_or_else(|| "Checking\u{2026}".to_string(), |id| st.models.label_of(&id));
+    ui.c.text(&shown, name, &TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT).center());
+}
+
+/// What the line under the models says and offers: the person's own pick when it still needs a
+/// download (or its download failed), else the recommended model while the engine says it is not on
+/// disk. (sentence, button, the model to pick first: only the recommendation is not picked yet.)
+fn offer(st: &AppState) -> Option<(String, &'static str, Option<String>)> {
+    let d = st.models.describe(Kind::Translate);
+    if let Some(button) = d.button {
+        return Some((d.text, button, None));
+    }
+    let (id, label, bytes) = st.models.recommended_offer()?;
+    let about = if bytes > 0 { format!(", about {:.1} GB", bytes as f64 / 1e9) } else { String::new() };
+    Some((format!("Recommended: {label}{about}. Captions use the model you have until it is here."), "Download", Some(id)))
+}
+
+/// The line under the models: what is to download, and the one press that does it.
+fn offer_row(ui: &mut Ui, st: &mut AppState, r: Rect) {
+    let Some((text, button, pick)) = offer(st) else { return };
+    let w = ui.pill_width(button, false, true);
+    let b = Rect::new(r.right() - w, r.center().y - PILL_SMALL / 2.0, w, PILL_SMALL);
+    ui.c.text(&text, Rect::new(r.x + PAD, r.y, (b.x - 8.0 - r.x).max(0.0), r.h), &TextStyle::caption().color(palette::TEXT_DIM));
+    if ui.pill(wid("cap.offer"), b, button, None, PillStyle::Primary(st.accent)).clicked {
+        if let Some(id) = pick {
+            st.models.set_pick(Kind::Translate, Some(id));
+        }
+        st.cmd(Command::ModelPull(Kind::Translate));
+    }
 }

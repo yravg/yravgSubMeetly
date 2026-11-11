@@ -304,6 +304,12 @@ pub fn draft_path(src: &str, tgt: &str) -> String {
     format!("/draft?src={src}&tgt={tgt}")
 }
 
+/// The path of an interim (PMM-025): the spoken text only, so no translation model runs for a line
+/// that the next post replaces, and the engine does not keep it as its live caption.
+pub fn interim_draft_path(src: &str) -> String {
+    format!("/draft?src={src}&tgt={NO_TRANSLATION}&interim=1")
+}
+
 /// What the capture says while the speech model is not on disk. The engine never downloads by
 /// itself (a `/draft` answers 409 `model-not-downloaded`), so no audio is sent until the person
 /// has pressed Download.
@@ -689,6 +695,8 @@ mod tests {
     #[test]
     fn the_draft_path_names_both_languages() {
         assert_eq!(draft_path("auto", "en"), "/draft?src=auto&tgt=en");
+        // An interim asks for the spoken text only (no translation) and is not the engine's live line.
+        assert_eq!(interim_draft_path("zh"), "/draft?src=zh&tgt=none&interim=1");
     }
 
     #[test]

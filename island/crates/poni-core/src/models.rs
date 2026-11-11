@@ -127,6 +127,9 @@ pub struct Choice {
 pub struct Inventory {
     pub rows: Vec<Row>,
     pub catalog: Vec<Choice>,
+    /// The translation model the engine recommends and whether it is on disk (an older engine
+    /// does not say).
+    pub recommended: Option<(String, bool)>,
 }
 
 fn find_status<'a>(rows: &'a [Row], catalog: &'a [Choice], id: &str) -> Option<&'a Status> {
@@ -161,7 +164,8 @@ pub fn parse(body: &str) -> Option<Inventory> {
                 .collect()
         })
         .unwrap_or_default();
-    Some(Inventory { rows, catalog })
+    let recommended = v.get("recommended").and_then(|r| Some((text(r, "id")?, flag(r, "downloaded"))));
+    Some(Inventory { rows, catalog, recommended })
 }
 
 /// Is the speech model on disk? `Some(true)` when `/health` says it is loaded or `/models` (fetched
@@ -191,6 +195,8 @@ pub fn translation_on_disk(health: &str, models: impl FnOnce() -> Option<String>
 pub struct Models {
     pub rows: Vec<Row>,
     pub catalog: Vec<Choice>,
+    /// The engine's recommended translation model and whether it is on disk.
+    pub recommended: Option<(String, bool)>,
     /// What the person stepped to in Settings, until the engine uses it (a model still to download).
     pub pick_asr: Option<String>,
     pub pick_translate: Option<String>,
@@ -287,6 +293,7 @@ impl Models {
             Ok(inv) => {
                 self.rows = inv.rows;
                 self.catalog = inv.catalog;
+                self.recommended = inv.recommended;
                 self.error = None;
                 // A pick the engine has taken up is no longer a pick.
                 for k in [Kind::Asr, Kind::Translate] {
@@ -333,6 +340,17 @@ impl Models {
     /// What Settings shows: the person's pick, else what the engine uses.
     pub fn chosen(&self, k: Kind) -> Option<String> {
         self.pick(k).cloned().or_else(|| self.selected(k))
+    }
+
+    /// The recommended translation model to offer for download: (id, name, about how many bytes),
+    /// while the engine says it is not on disk and no download of it is under way.
+    pub fn recommended_offer(&self) -> Option<(String, String, u64)> {
+        let (id, downloaded) = self.recommended.as_ref()?;
+        if *downloaded || self.pulling == Some(Kind::Translate) || self.status(id).is_some_and(|s| s.pulling) {
+            return None;
+        }
+        let bytes = self.catalog.iter().find(|c| c.id == *id).map_or(0, |c| c.approx_bytes);
+        Some((id.clone(), self.label_of(id), bytes))
     }
 
     /// The name for a choice (`Off` for no translation).
@@ -481,6 +499,27 @@ mod tests {
         assert!(inv.rows[0].id.is_none() && inv.catalog.is_empty());
         assert_eq!(parse("not json"), None);
         assert_eq!(parse(r#"{"nope":1}"#), None);
+    }
+
+    #[test]
+    fn the_recommended_translation_model_is_offered_only_while_it_is_not_on_disk() {
+        let with = |downloaded: bool| {
+            let text = format!(
+                r#"{{"models":[],"catalog":[{{"kind":"translate","id":"org/mt-rec","label":"Qwen fast","approxBytes":1110000000,"selected":false,"downloaded":{downloaded},"pulling":false}}],"recommended":{{"id":"org/mt-rec","downloaded":{downloaded}}}}}"#
+            );
+            let mut m = Models::default();
+            m.apply(Ok(parse(&text).unwrap()), 1.0);
+            m
+        };
+        // The engine says it is not there: offered with its name and size.
+        assert_eq!(with(false).recommended_offer(), Some(("org/mt-rec".to_string(), "Qwen fast".to_string(), 1_110_000_000)));
+        // It is there, or the engine says nothing (an older engine): no offer.
+        assert_eq!(with(true).recommended_offer(), None);
+        assert_eq!(models().recommended_offer(), None);
+        // Already downloading it: the row says so, no second offer.
+        let mut m = with(false);
+        m.pulling = Some(Kind::Translate);
+        assert_eq!(m.recommended_offer(), None);
     }
 
     #[test]

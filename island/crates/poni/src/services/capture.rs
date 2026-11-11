@@ -19,8 +19,9 @@
 use crate::events::{AppEvent, EventSink};
 use crate::services::audio::{device_id, ComApartment};
 use poni_core::capture::{pcm_bytes, CaptureState, Mixer, Pipeline, Side, Source};
+use poni_core::utterance::{replaces, Latency, Utterances};
 use poni_core::helper;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -47,6 +48,9 @@ const STOP_TIMEOUT: Duration = Duration::from_millis(800);
 pub struct Log {
     start: Option<Instant>,
     lines: Vec<helper::Line>,
+    /// The utterance still being spoken (PMM-025): its text so far, shown after the kept lines and
+    /// replaced by the next interim or, at last, by the line that is kept. Never saved, never counted.
+    interim: Option<String>,
 }
 
 pub type SessionLog = Arc<Mutex<Log>>;
@@ -59,14 +63,30 @@ impl Log {
         }
     }
 
-    fn push(&mut self, source: String, translation: String) {
+    /// A line is kept: `span_s` of audio ended now. It ends the interim that led up to it.
+    fn push(&mut self, source: String, translation: String, span_s: f64) {
         let end = self.start.get_or_insert_with(Instant::now).elapsed().as_secs_f64();
-        self.lines.push(helper::Line { t0: (end - poni_core::capture::WINDOW_S as f64).max(0.0), t1: end, source, translation });
+        self.interim = None;
+        self.lines.push(helper::Line { t0: (end - span_s).max(0.0), t1: end, source, translation });
     }
 
-    /// How many lines the session has, and its newest `n` (oldest first): the Meeting tab's view.
+    /// The utterance so far; `None` (or empty) when the engine heard nothing in it.
+    fn set_interim(&mut self, text: Option<String>) {
+        self.interim = text.filter(|t| !t.trim().is_empty());
+    }
+
+    /// How many lines the session has, and its newest `n` (oldest first): the Meeting tab's view,
+    /// with the interim, when there is one, as the last of them (it is not one of the lines counted).
     pub fn tail(&self, n: usize) -> (usize, Vec<helper::Line>) {
-        (self.lines.len(), self.lines[self.lines.len().saturating_sub(n)..].to_vec())
+        let mut out = self.lines[self.lines.len().saturating_sub(n)..].to_vec();
+        if let Some(text) = &self.interim {
+            let now = self.start.map_or(0.0, |s| s.elapsed().as_secs_f64());
+            out.push(helper::Line { t0: now, t1: now, source: text.clone(), translation: String::new() });
+            if out.len() > n {
+                out.remove(0);
+            }
+        }
+        (self.lines.len(), out)
     }
 
     /// Every line so far, for a notes refresh (the session goes on).
@@ -75,6 +95,7 @@ impl Log {
     }
 
     pub fn take(&mut self) -> Vec<helper::Line> {
+        self.interim = None;
         std::mem::take(&mut self.lines)
     }
 
@@ -158,6 +179,8 @@ pub enum CaptureEvent {
     State(CaptureState),
     /// The engine heard words: ask the helper link for the line now.
     Heard,
+    /// The utterance still being spoken changed (PMM-025): repaint; nothing is counted as heard.
+    Interim,
     /// The translation is missing or loading (or no longer is): a note under the source line.
     Hint(Option<poni_core::capture::TranslateHint>),
 }
@@ -172,12 +195,22 @@ pub struct CaptureService {
     langs: Arc<Mutex<(String, String)>>,
     /// The microphone's level (f32 bits, RMS of the last packets) for Live's mic chip.
     level: Arc<AtomicU32>,
+    /// The Latency mode (its place in `Latency::ALL`): its timing shapes the next utterance.
+    latency: Arc<AtomicU8>,
+}
+
+fn latency_of(n: u8) -> Latency {
+    Latency::ALL[(n as usize).min(Latency::ALL.len() - 1)]
+}
+
+fn latency_index(l: Latency) -> u8 {
+    Latency::ALL.iter().position(|x| *x == l).unwrap_or(1) as u8
 }
 
 impl CaptureService {
     /// Start capturing `source` (`mic`: a capture endpoint id, empty for Windows' default);
     /// `src`/`tgt` are the engine's language codes (`auto` detects).
-    pub fn start(sink: EventSink, port: u16, src: String, tgt: String, log: SessionLog, source: Source, mic: String) -> std::io::Result<Self> {
+    pub fn start(sink: EventSink, port: u16, src: String, tgt: String, log: SessionLog, source: Source, mic: String, latency: Latency) -> std::io::Result<Self> {
         let health = Arc::new(Health { sink: sink.clone(), st: Mutex::new(HealthState { sent: Some(CaptureState::On), ..Default::default() }) });
         let slot: Slot = Arc::default();
         let level = Arc::new(AtomicU32::new(0));
@@ -191,11 +224,18 @@ impl CaptureService {
         let (h, s, l) = (health.clone(), slot.clone(), langs.clone());
         std::thread::Builder::new().name("poni-capture-post".into()).spawn(move || post_loop(port, l, wake_rx, s, h, log))?;
         let (h, lv) = (health.clone(), level.clone());
+        let mode = Arc::new(AtomicU8::new(latency_index(latency)));
+        let m = mode.clone();
         let thread = std::thread::Builder::new().name("poni-capture".into()).spawn(move || {
-            capture_loop(rx, h, slot, wake_tx, flows, lv);
+            capture_loop(rx, h, slot, wake_tx, flows, lv, m);
             let _ = done_tx.send(());
         })?;
-        Ok(Self { tx, done, thread: Some(thread), health, langs, level })
+        Ok(Self { tx, done, thread: Some(thread), health, langs, level, latency: mode })
+    }
+
+    /// A new Latency mode: the next utterance is cut with its timing, with no restart.
+    pub fn set_latency(&self, latency: Latency) {
+        self.latency.store(latency_index(latency), Ordering::Relaxed);
     }
 
     /// The microphone's RMS level now (0 without one).
@@ -292,13 +332,36 @@ impl Health {
             self.sink.send(AppEvent::Capture(CaptureEvent::Heard));
         }
     }
+
+    /// The interim changed: the page repaints; nothing is counted as heard.
+    fn interim(&self) {
+        if !self.st.lock().unwrap_or_else(|e| e.into_inner()).silenced {
+            self.sink.send(AppEvent::Capture(CaptureEvent::Interim));
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
 // The poster: one request in flight, newest window wins.
 
-/// The newest window and, with Both, its louder side.
-type Slot = Arc<Mutex<Option<(Vec<f32>, Option<Side>)>>>;
+/// What waits for the poster: audio, with Both its louder side, and whether it is a final line (a
+/// window, or an utterance that ended) or an interim (PMM-025) that the next post replaces.
+struct Job {
+    audio: Vec<f32>,
+    side: Option<Side>,
+    last: bool,
+}
+
+/// The newest job. An interim never takes the place of a final the poster has not taken yet.
+type Slot = Arc<Mutex<Option<Job>>>;
+
+fn offer(slot: &Slot, wake: &Sender<()>, job: Job) {
+    let mut waiting = slot.lock().unwrap_or_else(|e| e.into_inner());
+    if waiting.as_ref().is_none_or(|old| replaces(old.last, job.last)) {
+        *waiting = Some(job);
+        let _ = wake.send(());
+    }
+}
 
 fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>, slot: Slot, health: Arc<Health>, log: SessionLog) {
     // The engine never downloads by itself: without the speech model a /draft answers 409. So the
@@ -307,19 +370,32 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
     // engine captions without it and each answer says so in `translateState`.
     let mut speech = Gate::default();
     while wake.recv().is_ok() {
-        let Some((window, side)) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
+        let Some(Job { audio: window, side, last }) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
         let (src, tgt) = langs.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let (src, tgt) = (src.as_str(), tgt.as_str());
         if !speech.open(|| speech_on_disk(port)) {
             health.engine(Some(poni_core::capture::SPEECH_MISSING.into()));
             continue;
         }
-        match helper::post_draft(port, src, tgt, &pcm_bytes(&window)) {
+        match helper::post_draft(port, src, tgt, !last, &pcm_bytes(&window)) {
+            Ok(d) if !last => {
+                // An interim carries the spoken text only: it shows, and the next post replaces it.
+                // Its answer says nothing of the translation, so the hint is left alone.
+                health.engine(None);
+                let text = (!d.source.is_empty()).then(|| poni_core::capture::tagged(side, &d.source));
+                log.lock().unwrap_or_else(|e| e.into_inner()).set_interim(text);
+                health.interim();
+            }
             Ok(d) => {
                 health.engine(None);
                 health.hint(poni_core::capture::translation_hint(d.translate, src, tgt));
-                if !d.source.is_empty() {
-                    log.lock().unwrap_or_else(|e| e.into_inner()).push(poni_core::capture::tagged(side, &d.source), d.translation);
+                if d.source.is_empty() {
+                    // The utterance ended with nothing heard in it: the interim goes.
+                    log.lock().unwrap_or_else(|e| e.into_inner()).set_interim(None);
+                    health.interim();
+                } else {
+                    let span = window.len() as f64 / poni_core::capture::RATE as f64;
+                    log.lock().unwrap_or_else(|e| e.into_inner()).push(poni_core::capture::tagged(side, &d.source), d.translation, span);
                     health.heard();
                 }
             }
@@ -521,7 +597,7 @@ unsafe fn describe(fmt: *const WAVEFORMATEX) -> (u32, usize, bool) {
     (f.nSamplesPerSec, f.nChannels.max(1) as usize, float)
 }
 
-fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Slot, wake: Sender<()>, flows: Vec<Flow>, level: Arc<AtomicU32>) {
+fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Slot, wake: Sender<()>, flows: Vec<Flow>, level: Arc<AtomicU32>, latency: Arc<AtomicU8>) {
     let com = ComApartment::enter_mta();
     if !com.initialized {
         health.fail("Windows audio could not be started on this thread.".into());
@@ -543,6 +619,8 @@ fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Slot, wake: Sende
     // One session per flow; every one is open before any is read.
     let mut sessions: Vec<Option<Session>> = flows.iter().map(|_| None).collect();
     let mut mixer = Mixer::default();
+    // One source: the utterance buffer (PMM-025). Both keeps the mixer's windows, each a final line.
+    let mut utter = Utterances::new(latency_of(latency.load(Ordering::Relaxed)).timing());
     let mut checked = Instant::now();
     while !stopped.load(Ordering::Relaxed) {
         if let Some(i) = sessions.iter().position(Option::is_none) {
@@ -590,21 +668,27 @@ fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Slot, wake: Sende
         if matches!(flows[0], Flow::Mic(_)) && !read[0].is_empty() {
             level.store(poni_core::capture::rms(&read[0]).to_bits(), Ordering::Relaxed);
         }
-        let windows: Vec<(Vec<f32>, Option<Side>)> = match sessions.as_mut_slice() {
-            [Some(s)] => s.pipeline.feed(&read[0]).into_iter().map(|w| (w, None)).collect(),
+        utter.set_timing(latency_of(latency.load(Ordering::Relaxed)).timing());
+        let jobs: Vec<Job> = match sessions.as_mut_slice() {
+            [Some(s)] => {
+                let mono = s.pipeline.mono(&read[0]);
+                utter.push(&mono).into_iter().map(|p| Job { audio: p.samples, side: None, last: p.last }).collect()
+            }
             [Some(mic), Some(pc)] => {
                 let (m, p) = (mic.pipeline.mono(&read[0]), pc.pipeline.mono(&read[1]));
-                mixer.push(&m, &p).into_iter().map(|(w, side)| (w, Some(side))).collect()
+                mixer.push(&m, &p).into_iter().map(|(w, side)| Job { audio: w, side: Some(side), last: true }).collect()
             }
             _ => Vec::new(),
         };
-        for w in windows {
-            // Newest wins: an older window the poster has not taken is dropped.
-            *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(w);
-            let _ = wake.send(());
+        for job in jobs {
+            // Newest wins: an older job the poster has not taken is dropped, but an interim never
+            // takes the place of a final line.
+            offer(&slot, &wake, job);
         }
         nap(POLL);
     }
+    // Stop leaves what was being said unposted, as the unfinished 4 s window always was: by now the
+    // session has been taken for saving, and a late line would land in the next one.
 }
 
 /// The active microphones: (endpoint id, name), for Live's mic chip (PMM-019). Read on a short MTA
@@ -651,16 +735,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_utterance_in_progress_shows_last_is_never_counted_or_saved_and_ends_with_its_line() {
+        let mut log = Log::default();
+        log.begin();
+        log.push("kept".into(), "kept too".into(), 4.0);
+        log.set_interim(Some("hello how".into()));
+        let (count, tail) = log.tail(5);
+        assert_eq!(count, 1, "the interim is not one of the lines");
+        assert_eq!(tail.iter().map(|l| l.source.as_str()).collect::<Vec<_>>(), ["kept", "hello how"]);
+        assert_eq!(log.lines().len(), 1, "a notes refresh or a save never sees it");
+        // The next interim replaces it; an empty answer clears it.
+        log.set_interim(Some("hello how are".into()));
+        assert_eq!(log.tail(5).1.last().map(|l| l.source.as_str()), Some("hello how are"));
+        log.set_interim(Some("  ".into()));
+        assert_eq!(log.tail(5).1.len(), 1);
+        // The kept line replaces it, and its span comes from the audio it covered.
+        log.set_interim(Some("hello how are you".into()));
+        log.push("hello how are you".into(), "hola".into(), 3.0);
+        let (count, tail) = log.tail(5);
+        assert_eq!((count, tail.len()), (2, 2));
+        assert!(tail[1].t1 - tail[1].t0 <= 3.0 + 1e-6);
+        // The window the tail asks for is kept with an interim in it.
+        log.set_interim(Some("next".into()));
+        assert_eq!(log.tail(2).1.iter().map(|l| l.source.as_str()).collect::<Vec<_>>(), ["hello how are you", "next"]);
+        // Stop clears it with the rest.
+        log.take();
+        assert_eq!(log.tail(5), (0, Vec::new()));
+    }
+
+    #[test]
     fn the_session_log_keeps_lines_in_order_and_gives_failed_ones_back_in_front() {
         let mut log = Log::default();
         log.begin();
-        log.push("line one".into(), "linie eins".into());
-        log.push("line two".into(), String::new());
+        log.push("line one".into(), "linie eins".into(), 4.0);
+        log.push("line two".into(), String::new(), 4.0);
         assert!(log.lines[1].t1 >= log.lines[0].t1 && log.lines[0].t0 >= 0.0 && log.lines[0].t0 <= log.lines[0].t1);
         let taken = log.take();
         assert_eq!((taken.len(), log.lines.len()), (2, 0));
         // A restart while lines wait does not reset the clock; a save that failed returns its lines first.
-        log.push("line three".into(), String::new());
+        log.push("line three".into(), String::new(), 4.0);
         log.restore(taken);
         let sources: Vec<_> = log.lines.iter().map(|l| l.source.as_str()).collect();
         assert_eq!(sources, ["line one", "line two", "line three"]);
@@ -723,7 +836,7 @@ mod tests {
         let (tx, rx) = channel();
         let sink = EventSink::new(tx, crate::events::SendHwnd::new(windows::Win32::Foundation::HWND::default()));
         let log = SessionLog::default();
-        let svc = CaptureService::start(sink, port, "auto".into(), "en".into(), log.clone(), source, std::env::var("PONI_TEST_MIC").unwrap_or_default()).unwrap();
+        let svc = CaptureService::start(sink, port, "auto".into(), "en".into(), log.clone(), source, std::env::var("PONI_TEST_MIC").unwrap_or_default(), Latency::default()).unwrap();
         let t0 = std::time::Instant::now();
         let (mut heard, mut states, mut peak) = (0, Vec::new(), 0f32);
         while t0.elapsed() < Duration::from_secs(40) {

@@ -1790,7 +1790,8 @@ impl App {
         if on {
             svc.engine_start();
             let mic = self.st.settings.mic_device.clone();
-            self.st.capture = match svc.capture_start(&sink, poni_core::helper::configured_port(), &src, &tgt, source, &mic) {
+            let latency = poni_core::utterance::Latency::parse(&self.st.settings.latency_mode);
+            self.st.capture = match svc.capture_start(&sink, poni_core::helper::configured_port(), &src, &tgt, source, &mic, latency) {
                 Ok(()) => poni_core::capture::CaptureState::On,
                 Err(e) => poni_core::capture::CaptureState::Failed(e),
             };
@@ -1826,6 +1827,32 @@ impl App {
             self.set_captions(true, source);
         }
         self.captions_notice();
+    }
+
+    /// A new Latency mode (PMM-026): running captions cut their next utterance with its timing, the
+    /// engine's own mode follows (Accurate uses its full translator for final lines), and the mode's
+    /// models are selected when they are on disk. A model still to download waits for the person:
+    /// the Captions tab offers it, and nothing downloads by itself.
+    fn apply_latency(&mut self) {
+        use poni_core::models::Kind;
+        let l = poni_core::utterance::Latency::parse(&self.st.settings.latency_mode);
+        if let Some(svc) = self.services.as_ref() {
+            svc.capture_latency(l);
+        }
+        let port = poni_core::helper::configured_port();
+        let body = format!(r#"{{"mode":"{}"}}"#, l.key());
+        std::thread::spawn(move || {
+            if let Err(e) = poni_core::helper::request(port, "POST", "/engine/mode", Some(&body)) {
+                pinfo!("latency: the engine did not take its mode ({e})");
+            }
+        });
+        let (asr, translate) = l.models();
+        for (kind, id) in [(Kind::Asr, asr), (Kind::Translate, translate)] {
+            if self.st.models.switchable(kind, id) {
+                self.select_model(kind, id.to_string());
+            }
+        }
+        self.request_frame();
     }
 
     /// Start or Stop pressed by the person: the automatic captions leave that choice alone.
@@ -1999,17 +2026,24 @@ impl App {
     /// The engine heard a line: the Meeting tab's view of the session, and its notes when a
     /// refresh is due (60 s or 12 new lines, not on battery saver).
     fn call_heard(&mut self) {
-        let Some(svc) = self.services.as_ref() else { return };
-        let (n, tail) = svc.session_tail(crate::pages::call::LINES);
+        let Some(n) = self.call_lines() else { return };
         self.st.call.heard = n;
-        // Hold on Live's room view keeps the lines it shows (the session goes on underneath).
-        if !(self.st.call.room && self.st.helper.paused()) {
-            self.st.call.lines = tail;
-        }
         let notes_shown = (self.st.call.meeting && !self.st.tab_hidden(PageKind::Call)) || self.st.call.room;
         if notes_shown && self.st.call.notes.due(self.st.now, n, self.st.power.saver) {
             self.call_refresh();
         }
+    }
+
+    /// The session's newest lines (and the utterance still being spoken, last) for the Meeting tab and
+    /// the room view; how many lines are kept. Hold on Live's room view keeps the lines it shows (the
+    /// session goes on underneath).
+    fn call_lines(&mut self) -> Option<usize> {
+        let svc = self.services.as_ref()?;
+        let (n, tail) = svc.session_tail(crate::pages::call::LINES);
+        if !(self.st.call.room && self.st.helper.paused()) {
+            self.st.call.lines = tail;
+        }
+        Some(n)
     }
 
     /// Ask the engine for the notes so far, off the UI thread (`AppEvent::CallNotes`).
@@ -2289,6 +2323,12 @@ impl App {
                 self.call_heard();
             }
             CaptureEvent::Hint(h) => self.st.caption_hint = h,
+            // The utterance still being spoken: the pages' lines are read again and painted; the count
+            // of lines heard, and the notes that follow it, wait for a kept line.
+            CaptureEvent::Interim => {
+                self.call_lines();
+                self.request_frame();
+            }
         }
     }
 
@@ -2378,6 +2418,7 @@ impl App {
         let retranslate = before.lyrics_translate != now.lyrics_translate || before.target_lang != now.target_lang;
         let new_language = before.source_lang != now.source_lang || before.target_lang != now.target_lang;
         let new_caption_target = new_language || before.translate_captions != now.translate_captions;
+        let new_latency = before.latency_mode != now.latency_mode;
         if retranslate {
             self.start_lyric_translation();
         }
@@ -2390,6 +2431,9 @@ impl App {
         // Running captions pick up a new language or translation choice at once.
         if new_caption_target && self.st.capture.running() {
             self.retune_captions();
+        }
+        if new_latency {
+            self.apply_latency();
         }
         self.st.pomodoro.cfg = self.st.settings.pomodoro.clone();
         // Prayer times: off stops it at once; a new place, or following the location again.

@@ -600,10 +600,12 @@ pub fn parse_draft(code: u16, body: &str) -> Result<Draft, String> {
 }
 
 /// `POST /draft`: 16 kHz mono f32 PCM in, a caption out. The engine also keeps
-/// it for `GET /live`, which is what the pill reads.
-pub fn post_draft(port: u16, src: &str, tgt: &str, pcm: &[u8]) -> Result<Draft, String> {
+/// it for `GET /live`, which is what the pill reads, except an `interim` (PMM-025): the spoken text
+/// of an utterance still going, with no translation, which the next post replaces.
+pub fn post_draft(port: u16, src: &str, tgt: &str, interim: bool, pcm: &[u8]) -> Result<Draft, String> {
     // shortcut: 25 s wait; a cold model load can take longer, and then the next window retries.
-    let (code, body) = request_bytes(port, "POST", &crate::capture::draft_path(src, tgt), "application/octet-stream", pcm, Duration::from_secs(25))?;
+    let path = if interim { crate::capture::interim_draft_path(src) } else { crate::capture::draft_path(src, tgt) };
+    let (code, body) = request_bytes(port, "POST", &path, "application/octet-stream", pcm, Duration::from_secs(25))?;
     parse_draft(code, &body)
 }
 
