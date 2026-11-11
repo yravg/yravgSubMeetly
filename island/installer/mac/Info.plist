@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- yravgSubMeetly.app's Info.plist. tools/make_mac_app.sh fills in @VERSION@ from Cargo.toml.
+     The bundle id must stay com.yraverage.submeetly: the updater (crates/poni/src/services/update.rs)
+     refuses an app in a DMG that carries another one. -->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>yravgSubMeetly</string>
+	<key>CFBundleName</key>
+	<string>yravgSubMeetly</string>
+	<key>CFBundleExecutable</key>
+	<string>poni</string>
+	<key>CFBundleIconFile</key>
+	<string>yravgSubMeetly</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.yraverage.submeetly</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<!-- The display link and the notch APIs the island uses need macOS 14 Sonoma. -->
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<!-- A menu bar app: no Dock icon, no menu bar of its own. -->
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>yravgSubMeetly shows what Music and Spotify are playing, with its lyrics, and its buttons play, pause and skip.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Prayer times uses your location to pick the nearest city. Your location stays on this Mac.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Prayer times uses your location to pick the nearest city. Your location stays on this Mac.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>yravgSubMeetly saves the videos and sounds you download, and the files you send from your phone, in Downloads.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>yravgSubMeetly listens to your Mac's own sound to caption a call or a video as it plays.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>yravgSubMeetly saves your meeting minutes in Documents.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>yravgSubMeetly listens to you, only while you hold to talk or a meeting is being captioned.</string>
+</dict>
+</plist>

@@ -11,7 +11,9 @@ yravgSubMeetly installs with one Setup and learns about new versions from one si
 | Make and sign the update file | `tools/make_update_feed.py` |
 | Public keys the app trusts | `crates/poni-core/data/update-keys.txt` |
 | Release repository (one constant) | `poni_core::update::REPO` = `yravg/yravgSubMeetly` |
-| Release workflow (draft) | `.github/workflows/release.yml` |
+| Mac app bundle and DMG | `tools/make_mac_app.sh` (+ `make_mac_dmg.sh`, `make_mac_icon.py`, `installer/mac/Info.plist`) -> `dist/yravgSubMeetly-<version>-mac.dmg` |
+| Mac update self-test | `tools/mac-update-test.sh` (an installed copy swaps in a newer one) |
+| Release workflow | `.github/workflows/release.yml`: `windows` and `mac` build in parallel, `publish` releases both and signs `latest.json` |
 
 ## The installer
 
@@ -43,11 +45,11 @@ About two minutes after start, then hourly, the app reads the file. A later vers
 
 ## Owner steps
 
-State 2026-11-08: the `release` environment exists (deployment limited to `v*` tags) and holds `UPDATE_FEED_KEY`; the spare key is made and listed in `update-keys.txt`. Still open: steps 1 and 3.
+State 2026-11-11: the repository is public, the `release` environment exists (deployment limited to `v*` tags) and holds `UPDATE_FEED_KEY`; the spare key is made and listed in `update-keys.txt`. No release has been published yet; the first tag is the workflow's first real run.
 
-1. **Make the repository public.** The app downloads without a token, so `yravg/yravgSubMeetly` must be public. Until then a check says it could not read the file; nothing breaks. `gh repo edit yravg/yravgSubMeetly --visibility public --accept-visibility-change-consequences`
+1. **Repository public (done).** The app downloads without a token.
 2. **Keys (done).** Signing key: private half at `%USERPROFILE%\.yravg\update-feed-key.pem` and in the `UPDATE_FEED_KEY` secret. Spare key `5693fbeec7bd596f`: private half written to `%USERPROFILE%\.yravg\update-feed-key-spare-OFFLINE.pem`; move it to offline storage (a USB stick kept apart) and delete it from the PC. Never print or commit either.
-3. **Release.** Bump `version` in `island/Cargo.toml`, commit, then `git tag v<version>` and `git push origin v<version>`. `release.yml` checks the tag matches `Cargo.toml`, runs `cargo test -p poni-core`, builds the Setup, publishes the release, signs `latest.json` and attaches it. It is a draft: read it once before the first tag.
+3. **Release.** Bump `version` in `island/Cargo.toml`, commit, then `git tag v<version>` and `git push origin v<version>`. `release.yml` checks the tag matches `Cargo.toml` and builds the Windows Setup and the Mac DMG (both Apple Silicon and Intel, one universal app); only when both pass does `publish` create the release with both files, sign `latest.json` (which then carries a `windows` and a `mac` entry) and attach it. Before the first tag, read the workflow once.
 4. **Offline signing** (no secret in CI): `python tools/make_update_feed.py --check` prints the payload; save it, then `python tools/make_update_feed.py latest.json --payload payload.json` signs it with the key file, and you upload `latest.json` by hand.
 5. **Taking a release back:** mark the previous release as latest; the file follows GitHub's latest.
 
@@ -58,3 +60,11 @@ Debug builds only: set `YRAVG_UPDATE_BASE=http://127.0.0.1:PORT` (and `PONI_HOME
 ## Checks
 
 `cargo test -p poni-core` runs `tests/update_feed.rs`: a signed file is believed, a changed file refused, an unlisted key refused, a feed outside the repo refused, and the exact Install command. (`cargo test -p poni` itself does not build on this branch's base; that is older than this work.)
+
+## The Mac app
+
+`tools/make_mac_app.sh` makes `yravgSubMeetly.app` (bundle id `com.yraverage.submeetly`, fixed: the updater refuses another) from the arm64 and x86_64 binaries, signs it ad hoc and wraps it in `yravgSubMeetly-<version>-mac.dmg`. Without an Apple Developer ID the first open needs System Settings > Privacy & Security > **Open Anyway** (the DMG says so in `READ ME FIRST.txt`). The updater's own checks (bundle id, version, `codesign --verify --deep --strict`) pass with an ad-hoc signature, and the app replaces itself in place: the new app is taken out of the DMG, swapped into the old one's place, and opened.
+
+When an Apple Developer ID exists: sign with `--options runtime --entitlements installer/mac/poni.entitlements`, notarize the DMG (`xcrun notarytool submit ... --wait`), staple it, and keep the same team on every release (the updater refuses a different team).
+
+Locally: `cargo build -p poni --release --target aarch64-apple-darwin` (and `x86_64-apple-darwin`), `python3 tools/make_mac_icon.py build/y.iconset && iconutil -c icns build/y.iconset -o build/yravgSubMeetly.icns`, then `tools/make_mac_app.sh <arm64> <x86_64> build/yravgSubMeetly.icns dist` and `bash tools/mac-update-test.sh dist/yravgSubMeetly.app`.

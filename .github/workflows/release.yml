@@ -1,7 +1,7 @@
-# DRAFT. Nothing has run this: it starts only when a tag v* is pushed, and pushing it is the
-# owner's step (island/docs/updates.md, "Publishing a release"). It needs the repository
-# secret UPDATE_FEED_KEY (the PEM text of the private signing key) in the `release`
-# environment; the secret is not set anywhere yet.
+# Starts only when a tag v* is pushed (island/docs/updates.md, "Publishing a release"). It builds the
+# Windows Setup and the Mac DMG in parallel, then publishes one release with both and a signed
+# latest.json. Needs the repository secret UPDATE_FEED_KEY (the PEM text of the private signing key)
+# in the `release` environment. Nothing is published unless both builds pass.
 name: Release
 
 on:
@@ -9,12 +9,11 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   windows:
     runs-on: windows-latest
-    environment: release
     steps:
       - uses: actions/checkout@v4
 
@@ -25,6 +24,20 @@ jobs:
           if ("v$v" -ne $env:GITHUB_REF_NAME) { throw "tag $env:GITHUB_REF_NAME does not match Cargo.toml version $v" }
           "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            island
+            engine-rs
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The Setup carries the built Chrome extension (build-installer.ps1 runs `npm run build`).
+      - name: Install the extension's dependencies
+        run: npm ci
+
       - name: Tests
         working-directory: island
         run: cargo test -p poni-core
@@ -34,20 +47,88 @@ jobs:
         shell: pwsh
         run: island/tools/build-installer.ps1
 
-      - name: Publish the release with the Setup
-        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-setup
+          path: island/dist/yravgSubMeetly-Setup-*.exe
+          if-no-files-found: error
+
+  mac:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches the version in island/Cargo.toml
+        run: |
+          v="$(sed -n 's/^version = "\([0-9.]*\)".*/\1/p' island/Cargo.toml | head -1)"
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME does not match Cargo.toml version $v"; exit 1; }
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: island
+
+      - name: Tests
+        working-directory: island
+        run: cargo test -p poni-core
+
+      - name: Build (Apple Silicon and Intel)
+        working-directory: island
+        run: |
+          cargo build -p poni --release --target aarch64-apple-darwin
+          cargo build -p poni --release --target x86_64-apple-darwin
+
+      - name: App icon
+        working-directory: island
+        run: |
+          python3 -m venv .icon-venv
+          .icon-venv/bin/pip install --quiet pillow
+          .icon-venv/bin/python tools/make_mac_icon.py build/yravgSubMeetly.iconset
+          iconutil -c icns build/yravgSubMeetly.iconset -o build/yravgSubMeetly.icns
+
+      - name: App bundle and DMG (ad-hoc signed until a Developer ID exists)
+        working-directory: island
+        run: tools/make_mac_app.sh target/aarch64-apple-darwin/release/poni target/x86_64-apple-darwin/release/poni build/yravgSubMeetly.icns dist
+
+      - name: Update in place (the app replaces itself)
+        working-directory: island
+        run: bash tools/mac-update-test.sh "dist/yravgSubMeetly.app"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-dmg
+          path: island/dist/yravgSubMeetly-*-mac.dmg
+          if-no-files-found: error
+
+  publish:
+    needs: [windows, mac]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Publish the release with the Setup and the DMG
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create $env:GITHUB_REF_NAME "island/dist/yravgSubMeetly-Setup-$env:VERSION.exe" --title $env:GITHUB_REF_NAME --generate-notes
+        run: |
+          ls -la assets
+          gh release create "$GITHUB_REF_NAME" assets/* --title "$GITHUB_REF_NAME" --generate-notes
 
-      # latest.json describes the release just published (it reads the asset's size and
-      # SHA-256 from GitHub) and is signed with the secret key; the app trusts only the
-      # public keys in crates/poni-core/data/update-keys.txt.
+      # latest.json describes the release just published (it reads each asset's size and SHA-256 from
+      # GitHub) and is signed with the secret key; the app trusts only the public keys in
+      # crates/poni-core/data/update-keys.txt.
       - name: Sign latest.json and attach it
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           UPDATE_FEED_KEY: ${{ secrets.UPDATE_FEED_KEY }}
         run: |
-          python island/tools/make_update_feed.py latest.json
-          gh release upload $env:GITHUB_REF_NAME latest.json --clobber
+          python3 island/tools/make_update_feed.py latest.json
+          gh release upload "$GITHUB_REF_NAME" latest.json --clobber
