@@ -6,10 +6,17 @@
 //! is separate from the one in the person's Chrome.
 
 use objc2::rc::Retained;
-use objc2::{msg_send, MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSWindow, NSWindowStyleMask};
-use objc2_foundation::{NSPoint, NSRect, NSSize, NSString, NSURL, NSURLRequest};
-use objc2_web_kit::{WKWebView, WKWebViewConfiguration};
+use objc2::runtime::{NSObject, NSObjectProtocol, ProtocolObject};
+use objc2::{define_class, msg_send, MainThreadMarker, MainThreadOnly};
+use objc2_app_kit::{
+    NSAlert, NSAlertFirstButtonReturn, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSModalResponseOK, NSSavePanel, NSTextField, NSWindow,
+    NSWindowStyleMask,
+};
+use objc2_foundation::{NSPoint, NSRect, NSSize, NSString, NSURL, NSURLRequest, NSURLResponse};
+use objc2_web_kit::{
+    WKDownload, WKDownloadDelegate, WKFrameInfo, WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKUIDelegate, WKWebView, WKWebViewConfiguration,
+    WKWindowFeatures,
+};
 use poni_core::helper;
 use std::cell::RefCell;
 use std::time::Duration;
@@ -18,6 +25,137 @@ struct Open {
     path: &'static str,
     window: Retained<NSWindow>,
     _web: Retained<WKWebView>,
+    /// WebKit holds its delegates weakly: this keeps ours alive as long as the window.
+    _host: Retained<WebHost>,
+}
+
+define_class!(
+    /// What a browser would do for the page and a bare web view does not: the JavaScript dialogs
+    /// (`alert`, `confirm`, `prompt` answer "no" without it), downloads (every export is a blob link
+    /// with a `download` name; the Save panel picks the place) and links (the engine's own pages open
+    /// in their window, anything else in the default browser).
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "SubMeetlyWebHost"]
+    struct WebHost;
+
+    unsafe impl NSObjectProtocol for WebHost {}
+
+    unsafe impl WKUIDelegate for WebHost {
+        #[unsafe(method(webView:runJavaScriptAlertPanelWithMessage:initiatedByFrame:completionHandler:))]
+        fn alert_panel(&self, _web: &WKWebView, message: &NSString, _frame: &WKFrameInfo, done: &block2::DynBlock<dyn Fn()>) {
+            ask(self.mtm(), message, None, false);
+            done.call(());
+        }
+
+        #[unsafe(method(webView:runJavaScriptConfirmPanelWithMessage:initiatedByFrame:completionHandler:))]
+        fn confirm_panel(&self, _web: &WKWebView, message: &NSString, _frame: &WKFrameInfo, done: &block2::DynBlock<dyn Fn(objc2::runtime::Bool)>) {
+            let ok = ask(self.mtm(), message, None, true).is_some();
+            done.call((objc2::runtime::Bool::new(ok),));
+        }
+
+        #[unsafe(method(webView:runJavaScriptTextInputPanelWithPrompt:defaultText:initiatedByFrame:completionHandler:))]
+        fn text_panel(&self, _web: &WKWebView, prompt: &NSString, default: Option<&NSString>, _frame: &WKFrameInfo, done: &block2::DynBlock<dyn Fn(*mut NSString)>) {
+            let text = ask(self.mtm(), prompt, Some(default.map(|d| d.to_string()).unwrap_or_default()), true);
+            match text {
+                // An empty string is a different answer from Cancel (null) for `prompt`.
+                Some(t) => done.call((Retained::as_ptr(&NSString::from_str(&t)) as *mut NSString,)),
+                None => done.call((std::ptr::null_mut(),)),
+            }
+        }
+
+        #[unsafe(method(webView:createWebViewWithConfiguration:forNavigationAction:windowFeatures:))]
+        fn new_window(&self, _web: &WKWebView, _cfg: &WKWebViewConfiguration, action: &WKNavigationAction, _features: &WKWindowFeatures) -> *mut WKWebView {
+            // `window.open` and `target=_blank`: never a second web view of ours, the URL goes where it belongs.
+            if let Some(url) = unsafe { action.request().URL() }.and_then(|u| u.absoluteString()) {
+                route(&url.to_string());
+            }
+            std::ptr::null_mut()
+        }
+    }
+
+    unsafe impl WKNavigationDelegate for WebHost {
+        #[unsafe(method(webView:decidePolicyForNavigationAction:decisionHandler:))]
+        fn decide(&self, _web: &WKWebView, action: &WKNavigationAction, decision: &block2::DynBlock<dyn Fn(WKNavigationActionPolicy)>) {
+            let policy = if unsafe { action.shouldPerformDownload() } {
+                WKNavigationActionPolicy::Download
+            } else {
+                // A link out of the app's own pages (https://…) opens in the browser, not in this window.
+                let out = unsafe { action.request().URL() }.and_then(|u| u.absoluteString()).map(|u| u.to_string()).filter(|u| u.starts_with("http") && !is_engine(u));
+                match out {
+                    Some(url) if unsafe { action.targetFrame() }.is_some_and(|f| unsafe { f.isMainFrame() }) => {
+                        route(&url);
+                        WKNavigationActionPolicy::Cancel
+                    }
+                    _ => WKNavigationActionPolicy::Allow,
+                }
+            };
+            decision.call((policy,));
+        }
+
+        #[unsafe(method(webView:navigationAction:didBecomeDownload:))]
+        fn became_download(&self, _web: &WKWebView, _action: &WKNavigationAction, download: &WKDownload) {
+            unsafe { download.setDelegate(Some(ProtocolObject::from_ref(self))) };
+        }
+    }
+
+    unsafe impl WKDownloadDelegate for WebHost {
+        #[unsafe(method(download:decideDestinationUsingResponse:suggestedFilename:completionHandler:))]
+        fn destination(&self, _download: &WKDownload, _response: &NSURLResponse, name: &NSString, done: &block2::DynBlock<dyn Fn(*mut NSURL)>) {
+            let panel = NSSavePanel::savePanel(self.mtm());
+            panel.setNameFieldStringValue(name);
+            if panel.runModal() == NSModalResponseOK {
+                if let Some(url) = panel.URL() {
+                    done.call((Retained::as_ptr(&url) as *mut NSURL,));
+                    return;
+                }
+            }
+            done.call((std::ptr::null_mut(),));
+        }
+    }
+);
+
+impl WebHost {
+    fn new(mtm: MainThreadMarker) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(());
+        unsafe { msg_send![super(this), init] }
+    }
+}
+
+/// An alert: the message, an optional text field (`prompt`), OK and, when it asks, Cancel. `None` =
+/// cancelled; `Some(text)` = OK (the field's text, empty without a field).
+fn ask(mtm: MainThreadMarker, message: &NSString, field: Option<String>, cancel: bool) -> Option<String> {
+    let alert = NSAlert::new(mtm);
+    alert.setMessageText(message);
+    alert.addButtonWithTitle(&NSString::from_str("OK"));
+    if cancel {
+        alert.addButtonWithTitle(&NSString::from_str("Cancel"));
+    }
+    let input = field.map(|text| {
+        let f = NSTextField::initWithFrame(mtm.alloc(), NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(280.0, 24.0)));
+        f.setStringValue(&NSString::from_str(&text));
+        alert.setAccessoryView(Some(&f));
+        f
+    });
+    NSApplication::sharedApplication(mtm).activate();
+    if alert.runModal() == NSAlertFirstButtonReturn {
+        Some(input.map(|f| f.stringValue().to_string()).unwrap_or_default())
+    } else {
+        None
+    }
+}
+
+fn is_engine(url: &str) -> bool {
+    url.starts_with("http://127.0.0.1:") || url.starts_with("http://localhost:")
+}
+
+/// The engine's own pages open in a window of ours, anything else in the default browser.
+fn route(url: &str) {
+    match url.split_once("/app/").filter(|_| is_engine(url)).map(|(_, rest)| rest.split(['?', '#']).next().unwrap_or("")) {
+        Some("minutes.html") => open("/app/minutes.html", "Minutes register"),
+        Some("app.html") | Some("") => open("/app/app.html", "yravgSubMeetly"),
+        _ => super::open(url),
+    }
 }
 
 thread_local! {
@@ -62,6 +200,11 @@ fn show(mtm: MainThreadMarker, port: u16, path: &'static str, title: &str) {
     window.setTitle(&NSString::from_str(title));
     window.setMinSize(NSSize::new(760.0, 520.0));
     let web = unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &WKWebViewConfiguration::new(mtm)) };
+    let host = WebHost::new(mtm);
+    unsafe {
+        web.setUIDelegate(Some(ProtocolObject::from_ref(&*host)));
+        web.setNavigationDelegate(Some(ProtocolObject::from_ref(&*host)));
+    }
     window.setContentView(Some(&web));
     window.center();
     let url = format!("http://127.0.0.1:{port}{path}");
@@ -69,5 +212,5 @@ fn show(mtm: MainThreadMarker, port: u16, path: &'static str, title: &str) {
         unsafe { web.loadRequest(&NSURLRequest::requestWithURL(&u)) };
     }
     raise(&window);
-    WINDOWS.with(|ws| ws.borrow_mut().push(Open { path, window, _web: web }));
+    WINDOWS.with(|ws| ws.borrow_mut().push(Open { path, window, _web: web, _host: host }));
 }
