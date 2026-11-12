@@ -7,9 +7,10 @@
 
 use objc2::rc::Retained;
 use objc2::runtime::{NSObject, NSObjectProtocol, ProtocolObject};
-use objc2::{define_class, msg_send, MainThreadMarker, MainThreadOnly};
+use objc2::{define_class, msg_send, sel, MainThreadMarker, MainThreadOnly};
+use objc2::runtime::Sel;
 use objc2_app_kit::{
-    NSAlert, NSAlertFirstButtonReturn, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSModalResponseOK, NSSavePanel, NSTextField, NSWindow,
+    NSAlert, NSAlertFirstButtonReturn, NSApplication, NSMenu, NSMenuItem, NSApplicationActivationPolicy, NSBackingStoreType, NSModalResponseOK, NSSavePanel, NSTextField, NSWindow,
     NSWindowStyleMask,
 };
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString, NSURL, NSURLRequest, NSURLResponse};
@@ -180,7 +181,50 @@ pub fn open(path: &'static str, title: &'static str) {
     });
 }
 
+/// The island is an accessory app with no menu bar of its own, so ⌘C, ⌘V, ⌘A, ⌘Z, ⌘W and ⌘M did nothing in
+/// a window. A standard Edit and Window menu, sent to whatever has focus, gives them back.
+fn install_main_menu(mtm: MainThreadMarker) {
+    let app = NSApplication::sharedApplication(mtm);
+    if app.mainMenu().is_some() {
+        return;
+    }
+    let entry = |title: &str, action: Sel, key: &str| unsafe {
+        NSMenuItem::initWithTitle_action_keyEquivalent(NSMenuItem::alloc(mtm), &NSString::from_str(title), Some(action), &NSString::from_str(key))
+    };
+    let submenu = |title: &str, items: Vec<Retained<NSMenuItem>>| {
+        let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &NSString::from_str(title));
+        for i in &items {
+            menu.addItem(i);
+        }
+        let holder = NSMenuItem::new(mtm);
+        holder.setSubmenu(Some(&menu));
+        (holder, menu)
+    };
+    let bar = NSMenu::new(mtm);
+    // The first entry is the application menu (its title is the app's name in the bar).
+    let (app_holder, _app_menu) = submenu("yravgSubMeetly", vec![]);
+    bar.addItem(&app_holder);
+    let (edit, _e) = submenu(
+        "Edit",
+        vec![
+            entry("Undo", sel!(undo:), "z"),
+            entry("Redo", sel!(redo:), "Z"),
+            NSMenuItem::separatorItem(mtm),
+            entry("Cut", sel!(cut:), "x"),
+            entry("Copy", sel!(copy:), "c"),
+            entry("Paste", sel!(paste:), "v"),
+            entry("Select All", sel!(selectAll:), "a"),
+        ],
+    );
+    bar.addItem(&edit);
+    let (window, window_menu) = submenu("Window", vec![entry("Minimize", sel!(performMiniaturize:), "m"), entry("Close", sel!(performClose:), "w")]);
+    bar.addItem(&window);
+    app.setMainMenu(Some(&bar));
+    app.setWindowsMenu(Some(&window_menu));
+}
+
 fn show(mtm: MainThreadMarker, port: u16, path: &'static str, title: &str) {
+    install_main_menu(mtm);
     let raise = |w: &NSWindow| {
         // A window needs a regular app to take the front: the island is an accessory app (no Dock icon),
         // so it becomes a regular one (a Dock icon) once a window has been opened.
@@ -206,7 +250,12 @@ fn show(mtm: MainThreadMarker, port: u16, path: &'static str, title: &str) {
         web.setNavigationDelegate(Some(ProtocolObject::from_ref(&*host)));
     }
     window.setContentView(Some(&web));
-    window.center();
+    // Where and how big the person left it comes back next time.
+    let name = NSString::from_str(&format!("SubMeetlyWindow {path}"));
+    if !window.setFrameUsingName(&name) {
+        window.center();
+    }
+    window.setFrameAutosaveName(&name);
     let url = format!("http://127.0.0.1:{port}{path}");
     if let Some(u) = NSURL::URLWithString(&NSString::from_str(&url)) {
         unsafe { web.loadRequest(&NSURLRequest::requestWithURL(&u)) };

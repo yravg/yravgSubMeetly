@@ -24,9 +24,9 @@
       <span data-t="onDevice">On-device</span>
     </span>
     <select id="m-switch" class="mswitch" aria-label="Meeting" data-tour="m-switch"></select>
-    <button type="button" class="btn collapsible" id="btn-add-item" data-t-title="addItem" title="Add item">＋ <span data-t="addItem">Add item</span></button>
+    <button type="button" class="btn collapsible" id="btn-add-item" data-t-title="addItem" title="Add item" aria-label="Add item">＋ <span data-t="addItem">Add item</span></button>
     <div class="menuwrap">
-      <button type="button" class="btn collapsible" id="btn-export" data-t-title="export" title="Export" aria-haspopup="menu">
+      <button type="button" class="btn collapsible" id="btn-export" data-t-title="export" title="Export" aria-label="Export" aria-haspopup="menu">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7.5 11 12 15.5 16.5 11"/><path d="M4.5 19.5h15"/></svg>
         <span data-t="export">Export</span>
       </button>
@@ -39,13 +39,13 @@
         <button type="button" data-export="print" data-t="printPdf">Print / PDF</button>
       </div>
     </div>
-    <button type="button" class="btn collapsible" id="btn-amend" data-t-title="applyCorrection" title="Amend">↻ <span data-t="applyCorrection">Amend</span></button>
-    <button type="button" class="btn primary" id="btn-issue" data-tour="btn-issue" data-t-title="issue" title="Issue MoM">
+    <button type="button" class="btn collapsible" id="btn-amend" data-t-title="applyCorrection" title="Amend" aria-label="Amend">↻ <span data-t="applyCorrection">Amend</span></button>
+    <button type="button" class="btn primary" id="btn-issue" data-tour="btn-issue" data-t-title="issue" title="Issue MoM" aria-label="Issue MoM">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"/></svg>
       <span data-t="issue">Issue MoM</span>
     </button>
     <div class="menuwrap">
-      <button type="button" class="icon-btn" id="btn-settings" data-t-title="settingsTitle" title="Layout &amp; appearance" aria-expanded="false" aria-haspopup="dialog">
+      <button type="button" class="icon-btn" id="btn-settings" data-t-title="settingsTitle" title="Layout &amp; appearance" aria-label="Layout &amp; appearance" aria-expanded="false" aria-haspopup="dialog">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
       <!-- Settings popover: theme, interface language, density, layout -->
