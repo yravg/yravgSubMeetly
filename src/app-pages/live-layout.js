@@ -86,14 +86,13 @@ export function mountLiveLayout(api) {
   /* ---- Captions show on card ---- */
   const sur = el('section', 'ls-surface');
   sur.innerHTML = `<h2><span data-ls="showOn"></span> <span class="ls-info" id="ls-info" tabindex="0" role="img">${svg('info', 16)}</span></h2>
-    <div class="ls-seg" id="ls-surface-seg" role="radiogroup"></div>
     <div class="ls-tiles" id="ls-surface-tiles" role="radiogroup"></div>
     <div class="ls-env" id="ls-env-note"${api.env === 'ext' ? ' hidden' : ''}><b data-ls="${api.env === 'web' ? 'envWebTitle' : 'envLabTitle'}"></b><p data-ls="${api.env === 'web' ? 'envWeb' : 'envLab'}"></p></div>
     <div class="ls-hint" id="ls-surface-hint" hidden><span data-ls="needsHelper"></span> <button type="button" class="link-btn" id="ls-use-helper" data-ls="useHelper"></button></div>`;
   const kinds = [['overlay', 'tab', 'overlayD'], ['island', 'island', 'islandD'], ['both', 'both', 'bothD']];
-  const seg = sur.querySelector('#ls-surface-seg'); const tiles = sur.querySelector('#ls-surface-tiles');
+  // One control for "Captions show on": the three described tiles (a pill strip with the same three options sat above them).
+  const tiles = sur.querySelector('#ls-surface-tiles');
   for (const [k, ic, d] of kinds) {
-    const b = el('button', null, `<span data-ls="${k}"></span>`); b.type = 'button'; b.setAttribute('role', 'radio'); b.dataset.surface = k; seg.append(b);
     const tl = el('button', 'ls-tile', `<span class="ls-tic">${svg(ic)}</span><span><b data-ls="${k}"></b><small data-ls="${d}"></small></span>`); tl.type = 'button'; tl.setAttribute('role', 'radio'); tl.dataset.surface = k; tiles.append(tl);
   }
 
@@ -109,7 +108,7 @@ export function mountLiveLayout(api) {
     for (const n of shell.querySelectorAll('[data-ls]')) n.textContent = T(n.dataset.ls);
     $('ls-info')?.setAttribute('title', T('showOnInfo'));
     $('ls-info')?.setAttribute('aria-label', T('showOnInfo'));
-    $('ls-surface-seg')?.setAttribute('aria-label', T('showOn'));
+    $('ls-surface-tiles')?.setAttribute('aria-label', T('showOn'));
     $('ls-surface-tiles')?.setAttribute('aria-label', T('showOn'));
     $('ls-source')?.setAttribute('aria-label', T('source'));
     paintPreview();
