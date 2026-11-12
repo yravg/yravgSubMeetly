@@ -9,6 +9,7 @@ use crate::events::{AppEvent, EventSink};
 use poni_core::helper;
 use poni_core::lyric_tr::{self, Cache, TrState};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
@@ -24,6 +25,8 @@ pub struct Job {
     pub src: Option<&'static str>,
     pub tgt: String,
     pub port: u16,
+    /// Line index at the current playback timestamp, so lines around the playhead are translated first.
+    pub start_index: usize,
 }
 
 #[derive(Default)]
@@ -32,6 +35,8 @@ struct Shared {
     wake: Condvar,
     /// Track the worker should be on; a job for another one stops early.
     newest: Mutex<String>,
+    /// Playhead line index; updated on seek so the worker translates from the new timestamp first.
+    cursor: AtomicUsize,
     shutdown: Mutex<bool>,
 }
 
@@ -50,9 +55,15 @@ impl LyricTranslateService {
 
     /// Queue `job` (UI thread safe); replaces one still waiting.
     pub fn request(&self, job: Job) {
+        self.shared.cursor.store(job.start_index, Ordering::Relaxed);
         *self.shared.newest.lock().unwrap() = job.track_key.clone();
         *self.shared.next.lock().unwrap() = Some(job);
         self.shared.wake.notify_one();
+    }
+
+    /// Update the priority line index when the user seeks on the video/track timeline.
+    pub fn set_cursor(&self, idx: usize) {
+        self.shared.cursor.store(idx, Ordering::Relaxed);
     }
 
     /// Stop translating the song now playing (translation switched off, new song without lyrics).
@@ -110,18 +121,24 @@ fn run(shared: &Shared, sink: &EventSink, job: Job) {
     if crate::services::capture::translation_on_disk(job.port) == Some(false) {
         return send(&job, Vec::new(), TrState::Unavailable(lyric_tr::MODEL_MISSING.into()));
     }
-    let mut out = vec![String::new(); job.lines.len()];
+    let n = job.lines.len();
+    let mut out = vec![String::new(); n];
+    let mut done: Vec<bool> = job.lines.iter().map(|l| l.trim().is_empty()).collect();
     send(&job, out.clone(), TrState::Working);
     let (mut since, mut failed) = (0, None);
-    for (i, line) in job.lines.iter().enumerate() {
+    let path_url = lyric_tr::translate_path(job.src, &job.tgt);
+    loop {
         if !current(&job) {
             return;
         }
-        if line.trim().is_empty() {
-            continue;
-        }
-        let path = lyric_tr::translate_path(job.src, &job.tgt);
-        let r = helper::request_bytes(job.port, "POST", &path, "text/plain; charset=utf-8", line.trim().as_bytes(), WAIT)
+        let cur = shared.cursor.load(Ordering::Relaxed).min(n.saturating_sub(1));
+        let next_idx = (cur..n).chain(0..cur).find(|&i| !done[i]);
+        let Some(i) = next_idx else {
+            break;
+        };
+        done[i] = true;
+        let line = &job.lines[i];
+        let r = helper::request_bytes(job.port, "POST", &path_url, "text/plain; charset=utf-8", line.trim().as_bytes(), WAIT)
             .and_then(|(code, body)| lyric_tr::parse_translation(code, &body));
         match r {
             Ok(t) => out[i] = lyric_tr::distinct(line, &t).unwrap_or_default(),

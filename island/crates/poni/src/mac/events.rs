@@ -64,6 +64,8 @@ pub enum AppEvent {
     /// Album art finished decoding for a track.
     MediaArt { track_key: String, art: Option<Image> },
     Lyrics { track_key: String, result: LyricsResult },
+    /// A song or video's transcript translated so far (index-aligned with the lines) and where that stands.
+    LyricsTr { track_key: String, tgt: String, lines: Vec<String>, state: poni_core::lyric_tr::TrState },
     AppleMusic(AppleMusicStatus),
     /// Master volume changed (0..=1). `switched`: the output device changed
     /// (headphones connected, say), not its volume.

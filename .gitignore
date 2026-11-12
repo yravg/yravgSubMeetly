@@ -1,5 +1,6 @@
 # Dependencies & virtualenvs
 node_modules/
+node_modules
 native/.venv/
 .hf-cache/
 

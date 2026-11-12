@@ -1,5 +1,11 @@
 # Riwayat rilis
 
+## 1.4.3 (2026-11-12)
+- **YouTube CC video transcripts with ahead-of-time translation:** When playing a YouTube video (browser or app), the island automatically fetches YouTube's closed captions / timed transcript in advance and begins translating all segments into the user's target language ahead of time. Seeks and timestamp changes instantly sync to the corresponding transcript lines and their translated text without waiting on audio ASR. Includes a `[CC On]` / `[CC Off]` toggle button on the Media page, seek-priority background translation, and automatic fallback when disabled.
+
+## 1.4.2 (2026-11-12)
+- **Pill Minutes: transcript side by side, Open Minutes app, and translate transcript into any language:** The pill's Minutes transcript (side by side), Open Minutes app, translate a transcript into any language, Mac Minutes decisions save.
+
 ## 1.4.1 (2026-11-12)
 - **Mac: Quit saves the session and stops the engine.** Quit from the Dock or AppleScript, logout and a signal (SIGTERM/SIGINT/SIGHUP) now go through the app's own quit, so captions running at that moment are saved as a meeting (`MOM-MAC-*`) and the engine this app started stops, instead of the app vanishing with the session lost and an engine left behind. Verified live on a Mac with captions on the Mac's own sound: caption in 1.8 s (RTF 0.2), translation into Indonesian after the model warms up, meeting saved on Quit.
 

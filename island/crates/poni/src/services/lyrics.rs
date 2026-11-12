@@ -99,7 +99,7 @@ impl LyricsService {
 
     /// Queue a lookup for `s` and return immediately (UI thread safe). The
     /// answer arrives as `AppEvent::Lyrics` with `s.track_key`.
-    pub fn request(&self, s: &MediaSession) {
+    pub fn request(&self, s: &MediaSession, video_transcript: bool, target_lang: &str) {
         let job = Job {
             track_key: s.track_key.clone(),
             query: TrackQuery {
@@ -109,6 +109,10 @@ impl LyricsService {
                 duration_s: duration_secs(s.timeline.duration_s),
             },
             browser: nowplaying::is_browser(&s.app_id),
+            video_transcript,
+            app_id: s.app_id.clone(),
+            app_name: s.app_name.clone(),
+            target_lang: target_lang.to_string(),
             attempt: 0,
         };
         {
@@ -145,6 +149,10 @@ struct Job {
     query: TrackQuery,
     /// A browser tab: the title is a video title ("Artist - Song").
     browser: bool,
+    video_transcript: bool,
+    app_id: String,
+    app_name: String,
+    target_lang: String,
     /// 0 for a fresh request, n for the n-th delayed retry.
     attempt: u32,
 }
@@ -196,6 +204,7 @@ impl Shared {
 // ----------------------------------------------------------------- worker
 
 /// Why a lookup stopped without an answer.
+#[derive(Debug)]
 enum Halt {
     /// Superseded by a newer track, or shutting down: say nothing.
     Abandoned,
@@ -333,12 +342,161 @@ impl Worker {
             // Nothing to search for; answer so the UI doesn't sit on "loading".
             return Ok(LyricsResult::NotFound);
         }
+        if job.video_transcript && poni_core::video_transcript::should_try_video_transcript(&job.app_id, &job.app_name, true) {
+            if let Some(result) = self.lookup_video_transcript(job, &q)? {
+                return Ok(result);
+            }
+        }
         if self.apple.enabled() {
             if let Some(result) = self.lookup_apple(job, &q)? {
                 return Ok(result);
             }
         }
         self.lookup_lrclib(job, &q)
+    }
+
+    /// Automatic video transcript (YouTube CC) turned into seekable synced lines.
+    fn lookup_video_transcript(&mut self, job: &Job, q: &TrackQuery) -> Result<Option<LyricsResult>, Halt> {
+        let key = poni_core::video_transcript::cache_key(q);
+        let path = self.cache_dir.join(format!("{key}.json"));
+        let cached = read_cache(&path);
+        if let Some(entry) = &cached {
+            if is_fresh(entry, crate::clock::unix_now()) {
+                if let Some(record) = entry.record.as_ref() {
+                    return Ok(Some(to_result(Some(record), job, poni_core::video_transcript::YOUTUBE_SOURCE)));
+                }
+                return Ok(None);
+            }
+        }
+        match self.fetch_video_transcript(job, q) {
+            Ok(Some(record)) => {
+                crate::pinfo!("video transcript {key}: found transcript");
+                self.store(&path, &CacheEntry::new(Some(record.clone()), crate::clock::unix_now()));
+                Ok(Some(to_result(Some(&record), job, poni_core::video_transcript::YOUTUBE_SOURCE)))
+            }
+            Ok(None) => {
+                crate::pinfo!("video transcript {key}: not found");
+                self.store(&path, &CacheEntry::new(None, crate::clock::unix_now()));
+                Ok(None)
+            }
+            Err(e) => {
+                crate::pwarn!("video transcript fetch failed: {e:?}");
+                if let Some(record) = cached.as_ref().and_then(|e| e.record.as_ref()) {
+                    return Ok(Some(to_result(Some(record), job, poni_core::video_transcript::YOUTUBE_SOURCE)));
+                }
+                Ok(None)
+            }
+        }
+    }
+
+    fn fetch_video_transcript(&mut self, job: &Job, q: &TrackQuery) -> Result<Option<LrclibRecord>, Halt> {
+        let mut vid = poni_core::video_transcript::youtube_id_from_text(&job.query.title)
+            .or_else(|| poni_core::video_transcript::youtube_id_from_text(&job.query.artist))
+            .or_else(|| poni_core::video_transcript::youtube_id_from_text(&job.track_key));
+
+        if vid.is_none() {
+            let search_query = if !q.artist.is_empty() && !q.title.contains(&q.artist) {
+                format!("{} {}", q.title, q.artist)
+            } else {
+                q.title.clone()
+            };
+            let body = poni_core::video_transcript::innertube_search_body(&search_query);
+            let client = self.ensure_client(job)?;
+            let resp = client.send(
+                http::Method::Post,
+                "https://www.youtube.com/youtubei/v1/search?prettyPrint=false",
+                &[("Content-Type", "application/json")],
+                Some(&body),
+                Duration::from_secs(6),
+            );
+            if let Ok(r) = resp {
+                let candidates = poni_core::video_transcript::parse_youtube_search(&r.body);
+                let dur = (q.duration_s > 0).then_some(q.duration_s);
+                if let Some(best) = poni_core::video_transcript::best_video_match(&candidates, &q.title, &q.artist, dur) {
+                    vid = Some(best.video_id.clone());
+                }
+            }
+        }
+
+        let Some(video_id) = vid else {
+            return Ok(None);
+        };
+
+        let mut tracks = Vec::new();
+        for (player_body, ua) in poni_core::video_transcript::innertube_player_requests(&video_id) {
+            let client = self.ensure_client(job)?;
+            let resp = client.send(
+                http::Method::Post,
+                "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+                &[
+                    ("Content-Type", "application/json"),
+                    ("User-Agent", ua),
+                ],
+                Some(&player_body),
+                Duration::from_secs(6),
+            );
+            if let Ok(r) = resp {
+                let found = poni_core::video_transcript::extract_caption_tracks(&r.body);
+                if !found.is_empty() {
+                    tracks = found;
+                    break;
+                }
+            }
+        }
+
+        if tracks.is_empty() {
+            let client = self.ensure_client(job)?;
+            let watch_url = format!("https://www.youtube.com/watch?v={video_id}");
+            if let Ok(r) = client.get_with_headers(
+                &watch_url,
+                &[
+                    ("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"),
+                    ("Accept-Language", "en-US,en;q=0.9"),
+                ],
+                Duration::from_secs(6),
+            ) {
+                tracks = poni_core::video_transcript::extract_caption_tracks(&r.body);
+            }
+        }
+
+        let Some(chosen) = poni_core::video_transcript::pick_caption_track(&tracks, &job.target_lang) else {
+            return Ok(None);
+        };
+
+        let client = self.ensure_client(job)?;
+        let fetch_url = poni_core::video_transcript::json3_url(&chosen.base_url);
+        let resp = client.get(&fetch_url, Duration::from_secs(8));
+        let body = match resp {
+            Ok(r) if r.status == 200 => r.body,
+            _ => {
+                let client = self.ensure_client(job)?;
+                let fallback_resp = client.get(&chosen.base_url, Duration::from_secs(8));
+                match fallback_resp {
+                    Ok(r) if r.status == 200 => r.body,
+                    _ => return Ok(None),
+                }
+            }
+        };
+
+        let Some(lyrics) = poni_core::video_transcript::parse_transcript(&body) else {
+            return Ok(None);
+        };
+        if lyrics.lines.is_empty() {
+            return Ok(None);
+        }
+        let record = poni_core::video_transcript::to_lrc_record(&lyrics, q);
+        Ok(Some(record))
+    }
+
+    fn ensure_client(&mut self, job: &Job) -> Result<&Client, Halt> {
+        if self.client.is_none() {
+            let c = Client::new(USER_AGENT).map_err(|e| {
+                crate::pwarn!("lyrics: client creation failed: {e}");
+                Halt::Failed { msg: "Lyrics are unavailable".into(), retry_at: Some(Instant::now() + retry_delay(job.attempt)) }
+            })?;
+            self.client = Some(c);
+        }
+        Ok(self.client.as_ref().unwrap())
     }
 
     /// Apple Music's synced lyrics; `Ok(None)` hands the song to LRCLIB.

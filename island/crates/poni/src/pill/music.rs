@@ -278,7 +278,17 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     let col = cols.lyrics_w.map(|lyr_w| Rect::new(snap(x0 + area.w - lyr_w), y0, lyr_w, H_SESSION));
     if let Some(col) = col.filter(|_| matches!(which, Column::Lyrics | Column::Offer)) {
         let offer = if pronounce && st.lyrics.wants_ja_readings { st.ja_offer().map(|(line, click)| (line, click != JaClick::None)) } else { None };
-        let ctx = LyricsCtx { now, pos: lyric_pos, live: playing && has_dur, can_seek: m.can_seek, scale, track_key: &m.track_key, pronounce, offer };
+        let ctx = LyricsCtx {
+            now,
+            pos: lyric_pos,
+            live: playing && has_dur,
+            can_seek: m.can_seek,
+            scale,
+            track_key: &m.track_key,
+            pronounce,
+            offer,
+            translated: (!st.lyrics.translated.is_empty()).then_some(st.lyrics.translated.as_slice()),
+        };
         let out = classic::draw_lyrics(ui, &st.lyrics, &mut st.ui, col, a, fr, &ctx, &mut acts);
         anim |= out.animating;
         synced_shown = out.synced;

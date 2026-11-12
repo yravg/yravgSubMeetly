@@ -1973,6 +1973,9 @@ impl App {
     /// The PC plays sound that is not a music app (a call, a video, a meeting), a video plays, or a
     /// calendar meeting with a join link runs now.
     fn captions_wanted(&self) -> bool {
+        if self.st.settings.video_transcript && self.st.lyrics.status == LyricsStatus::Found && poni_core::video_transcript::is_video_transcript_source(&self.st.lyrics.source) {
+            return false;
+        }
         let playing = self.st.media.as_ref().filter(|m| m.is_playing());
         let music = playing.is_some_and(|m| !poni_core::capture::captionable_app(&m.app_id));
         let video = playing.is_some_and(|m| poni_core::capture::captionable_app(&m.app_id));
@@ -2542,13 +2545,26 @@ impl App {
         let l = &self.st.lyrics;
         let lines: Vec<String> = l.lyrics.as_ref().filter(|x| x.synced).map(|x| x.lines.iter().map(|y| y.text.trim().to_string()).collect()).unwrap_or_default();
         let src = poni_core::lyric_tr::song_lang(&lines.iter().map(String::as_str).collect::<Vec<_>>());
-        if !s.lyrics_translate || lines.is_empty() || !poni_core::lyric_tr::wants(src, &s.target_lang) {
+        let is_video = poni_core::video_transcript::is_video_transcript_source(&l.source);
+        let wanted = (s.lyrics_translate || is_video) && !lines.is_empty() && poni_core::lyric_tr::wants(src, &s.target_lang);
+        if !wanted {
             svc.translate_lyrics(None);
             self.st.lyrics.translated.clear();
             self.st.lyrics.tr = poni_core::lyric_tr::TrState::Idle;
             return;
         }
-        let job = services::lyric_translate::Job { track_key: l.track_key.clone(), lines, src, tgt: s.target_lang.clone(), port: poni_core::helper::configured_port() };
+        let now = self.st.now;
+        let start_index = self.st.media.as_ref()
+            .and_then(|m| l.lyrics.as_ref().and_then(|lyr| lyr.line_index_at(m.timeline.position_at(now))))
+            .unwrap_or(0);
+        let job = services::lyric_translate::Job {
+            track_key: l.track_key.clone(),
+            lines,
+            src,
+            tgt: s.target_lang.clone(),
+            port: poni_core::helper::configured_port(),
+            start_index,
+        };
         svc.translate_lyrics(Some(job));
         self.st.lyrics.tr = poni_core::lyric_tr::TrState::Working;
         self.st.lyrics.translated.clear();
@@ -2623,13 +2639,13 @@ impl App {
 
     /// Look up the current track's lyrics again (the sources changed).
     fn refetch_lyrics(&mut self) {
-        if !self.st.settings.lyrics {
+        if !self.st.settings.lyrics && !self.st.settings.video_transcript {
             return;
         }
         let Some(m) = self.st.media.clone().filter(|m| !m.title.is_empty()) else { return };
         if let Some(svc) = self.services.as_ref() {
             self.st.lyrics = LyricsState { track_key: m.track_key.clone(), status: LyricsStatus::Loading, ..Default::default() };
-            svc.request_lyrics(&m);
+            svc.request_lyrics(&m, self.st.settings.video_transcript, &self.st.settings.target_lang);
         }
     }
 
@@ -2674,13 +2690,14 @@ impl App {
             self.sync_top_watch();
         }
         let now = &self.st.settings;
-        if !before.lyrics && now.lyrics {
+        let lyrics_switched_on = (!before.lyrics && now.lyrics) || (!before.video_transcript && now.video_transcript);
+        if lyrics_switched_on {
             if let Some(m) = self.st.media.clone() {
                 let stale = self.st.lyrics.track_key != m.track_key || self.st.lyrics.status == LyricsStatus::Idle;
                 if stale && !m.title.is_empty() {
                     if let Some(svc) = self.services.as_ref() {
                         self.st.lyrics = LyricsState { track_key: m.track_key.clone(), status: LyricsStatus::Loading, ..Default::default() };
-                        svc.request_lyrics(&m);
+                        svc.request_lyrics(&m, now.video_transcript, &now.target_lang);
                     }
                 }
             }
@@ -2947,10 +2964,11 @@ impl App {
                             if let Some(svc) = self.services.as_ref() {
                                 svc.translate_lyrics(None);
                             }
-                            if self.st.settings.lyrics && !s.title.is_empty() {
+                            let wants_lookup = (self.st.settings.lyrics || (self.st.settings.video_transcript && poni_core::video_transcript::is_video_session(&s.app_id, &s.app_name))) && !s.title.is_empty();
+                            if wants_lookup {
                                 if let Some(svc) = self.services.as_ref() {
                                     self.st.lyrics.status = LyricsStatus::Loading;
-                                    svc.request_lyrics(&s);
+                                    svc.request_lyrics(&s, self.st.settings.video_transcript, &self.st.settings.target_lang);
                                 }
                             }
                         }
@@ -2967,6 +2985,11 @@ impl App {
                 if let Some(m) = self.st.media.as_mut() {
                     if m.track_key == track_key {
                         m.timeline = timeline;
+                        if let Some(idx) = self.st.lyrics.lyrics.as_ref().filter(|l| l.synced).and_then(|l| l.line_index_at(m.timeline.position_at(self.st.now))) {
+                            if let Some(svc) = self.services.as_ref() {
+                                svc.set_lyric_cursor(idx);
+                            }
+                        }
                     }
                 }
                 self.auto_captions_step();
@@ -3228,7 +3251,8 @@ impl App {
             }
             AppEvent::LyricsTr { track_key, tgt, lines, state } => {
                 // A late answer for another song or another target language is dropped.
-                if self.st.lyrics.track_key == track_key && self.st.settings.target_lang == tgt && self.st.settings.lyrics_translate {
+                let is_video = poni_core::video_transcript::is_video_transcript_source(&self.st.lyrics.source);
+                if self.st.lyrics.track_key == track_key && self.st.settings.target_lang == tgt && (self.st.settings.lyrics_translate || is_video) {
                     self.st.lyrics.translated = lines;
                     self.st.lyrics.tr = state;
                 }
@@ -3251,7 +3275,7 @@ impl App {
                     if let (Some(svc), Some(m)) = (self.services.as_ref(), self.st.media.as_ref()) {
                         if m.track_key == self.st.lyrics.track_key {
                             pinfo!("lyrics: Japanese readings are on this PC; reading the song again");
-                            svc.request_lyrics(m);
+                            svc.request_lyrics(m, self.st.settings.video_transcript, &self.st.settings.target_lang);
                         }
                     }
                 }
@@ -5022,6 +5046,7 @@ impl App {
                     self.settings_changed(&before);
                     self.save_settings();
                 }
+                Command::RefetchLyrics => self.refetch_lyrics(),
                 Command::OpenSettings => self.show_settings(deferred),
                 Command::RestoreLiveCaptions => {
                     if self.services.as_ref().is_some_and(|s| s.livecap_running()) {
@@ -5212,7 +5237,7 @@ impl App {
             if let (Some(svc), Some(m)) = (self.services.as_ref(), self.st.media.as_ref()) {
                 if m.track_key == self.st.lyrics.track_key {
                     pinfo!("lyrics: Windows reads Japanese now; reading the song again");
-                    svc.request_lyrics(m);
+                    svc.request_lyrics(m, self.st.settings.video_transcript, &self.st.settings.target_lang);
                 }
             }
         }

@@ -143,6 +143,9 @@ pub struct Settings {
     pub lyrics_offset_ms: i32,
     /// Translate synced lyrics into `target_lang` under the sung line.
     pub lyrics_translate: bool,
+    /// Automatically fetch the full video transcript (e.g. YouTube CC) and pre-translate it in
+    /// advance on the Media tab, synced to the video's playback timestamp. On by default.
+    pub video_transcript: bool,
     /// Language the PC's speech is in for live captions: `auto` or an engine code (`capture::LANGS`).
     pub source_lang: String,
     /// Language captions and lyrics are translated into.
@@ -301,6 +304,7 @@ impl Default for Settings {
             lyrics_pronunciation: true,
             lyrics_offset_ms: 0,
             lyrics_translate: true,
+            video_transcript: true,
             source_lang: "auto".into(),
             target_lang: "en".into(),
             captions_on: false,

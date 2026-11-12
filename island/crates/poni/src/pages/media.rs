@@ -365,6 +365,7 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     let has_dur = tl.has_duration();
     let mut acts: Vec<MediaCmd> = Vec::new();
     let mut anim = false;
+    let mut toggle_cc = false;
 
     // Album art (gently shrinks while paused).
     let art_target = if playing { 1.0 } else { ART_PAUSED_SCALE };
@@ -402,6 +403,16 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     if let Some(label) = source {
         let dot = if playing { accent } else { accent.mul_alpha(0.45) };
         draw_source(ui, mid.x, y0 + SOURCE_Y, mid.w, &label, dot, scale);
+    }
+    if poni_core::video_transcript::is_video_session(&m.app_id, &m.app_name) {
+        let cc_on = st.settings.video_transcript;
+        let cc_label = if cc_on { "CC On" } else { "CC Off" };
+        let cc_style = if cc_on { crate::ui::PillStyle::Primary(accent) } else { crate::ui::PillStyle::Utility };
+        let cc_w = ui.pill_width(cc_label, false, true);
+        let cc_rect = Rect::new(mid.right() - cc_w, y0 + SOURCE_Y - 3.0, cc_w, crate::ui::PILL_SMALL);
+        if ui.pill(wid("media.video_transcript_toggle"), cc_rect, cc_label, None, cc_style).clicked {
+            toggle_cc = true;
+        }
     }
 
     // Progress + times.
@@ -461,7 +472,17 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
         // A Japanese song whose kanji went unread: the readings add-on coming
         // in (the app switched it on), or offered after a switch-off by hand.
         let offer = if pronounce && st.lyrics.wants_ja_readings { st.ja_offer().map(|(line, click)| (line, click != JaClick::None)) } else { None };
-        let ctx = LyricsCtx { now, pos: lyric_pos, live: playing && has_dur, can_seek: m.can_seek, scale, track_key: &m.track_key, pronounce, offer };
+        let ctx = LyricsCtx {
+            now,
+            pos: lyric_pos,
+            live: playing && has_dur,
+            can_seek: m.can_seek,
+            scale,
+            track_key: &m.track_key,
+            pronounce,
+            offer,
+            translated: (!st.lyrics.translated.is_empty()).then_some(st.lyrics.translated.as_slice()),
+        };
         let out = draw_lyrics(ui, &st.lyrics, &mut st.ui, col, a, fr, &ctx, &mut acts);
         anim |= out.animating;
         synced_shown = out.synced;
@@ -496,6 +517,18 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     // reads the song again), or Windows' Japanese typing.
     if get_ja_readings {
         st.ja_offer_clicked();
+    }
+    if toggle_cc {
+        st.settings.video_transcript = !st.settings.video_transcript;
+        st.cmd(Command::SaveSettings);
+        if !st.settings.video_transcript {
+            if poni_core::video_transcript::is_video_transcript_source(&st.lyrics.source) {
+                st.lyrics = LyricsState::default();
+                st.lyrics.status = LyricsStatus::Idle;
+            }
+        } else {
+            st.cmd(Command::RefetchLyrics);
+        }
     }
 }
 
@@ -611,6 +644,8 @@ pub(crate) struct LyricsCtx<'a> {
     /// In the credit's place, always shown: the Japanese readings add-on's
     /// line (`AppState::ja_offer`) and whether a click does anything.
     pub(crate) offer: Option<(String, bool)>,
+    /// Translated transcript or lyric lines aligned with the original lines.
+    pub(crate) translated: Option<&'a [String]>,
 }
 
 #[derive(Default)]
@@ -680,7 +715,7 @@ pub(crate) fn column(synced: bool, no_lyrics: bool, captions: bool, kept: bool, 
 /// meeting (a meeting's captions belong to the Meeting tab).
 pub(crate) fn column_for(st: &AppState) -> Column {
     let Some(m) = st.media.as_ref() else { return Column::Lyrics };
-    let lyrics_on = st.settings.lyrics;
+    let lyrics_on = st.settings.lyrics || (st.settings.video_transcript && poni_core::video_transcript::is_video_session(&m.app_id, &m.app_name));
     let view = lyrics_view(&st.lyrics, &m.track_key);
     let synced = lyrics_on && matches!(view, View::Synced(_));
     let no_lyrics = lyrics_on && matches!(view, View::Status { msg, .. } if msg == NO_SYNCED);
@@ -691,7 +726,7 @@ pub(crate) fn column_for(st: &AppState) -> Column {
 
 /// The column shows: the lyrics are on, or it has captions or a kept transcript to show.
 pub(crate) fn column_shown(st: &AppState, c: Column) -> bool {
-    st.settings.lyrics || c != Column::Lyrics
+    st.settings.lyrics || st.settings.video_transcript || c != Column::Lyrics
 }
 
 /// The page height the Aa strip adds: only under the caption column (board P02 d).
@@ -787,16 +822,25 @@ pub(crate) fn draw_lyrics(
     let vp = Rect::new(col.x, col.y, col.w, col.h - CREDIT_H - CREDIT_GAP);
     let mut out = LyricsOut::default();
     let source = lyrics_source(lyr);
+    let is_video_tr = poni_core::video_transcript::is_video_transcript_source(source);
     let credit = match view {
         View::Status { msg, busy } => {
             let pulse = if busy && ctx.live { Some(ctx.now) } else { None };
             draw_status(ui, vp, msg, pulse);
-            format!("Lyrics: {source}")
+            if is_video_tr {
+                "Transcript: YouTube CC".to_string()
+            } else {
+                format!("Lyrics: {source}")
+            }
         }
         View::Synced(l) => {
             out.synced = true;
             out.animating = draw_synced(ui, l, &lyr.ruby, pui, vp, a, fr, fresh, ctx, acts);
-            format!("Lyrics: {source}")
+            if is_video_tr {
+                "Transcript: YouTube CC".to_string()
+            } else {
+                format!("Lyrics: {source}")
+            }
         }
         View::Plain(l) => {
             out.animating = draw_plain(ui, l, &lyr.ruby, pui, vp, a, fr, fresh, ctx);
@@ -872,15 +916,24 @@ fn lyric_style(size: f32) -> TextStyle {
 }
 
 /// Wrapped lyric line size, cached per (row, size) for the current lyrics.
-fn measure_row(ui: &mut Ui, a: &mut Anim, row: usize, size: f32, text: &str, wrap_w: f32) -> (f32, f32) {
+fn measure_row(ui: &mut Ui, a: &mut Anim, row: usize, size: f32, text: &str, tr: Option<&str>, wrap_w: f32) -> (f32, f32) {
     let key = (row, (size * 4.0).round() as u16);
-    if let Some(v) = a.sizes.get(&key) {
-        return *v;
+    if tr.is_none() {
+        if let Some(v) = a.sizes.get(&key) {
+            return *v;
+        }
     }
     let ts = lyric_style(size);
-    let (w, h) = ui.c.measure(text, &ts, wrap_w);
+    let (mut w, mut h) = ui.c.measure(text, &ts, wrap_w);
+    if let Some(tr_text) = tr {
+        let (tw, th) = ui.c.measure(tr_text, &roman_style(size), wrap_w);
+        w = w.max(tw);
+        h += th + 2.0;
+    }
     let v = (w.min(wrap_w), h.max(size));
-    a.sizes.insert(key, v);
+    if tr.is_none() {
+        a.sizes.insert(key, v);
+    }
     v
 }
 
@@ -998,6 +1051,7 @@ struct Row<'a> {
     /// Height of the layout box at `size_q` (`h` is its scaled height).
     lay_h: f32,
     text: &'a str,
+    tr: Option<&'a str>,
     /// The line's pieces with their readings, when it is shown pronounced.
     ruby: Option<&'a [Ruby]>,
     wrap_w: f32,
@@ -1110,14 +1164,15 @@ fn draw_synced(
         let (size, size_q) = lyric_size(1.0 - d);
         let k = size / size_q;
         let text = text_of(r);
+        let tr = if r >= off { ctx.translated.and_then(|t| t.get(r - off)).map(String::as_str).filter(|s| !s.trim().is_empty()) } else { None };
         let ruby = if ctx.pronounce && !text.is_empty() { rubies.get(r - off).map(Vec::as_slice).filter(|p| !p.is_empty()) } else { None };
         let wrap_w = vp.w * size_q / LYRIC_MAX;
         let (w, lay_h) = match ruby {
             _ if text.is_empty() => (dots_width(size) / k, size_q * LYRIC_LEADING * open),
             Some(p) => measure_ruby(ui, a, r, size_q * RUBY_SIZE, p, wrap_w),
-            None => measure_row(ui, a, r, size_q, text, wrap_w),
+            None => measure_row(ui, a, r, size_q, text, tr, wrap_w),
         };
-        rows.push(Row { r, d, size, size_q, k, lay_h, text, ruby, wrap_w, w: w * k, h: lay_h * k, open, c: 0.0 });
+        rows.push(Row { r, d, size, size_q, k, lay_h, text, tr, ruby, wrap_w, w: w * k, h: lay_h * k, open, c: 0.0 });
     }
     let ik = k - lo;
     for i in ik + 1..rows.len() {
@@ -1195,7 +1250,13 @@ fn draw_synced(
                 draw_ruby(ui, a, row.r, row.size_q * RUBY_SIZE, vp.x, y, alpha);
             } else {
                 let ts = lyric_style(row.size_q).color(Color::white(alpha)).top();
-                ui.c.text(row.text, Rect::new(vp.x, y, row.wrap_w, row.lay_h + 2.0), &ts);
+                let orig_h = ui.c.measure(row.text, &ts, row.wrap_w).1.max(row.size_q);
+                ui.c.text(row.text, Rect::new(vp.x, y, row.wrap_w, orig_h + 2.0), &ts);
+                if let Some(tr_text) = row.tr {
+                    let tr_style = roman_style(row.size_q).color(Color::white(alpha * 0.72)).top();
+                    let tr_y = y + orig_h + 1.0;
+                    ui.c.text(tr_text, Rect::new(vp.x, tr_y, row.wrap_w, (row.lay_h - orig_h).max(0.0) + 2.0), &tr_style);
+                }
             }
             ui.c.restore_transform(m0);
         }
@@ -1248,7 +1309,7 @@ fn draw_plain(
         let h = match pieces(i) {
             _ if text.is_empty() => STANZA_GAP,
             Some(p) => measure_ruby(ui, a, i, PLAIN_SIZE, p, vp.w).1,
-            None => measure_row(ui, a, i, PLAIN_SIZE, text, vp.w).1,
+            None => measure_row(ui, a, i, PLAIN_SIZE, text, None, vp.w).1,
         };
         heights.push(h);
     }

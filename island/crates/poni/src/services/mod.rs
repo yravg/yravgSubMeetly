@@ -334,9 +334,16 @@ impl Services {
         }
     }
 
-    pub fn request_lyrics(&self, s: &MediaSession) {
+    /// Set the playback cursor line index for seek-priority translation.
+    pub fn set_lyric_cursor(&self, idx: usize) {
+        if let Some(t) = &self.lyric_tr {
+            t.set_cursor(idx);
+        }
+    }
+
+    pub fn request_lyrics(&self, s: &MediaSession, video_transcript: bool, target_lang: &str) {
         if let Some(l) = &self.lyrics {
-            l.request(s);
+            l.request(s, video_transcript, target_lang);
         }
     }
 

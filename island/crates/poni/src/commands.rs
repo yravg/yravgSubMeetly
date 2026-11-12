@@ -99,6 +99,8 @@ pub enum Command {
     SaveStore,
     /// Persist `AppState::settings` now (after a page toggled a setting).
     SaveSettings,
+    /// Look up lyrics/video transcript again for the current track.
+    RefetchLyrics,
     /// Open the Settings window, or bring it forward (the gear, Windows).
     OpenSettings,
     /// The same, on one section (the Captions tab's "Manage" opens Captions and languages).
