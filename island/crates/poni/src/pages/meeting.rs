@@ -329,7 +329,7 @@ fn translate_bar(ui: &mut Ui, st: &mut AppState, note: &helper::Note, r: Rect) -
         if ui.pill(wid("meeting.translate.prev"), pb, "\u{2039}", None, PillStyle::Utility).clicked {
             st.records.translate_to = poni_core::capture::step_lang(&st.records.translate_to, -1, false).to_string();
         }
-        let lead = if pb.x - bar.x >= 150.0 { "Translate the transcript into" } else { "Into" };
+        let lead = if pb.x - bar.x >= 100.0 { "Translate into" } else { "Into" };
         ui.c.text(lead, Rect::new(bar.x, cy - 9.0, (pb.x - PILL_GAP - bar.x).max(0.0), 18.0), &dim);
     }
     Rect::new(r.x, r.y + BAR_H + 4.0, r.w, (r.h - BAR_H - 4.0).max(0.0))
