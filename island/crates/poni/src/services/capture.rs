@@ -255,11 +255,12 @@ fn capture_loop(stop: Receiver<()>, health: Arc<Health>, slot: Slot, wake: Sende
         let jobs: Vec<Job> = match sessions.as_mut_slice() {
             [Some(s)] => {
                 let mono = s.pipeline.mono(&read[0]);
-                utter.push(&mono).into_iter().map(|p| Job { audio: p.samples, side: None, last: p.last }).collect()
+                let who = poni_core::capture::who(None, matches!(flows[0], Flow::Mic(_)));
+                utter.push(&mono).into_iter().map(|p| Job { audio: p.samples, side: None, who, last: p.last }).collect()
             }
             [Some(mic), Some(pc)] => {
                 let (m, p) = (mic.pipeline.mono(&read[0]), pc.pipeline.mono(&read[1]));
-                mixer.push(&m, &p).into_iter().map(|(w, side)| Job { audio: w, side: Some(side), last: true }).collect()
+                mixer.push(&m, &p).into_iter().map(|(w, side)| Job { audio: w, side: Some(side), who: poni_core::capture::who(Some(side), false), last: true }).collect()
             }
             _ => Vec::new(),
         };

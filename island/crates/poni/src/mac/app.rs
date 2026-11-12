@@ -1282,9 +1282,10 @@ impl App {
             }
             // The Chrome extension and the island's own captions are the Windows
             // app's services; the Mac has no twin of them yet.
-            MenuCmd::OpenApp
-            | MenuCmd::OpenMinutes
-            | MenuCmd::SetupExtension
+            // The main window is the native app shipped in this bundle (a real window, not a web page).
+            // The register lives in it: Minutes opens the same window.
+            MenuCmd::OpenApp | MenuCmd::OpenMinutes => services::open_main_window(),
+            MenuCmd::SetupExtension
             | MenuCmd::OpenCaptionsPanel
             => {}
             MenuCmd::StartCaptions => {

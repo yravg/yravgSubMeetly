@@ -265,6 +265,39 @@ pub fn first_tab(st: &AppState) -> PageKind {
 }
 
 fn row(st: &AppState, open: Option<PageKind>) -> Vec<PageKind> {
+    let mut v = default_row(st, open);
+    apply_order(&mut v, &st.settings.tab_order);
+    v
+}
+
+/// Puts the tabs in the user's saved order (`Settings::tab_order`): listed tabs first, in that
+/// order, the rest after them in their built-in order; Add-ons stays last.
+fn apply_order(v: &mut [PageKind], order: &[String]) {
+    if order.is_empty() {
+        return;
+    }
+    let n = v.iter().rposition(|p| *p != PageKind::Addons).map_or(0, |i| i + 1);
+    v[..n].sort_by_key(|p| order.iter().position(|k| k == p.key()).unwrap_or(usize::MAX));
+}
+
+/// Moves the dragged tab `p` to where the pointer at `x` is among the tab slots `tabs`, and
+/// remembers the new order.
+fn drag_tab(st: &mut AppState, row: &[PageKind], tabs: &[Rect], p: PageKind, x: f32) {
+    let Some(from) = row.iter().position(|t| *t == p) else { return };
+    let last = row.iter().rposition(|t| *t != PageKind::Addons).unwrap_or(0);
+    let to = (0..row.len()).filter(|&i| i != from && row[i] != PageKind::Addons && tabs[i].center().x < x).count().min(last);
+    if to == from {
+        return;
+    }
+    let mut v = row.to_vec();
+    let t = v.remove(from);
+    v.insert(to, t);
+    let mut order: Vec<String> = v.iter().filter(|t| **t != PageKind::Addons).map(|t| t.key().to_string()).collect();
+    order.extend(st.settings.tab_order.iter().filter(|k| !order.contains(k)).cloned().collect::<Vec<_>>());
+    st.settings.tab_order = order;
+}
+
+fn default_row(st: &AppState, open: Option<PageKind>) -> Vec<PageKind> {
     PageKind::ALL
         .into_iter()
         .filter(|&p| match p {
@@ -477,7 +510,11 @@ pub(crate) fn snap(v: f32, scale: f32) -> f32 {
 const TAB_H: f32 = 28.0;
 /// Inactive tabs are bare icons in a 30 DIP slot.
 const TAB_W: f32 = 30.0;
+/// The narrowest an icon slot gets when a long row has to fit.
+const MIN_TAB_W: f32 = 22.0;
 const TAB_GAP: f32 = 2.0;
+/// Press-and-move distance (DIPs) that starts dragging a tab.
+const TAB_DRAG_MIN: f32 = 6.0;
 const TAB_ICON: f32 = 16.0;
 /// The active tab's label starts this far in and ends `TAB_LABEL_END` before its edge.
 const TAB_LABEL_X: f32 = 28.0;
@@ -487,8 +524,6 @@ const TAB_LABEL_END: f32 = 12.0;
 const DATE_GAP: f32 = 12.0;
 const PIN_GAP: f32 = 10.0;
 const PIN: f32 = 28.0;
-const GEAR: f32 = 28.0;
-const GEAR_GAP: f32 = 2.0;
 /// Hover labels: dwell, fade-in, capsule metrics.
 /// A name shows the moment the pointer or the keyboard is on a tab.
 const TIP_DELAY: f64 = 0.0;
@@ -513,13 +548,18 @@ pub(crate) struct Tip {
 }
 
 /// Tab slots (x, width) of `tabs`, with `active` showing its label.
-fn tab_layout(ui: &mut Ui, x0: f32, tabs: &[PageKind], active: PageKind, label_st: &TextStyle, scale: f32) -> Vec<(f32, f32)> {
+fn tab_layout(ui: &mut Ui, x0: f32, end: f32, slot_w: f32, tabs: &[PageKind], active: PageKind, label_st: &TextStyle, scale: f32) -> Vec<(f32, f32)> {
     let mut x = x0;
+    let n = tabs.len();
     tabs.iter()
-        .map(|&p| {
+        .enumerate()
+        .map(|(i, &p)| {
             // The Meeting tab stays an icon when open (its page names the meeting): with it in the
             // row a label would push the pin and the gear off a 620 DIP island.
-            let w = if p == active && p != PageKind::Call { snap(TAB_LABEL_X + ui.c.measure(p.title(), label_st, 200.0).0 + TAB_LABEL_END, scale) } else { TAB_W };
+            let mut w = if p == active && p != PageKind::Call { snap(TAB_LABEL_X + ui.c.measure(p.title(), label_st, 200.0).0 + TAB_LABEL_END, scale) } else { slot_w };
+            // The label gives way (it is clipped) so the row, the Settings slot after it and the clock all fit.
+            let room = end - x - (n - 1 - i) as f32 * (slot_w + TAB_GAP);
+            w = w.min(room.max(slot_w));
             let slot = (snap(x, scale), w);
             x += w + TAB_GAP;
             slot
@@ -537,8 +577,16 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
     let from = tr.map_or(page, |t| t.from);
     let e = tr.map_or(1.0, |t| ease_out_cubic(t.t / TABS_END));
     let row = self::tabs(st);
-    let lay_from = tab_layout(ui, r.x + menu::SLOT, &row, from, &label_st, scale);
-    let lay_to = if from == page { lay_from.clone() } else { tab_layout(ui, r.x + menu::SLOT, &row, page, &label_st, scale) };
+    // The clock keeps the right edge; the tabs and the Settings slot after them end before it.
+    let clock_w = ui.c.measure(&fmt_clock(&st.local, st.settings.use_24h), &TextStyle::body().weight(Weight::Semibold).tabular().right(), 200.0).0;
+    let x0 = r.x + menu::SLOT;
+    let stop = r.right() - 6.0 - clock_w - DATE_GAP;
+    // However many tabs there are, they and the Settings slot after them end before the clock: the
+    // slots narrow (down to MIN_TAB_W) when the row is long, so nothing is fixed per tab.
+    let slot_w = ((stop - x0) / (row.len() + 1) as f32 - TAB_GAP).clamp(MIN_TAB_W, TAB_W).floor();
+    let end = stop - slot_w - TAB_GAP;
+    let lay_from = tab_layout(ui, x0, end, slot_w, &row, from, &label_st, scale);
+    let lay_to = if from == page { lay_from.clone() } else { tab_layout(ui, x0, end, slot_w, &row, page, &label_st, scale) };
     let tabs: Vec<Rect> =
         (0..row.len()).map(|i| Rect::new(lerp(lay_from[i].0, lay_to[i].0, e), cy - TAB_H / 2.0, lerp(lay_from[i].1, lay_to[i].1, e), TAB_H)).collect();
     let place = |p: PageKind| row.iter().position(|t| *t == p).unwrap_or(0);
@@ -580,14 +628,33 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
         }
         let k = if active { e } else if from.tabbed() && i == fi { 1.0 - e } else { 0.0 };
         let ic = if resp.hovered { palette::TEXT } else { Color::lerp(palette::TEXT_FAINT, palette::TEXT, k) };
-        let ix = snap(tr.x + (TAB_W - TAB_ICON) / 2.0, scale);
+        let ix = snap(tr.x + (slot_w - TAB_ICON) / 2.0, scale);
         ui.c.icon(p.icon(), Rect::new(ix, snap(cy - TAB_ICON / 2.0, scale), TAB_ICON, TAB_ICON), ic);
         // Steady red dot while the meeting's captions run (board P01).
         if p == PageKind::Call && st.call_live() {
             ui.c.fill_circle(Point::new(ix + TAB_ICON, cy - TAB_ICON / 2.0 + 1.0), 3.0, palette::RED);
         }
-        if resp.clicked && !active {
+        // Press and move past a few DIPs to drag the tab along the row.
+        if resp.pressed && st.ui.tab_drag.is_none() && p != PageKind::Addons {
+            if let Some((dx, _)) = resp.drag {
+                if dx.abs() >= TAB_DRAG_MIN {
+                    st.ui.tab_drag = Some(p);
+                }
+            }
+        }
+        if st.ui.tab_drag == Some(p) {
+            ui.c.fill_rrect(tr, TAB_H / 2.0, Color::white(0.14));
+        }
+        if resp.clicked && !active && st.ui.tab_drag.is_none() {
             st.go_tab(p);
+        }
+    }
+    if let Some(p) = st.ui.tab_drag {
+        if !ui.input.down {
+            st.ui.tab_drag = None;
+            st.cmd(Command::SaveSettings);
+        } else if let Some(m) = ui.input.mouse {
+            drag_tab(st, &row, &tabs, p, m.x);
         }
     }
     // The keyboard's focus ring, with the name of what it is on.
@@ -628,9 +695,10 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
         left = lerp(left, date_left, date_k);
     }
 
-    let gear_r = Rect::new(snap(left - PIN_GAP - GEAR, scale), cy - GEAR / 2.0, GEAR, GEAR);
-    let pin_r = Rect::new(snap(gear_r.x - GEAR_GAP - PIN, scale), cy - PIN / 2.0, PIN, PIN);
-    if pin_r.x > tabs_end + 8.0 {
+    // Settings sits in the row itself, right after the last tab, so a long row can't push it off.
+    let gear_r = Rect::new(snap(tabs_end + TAB_GAP, scale), cy - TAB_H / 2.0, slot_w, TAB_H);
+    let pin_r = Rect::new(snap(left - PIN_GAP - PIN, scale), cy - PIN / 2.0, PIN, PIN);
+    if pin_r.x > gear_r.right() + 8.0 {
         let pinned = st.pinned;
         let (icon, color) = if pinned { (Icon::PinFill, st.accent) } else { (Icon::Pin, palette::TEXT_FAINT) };
         let resp = ui.icon_button(wid("pin"), pin_r, icon, color, 15.0);
@@ -645,9 +713,9 @@ pub(crate) fn draw_header(ui: &mut Ui, st: &mut AppState, r: Rect, page: PageKin
     // and a second press goes back to the page it was pressed on. The page
     // has the everyday settings; its last row opens Advanced settings, the
     // window with every setting.
-    if gear_r.x > tabs_end + 8.0 {
+    {
         if gear_k > 0.0 {
-            ui.c.with_alpha(gear_k, |c| c.fill_rrect(gear_r, GEAR / 2.0, Color::white(0.14)));
+            ui.c.with_alpha(gear_k, |c| c.fill_rrect(gear_r, TAB_H / 2.0, Color::white(0.14)));
         }
         let color = Color::lerp(palette::TEXT_FAINT, palette::TEXT, gear_k);
         let resp = ui.icon_button(wid(GEAR_ID), gear_r, Icon::Gear, color, 16.0);
@@ -977,5 +1045,19 @@ mod tests {
         st.update.sheet = true;
         let sheet = content_height(PageKind::Settings, &st);
         assert!(row <= content_height(PageKind::System, &st) && sheet <= content_height(PageKind::System, &st), "{row} {sheet}");
+    }
+
+    #[test]
+    fn a_saved_tab_order_rearranges_the_row_and_keeps_add_ons_last() {
+        use PageKind::*;
+        let mut v = vec![Live, Media, Shelf, Addons];
+        apply_order(&mut v, &["shelf".into(), "live".into()]);
+        assert_eq!(v, [Shelf, Live, Media, Addons], "listed first, the rest after");
+        let mut v = vec![Live, Media, Addons];
+        apply_order(&mut v, &["addons".into(), "media".into()]);
+        assert_eq!(v, [Media, Live, Addons]);
+        let mut v = vec![Live, Media, Addons];
+        apply_order(&mut v, &[]);
+        assert_eq!(v, [Live, Media, Addons]);
     }
 }

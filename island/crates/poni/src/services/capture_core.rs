@@ -49,6 +49,13 @@ impl Log {
         self.ms.push(None);
     }
 
+    /// Names who spoke the newest kept line.
+    pub(crate) fn set_last_speaker(&mut self, who: &str) {
+        if let Some(last) = self.lines.last_mut() {
+            last.speaker = who.to_string();
+        }
+    }
+
     /// A line kept with its readout (Fast: the translation's round trip).
     pub(crate) fn push_with_ms(&mut self, source: String, translation: String, span_s: f64, ms: u32) {
         self.push(source, translation, span_s);
@@ -380,6 +387,8 @@ impl Health {
 pub struct Job {
     pub audio: Vec<f32>,
     pub side: Option<Side>,
+    /// The speaker label the line gets ("You" / "Others"), see [`poni_core::capture::who`].
+    pub who: &'static str,
     pub last: bool,
 }
 
@@ -401,7 +410,7 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
     // engine captions without it and each answer says so in `translateState`.
     let mut speech = Gate::default();
     while wake.recv().is_ok() {
-        let Some(Job { audio: window, side, last }) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
+        let Some(Job { audio: window, side, who, last }) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
         let (src, tgt) = langs.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let (src, tgt) = (src.as_str(), tgt.as_str());
         if !speech.open(|| speech_on_disk(port)) {
@@ -429,6 +438,7 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
                     let span = window.len() as f64 / poni_core::capture::RATE as f64;
                     let mut l = log.lock().unwrap_or_else(|e| e.into_inner());
                     l.push(poni_core::capture::tagged(side, &d.source), d.translation, span);
+                    l.set_last_speaker(who);
                     l.set_last_ms(asked.elapsed().as_millis().min(u32::MAX as u128) as u32);
                     drop(l);
                     health.heard();

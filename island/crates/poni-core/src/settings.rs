@@ -96,6 +96,14 @@ fn version_zero() -> u32 {
     0
 }
 
+/// A named header tab order the user saved ("Template 1"), to come back to after a reset.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TabTemplate {
+    pub name: String,
+    /// Page keys in row order.
+    pub order: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -201,6 +209,11 @@ pub struct Settings {
     /// while its key is here. Keys this version doesn't know are kept, so a
     /// newer Studio's choices survive a save.
     pub hidden_tabs: Vec<String>,
+    /// The header row's order by page key, set by dragging a tab. Empty = the built-in order; tabs
+    /// not listed follow the listed ones, and Add-ons stays last.
+    pub tab_order: Vec<String>,
+    /// Saved tab orders, picked in Settings › Tabs.
+    pub tab_templates: Vec<TabTemplate>,
     /// The optional Captions tab (PMM-022) is in the row. Off by default, and a switch of its own
     /// rather than a `hidden_tabs` key: that list says what to hide, and a tab that starts hidden
     /// must not appear in files written before it existed.
@@ -318,6 +331,8 @@ impl Default for Settings {
             start_page: "media".into(),
             remember_page: true,
             hidden_tabs: Vec::new(),
+            tab_order: Vec::new(),
+            tab_templates: Vec::new(),
             captions_tab: false,
             pomodoro: PomodoroConfig::default(),
             system_history: true,
@@ -335,6 +350,49 @@ fn px_unset() -> u32 {
 }
 
 impl Settings {
+    /// The saved template whose order is the one in use now.
+    pub fn current_tab_template(&self) -> Option<usize> {
+        if self.tab_order.is_empty() {
+            return None;
+        }
+        self.tab_templates.iter().position(|t| t.order == self.tab_order)
+    }
+
+    /// Saves `order` (the row as shown now) as a new template with the next free "Template N"
+    /// name and makes it the order in use. Returns its index.
+    pub fn save_tab_template(&mut self, order: Vec<String>) -> usize {
+        let mut n = self.tab_templates.len() + 1;
+        while self.tab_templates.iter().any(|t| t.name == format!("Template {n}")) {
+            n += 1;
+        }
+        self.tab_order = order.clone();
+        self.tab_templates.push(TabTemplate { name: format!("Template {n}"), order });
+        self.tab_templates.len() - 1
+    }
+
+    /// Back to the built-in order.
+    pub fn reset_tab_order(&mut self) {
+        self.tab_order.clear();
+    }
+
+    /// Steps the picker through "Default order" and the templates, wrapping; applies the result.
+    pub fn step_tab_template(&mut self, step: i32) {
+        let n = self.tab_templates.len() as i32 + 1;
+        let at = self.current_tab_template().map_or(0, |i| i as i32 + 1);
+        let next = (at + step).rem_euclid(n);
+        match next {
+            0 => self.reset_tab_order(),
+            i => self.tab_order = self.tab_templates[i as usize - 1].order.clone(),
+        }
+    }
+
+    /// Removes the template in use; the row keeps its order.
+    pub fn delete_current_tab_template(&mut self) {
+        if let Some(i) = self.current_tab_template() {
+            self.tab_templates.remove(i);
+        }
+    }
+
     /// Settings › Tabs flipped the tab with this page key: Captions through its own switch, the
     /// others in or out of `hidden_tabs`.
     pub fn toggle_tab(&mut self, key: &str) {
@@ -462,6 +520,30 @@ impl Settings {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn tab_templates_save_apply_reset_and_delete() {
+        let mut s = Settings::default();
+        let a = s.save_tab_template(vec!["media".into(), "live".into()]);
+        let b = s.save_tab_template(vec!["live".into(), "media".into()]);
+        assert_eq!((s.tab_templates[a].name.as_str(), s.tab_templates[b].name.as_str()), ("Template 1", "Template 2"));
+        assert_eq!(s.current_tab_template(), Some(1));
+        s.reset_tab_order();
+        assert!(s.tab_order.is_empty() && s.current_tab_template().is_none());
+        s.step_tab_template(1);
+        assert_eq!(s.current_tab_template(), Some(0));
+        s.step_tab_template(1);
+        s.step_tab_template(1);
+        assert!(s.tab_order.is_empty(), "wraps through the default order");
+        s.step_tab_template(-1);
+        assert_eq!(s.current_tab_template(), Some(1));
+        s.delete_current_tab_template();
+        assert_eq!(s.tab_templates.len(), 1);
+        assert_eq!(s.save_tab_template(vec!["live".into()]), 1);
+        assert_eq!(s.tab_templates[1].name, "Template 2", "a freed name is reused");
+        let back: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(back.tab_templates, s.tab_templates);
+    }
+
     use super::*;
 
     #[test]

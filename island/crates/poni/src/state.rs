@@ -365,6 +365,8 @@ pub struct PageUiState {
     pub peek_until: f64,
     /// Header tab under the pointer and since when (for hover labels).
     pub tab_hover: Option<(usize, f64)>,
+    /// The header tab being dragged to a new place in the row.
+    pub tab_drag: Option<PageKind>,
     /// The header's Menu: whether its list is open, the row and the keyboard ring ([`crate::pages::menu`]).
     pub menu: crate::pages::menu::MenuUi,
     /// The quick caption strip's keyboard ring and its open language list ([`crate::pill::quick_captions`]).
