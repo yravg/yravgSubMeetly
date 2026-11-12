@@ -560,3 +560,8 @@ Fitur besar; status per langkah ada di `docs/handoff/pill-meetings.md`, rencana 
 - **Island and Add-ins pages** no longer show the Settings dialog around their pane (`solo=1` -> `data-shell='solo'`).
 - **Mac window:** microphone permission for the app's own origin and `window.print()` (system print panel / save as PDF) are handled in `webwindow.rs`. Compiled, not clicked through on screen (the display kept sleeping and a system-audio permission prompt was pending).
 - **Signing:** ad-hoc builds change identity every time, so macOS re-asks for system audio after each install. For installs on this Mac re-sign with the stable local cert: `codesign --force --deep --sign "yraverageSubMin Dev" /Applications/yravgSubMeetly.app` (designated requirement = `com.yraverage.submeetly` + the cert), after which the grant survives updates.
+
+## Pill Minutes: transcript + Open Minutes app (2026-11-12, PR #20 merged)
+
+- `pages/meeting.rs`: a record's header has **Transcript N** (`RecordsUi::transcript`, scroll in `transcript_scroll`, reset on record change) and **Open Minutes app** (`Command::Menu(MenuCmd::OpenMinutes)`, also on the list head in `records.rs` when the chips leave room). Transcript sits beside the items from `SPLIT_FROM_W` 760 px, replaces them when narrower (the Mac pill is ~620 px, so it toggles there).
+- Seen on this Mac (installed build): buttons, transcript view, Open Minutes app opened the register window. Not seen: the side-by-side layout, a long scrolling transcript. Windows not compiled.
