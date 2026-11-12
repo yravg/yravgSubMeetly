@@ -115,6 +115,8 @@ pub fn menu_items(s: &Settings, pinned: bool, login: Login, update: UpdateLine) 
     };
     let mut items = vec![
         MenuItem::Info { label: "yravgSubMeetly".into() },
+        item("Open yravgSubMeetly", MenuCmd::OpenApp, false),
+        item("Open Minutes register", MenuCmd::OpenMinutes, false),
         item("Live captions", MenuCmd::OpenLive, false),
         item("Meeting", MenuCmd::OpenCall, false),
         item("Minutes", MenuCmd::OpenMeeting, false),

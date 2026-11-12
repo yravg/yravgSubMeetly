@@ -84,8 +84,11 @@ fn capture_loop(c: LoopCtx, source: Source) {
         utter.set_timing(super::capture_core::latency_of(latency.load(Ordering::Relaxed)).timing());
         let live: Vec<usize> = (0..devs.len()).filter(|&i| !devs[i].moved()).collect();
         let jobs: Vec<Job> = match live.as_slice() {
-            [i] => utter.push(&pcm[*i]).into_iter().map(|p| Job { audio: p.samples, side: None, last: p.last }).collect(),
-            [m, p] => mixer.push(&pcm[*m], &pcm[*p]).into_iter().map(|(w, side)| Job { audio: w, side: Some(side), last: true }).collect(),
+            [i] => {
+                let who = poni_core::capture::who(None, devs[*i].what.contains("microphone"));
+                utter.push(&pcm[*i]).into_iter().map(|p| Job { audio: p.samples, side: None, who, last: p.last }).collect()
+            }
+            [m, p] => mixer.push(&pcm[*m], &pcm[*p]).into_iter().map(|(w, side)| Job { audio: w, side: Some(side), who: poni_core::capture::who(Some(side), false), last: true }).collect(),
             _ => Vec::new(),
         };
         for job in jobs {
@@ -126,7 +129,7 @@ mod tests {
         let log = SessionLog::default();
         log.lock().unwrap().begin();
         let svc = CaptureService::spawn(EventSink::new(tx), port, "en".into(), "en".into(), log.clone(), Latency::default(), move |c| {
-            offer(&c.slot, &c.wake, Job { audio: samples, side: None, last: true });
+            offer(&c.slot, &c.wake, Job { audio: samples, side: None, who: "Others", last: true });
             let _ = c.stop.recv_timeout(Duration::from_secs(120));
         })
         .unwrap();

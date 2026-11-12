@@ -250,6 +250,18 @@ pub enum Side {
     Online,
 }
 
+/// Who a window's sound came from, for the line's speaker label: the room (the microphone) is
+/// "You", what the machine plays is "Others". Engine-side acoustic labelling only works on a saved
+/// file, so a live line gets this one, from the side it was heard on.
+pub fn who(side: Option<Side>, mic_only: bool) -> &'static str {
+    match side {
+        Some(Side::Room) => "You",
+        Some(Side::Online) => "Others",
+        None if mic_only => "You",
+        None => "Others",
+    }
+}
+
 /// A line as the session keeps it: with "Both" its side in front, so the minutes tell them apart.
 /// shortcut: the side rides in the text, since the engine keeps only t0/t1/source/translation per
 /// transcript line; give lines a `side` field once the engine stores one.
@@ -917,6 +929,14 @@ mod tests {
             assert_eq!(g.step(0.0, 0.5), None, "a pause in speech keeps it on");
         }
         assert_eq!(g.step(0.0, 0.5), Some(false));
+    }
+
+    #[test]
+    fn a_live_window_is_you_or_others() {
+        assert_eq!(who(Some(Side::Room), false), "You");
+        assert_eq!(who(Some(Side::Online), true), "Others");
+        assert_eq!(who(None, true), "You");
+        assert_eq!(who(None, false), "Others");
     }
 
     #[test]

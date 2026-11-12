@@ -64,6 +64,14 @@ else
   echo "warning: no MEDIAREMOTE_BUILD given, the app is built without macOS's now playing reader" >&2
 fi
 
+# The main window: the native SwiftUI app (mac/build-app.sh), shipped inside this one and opened by
+# the menu's "Open yravgSubMeetly" / "Open Minutes register" (mac/app.rs). MAIN_APP = its .app.
+if [ -n "${MAIN_APP:-}" ]; then
+  cp -R "$MAIN_APP" "$app/Contents/Resources/yravgSubMeetly-window.app"
+else
+  echo "warning: no MAIN_APP given, the app is built without its main window" >&2
+fi
+
 # Ad-hoc signature: seals the bundle, the adapter's framework too (Apple Silicon refuses unsigned code outright).
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict --verbose=2 "$app"

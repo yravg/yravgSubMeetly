@@ -469,6 +469,10 @@ pub enum Key {
     RememberPage,
     StartPage,
     Tab(PageKind),
+    TabTemplate,
+    TabSave,
+    TabReset,
+    TabDelete,
     FocusMin,
     ShortBreak,
     LongBreak,
@@ -837,7 +841,22 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                     item(Key::Tab(p), p.title(), sub, Ctl::Switch(Some(!st.tab_hidden(p))))
                 })
                 .collect();
-            vec![Block::Group(Some("When the island opens"), open), Block::Group(Some("Tabs in the island"), tabs), Block::Note("The add-ons' pages always have a tab.")]
+            let cur = s.current_tab_template();
+            let name = cur.map_or(if s.tab_order.is_empty() { "Default order" } else { "Your own order" }, |i| s.tab_templates[i].name.as_str());
+            let mut order = vec![
+                item(Key::TabTemplate, "Tab order", Some("Drag a tab on the island to move it; pick a saved order here"), Ctl::Stepper(name.to_string())),
+                item(Key::TabSave, "Save this order", Some("Keeps the row as it is now as a new template, Template 1, 2 and so on"), Ctl::Button("Save")),
+                item(Key::TabReset, "Reset the order", Some("Back to the built-in order; your templates stay"), Ctl::Button("Reset")),
+            ];
+            if cur.is_some() {
+                order.push(item(Key::TabDelete, "Delete this template", None, Ctl::Button("Delete")));
+            }
+            vec![
+                Block::Group(Some("When the island opens"), open),
+                Block::Group(Some("Tabs in the island"), tabs),
+                Block::Group(Some("Order of the tabs"), order),
+                Block::Note("The add-ons' pages always have a tab."),
+            ]
         }
         Section::Addons => vec![Block::Addons],
         Section::Focus => {
@@ -1171,6 +1190,13 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
             st.settings.start_page = pages[next].key().to_string();
         }
         Key::Tab(p) => s.toggle_tab(p.key()),
+        Key::TabTemplate => s.step_tab_template(if step == 0 { 1 } else { step }),
+        Key::TabSave => {
+            let order = crate::pages::tabs(st).into_iter().filter(|p| *p != PageKind::Addons).map(|p| p.key().to_string()).collect();
+            st.settings.save_tab_template(order);
+        }
+        Key::TabReset => s.reset_tab_order(),
+        Key::TabDelete => s.delete_current_tab_template(),
         Key::FocusMin => s.pomodoro.focus_min = step_min(s.pomodoro.focus_min, step, 1, 180),
         Key::ShortBreak => s.pomodoro.short_break_min = (s.pomodoro.short_break_min as i32 + step).clamp(1, 60) as u32,
         Key::LongBreak => s.pomodoro.long_break_min = step_min(s.pomodoro.long_break_min, step, 1, 120),

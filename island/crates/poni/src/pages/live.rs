@@ -298,7 +298,9 @@ pub(crate) fn caption_lines(ui: &mut Ui, st: &AppState, cap: &Captions, x: f32, 
     // Who is speaking, in front of the line (Settings › Captions › Show who is speaking).
     let tagged;
     let main = if st.settings.show_speakers && !cap.speaker.is_empty() && !main.is_empty() {
-        tagged = format!("{}: {main}", cap.speaker);
+        // The side tag ("[Room]") is the same thing said again: the name replaces it.
+        let bare = main.strip_prefix("[Room] ").or_else(|| main.strip_prefix("[Online] ")).unwrap_or(main);
+        tagged = format!("{}: {bare}", cap.speaker);
         tagged.as_str()
     } else {
         main
