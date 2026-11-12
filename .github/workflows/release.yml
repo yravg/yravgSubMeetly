@@ -107,9 +107,18 @@ jobs:
           cmake --build build/mediaremote --config Release -j 4
           lipo -info build/mediaremote/MediaRemoteAdapter.framework/MediaRemoteAdapter
 
+      # The app's pages (main window, Minutes register) travel in the bundle: the built extension.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build the app's pages
+        run: npm ci && npm run build
+
       - name: App bundle and DMG (ad-hoc signed until a Developer ID exists)
         working-directory: island
         env:
+          EXTENSION_DIR: ${{ github.workspace }}/dist
           ENGINE_ARM: ${{ github.workspace }}/engine-rs/target/aarch64-apple-darwin/release/submeetly-engine
           ENGINE_INTEL: ${{ github.workspace }}/engine-rs/target/x86_64-apple-darwin/release/submeetly-engine
           MEDIAREMOTE_BUILD: ${{ github.workspace }}/island/build/mediaremote

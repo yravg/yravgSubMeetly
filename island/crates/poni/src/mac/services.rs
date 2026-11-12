@@ -60,6 +60,9 @@ pub mod meeting_probe;
 // its models by the shared `models.rs`.
 #[path = "services/engine.rs"]
 pub mod engine;
+// The main window: the app's pages in a normal window of their own (not a browser).
+#[path = "services/webwindow.rs"]
+pub mod webwindow;
 #[path = "../services/integrations.rs"]
 pub mod integrations;
 #[path = "../services/models.rs"]
@@ -147,22 +150,6 @@ pub fn open(target: &str) {
             }
         }
         None => pwarn!("not a URL: {target}"),
-    }
-}
-
-/// The main window: the SwiftUI app inside this bundle (`Contents/Resources/yravgSubMeetly-window.app`),
-/// else one installed by `mac/build-app.sh` (`/Applications/yraverageSubMin.app`). `open` brings a
-/// window that is already up to the front.
-pub fn open_main_window() {
-    let bundled = std::env::current_exe().ok().and_then(|e| Some(e.parent()?.parent()?.join("Resources").join("yravgSubMeetly-window.app")));
-    let installed = std::path::PathBuf::from("/Applications/yraverageSubMin.app");
-    match [bundled, Some(installed)].into_iter().flatten().find(|p| p.is_dir()) {
-        Some(app) => {
-            if !std::process::Command::new("open").arg(&app).status().is_ok_and(|s| s.success()) {
-                pwarn!("could not open {}", app.display());
-            }
-        }
-        None => pwarn!("the main window app is not in this bundle"),
     }
 }
 
