@@ -1,5 +1,8 @@
 # Riwayat rilis
 
+## 1.4.1 (2026-11-12)
+- **Mac: Quit saves the session and stops the engine.** Quit from the Dock or AppleScript, logout and a signal (SIGTERM/SIGINT/SIGHUP) now go through the app's own quit, so captions running at that moment are saved as a meeting (`MOM-MAC-*`) and the engine this app started stops, instead of the app vanishing with the session lost and an engine left behind. Verified live on a Mac with captions on the Mac's own sound: caption in 1.8 s (RTF 0.2), translation into Indonesian after the model warms up, meeting saved on Quit.
+
 ## 1.4.0 (2026-11-12)
 - **Mac: captions, engine and models.** The Mac app now starts and watches its local engine (bundled in the DMG, universal), asks it for models (download, select, delete) and has live captions from the Mac's own sound (Core Audio tap) and the microphone, saved as a meeting on Stop. macOS asks once for Screen & System Audio Recording and Microphone. A reader for macOS's now playing (vendored MediaRemote adapter) is bundled.
 - **Pro-style features, our own code:** speaker labels (You / Others, and Speaker 1..N by voice; approximate, see `docs/DIARIZATION.md`), a custom AI model connector (OpenAI-compatible, Ollama, OpenRouter) and custom summary templates (7 built in), meeting auto-detect on the Mac, exports to Word, PDF, Markdown and CSV, and webhooks, an MCP server and a CLI (`docs/INTEGRATIONS.md`).
