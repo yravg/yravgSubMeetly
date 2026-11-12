@@ -62,6 +62,14 @@ pub fn draw_list(ui: &mut Ui, st: &mut AppState, area: Rect) {
         }
         x += w + PILL_GAP;
     }
+    // The full Minutes app (its own window), when the chips leave room for it.
+    let w = ui.pill_width(super::meeting::OPEN_APP, false, true);
+    if x + PILL_GAP + w <= head.right() {
+        let b = Rect::new(head.right() - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+        if ui.pill(wid("records.open_app"), b, super::meeting::OPEN_APP, None, PillStyle::Utility).clicked {
+            st.cmd(Command::Menu(crate::tray::MenuCmd::OpenMinutes));
+        }
+    }
     let rows = records::filtered(&notes, st.records.filter);
     let foot = Rect::new(area.x, area.bottom() - FOOT_H, area.w, FOOT_H);
     let rest = Rect::new(area.x, head.bottom() + 4.0, area.w, MAX_ROWS as f32 * ROW_H);
