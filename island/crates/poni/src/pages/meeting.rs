@@ -275,14 +275,76 @@ pub fn stamp(secs: f64) -> String {
     if h > 0 { format!("{h}:{m:02}:{s:02}") } else { format!("{m}:{s:02}") }
 }
 
+/// The row over the transcript: translate it again into another language (to share it with people
+/// who read that one), or how far that has come. Returns what is left under it.
+fn translate_bar(ui: &mut Ui, st: &mut AppState, note: &helper::Note, r: Rect) -> Rect {
+    const BAR_H: f32 = 28.0;
+    let bar = Rect::new(r.x, r.y, r.w, BAR_H);
+    let cy = bar.center().y;
+    let accent = st.accent;
+    let dim = TextStyle::footnote().color(palette::TEXT_DIM);
+    if st.records.translate_to.is_empty() {
+        st.records.translate_to = st.settings.target_lang.clone();
+    }
+    let running = st.records.job.as_ref().filter(|j| j.id == note.id).cloned();
+    let mut right = bar.right();
+    if let Some(j) = running {
+        let w = ui.pill_width("Stop", false, true);
+        let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+        if ui.pill(wid("meeting.translate.stop"), b, "Stop", None, PillStyle::Neutral).clicked {
+            st.records.job = None;
+            st.cmd(Command::RetranslateStop);
+        }
+        right = b.x - PILL_GAP * 2.0;
+        let line = if j.total == 0 { format!("Translating into {}\u{2026}", poni_core::capture::lang_name(&j.tgt)) } else { format!("Translating into {} \u{b7} {} / {}", poni_core::capture::lang_name(&j.tgt), j.done, j.total) };
+        ui.c.text(&line, Rect::new(bar.x, cy - 9.0, (right - bar.x).max(0.0), 18.0), &dim);
+        // How far, as a thin bar under the row.
+        if j.total > 0 {
+            let track = Rect::new(bar.x, bar.bottom() - 3.0, (bar.w - 6.0).max(0.0), 2.0);
+            ui.c.fill_rrect(track, 1.0, palette::TRACK);
+            ui.c.fill_rrect(Rect::new(track.x, track.y, track.w * j.done as f32 / j.total as f32, 2.0), 1.0, accent);
+        }
+    } else {
+        let w = ui.pill_width("Translate", false, true);
+        let b = Rect::new(right - 6.0 - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+        if ui.pill(wid("meeting.translate.go"), b, "Translate", None, PillStyle::Primary(accent)).clicked {
+            let tgt = st.records.translate_to.clone();
+            st.records.job = Some(crate::state::TranslateJob { id: note.id.clone(), tgt: tgt.clone(), done: 0, total: note.transcript.len() });
+            st.cmd(Command::Retranslate(note.id.clone(), st.settings.source_lang.clone(), tgt));
+        }
+        // "Into ‹ Japanese ›": steps through the app's languages.
+        let x = b.x - PILL_GAP * 2.0;
+        let next = ui.pill_width("\u{203a}", false, true);
+        let nb = Rect::new(x - next, cy - PILL_SMALL / 2.0, next, PILL_SMALL);
+        if ui.pill(wid("meeting.translate.next"), nb, "\u{203a}", None, PillStyle::Utility).clicked {
+            st.records.translate_to = poni_core::capture::step_lang(&st.records.translate_to, 1, false).to_string();
+        }
+        let name = poni_core::capture::lang_name(&st.records.translate_to);
+        let nst = TextStyle::footnote().weight(Weight::Semibold);
+        let nw = ui.c.measure(&name, &nst, 160.0).0.ceil();
+        let nx = nb.x - PILL_GAP - nw;
+        ui.c.text(&name, Rect::new(nx, cy - 9.0, nw + 1.0, 18.0), &nst);
+        let prev = ui.pill_width("\u{2039}", false, true);
+        let pb = Rect::new(nx - PILL_GAP - prev, cy - PILL_SMALL / 2.0, prev, PILL_SMALL);
+        if ui.pill(wid("meeting.translate.prev"), pb, "\u{2039}", None, PillStyle::Utility).clicked {
+            st.records.translate_to = poni_core::capture::step_lang(&st.records.translate_to, -1, false).to_string();
+        }
+        let lead = if pb.x - bar.x >= 100.0 { "Translate into" } else { "Into" };
+        ui.c.text(lead, Rect::new(bar.x, cy - 9.0, (pb.x - PILL_GAP - bar.x).max(0.0), 18.0), &dim);
+    }
+    Rect::new(r.x, r.y + BAR_H + 4.0, r.w, (r.h - BAR_H - 4.0).max(0.0))
+}
+
 /// The open record's transcript, oldest first, as the Meeting tab shows captions: each line under
 /// its time and speaker, the translation under it. The wheel scrolls it.
 fn draw_transcript(ui: &mut Ui, st: &mut AppState, note: &helper::Note, r: Rect) {
     if r.w <= 0.0 || r.h <= 0.0 {
         return;
     }
+    let r = translate_bar(ui, st, note, r);
     let tr = hkit::translation_color(ui, st.settings.translation_color);
-    let show = poni_core::capture::Show::parse(&st.settings.caption_show);
+    // Checking the minutes wants what was said and its translation, whatever the captions print.
+    let show = poni_core::capture::Show::Both;
     let meta = TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT_DIM);
     let src = TextStyle::footnote().color(palette::TEXT).wrap().top();
     let tst = TextStyle::footnote().color(tr).wrap().top();

@@ -113,6 +113,8 @@ pub enum AppEvent {
     NoteExported(Result<std::path::PathBuf, String>),
     /// A CSV export ended: the file it wrote (its full path), or why it could not.
     Exported(Result<String, String>),
+    /// A transcript translated again (`crate::retranslate`): how it goes, or how it ended.
+    Retranslate(crate::retranslate::Event),
     /// What the engine supervisor sees (`services::engine`).
     Engine(poni_core::engine_link::EngineInfo),
     /// The engine's webhooks (`services::integrations`), and one line about the change just made.

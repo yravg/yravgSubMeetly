@@ -154,6 +154,8 @@ pub enum AppEvent {
     NoteExported(Result<std::path::PathBuf, String>),
     /// A CSV export ended: the file it wrote (its full path), or why it could not.
     Exported(Result<String, String>),
+    /// A transcript translated again (`crate::retranslate`): how it goes, or how it ended.
+    Retranslate(crate::retranslate::Event),
     /// The engine's calendar, or why it could not be read.
     Calendar(Result<poni_core::calendar::Calendar, String>),
     /// The answer to "Open notes" on a meeting: the note's title, or why not.

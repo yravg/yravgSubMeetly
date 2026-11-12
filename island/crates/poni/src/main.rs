@@ -24,6 +24,8 @@ mod plog;
 mod activities;
 #[cfg(any(windows, target_os = "macos"))]
 mod ai;
+#[cfg(any(windows, target_os = "macos"))]
+mod retranslate;
 #[cfg(windows)]
 mod app;
 #[cfg(windows)]
