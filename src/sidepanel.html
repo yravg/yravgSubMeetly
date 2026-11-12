@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="sidepanel.css" />
     <link rel="stylesheet" href="notes-panel.css" />
     <link rel="stylesheet" href="theme-tide.css" />
+    <link rel="stylesheet" href="palettes.css" />
     <link rel="stylesheet" href="pages.css" />
   </head>
   <body>
@@ -333,25 +334,9 @@
         </div>
 
         <div class="setting-col">
-          <label class="lbl" data-i18n="reskin">Reskin pattern</label>
-          <div class="reskin-grid" id="reskin-toggle" role="radiogroup" aria-label="Reskin pattern">
-            <button type="button" class="reskin-card active" data-reskin="yraverage" role="radio" aria-checked="true">
-              <span class="reskin-mock reskin-mock-yraverage" aria-hidden="true"><i></i><b></b></span>
-              <span data-i18n="reskinYraverage">Yraverage</span>
-            </button>
-            <button type="button" class="reskin-card" data-reskin="coretax" role="radio" aria-checked="false">
-              <span class="reskin-mock reskin-mock-coretax" aria-hidden="true"><i></i><b></b></span>
-              <span data-i18n="reskinCoretax">Coretax</span>
-            </button>
-            <button type="button" class="reskin-card" data-reskin="modern" role="radio" aria-checked="false">
-              <span class="reskin-mock reskin-mock-modern" aria-hidden="true"><i></i><b></b></span>
-              <span data-i18n="reskinModern">Yraverage Modern</span>
-            </button>
-            <button type="button" class="reskin-card" data-reskin="tide" role="radio" aria-checked="false">
-              <span class="reskin-mock reskin-mock-tide" aria-hidden="true"><i></i><b></b></span>
-              <span data-i18n="reskinTide">Tide</span>
-            </button>
-          </div>
+          <label class="lbl" data-i18n="reskin">Theme</label>
+          <div class="hint" data-i18n="reskinHint">Pick a look. It applies at once to the app, the side panel and the Minutes register, in light and dark.</div>
+          <div class="reskin-grid" id="reskin-toggle" role="radiogroup" aria-label="Theme"></div>
           <div class="reskin-foot">
             <button type="button" id="btn-reskin-reset" class="mini-btn" data-i18n="reskinReset">Reset to default</button>
           </div>

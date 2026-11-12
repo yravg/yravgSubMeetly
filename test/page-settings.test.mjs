@@ -124,7 +124,7 @@ test('R2 General rows, in the board order, each with its hint', async () => {
   assert.deepEqual(await rowLabels('general'), ['Language', 'Appearance', 'Theme', 'Accent', 'Tab rows', 'Font size', 'Density and dock motion']);
   assert.equal(await frame.$eval('[data-pane="general"] .setting-row .set-hint', (h) => h.textContent.trim()), 'Interface language');
   assert.ok(await frame.$('[data-pane="general"] #theme-toggle'), 'Appearance keeps Auto / Light / Dark');
-  assert.equal((await frame.$$('[data-pane="general"] #reskin-toggle [data-reskin]')).length, 4, 'all four themes stay');
+  assert.equal((await frame.$$('[data-pane="general"] #reskin-toggle [data-reskin]')).length, 9, 'all nine themes');
   assert.deepEqual(await frame.$$eval('[data-pane="general"] #tcolor-toggle button', (b) => b.map((x) => x.textContent.trim())), ['Indigo', 'Navy', 'Teal', 'Neutral', 'Bronze']);
   assert.ok(await frame.$('[data-pane="general"] #font-size'), 'font size moved to General');
   assert.equal(await vis('#btn-reskin-reset'), true);

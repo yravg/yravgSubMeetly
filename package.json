@@ -5,6 +5,7 @@
   "description": "yravgSubMeetly 2014 on-device realtime subtitle & translation Chrome extension. Inference stays local after models download.",
   "type": "module",
   "scripts": {
+    "palettes": "node scripts/gen-palettes.mjs",
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "dev:browser": "npm run build && node scripts/dev-browser.mjs",

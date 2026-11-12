@@ -5,14 +5,14 @@
    register Classic (tanpa parameter) tidak berubah — TIDE-024.
    Struktur tetap milik minutes.css: pilihan "Local · dark" memakai tata letak
    gelap bawaan, pilihan terang memakai struktur terang yang sudah ada
-   (data-theme="coretax"). Di sini hanya warnanya yang diganti ke token Tide:
+   (data-theme="paper"). Di sini hanya warnanya yang diganti ke token Tide:
    lime menggantikan emas, pil tinta untuk aksi utama, green-ink untuk hijau
    yang dibaca. Selektor html[data-reskin][data-theme] (0,2,1) mengalahkan
    cakupan theme-tide.css; blok token di bawah memakai :root (0,3,0) dan dimuat sesudah theme-tide.css.
    ========================================================================== */
 
 /* ---- Gelap: struktur gelap bawaan, warna Tide gelap -------------------- */
-:root[data-reskin="tide"]:not([data-theme="coretax"]) {
+:root[data-reskin="tide"]:not([data-theme="paper"]) {
   --bg: #0B1310; --bg-deep: #08100D; --card: #111C18; --card2: #12241B; --card3: #1A2E25;
   --border: #24372F; --grid: rgba(232, 242, 236, 0.06); --row-hover: rgba(232, 242, 236, 0.04); --row-sel: rgba(74, 222, 128, 0.12);
   --text: #E8F2EC; --text2: #C9D8CF; --muted: #A3B5AB; --muted2: #8FA299;
@@ -23,7 +23,7 @@
 }
 
 /* ---- Terang: struktur terang yang ada, warna Tide ---------------------- */
-:root[data-reskin="tide"][data-theme="coretax"] {
+:root[data-reskin="tide"][data-theme="paper"] {
   --bg: #FFFFFF; --bg-deep: #F3FBF6; --card: #FFFFFF; --card2: #F3FBF6; --card3: #E9F7EE;
   --border: #DCE8E1; --grid: rgba(10, 15, 12, 0.06); --row-hover: rgba(14, 122, 71, 0.05); --row-sel: rgba(182, 243, 92, 0.28);
   --text: #0A0F0C; --text2: #33443A; --muted: #4B5A52; --muted2: #5B6B62;
@@ -38,34 +38,34 @@
 }
 html[data-reskin="tide"] body { font-family: var(--font-ui); }
 
-/* Aturan Coretax yang menulis warna langsung, diganti token Tide. */
-html[data-reskin="tide"][data-theme="coretax"] .tabs button[aria-selected="true"],
-html[data-reskin="tide"][data-theme="coretax"] .langsw button[aria-pressed="true"],
-html[data-reskin="tide"][data-theme="coretax"] .seg2 button[aria-pressed="true"] { background: var(--tide-lime); color: var(--tide-ink); }
-html[data-reskin="tide"][data-theme="coretax"] .btn.primary { background: var(--tide-ink); border-color: var(--tide-ink); color: var(--tide-white); }
-html[data-reskin="tide"][data-theme="coretax"] .btn.primary:hover { background: var(--ink-hover); border-color: var(--ink-hover); }
-html[data-reskin="tide"][data-theme="coretax"] .navitem[aria-current="true"],
-html[data-reskin="tide"][data-theme="coretax"] .lp-row[aria-pressed="true"],
-html[data-reskin="tide"][data-theme="coretax"] .icon-btn[aria-pressed="true"],
-html[data-reskin="tide"][data-theme="coretax"] .icon-btn[aria-expanded="true"] { background: var(--tide-mint); color: var(--tide-ink); border-color: var(--ink-line); }
-html[data-reskin="tide"][data-theme="coretax"] .pill.ondevice { color: var(--tide-green-ink); background: var(--tide-mint); border-color: var(--ink-line); }
-html[data-reskin="tide"][data-theme="coretax"] .prov { background: var(--tide-surface-2); border-color: var(--tide-line); color: var(--text2); }
-html[data-reskin="tide"][data-theme="coretax"] .prov b { color: var(--tide-ink); }
-html[data-reskin="tide"][data-theme="coretax"] .prov svg { color: var(--tide-green-ink); }
-html[data-reskin="tide"][data-theme="coretax"] .stat .bar i { background: var(--tide-green); }
-html[data-reskin="tide"][data-theme="coretax"] .stat.is-ok .n { color: var(--tide-green-ink); }
-html[data-reskin="tide"][data-theme="coretax"] thead th { background: var(--tide-surface-2); }
-html[data-reskin="tide"][data-theme="coretax"] tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--tide-green); }
-html[data-reskin="tide"][data-theme="coretax"] .chip[aria-pressed="true"] { background: var(--tide-mint); border-color: var(--ink-line); }
-html[data-reskin="tide"][data-theme="coretax"] .viewdock .tabs { background: var(--tide-surface-2); }
-html[data-reskin="tide"][data-theme="coretax"] .split::after,
-html[data-reskin="tide"][data-theme="coretax"] .dock-hint i,
-html[data-reskin="tide"][data-theme="coretax"] .dock-snap { border-color: var(--tide-green); background: var(--green-wash); }
-html[data-reskin="tide"][data-theme="coretax"] .split::after { background: var(--tide-green); }
-html[data-reskin="tide"][data-theme="coretax"] .sw2[aria-pressed="true"]::after { background: var(--tide-green-ink); }
-html[data-reskin="tide"][data-theme="coretax"] .viewdock.dragging { box-shadow: var(--shadow-float), 0 0 0 2px var(--tide-green); }
-html[data-reskin="tide"][data-theme="coretax"] .toast { background: var(--tide-white); color: var(--tide-ink); }
-html[data-reskin="tide"][data-theme="coretax"] :focus-visible { outline-color: var(--tide-green-ink); }
+/* Aturan Paper yang menulis warna langsung, diganti token Tide. */
+html[data-reskin="tide"][data-theme="paper"] .tabs button[aria-selected="true"],
+html[data-reskin="tide"][data-theme="paper"] .langsw button[aria-pressed="true"],
+html[data-reskin="tide"][data-theme="paper"] .seg2 button[aria-pressed="true"] { background: var(--tide-lime); color: var(--tide-ink); }
+html[data-reskin="tide"][data-theme="paper"] .btn.primary { background: var(--tide-ink); border-color: var(--tide-ink); color: var(--tide-white); }
+html[data-reskin="tide"][data-theme="paper"] .btn.primary:hover { background: var(--ink-hover); border-color: var(--ink-hover); }
+html[data-reskin="tide"][data-theme="paper"] .navitem[aria-current="true"],
+html[data-reskin="tide"][data-theme="paper"] .lp-row[aria-pressed="true"],
+html[data-reskin="tide"][data-theme="paper"] .icon-btn[aria-pressed="true"],
+html[data-reskin="tide"][data-theme="paper"] .icon-btn[aria-expanded="true"] { background: var(--tide-mint); color: var(--tide-ink); border-color: var(--ink-line); }
+html[data-reskin="tide"][data-theme="paper"] .pill.ondevice { color: var(--tide-green-ink); background: var(--tide-mint); border-color: var(--ink-line); }
+html[data-reskin="tide"][data-theme="paper"] .prov { background: var(--tide-surface-2); border-color: var(--tide-line); color: var(--text2); }
+html[data-reskin="tide"][data-theme="paper"] .prov b { color: var(--tide-ink); }
+html[data-reskin="tide"][data-theme="paper"] .prov svg { color: var(--tide-green-ink); }
+html[data-reskin="tide"][data-theme="paper"] .stat .bar i { background: var(--tide-green); }
+html[data-reskin="tide"][data-theme="paper"] .stat.is-ok .n { color: var(--tide-green-ink); }
+html[data-reskin="tide"][data-theme="paper"] thead th { background: var(--tide-surface-2); }
+html[data-reskin="tide"][data-theme="paper"] tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--tide-green); }
+html[data-reskin="tide"][data-theme="paper"] .chip[aria-pressed="true"] { background: var(--tide-mint); border-color: var(--ink-line); }
+html[data-reskin="tide"][data-theme="paper"] .viewdock .tabs { background: var(--tide-surface-2); }
+html[data-reskin="tide"][data-theme="paper"] .split::after,
+html[data-reskin="tide"][data-theme="paper"] .dock-hint i,
+html[data-reskin="tide"][data-theme="paper"] .dock-snap { border-color: var(--tide-green); background: var(--green-wash); }
+html[data-reskin="tide"][data-theme="paper"] .split::after { background: var(--tide-green); }
+html[data-reskin="tide"][data-theme="paper"] .sw2[aria-pressed="true"]::after { background: var(--tide-green-ink); }
+html[data-reskin="tide"][data-theme="paper"] .viewdock.dragging { box-shadow: var(--shadow-float), 0 0 0 2px var(--tide-green); }
+html[data-reskin="tide"][data-theme="paper"] .toast { background: var(--tide-white); color: var(--tide-ink); }
+html[data-reskin="tide"][data-theme="paper"] :focus-visible { outline-color: var(--tide-green-ink); }
 
 /* Perbaikan A04a: tipe = kata tinta + titik warna (bukan teks berwarna). */
 html[data-reskin="tide"] .type { color: var(--text); }
@@ -83,11 +83,11 @@ html[data-reskin="tide"] #empty-state .empty { text-align: center; }
    scroll shadow, row density, hover actions, sentence-case Source chips,
    overdue as a red sub-line. Specificity bumps only, no !important.
    ========================================================================== */
-:root[data-reskin="tide"][data-theme="coretax"] {
+:root[data-reskin="tide"][data-theme="paper"] {
   --t-action: #0A0F0C; --t-decision: #0E9F6E; --t-metric: #2563EB; --t-risk: #C0362C; --t-question: #7C3AED; --t-info: #64748B;
   --shadow-scroll: 0 6px 10px -8px rgba(10, 15, 12, 0.35);
 }
-:root[data-reskin="tide"]:not([data-theme="coretax"]) {
+:root[data-reskin="tide"]:not([data-theme="paper"]) {
   --t-action: #E8F2EC; --t-decision: #34D399; --t-metric: #60A5FA; --t-risk: #F87171; --t-question: #A78BFA; --t-info: #94A3B8;
   --shadow-scroll: 0 6px 10px -8px rgba(0, 0, 0, 0.7);
   --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);

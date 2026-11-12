@@ -77,7 +77,7 @@ export function patchLayout(layout, action) {
 
 const S = {
   en: {
-    back: 'Back to the main page', crumb: 'Minutes', openRegister: 'Open register', classic: 'Classic ↗', modern: 'Modern ↗',
+    back: 'Back to the main page', crumb: 'Minutes', openRegister: 'Open register', openFull: 'Open full register ↗', more: 'More', classic: 'Classic ↗', modern: 'Modern ↗',
     collapse: 'Collapse header', expand: 'Expand header', layout: 'Layout & appearance', density: 'Density',
     review: 'Review', reading: 'Reading', compact: 'Compact', float: 'Float this panel', rail: 'Collapse to rail', dock: 'Expand view dock', hide: 'Hide', reset: 'Reset layout',
     layoutNote: 'Saved for the register window.', meeting: 'Meeting', draft: 'Draft options', library: 'Library', training: 'Training', add: 'Add item', exportB: 'Export', amend: 'Apply correction', issue: 'Issue MoM',
@@ -91,7 +91,7 @@ const S = {
     emptyTitle: 'No minutes yet', emptyBody: 'Start captions in a meeting and the register fills itself, or load a few demo meetings to look around.', loadDemo: 'Load demo meetings (removable)', loading: 'Reading your register…',
   },
   id: {
-    back: 'Kembali ke halaman utama', crumb: 'Notulen', openRegister: 'Buka register', classic: 'Klasik ↗', modern: 'Modern ↗',
+    back: 'Kembali ke halaman utama', crumb: 'Notulen', openRegister: 'Buka register', openFull: 'Buka register penuh ↗', more: 'Lainnya', classic: 'Klasik ↗', modern: 'Modern ↗',
     collapse: 'Ciutkan kepala', expand: 'Buka kepala', layout: 'Tata letak & tampilan', density: 'Kepadatan',
     review: 'Tinjau', reading: 'Baca', compact: 'Ringkas', float: 'Mengambangkan panel', rail: 'Ciutkan ke rel', dock: 'Buka dok tampilan', hide: 'Sembunyikan', reset: 'Atur ulang tata letak',
     layoutNote: 'Tersimpan untuk jendela register.', meeting: 'Rapat', draft: 'Opsi draf', library: 'Pustaka', training: 'Pelatihan', add: 'Tambah butir', exportB: 'Ekspor', amend: 'Terapkan koreksi', issue: 'Terbitkan notulen',
@@ -112,7 +112,7 @@ const DO = { draft: 'draft', library: 'library', training: 'training', add: 'add
 /* ---------------------------------------------------------------- tampilan */
 
 /** Keadaan tampilan halaman ini (satu salinan per muat, bukan disimpan). */
-export const ui = { meetingId: null, types: new Set(), reviewOnly: false, group: 'none', mine: false, tab: 'register', collapsed: false, layoutOpen: false };
+export const ui = { meetingId: null, types: new Set(), reviewOnly: false, group: 'none', mine: false, tab: 'register', collapsed: false, layoutOpen: false, moreOpen: false };
 
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* storage blocked */ } };
@@ -143,10 +143,14 @@ export function minutesHtml(c) {
   const list = [...meetings].sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.start || '').localeCompare(String(a.start || '')));
   const sel = `<select data-mn="meeting" aria-label="${esc(t.meeting)}" title="${esc(t.meeting)}">${list.map((m) => `<option value="${esc(m.id)}"${m.id === meeting.id ? ' selected' : ''}>${esc(`${m.title} · ${m.date}${m.start ? ` ${m.start}` : ''}`)}</option>`).join('')}</select>`;
   const doBtn = (k, label, icon, cls = 'btn') => `<button type="button" class="${cls}" data-do="${DO[k]}">${icon ? ic(icon, 16) : ''}${esc(label)}</button>`;
-  const bar = `<div class="mn-bar">${sel}${doBtn('draft', t.draft, '')}${doBtn('library', t.library, 'book')}${doBtn('training', t.training, '')}<span class="grow"></span>${doBtn('add', t.add, '')}${doBtn('export', t.exportB, 'export')}${doBtn('amend', t.amend, '')}${doBtn('issue', t.issue, '', 'pill-b')}</div>`;
+  // One row: the meeting, the two everyday actions, ONE primary (Issue MoM), and a More menu for the rest.
+  const menuBtn = (k, label) => `<button type="button" role="menuitem" data-do="${DO[k]}">${esc(label)}</button>`;
+  const other = kinds[1];
+  const more = `<div class="mn-more"><button type="button" class="btn mn-morebtn" data-mn="more" aria-haspopup="menu" aria-expanded="${ui.moreOpen}" aria-label="${esc(t.more)}" title="${esc(t.more)}"><span aria-hidden="true">•••</span><span class="mn-morelbl">${esc(t.more)}</span></button>${ui.moreOpen ? `<div class="mn-menu" role="menu" aria-label="${esc(t.more)}">${menuBtn('draft', t.draft)}${menuBtn('library', t.library)}${menuBtn('training', t.training)}${menuBtn('amend', t.amend)}<hr role="separator"><a role="menuitem" href="${esc(c.registerSrc(other, { meeting: meeting.id }))}" target="_blank" rel="noopener" data-register="${other}">${esc(t.openRegister)}: ${esc(t[other])}</a><button type="button" role="menuitem" data-mn="collapse">${esc(ui.collapsed ? t.expand : t.collapse)}</button><button type="button" role="menuitem" data-mn="layout">${esc(t.layout)}</button></div>` : ''}</div>`;
+  const bar = `<div class="mn-bar">${sel}<span class="grow"></span>${doBtn('add', t.add, '')}${doBtn('export', t.exportB, 'export')}${doBtn('issue', t.issue, '', 'pill-b')}${more}</div>`;
   const d = density();
   const pop = ui.layoutOpen ? `<div class="mn-pop" role="dialog" aria-label="${esc(t.layout)}"><b>${esc(t.layout)}</b><span class="mn-k">${esc(t.density)}</span><div class="mn-seg" role="group">${['review', 'reading', 'compact'].map((k) => `<button type="button" data-density="${k}" aria-pressed="${k === d}">${esc(t[k])}</button>`).join('')}</div><div class="mn-pops"><button type="button" class="btn sm" data-layout="float">${esc(t.float)}</button><button type="button" class="btn sm" data-layout="rail">${esc(t.rail)}</button><button type="button" class="btn sm" data-layout="expand-dock">${esc(t.dock)}</button><button type="button" class="btn sm" data-layout="hide">${esc(t.hide)}</button></div><button type="button" class="btn sm full" data-layout="reset">${esc(t.reset)}</button><small class="mut">${esc(t.layoutNote)}</small></div>` : '';
-  const tools = `<div class="mn-tools"><div class="mn-open"><span>${esc(t.openRegister)}</span>${openLinks}</div><button type="button" class="btn sm" data-mn="collapse" aria-pressed="${ui.collapsed}">${esc(ui.collapsed ? t.expand : t.collapse)}</button><div class="mn-lay"><button type="button" class="btn sm" data-mn="layout" aria-expanded="${ui.layoutOpen}">${esc(t.layout)}</button>${pop}</div></div>`;
+  const tools = `<div class="mn-tools"><a class="btn sm mn-full" href="${esc(c.registerSrc(c.register, { meeting: meeting.id }))}" target="_blank" rel="noopener" data-register="${c.register}">${esc(t.openFull)}</a><div class="mn-lay">${pop}</div></div>`;
 
   const parts = [['items', counts.all], ...['decision', 'action', 'question', 'risk', 'metric', 'info'].filter((k) => counts[k]).map((k) => [k, counts[k]])];
   const sum = `<div class="mn-sum">${parts.map(([k, n]) => esc(t[k](n))).join(' · ')}</div>`;
@@ -191,8 +195,9 @@ export function mountMinutes(page, c) {
     const act = q('[data-mn]')?.dataset.mn;
     if (act === 'review-only') { ui.reviewOnly = !ui.reviewOnly; return c.rerender(); }
     if (act === 'review-low') { ui.reviewOnly = true; ui.types.clear(); ui.tab = 'register'; return c.rerender(); }
-    if (act === 'collapse') { ui.collapsed = !ui.collapsed; return c.rerender(); }
-    if (act === 'layout') { ui.layoutOpen = !ui.layoutOpen; return c.rerender(); }
+    if (act === 'more') { ui.moreOpen = !ui.moreOpen; return c.rerender(); }
+    if (act === 'collapse') { ui.collapsed = !ui.collapsed; ui.moreOpen = false; return c.rerender(); }
+    if (act === 'layout') { ui.layoutOpen = !ui.layoutOpen; ui.moreOpen = false; return c.rerender(); }
     if (act === 'mine') {
       if (!ui.mine && !c.getMe()) { const n = globalThis.prompt?.(t().whoName); if (!n) return; c.setMe(n.trim()); }
       ui.mine = !ui.mine; return c.rerender();
@@ -207,8 +212,12 @@ export function mountMinutes(page, c) {
       return;
     }
     const d = q('[data-do]');
-    if (d) return openReg({ do: d.dataset.do });
-    if (ui.layoutOpen && !q('.mn-lay')) { ui.layoutOpen = false; c.rerender(); }
+    if (d) { const inMenu = ui.moreOpen; ui.moreOpen = false; if (inMenu) c.rerender(); return openReg({ do: d.dataset.do }); }
+    if (q('.mn-menu a')) { ui.moreOpen = false; return c.rerender(); }
+    if ((ui.layoutOpen && !q('.mn-lay')) || (ui.moreOpen && !q('.mn-more'))) { ui.layoutOpen = false; ui.moreOpen = false; c.rerender(); }
+  });
+  page.addEventListener('keydown', (e) => {
+    if (page.dataset.route === 'minutes' && e.key === 'Escape' && (ui.moreOpen || ui.layoutOpen)) { ui.moreOpen = false; ui.layoutOpen = false; c.rerender(); }
   });
   page.addEventListener('change', (e) => {
     if (page.dataset.route !== 'minutes') return;

@@ -13,7 +13,10 @@
  * Catatan: pengguna yang dulu memilih Klasik/otomatis sendiri tak bisa dibedakan dari yang
  * bawaan (tidak ada penanda saat itu); mereka pindah satu kali dan bisa memilih lagi.
  */
-export const RESKINS = ['yraverage', 'coretax', 'modern', 'tide'];
+// Palettes (scripts/gen-palettes.mjs). The three earlier reskins are still accepted and mean the palette
+// with the same hue: yraverage -> teal, coretax -> azure, modern -> violet.
+export const RESKINS = ['tide', 'teal', 'azure', 'violet', 'sunset', 'rose', 'sand', 'slate', 'citrus', 'yraverage', 'coretax', 'modern'];
+export const LEGACY_RESKINS = { yraverage: 'teal', coretax: 'azure', modern: 'violet' };
 export const THEMES = ['auto', 'light', 'dark'];
 export const DEFAULT_RESKIN = 'tide';
 export const DEFAULT_THEME = 'light';
@@ -29,7 +32,8 @@ export function migrateUiDefaults(settings) {
     if (v === OLD[key] && !s[FLAG[key]]) return dflt;
     return v;
   };
-  return { reskin: pick('reskin', RESKINS, DEFAULT_RESKIN), theme: pick('theme', THEMES, DEFAULT_THEME) };
+  const reskin = pick('reskin', RESKINS, DEFAULT_RESKIN);
+  return { reskin: LEGACY_RESKINS[reskin] || reskin, theme: pick('theme', THEMES, DEFAULT_THEME) };
 }
 
 export function shouldAdoptRemote(key, value, settings) {

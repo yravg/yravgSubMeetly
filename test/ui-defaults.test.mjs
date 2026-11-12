@@ -19,9 +19,9 @@ test('pengguna lama di bawaan lama (tersimpan utuh tanpa penanda) pindah ke bawa
 });
 
 test('pilihan eksplisit tidak diubah, termasuk Klasik, Coretax, Modern, gelap dan otomatis', () => {
-  assert.deepEqual(migrateUiDefaults({ reskin: 'yraverage', reskinExplicit: true, theme: 'auto', themeExplicit: true }), { reskin: 'yraverage', theme: 'auto' });
-  assert.deepEqual(migrateUiDefaults({ reskin: 'coretax', theme: 'dark' }), { reskin: 'coretax', theme: 'dark' });
-  assert.deepEqual(migrateUiDefaults({ reskin: 'modern', theme: 'light' }), { reskin: 'modern', theme: 'light' });
+  assert.deepEqual(migrateUiDefaults({ reskin: 'yraverage', reskinExplicit: true, theme: 'auto', themeExplicit: true }), { reskin: 'teal', theme: 'auto' });
+  assert.deepEqual(migrateUiDefaults({ reskin: 'coretax', theme: 'dark' }), { reskin: 'azure', theme: 'dark' });
+  assert.deepEqual(migrateUiDefaults({ reskin: 'modern', theme: 'light' }), { reskin: 'violet', theme: 'light' });
 });
 
 test('nilai tak dikenal jatuh ke bawaan', () => {

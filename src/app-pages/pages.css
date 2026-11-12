@@ -181,6 +181,15 @@ html[data-shell] .ls-preview .live-tgt-box .line { font: 500 var(--text-md)/1.4 
 .fh-chip { border-radius: 999px; background: var(--card2); color: var(--accent-soft); font: 700 var(--text-xs)/1 var(--font-ui); padding: 8px 16px; }
 .fh-chip[hidden] { display: none; }
 
+/* ---------------- One settings pane on its own (Island, Add-ins): the dialog's chrome goes away ---------------- */
+html[data-shell='solo'] main { max-width: 1180px; }
+html[data-shell='solo'] .settings-view { padding: 0; }
+html[data-shell='solo'] .modal-card { background: transparent; border: 0; box-shadow: none; padding: 0; max-width: none; width: 100%; }
+html[data-shell='solo'] .modal-head, html[data-shell='solo'] .settings-search-row, html[data-shell='solo'] .settings-tabs { display: none; }
+html[data-shell='solo'] .set-card { background: transparent; border: 0; box-shadow: none; padding: 0; }
+html[data-shell='solo'] .set-card-head { display: none; }
+html[data-shell='solo'] .setting-row { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-3); }
+
 /* ---------------- A07 Settings and Helper ---------------- */
 html[data-shell='settings'] main { max-width: 1180px; }
 html[data-shell='settings'] .settings-view { padding: 0; }
@@ -212,11 +221,10 @@ html[data-shell='settings'] .setting-row > :not(.set-lbl):not(.set-hint) { grid-
 html[data-shell='settings'] .setting-row > .hint { grid-column: 1 / -1; grid-row: auto; justify-self: stretch; }
 html[data-shell='settings'] .setting-row:not(:has(.set-hint)) > :not(.set-lbl) { grid-row: 1; }
 html[data-shell='settings'] .setting-row select { border-radius: var(--radius-lg); min-width: 200px; }
-/* Theme: the four reskin cards read as one segment of names, like the board */
-html[data-shell='settings'] #reskin-toggle { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--card2); border: 1px solid var(--border); border-radius: 999px; }
-html[data-shell='settings'] #reskin-toggle .reskin-card { flex-direction: row; background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; box-shadow: none; font: 600 var(--text-xs)/1 var(--font-ui); color: var(--text2); }
-html[data-shell='settings'] #reskin-toggle .reskin-card.active { background: var(--pill-bg); color: var(--pill-fg); }
-html[data-shell='settings'] #reskin-toggle .reskin-mock { display: none; }
+/* Theme: the palette gallery (cards with a live preview), three across */
+html[data-shell='settings'] #reskin-toggle { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; max-width: 640px; }
+html[data-shell='settings'] #reskin-toggle .reskin-card { box-shadow: none; }
+html[data-shell='settings'] #reskin-toggle .reskin-card.active { box-shadow: 0 0 0 1px var(--accent-soft); }
 /* Accent: swatch + name */
 html[data-shell='settings'] #tcolor-toggle { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--card2); border: 1px solid var(--border); border-radius: 999px; }
 html[data-shell='settings'] #tcolor-toggle .tcolor-sw { width: auto; height: auto; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 0; background: transparent; padding: 7px 12px; font: 600 var(--text-xs)/1 var(--font-ui); color: var(--text2); box-shadow: none; }
