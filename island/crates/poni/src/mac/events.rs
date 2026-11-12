@@ -105,6 +105,8 @@ pub enum AppEvent {
     AdzanEnded,
     /// Free-form log line from a service thread.
     Log(String),
+    /// macOS asked this app to end (a signal, Quit from the Dock or AppleScript, logout): save and leave.
+    Terminate,
     /// What the meeting probe saw (`services::meeting_probe`).
     MeetingSignals(crate::services::meeting_probe::Seen),
     /// A meeting exported to a file (`Command::ExportNote`), or why not.

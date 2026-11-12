@@ -207,6 +207,7 @@ pub fn main_entry() -> i32 {
     APP.with(|c| *c.borrow_mut() = Some(app));
     enter(|a| a.start());
     install_monitors();
+    install_termination();
     pinfo!("started; running");
     nsapp.run();
     0
@@ -237,6 +238,48 @@ fn single_instance() -> Result<Option<std::fs::File>, ()> {
 pub fn pointer_moved() {
     if let Some((x, y)) = window::pointer() {
         enter(|a| a.on_pointer(Point::new(x, y)));
+    }
+}
+
+/// Quit from outside the app (AppleScript, the Dock, logout) and a signal both go through `App::quit`, which
+/// saves the captioned session as a meeting and stops the engine this app started.
+fn install_termination() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static ASKED: AtomicBool = AtomicBool::new(false);
+    extern "C" fn on_signal(_: i32) {
+        ASKED.store(true, Ordering::SeqCst);
+    }
+    extern "C" {
+        fn signal(sig: i32, handler: extern "C" fn(i32)) -> usize;
+    }
+    // SIGHUP, SIGINT, SIGTERM: a handler that only sets a flag (all it may safely do).
+    for sig in [1, 2, 15] {
+        unsafe { signal(sig, on_signal) };
+    }
+    let sink = APP.with(|c| c.borrow().as_ref().map(|a| a.sink.clone()));
+    if let Some(sink) = sink {
+        let _ = std::thread::Builder::new().name("poni-terminate".into()).spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            if ASKED.swap(false, Ordering::SeqCst) {
+                sink.send(AppEvent::Terminate);
+            }
+        });
+    }
+    // NSApplication's own terminate (Quit from the Dock, AppleScript, logout) ends the process by itself:
+    // the notification is the last moment the app can still save.
+    unsafe {
+        let center = objc2_foundation::NSNotificationCenter::defaultCenter();
+        let block = block2::RcBlock::new(|_: std::ptr::NonNull<objc2_foundation::NSNotification>| {
+            APP.with(|c| {
+                if let Ok(mut app) = c.try_borrow_mut() {
+                    if let Some(a) = app.as_mut() {
+                        a.quit(0);
+                    }
+                }
+            });
+        });
+        let observer = center.addObserverForName_object_queue_usingBlock(Some(objc2_app_kit::NSApplicationWillTerminateNotification), None, None, &block);
+        std::mem::forget(observer);
     }
 }
 
@@ -1721,6 +1764,7 @@ impl App {
             AppEvent::Phone(e) => self.on_phone(e),
             AppEvent::Addon { id, status } => self.on_addon(id, status),
             AppEvent::Engine(info) => self.st.engine = info,
+            AppEvent::Terminate => self.quit(0),
             AppEvent::MeetingSignals(seen) => {
                 self.st.meeting_seen = seen;
                 self.meeting_detect_step();

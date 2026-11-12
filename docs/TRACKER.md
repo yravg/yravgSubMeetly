@@ -138,7 +138,7 @@ Columns: **Win** = island on Windows · **Mac** = Rust island on macOS (v1.3.13)
 | AI assistant & script integrations (MCP, webhooks, CLI) | `feat/integrations` | merged in 1.4.0 (tests green; not seen live) |
 | Mac now-playing reader (MediaRemote adapter vendored, bundled, CI-built) | `feat/mac-nowplaying` | merged in 1.4.0 (tests green; not seen live) |
 
-| Mac live captions (Core Audio tap + mic → engine → pill, saved as MOM-MAC) | `feat/mac-captions` | merged in 1.4.0 (engine round trip verified; real tap capture needs macOS permissions, not verified) |
+| Mac live captions (Core Audio tap + mic → engine → pill, saved as MOM-MAC) | `feat/mac-captions` | merged in 1.4.0 (verified live in 1.4.1: Mac sound tap → caption 1.8 s, translation, meeting saved on Quit) |
 | Model speed tests + charts on Models | `feat/model-bench` | merged in 1.4.0 (real measurements on this Mac; rendered picture checked) |
 
 ### D2. LiveCaptions-Translator parity (Apache-2.0; features only)
