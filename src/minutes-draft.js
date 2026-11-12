@@ -217,7 +217,7 @@ export function mountDraftOptions(ctx) {
   function sourceStrip() {
     const ls = S.src.lines;
     const p = S.pair;
-    return `<span class="do-chip">${ls.length} segments</span><span class="do-chip">${mmss(ls[0]?.t0)}–${mmss(ls[ls.length - 1]?.t1)}</span>${p ? `<span class="do-chip">${esc(p.src)} to ${esc(p.tgt)}</span>` : ''}<span class="do-chip" title="Where the draft lines come from">${esc(ORIGIN_LABEL[S.src.origin] || S.src.origin)}</span>`;
+    return `<span class="do-chip">${ls.length} ${ls.length === 1 ? 'segment' : 'segments'}</span><span class="do-chip">${mmss(ls[0]?.t0)}–${mmss(ls[ls.length - 1]?.t1)}</span>${p ? `<span class="do-chip">${esc(p.src)} to ${esc(p.tgt)}</span>` : ''}<span class="do-chip" title="Where the draft lines come from">${esc(ORIGIN_LABEL[S.src.origin] || S.src.origin)}</span>`;
   }
 
   function body(m, locked) {

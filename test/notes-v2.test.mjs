@@ -213,6 +213,10 @@ test('i18n: no UI string is hardcoded; both locales resolve', () => {
   assert.equal(en('decision'), 'Decision');
   assert.equal(id('decision'), 'Keputusan');
   assert.equal(id('showing', 9, 22), 'Menampilkan 9 dari 22');
+  assert.equal(en('pipeline', 'Whisper', 1, 1), 'Whisper → 1 segment → 1 register item');
+  assert.equal(en('pipeline', 'Whisper', 3, 5), 'Whisper → 3 segments → 5 register items');
+  assert.equal(id('pipeline', 'Whisper', 1, 1), 'Whisper → 1 segmen → 1 butir register');
+  assert.equal(id('pipeline', 'Whisper', 3, 5), 'Whisper → 3 segmen → 5 butir register');
   assert.equal(makeT('ja')('decision'), 'Decision', 'unknown locales fall back to English');
 });
 
