@@ -1719,6 +1719,8 @@ function wireEvents() {
     paint,
     toast,
   });
+  // Tombol Draft dibuat modul di atas, setelah paintStaticStrings boot berjalan.
+  syncTitleLabels();
 
   dock = mountDock({
     state: () => state,
@@ -1861,12 +1863,18 @@ function wireEvents() {
   });
 }
 
+/** Tombol appbar yang labelnya dilipat jadi ikon: nama aksesibel = tooltip. */
+function syncTitleLabels() {
+  document.querySelectorAll('.appbar button[title]').forEach((el) => { el.setAttribute('aria-label', el.title); });
+}
+
 function paintStaticStrings() {
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = T(el.dataset.t); });
   // Tombol yang labelnya dilipat jadi ikon di layar sempit hanya menyisakan
   // tooltip, jadi tooltipnya harus ikut diterjemahkan.
   // aria-label too: below 1100 px these buttons keep only their icon, and a title alone is not a reliable name.
   document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = T(el.dataset.tTitle); el.setAttribute('aria-label', el.title); });
+  syncTitleLabels();
   // Halaman utama: di lab itu /app.html di root server; di ekstensi app.html
   // tidak ikut dipaket, jadi jalan pulangnya panel sisi.
   const home = $('#crumb-home');
