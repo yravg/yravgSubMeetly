@@ -139,7 +139,7 @@ const en = {
   kbdSearch: 'search', kbdClose: 'close',
   lastSaved: (t, backend) => `Last saved ${t} · ${backend}`,
   notSavedYet: (backend) => `Not saved yet · ${backend}`,
-  savedOnDevice: 'Saved on this device',
+  savedOnDevice: 'On this device',
 
   /* drawer (Provenance artboard) */
   agendaRef: (a) => `agenda ${a}`,
@@ -477,7 +477,7 @@ const id = {
   kbdSearch: 'cari', kbdClose: 'tutup',
   lastSaved: (t, backend) => `Tersimpan ${t} · ${backend}`,
   notSavedYet: (backend) => `Belum tersimpan · ${backend}`,
-  savedOnDevice: 'Tersimpan di perangkat ini',
+  savedOnDevice: 'Di perangkat ini',
 
   agendaRef: (a) => `agenda ${a}`,
   translationHint: (other) => `Teks ${other} disimpan terpisah — ganti bahasa untuk menyuntingnya`,
