@@ -80,6 +80,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: relative;
   z-index: var(--z-appbar);
 }
+/* Whatever is added to the bar later, nothing may sit on top of its neighbour: the crumbs give way
+   (clipped with an ellipsis) before anything overlaps, and the other items keep their size. */
+.appbar > * { flex-shrink: 0; }
+.appbar > .crumbs { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.appbar > .grow { flex: 1 1 0; min-width: 0; }
 /* ---- Wordmark yraverageSubMin ----------------------------------------
  * Sama seperti di panel sisi: dua potong teks, bukan berkas gambar, jadi
  * ukurannya ikut tipografi appbar dan warnanya ikut token tema — gelap dan
@@ -648,8 +653,7 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
 .mtitle-wrap { flex: 1; min-width: 240px; }
 
 /* ---- narrow ---- */
-@media (max-width: 1100px) {
-  .srail { width: 320px; }
+@media (max-width: 1360px) {
   #crumb-trail { display: none; }
   /* Appbar butuh ~1070 px penuh. Di bawah itu ia meluber keluar layar dan
      menyeret seluruh halaman ikut menggulir mendatar — popover yang
@@ -657,6 +661,13 @@ tbody tr.ghead .cnt { font-family: var(--mono); font-size: 10.5px; color: var(--
      sekunder dilipat jadi ikon; judulnya pindah ke tooltip. */
   .appbar .btn.collapsible { padding: 0 9px; gap: 0; }
   .appbar .btn.collapsible > span:not(.lt-lvl):not(.ct) { display: none; }
+  .appbar .pill.ondevice > span { display: none; }
+  .appbar .pill.ondevice { padding: 3px 7px; }
+  .appbar .pill.sync-pill > span { display: none; }
+  .appbar .pill.sync-pill { padding: 3px 7px; }
+}
+@media (max-width: 1100px) {
+  .srail { width: 320px; }
 }
 @media (max-width: 880px) {
   .appbar { padding: 0 12px; gap: 7px; }
