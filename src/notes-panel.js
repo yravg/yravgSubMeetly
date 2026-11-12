@@ -267,7 +267,7 @@ export function renderNotesPanel(root, state, handlers = {}) {
           <span aria-hidden="true">●</span>
           ${notice ? escapeHtml(notice) : active ? escapeHtml(T('onDevice')) : escapeHtml(T('msgNoMeeting'))}
         </span>
-        <span class="notes-meta" data-density="detail">${escapeHtml(backendName())}</span>
+        <span class="notes-meta" data-density="detail">${escapeHtml(T('savedOnDevice'))}</span>
       </div>
 
       ${addinsHtml}

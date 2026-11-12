@@ -44,7 +44,7 @@ const en = {
 
   /* provenance band */
   draftedOnDevice: `Drafted on this ${DEV_EN}`,
-  pipeline: (asr, seg, items) => `${asr} → ${seg} segments → ${items} register items`,
+  pipeline: (asr, seg, items) => `${asr} → ${seg} ${seg === 1 ? 'segment' : 'segments'} → ${items} ${items === 1 ? 'register item' : 'register items'}`,
   needReview: 'need review',
   lowConfFlag: 'low-confidence flag',
   nothingLeft: 'No audio, transcript or text left this device.',
@@ -112,6 +112,7 @@ const en = {
   msgAccepted: 'Item accepted — locked into the MoM',
   msgCarried: 'Carried into this register',
   msgIssued: 'MoM issued',
+  msgNeedItemToIssue: 'Add at least one item before issuing',
   msgBlocked: (n) => `${n} items still need review — issue anyway?`,
   msgIssuedFrozen: 'This MoM is issued and read-only. Create an amendment to correct it.',
   msgMigrated: (n) => `${n} meeting(s) upgraded from the old notes format`,
@@ -138,6 +139,7 @@ const en = {
   kbdSearch: 'search', kbdClose: 'close',
   lastSaved: (t, backend) => `Last saved ${t} · ${backend}`,
   notSavedYet: (backend) => `Not saved yet · ${backend}`,
+  savedOnDevice: 'Saved on this device',
 
   /* drawer (Provenance artboard) */
   agendaRef: (a) => `agenda ${a}`,
@@ -196,7 +198,7 @@ const en = {
   docFootAi: (n) => `${n} item(s) marked ‡ were drafted by on-device speech recognition and accepted without amendment by the minute-taker.`,
   docFootAllReviewed: 'Every item was reviewed by a human before issue.',
   docFootCorrected: (ref, from, to, tc) => `${ref} was corrected against the recording before issue: “${from}” → “${to}”, verified at ${tc}.`,
-  docFootEngine: (asr, seg) => `Transcribed and drafted on the minute-taker's own machine — ${asr}, ${seg} segments. No audio, transcript or minute text was sent to any external service.`,
+  docFootEngine: (asr, seg) => `Transcribed and drafted on the minute-taker's own machine — ${asr}, ${seg} ${seg === 1 ? 'segment' : 'segments'}. No audio, transcript or minute text was sent to any external service.`,
   docFootTrace: 'Every entry above is traceable to a timestamped segment of the recording kept on this device.',
   minutedBy: 'Minuted by',
   docSevLik: 'Sev × Lik',
@@ -450,6 +452,7 @@ const id = {
   msgAccepted: 'Butir disetujui — terkunci di notulen',
   msgCarried: 'Dibawa ke register ini',
   msgIssued: 'Notulen diterbitkan',
+  msgNeedItemToIssue: 'Tambahkan setidaknya satu butir sebelum menerbitkan',
   msgBlocked: (n) => `${n} butir belum ditinjau — tetap terbitkan?`,
   msgIssuedFrozen: 'Notulen ini sudah terbit dan hanya-baca. Buat amandemen untuk mengoreksi.',
   msgMigrated: (n) => `${n} rapat dinaikkan dari format notulen lama`,
@@ -474,6 +477,7 @@ const id = {
   kbdSearch: 'cari', kbdClose: 'tutup',
   lastSaved: (t, backend) => `Tersimpan ${t} · ${backend}`,
   notSavedYet: (backend) => `Belum tersimpan · ${backend}`,
+  savedOnDevice: 'Tersimpan di perangkat ini',
 
   agendaRef: (a) => `agenda ${a}`,
   translationHint: (other) => `Teks ${other} disimpan terpisah — ganti bahasa untuk menyuntingnya`,

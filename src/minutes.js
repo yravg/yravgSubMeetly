@@ -996,7 +996,7 @@ function paintFooter(rows) {
     `<kbd>/</kbd> ${esc(T('kbdSearch'))}`,
     `<kbd>Esc</kbd> ${esc(T('kbdClose'))}`,
   ].join(' · ');
-  $('#saved-line').textContent = state.lastSaved ? T('lastSaved', fmtClock(state.lastSaved), backendName()) : T('notSavedYet', backendName());
+  $('#saved-line').textContent = state.lastSaved ? T('lastSaved', fmtClock(state.lastSaved), T('savedOnDevice')) : T('notSavedYet', T('savedOnDevice'));
 }
 
 /* ==========================================================================
@@ -1466,6 +1466,10 @@ function doAddGlossary(term) {
 
 async function doIssue(force = false) {
   const m = activeMeeting();
+  if (!m || !m.items || !m.items.length) {
+    toast(T('msgNeedItemToIssue'));
+    return;
+  }
   try {
     const meeting = await issueMeetingAndSave(m, { force, by: state.me || 'local' });
     replaceActive(meeting);

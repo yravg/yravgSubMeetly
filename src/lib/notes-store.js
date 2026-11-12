@@ -34,7 +34,7 @@ const memoryBackend = {
 
 /** @type {Backend} */
 const chromeBackend = {
-  name: 'chrome.storage.local',
+  name: 'Saved on this device',
   async get(key) {
     const out = await chrome.storage.local.get(key);
     return out?.[key] ?? null;
@@ -46,7 +46,7 @@ const chromeBackend = {
 
 /** @type {Backend} */
 const localBackend = {
-  name: 'localStorage',
+  name: 'Saved on this device',
   async get(key) {
     try {
       const raw = localStorage.getItem(key);
