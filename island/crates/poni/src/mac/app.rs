@@ -1791,6 +1791,7 @@ impl App {
                 let (icon, color) = if ok { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::ORANGE) };
                 self.st.notify(icon, color, "Webhooks", text, if ok { 4.0 } else { 8.0 }, None);
             }
+            AppEvent::Retranslate(e) => self.st.on_retranslate(e),
             AppEvent::Exported(Ok(path)) => self.st.notify(Icon::Check, palette::GREEN, "CSV saved", path, 8.0, None),
             AppEvent::Exported(Err(e)) => self.st.notify(Icon::Download, palette::ORANGE, "CSV not saved", e, 8.0, None),
             AppEvent::Helper(r) => {
@@ -3204,6 +3205,14 @@ impl App {
                 Command::WinLang(_) => {}
                 Command::OpenSettings | Command::OpenSettingsAt(_) => self.show_settings(),
                 Command::CopyCaption => self.copy_caption(),
+                Command::Retranslate(id, src, tgt) => crate::retranslate::start(self.sink.clone(), poni_core::helper::configured_port(), id, src, tgt),
+                Command::RetranslateStop => crate::retranslate::stop(),
+                // A decision on Minutes (Accept, Carry, Assign) or a translated transcript: save it.
+                Command::HelperPost(body) => {
+                    if let Some(h) = &self.helper_link {
+                        h.post(body);
+                    }
+                }
                 Command::ExportCsv(id) => services::export::csv(self.sink.clone(), poni_core::helper::configured_port(), id, crate::paths::media_downloads_dir()),
                 // Pausing a translation is the island's own captions' (Windows); the Mac app has no
                 // capture of its own, so there is nothing running to pause.

@@ -3151,6 +3151,7 @@ impl App {
             }
             AppEvent::HelperNotice(m) => self.st.helper_notice = Some((m, now + 6.0, true)),
             AppEvent::NoteExported(r) => self.on_note_exported(r),
+            AppEvent::Retranslate(e) => self.st.on_retranslate(e),
             AppEvent::Exported(Ok(path)) => self.st.notify(Icon::Check, palette::GREEN, "CSV saved", path, 8.0, None),
             AppEvent::Exported(Err(e)) => self.st.notify(Icon::Download, palette::ORANGE, "CSV not saved", e, 8.0, None),
             AppEvent::Calendar(r) => {
@@ -5116,6 +5117,8 @@ impl App {
                 Command::PasteTranscript => self.paste_transcript(),
                 Command::ToggleTranslationPause => self.toggle_translation_pause(),
                 Command::CopyCaption => self.copy_caption(),
+                Command::Retranslate(id, src, tgt) => crate::retranslate::start(self.sink.clone(), poni_core::helper::configured_port(), id, src, tgt),
+                Command::RetranslateStop => crate::retranslate::stop(),
                 Command::ExportCsv(id) => services::export::csv(self.sink.clone(), poni_core::helper::configured_port(), id, crate::paths::media_downloads_dir()),
                 Command::JoinMeeting(u) => self.join_meeting(&u),
                 Command::JoinPastedLink => {

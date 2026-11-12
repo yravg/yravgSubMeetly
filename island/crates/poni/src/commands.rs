@@ -161,6 +161,10 @@ pub enum Command {
     CopyCaption,
     /// Save this meeting's transcript as a CSV file in Downloads (the engine's `format=csv`).
     ExportCsv(String),
+    /// Translate meeting `id`'s transcript again: (id, spoken language or `auto`, into).
+    Retranslate(String, String, String),
+    /// Stop the transcript translation that runs.
+    RetranslateStop,
     /// Live › source picker: listen to this from now on.
     LiveSource(poni_core::capture::Source),
     /// Live › mic chip: the next of Windows' microphones.

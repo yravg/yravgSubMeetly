@@ -928,6 +928,40 @@ impl AppState {
 
     /// Show one record in Minutes' register, from its first item (a meeting just saved, one picked
     /// in a list or from Inbox). The caller then goes to the page.
+    /// How a transcript translation goes (`AppEvent::Retranslate`): progress on the page, the saved
+    /// document to the helper, a line in the Minutes foot when it ends.
+    #[cfg(any(windows, target_os = "macos"))]
+    pub fn on_retranslate(&mut self, e: crate::retranslate::Event) {
+        use crate::retranslate::Event;
+        let ours = |job: &Option<TranslateJob>, id: &str| job.as_ref().is_some_and(|j| j.id == id);
+        match e {
+            Event::Progress { id, done, total } => {
+                if let Some(j) = self.records.job.as_mut().filter(|j| j.id == id) {
+                    j.done = done;
+                    j.total = total;
+                }
+            }
+            Event::Done { id, tgt, body } => {
+                if ours(&self.records.job, &id) {
+                    self.records.job = None;
+                }
+                self.helper_notice = Some((format!("Transcript translated into {}", poni_core::capture::lang_name(&tgt)), self.now + 5.0, false));
+                self.cmds.push(Command::HelperPost(body));
+            }
+            Event::Failed { id, why } => {
+                if ours(&self.records.job, &id) {
+                    self.records.job = None;
+                }
+                self.helper_notice = Some((format!("Not translated: {why}"), self.now + 8.0, true));
+            }
+            Event::Stopped { id } => {
+                if ours(&self.records.job, &id) {
+                    self.records.job = None;
+                }
+            }
+        }
+    }
+
     pub fn show_record(&mut self, id: &str) {
         self.helper.select(id);
         self.meeting_page = 0;
@@ -1105,6 +1139,19 @@ pub struct RecordsUi {
     pub transcript: bool,
     /// How far the transcript is scrolled (px from its top).
     pub transcript_scroll: f32,
+    /// The language the transcript is translated into on request (empty: the captions' target).
+    pub translate_to: String,
+    /// A transcript being translated again (`crate::retranslate`).
+    pub job: Option<TranslateJob>,
+}
+
+/// The transcript translation that runs: which meeting, into what, how far.
+#[derive(Clone, Debug, Default)]
+pub struct TranslateJob {
+    pub id: String,
+    pub tgt: String,
+    pub done: usize,
+    pub total: usize,
 }
 
 pub struct CallSaved {
