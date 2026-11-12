@@ -120,22 +120,73 @@ pub fn is_valid_video_id(id: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
-/// Map a browser `app_id` to `yt-dlp --cookies-from-browser <name>`.
-pub fn browser_for_cookies(app_id: &str) -> Option<&'static str> {
-    let id = app_id.trim().to_ascii_lowercase();
-    if id.contains("safari") {
+/// Clean browser tab noise from a video title (e.g. `(224) `, ` - YouTube`, ` - Audio playing`)
+/// and combine with `artist` (channel name) to produce a high-precision search query.
+pub fn clean_video_search_query(title: &str, artist: &str) -> String {
+    let mut s = title.trim();
+    // Strip leading notification count: "(1) ", "(224) "
+    if s.starts_with('(') {
+        if let Some(close_idx) = s.find(')') {
+            let inner = &s[1..close_idx];
+            if inner.chars().all(|c| c.is_ascii_digit()) && close_idx + 1 < s.len() {
+                s = s[close_idx + 1..].trim_start();
+            }
+        }
+    }
+    // Strip trailing browser / site suffixes (repeating until clean):
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for suffix in [
+            " - YouTube - Audio playing",
+            " - Audio playing",
+            " - YouTube",
+            " – YouTube",
+            " — YouTube",
+            " | YouTube",
+            " \u{1f50a}",
+            " \u{1f508}",
+            " \u{1f509}",
+            " \u{25b6}\u{fe0f}",
+            " - Google Chrome",
+            " - Microsoft Edge",
+            " - Mozilla Firefox",
+            " - Safari",
+        ] {
+            if let Some(stripped) = s.strip_suffix(suffix) {
+                s = stripped.trim_end();
+                changed = true;
+            }
+        }
+    }
+    let s_clean = s.trim();
+    let artist_clean = artist.trim();
+    if !artist_clean.is_empty()
+        && !artist_clean.eq_ignore_ascii_case("YouTube")
+        && !s_clean.to_ascii_lowercase().contains(&artist_clean.to_ascii_lowercase())
+    {
+        format!("{s_clean} {artist_clean}")
+    } else {
+        s_clean.to_string()
+    }
+}
+
+/// Map a browser `app_id` and/or `app_name` to `yt-dlp --cookies-from-browser <name>`.
+pub fn browser_for_cookies(app_id: &str, app_name: &str) -> Option<&'static str> {
+    let text = format!("{} {}", app_id.trim(), app_name.trim()).to_ascii_lowercase();
+    if text.contains("safari") {
         Some("safari")
-    } else if id.contains("edgemac") || id.contains("msedge") || id.contains("microsoftedge") {
+    } else if text.contains("edgemac") || text.contains("msedge") || text.contains("microsoftedge") || text.contains("edge") {
         Some("edge")
-    } else if id.contains("brave") {
+    } else if text.contains("brave") {
         Some("brave")
-    } else if id.contains("firefox") || (id.len() == 16 && id.bytes().all(|b| b.is_ascii_hexdigit())) {
+    } else if text.contains("firefox") || (app_id.len() == 16 && app_id.bytes().all(|b| b.is_ascii_hexdigit())) {
         Some("firefox")
-    } else if id.contains("vivaldi") {
+    } else if text.contains("vivaldi") {
         Some("vivaldi")
-    } else if id.contains("opera") {
+    } else if text.contains("opera") {
         Some("opera")
-    } else if id.contains("chrome") || id.starts_with("company.thebrowser.") {
+    } else if text.contains("chrome") || text.contains("chromium") || app_id.starts_with("company.thebrowser.") {
         Some("chrome")
     } else {
         None
@@ -264,39 +315,45 @@ pub fn best_video_match<'a>(
         if cand_title.is_empty() {
             continue;
         }
-        // Title overlap check: must share exact normalized text or at least half of significant tokens.
         let mut score = 0i32;
+
+        // Channel / artist match.
+        let mut channel_matches = false;
+        if !want_artist.is_empty() {
+            let cand_channel = norm_tokens(&cand.channel);
+            if cand_channel == want_artist {
+                channel_matches = true;
+                score += 50;
+            } else if !cand_channel.is_empty()
+                && (cand_channel.contains(&want_artist) || want_artist.contains(&cand_channel))
+            {
+                channel_matches = true;
+                score += 35;
+            }
+        }
+
+        // Title overlap check: exact, substring, or token overlap.
+        // For podcasts, seminars, news, and lectures, titles may be longer or have subtle
+        // differences, so allow overlap down to 25% (or 15% if channel matches).
+        let overlap = token_overlap(&want_title, &cand_title);
+        let min_overlap = if channel_matches { 15 } else { 25 };
         if cand_title == want_title {
             score += 100;
         } else if cand_title.contains(&want_title) || want_title.contains(&cand_title) {
             score += 75;
+        } else if overlap >= min_overlap {
+            score += overlap;
         } else {
-            let overlap = token_overlap(&want_title, &cand_title);
-            if overlap < 50 {
-                continue;
-            }
-            score += overlap / 2;
-        }
-
-        // Channel / artist match.
-        if !want_artist.is_empty() {
-            let cand_channel = norm_tokens(&cand.channel);
-            if cand_channel == want_artist {
-                score += 45;
-            } else if !cand_channel.is_empty()
-                && (cand_channel.contains(&want_artist) || want_artist.contains(&cand_channel))
-            {
-                score += 30;
-            }
+            continue;
         }
 
         // Duration check when both durations are known.
         if let (Some(want_d), Some(cand_d)) = (duration_s.filter(|&d| d > 0), cand.duration_s.filter(|&d| d > 0)) {
             let diff = want_d.abs_diff(cand_d);
-            let max_tol = (want_d / 10).max(15);
-            if diff <= 2 {
+            let max_tol = (want_d / 10).max(30);
+            if diff <= 3 {
                 score += 60;
-            } else if diff <= 6 {
+            } else if diff <= 10 {
                 score += 40;
             } else if diff <= max_tol {
                 score += 15;
@@ -308,6 +365,19 @@ pub fn best_video_match<'a>(
 
         if best.as_ref().is_none_or(|(best_score, _)| score > *best_score) {
             best = Some((score, cand));
+        }
+    }
+    // Fallback: If no candidate passed the threshold, but the 1st candidate has a channel match
+    // or at least 20% token overlap, accept it as the most likely match.
+    if best.is_none() {
+        if let Some(first) = candidates.first() {
+            let c_title = norm_tokens(&first.title);
+            let overlap = token_overlap(&want_title, &c_title);
+            let c_channel = norm_tokens(&first.channel);
+            let chan_match = !want_artist.is_empty() && (c_channel == want_artist || c_channel.contains(&want_artist) || want_artist.contains(&c_channel));
+            if overlap >= 20 || chan_match {
+                best = Some((10, first));
+            }
         }
     }
     best.map(|(_, c)| c)
@@ -347,6 +417,21 @@ pub struct CaptionTrack {
 /// Candidate InnerTube `/youtubei/v1/player` `(json_body, user_agent)` pairs for `video_id`.
 pub fn innertube_player_requests(video_id: &str) -> Vec<(String, &'static str)> {
     vec![
+        (
+            json!({
+                "context": {
+                    "client": {
+                        "clientName": "TVHTML5",
+                        "clientVersion": "7.20241028.00.00",
+                        "hl": "en",
+                        "gl": "US"
+                    }
+                },
+                "videoId": video_id
+            })
+            .to_string(),
+            "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/24.lts.4-gold (unlike Gecko) v8/11.4.183.29-jit Starboard/16, Amazon_FireTV_GEN4/FireOS_7.6.7.9 (Amazon, AFTMM, Wireless)",
+        ),
         (
             json!({
                 "context": {
@@ -809,6 +894,35 @@ mod tests {
             Some("jNQXAC9IVRw".into())
         );
         assert_eq!(youtube_id_from_text("Plain video title"), None);
+    }
+
+    #[test]
+    fn cleans_browser_tab_titles_for_video_search() {
+        assert_eq!(
+            clean_video_search_query("(224) Rick Astley - Never Gonna Give You Up - YouTube - Audio playing", "Rick Astley"),
+            "Rick Astley - Never Gonna Give You Up"
+        );
+        assert_eq!(
+            clean_video_search_query("Inside the mind of a master procrastinator | Tim Urban | TED - YouTube", "TED"),
+            "Inside the mind of a master procrastinator | Tim Urban | TED"
+        );
+        assert_eq!(
+            clean_video_search_query("Kompas TV Live Streaming - Berita Terkini", "KOMPASTV"),
+            "Kompas TV Live Streaming - Berita Terkini KOMPASTV"
+        );
+        assert_eq!(
+            clean_video_search_query("(224) Sam Altman: OpenAI CEO on GPT-4, ChatGPT, and the Future of AI | Lex Fridman Podcast #367 - YouTube \u{1f50a}", "Lex Fridman"),
+            "Sam Altman: OpenAI CEO on GPT-4, ChatGPT, and the Future of AI | Lex Fridman Podcast #367"
+        );
+    }
+
+    #[test]
+    fn maps_browser_apps_to_cookie_names() {
+        assert_eq!(browser_for_cookies("com.google.Chrome", "Google Chrome"), Some("chrome"));
+        assert_eq!(browser_for_cookies("com.apple.Safari", "Safari"), Some("safari"));
+        assert_eq!(browser_for_cookies("com.microsoft.edgemac", "Microsoft Edge"), Some("edge"));
+        assert_eq!(browser_for_cookies("org.mozilla.firefox", "Firefox"), Some("firefox"));
+        assert_eq!(browser_for_cookies("com.spotify.client", "Spotify"), None);
     }
 
     #[test]

@@ -337,15 +337,24 @@ impl Worker {
     }
 
     fn lookup(&mut self, job: &Job) -> Result<LyricsResult, Halt> {
+        if job.video_transcript && poni_core::video_transcript::should_try_video_transcript(&job.app_id, &job.app_name, true) {
+            let clean_title = poni_core::video_transcript::clean_video_search_query(&job.query.title, "");
+            let vq = TrackQuery {
+                title: clean_title,
+                artist: job.query.artist.clone(),
+                album: job.query.album.clone(),
+                duration_s: job.query.duration_s,
+            };
+            if !vq.title.trim().is_empty() {
+                if let Some(result) = self.lookup_video_transcript(job, &vq)? {
+                    return Ok(result);
+                }
+            }
+        }
         let q = lrclib::normalize_query(&job.query);
         if q.title.trim().is_empty() {
             // Nothing to search for; answer so the UI doesn't sit on "loading".
             return Ok(LyricsResult::NotFound);
-        }
-        if job.video_transcript && poni_core::video_transcript::should_try_video_transcript(&job.app_id, &job.app_name, true) {
-            if let Some(result) = self.lookup_video_transcript(job, &q)? {
-                return Ok(result);
-            }
         }
         if self.apple.enabled() {
             if let Some(result) = self.lookup_apple(job, &q)? {
@@ -376,7 +385,6 @@ impl Worker {
             }
             Ok(None) => {
                 crate::pinfo!("video transcript {key}: not found");
-                self.store(&path, &CacheEntry::new(None, crate::clock::unix_now()));
                 Ok(None)
             }
             Err(e) => {
@@ -394,12 +402,35 @@ impl Worker {
             .or_else(|| poni_core::video_transcript::youtube_id_from_text(&job.query.artist))
             .or_else(|| poni_core::video_transcript::youtube_id_from_text(&job.track_key));
 
-        if vid.is_none() {
-            let search_query = if !q.artist.is_empty() && !q.title.contains(&q.artist) {
-                format!("{} {}", q.title, q.artist)
-            } else {
-                q.title.clone()
+        let browser_cookie = poni_core::video_transcript::browser_for_cookies(&job.app_id, &job.app_name);
+
+        // 1. Primary path: try via yt-dlp with browser cookies.
+        // Handles podcasts, seminars, news, and music directly by video URL or via ytsearch1:
+        {
+            let client = self.ensure_client(job)?;
+            let query_target = match &vid {
+                Some(id) => format!("https://www.youtube.com/watch?v={id}"),
+                None => {
+                    let clean = poni_core::video_transcript::clean_video_search_query(&job.query.title, &job.query.artist);
+                    format!("ytsearch1:{clean}")
+                }
             };
+            let mut ytdlp_lyrics = fetch_transcript_via_ytdlp(client, &query_target, browser_cookie, &job.target_lang);
+            if ytdlp_lyrics.is_none() && browser_cookie.is_some() {
+                ytdlp_lyrics = fetch_transcript_via_ytdlp(client, &query_target, None, &job.target_lang);
+            }
+            if let Some(lyrics) = ytdlp_lyrics {
+                if !lyrics.lines.is_empty() {
+                    crate::pinfo!("video transcript {query_target}: retrieved via yt-dlp ({} lines)", lyrics.lines.len());
+                    let record = poni_core::video_transcript::to_lrc_record(&lyrics, q);
+                    return Ok(Some(record));
+                }
+            }
+        }
+
+        // 2. Secondary fallback: InnerTube search + player requests
+        if vid.is_none() {
+            let search_query = poni_core::video_transcript::clean_video_search_query(&job.query.title, &job.query.artist);
             let body = poni_core::video_transcript::innertube_search_body(&search_query);
             let client = self.ensure_client(job)?;
             let resp = client.send(
@@ -422,6 +453,7 @@ impl Worker {
             return Ok(None);
         };
 
+        // Secondary fallback: Direct HTTP InnerTube requests.
         let mut tracks = Vec::new();
         for (player_body, ua) in poni_core::video_transcript::innertube_player_requests(&video_id) {
             let client = self.ensure_client(job)?;
@@ -776,6 +808,151 @@ fn to_result(record: Option<&LrclibRecord>, job: &Job, source: &str) -> LyricsRe
         Some(lyrics) => LyricsResult::Found { lyrics, source: source.into(), ruby: Vec::new(), wants_ja_readings: false },
         None => LyricsResult::NotFound,
     }
+}
+
+#[derive(serde::Deserialize, Default)]
+struct YtDlpTrack {
+    #[serde(default)]
+    ext: String,
+    #[serde(default)]
+    url: String,
+}
+
+#[derive(serde::Deserialize, Default)]
+struct YtDlpInfo {
+    #[serde(default)]
+    subtitles: std::collections::HashMap<String, Vec<YtDlpTrack>>,
+    #[serde(default)]
+    automatic_captions: std::collections::HashMap<String, Vec<YtDlpTrack>>,
+}
+
+fn find_ytdlp_bin() -> Option<PathBuf> {
+    #[cfg(unix)]
+    let which_cmd = "which";
+    #[cfg(windows)]
+    let which_cmd = "where";
+
+    if let Ok(output) = std::process::Command::new(which_cmd).arg("yt-dlp").output() {
+        if output.status.success() {
+            let s = String::from_utf8_lossy(&output.stdout);
+            if let Some(first_line) = s.lines().next() {
+                let p = PathBuf::from(first_line.trim());
+                if p.is_file() {
+                    return Some(p);
+                }
+            }
+        }
+    }
+
+    let mut candidates = Vec::new();
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push(PathBuf::from("/opt/homebrew/bin/yt-dlp"));
+        candidates.push(PathBuf::from("/usr/local/bin/yt-dlp"));
+        candidates.push(PathBuf::from("/usr/bin/yt-dlp"));
+        if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+            candidates.push(home.join("Library/Python/3.13/bin/yt-dlp"));
+            candidates.push(home.join("Library/Python/3.12/bin/yt-dlp"));
+            candidates.push(home.join("Library/Python/3.11/bin/yt-dlp"));
+            candidates.push(home.join("Library/Python/3.10/bin/yt-dlp"));
+            candidates.push(home.join("Library/Python/3.9/bin/yt-dlp"));
+            candidates.push(home.join(".local/bin/yt-dlp"));
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        candidates.push(PathBuf::from("/usr/local/bin/yt-dlp"));
+        candidates.push(PathBuf::from("/usr/bin/yt-dlp"));
+        if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+            candidates.push(home.join(".local/bin/yt-dlp"));
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+            candidates.push(local_app_data.join("yt-dlp").join("yt-dlp.exe"));
+            candidates.push(local_app_data.join("Programs").join("yt-dlp").join("yt-dlp.exe"));
+        }
+        if let Some(user_profile) = std::env::var_os("USERPROFILE").map(PathBuf::from) {
+            candidates.push(user_profile.join("scoop").join("shims").join("yt-dlp.exe"));
+        }
+        candidates.push(PathBuf::from(r"C:\Program Files\yt-dlp\yt-dlp.exe"));
+        candidates.push(PathBuf::from(r"C:\ProgramData\chocolatey\bin\yt-dlp.exe"));
+    }
+
+    for p in candidates {
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+
+    None
+}
+
+fn fetch_transcript_via_ytdlp(
+    client: &Client,
+    target: &str,
+    browser_cookie: Option<&str>,
+    target_lang: &str,
+) -> Option<poni_core::lrc::Lyrics> {
+    let ytdlp = find_ytdlp_bin()?;
+    let mut cmd = std::process::Command::new(ytdlp);
+    cmd.arg("--dump-json")
+        .arg("--skip-download")
+        .arg("--no-playlist")
+        .arg("--no-warnings")
+        .arg("--socket-timeout")
+        .arg("5");
+
+    if let Some(browser) = browser_cookie {
+        cmd.arg("--cookies-from-browser").arg(browser);
+    }
+    cmd.arg(target);
+
+    let output = cmd.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let info: YtDlpInfo = serde_json::from_slice(&output.stdout).ok()?;
+
+    fn find_tracks<'a>(
+        map: &'a std::collections::HashMap<String, Vec<YtDlpTrack>>,
+        target_lang: &str,
+    ) -> Option<&'a [YtDlpTrack]> {
+        if !target_lang.is_empty() {
+            if let Some(t) = map.get(target_lang) {
+                return Some(t.as_slice());
+            }
+        }
+        if let Some(t) = map.get("en") {
+            return Some(t.as_slice());
+        }
+        for (k, v) in map {
+            if k != "live_chat" && !v.is_empty() {
+                return Some(v.as_slice());
+            }
+        }
+        None
+    }
+
+    let track_list = find_tracks(&info.subtitles, target_lang)
+        .or_else(|| find_tracks(&info.automatic_captions, target_lang))?;
+
+    let url = track_list
+        .iter()
+        .find(|t| t.ext == "json3" && !t.url.is_empty())
+        .or_else(|| track_list.iter().find(|t| t.ext == "srv1" && !t.url.is_empty()))
+        .or_else(|| track_list.iter().find(|t| t.ext == "vtt" && !t.url.is_empty()))
+        .or_else(|| track_list.iter().find(|t| !t.url.is_empty()))
+        .map(|t| t.url.as_str())?;
+
+    let resp = client.get(url, Duration::from_secs(8)).ok()?;
+    if resp.status != 200 {
+        return None;
+    }
+
+    poni_core::video_transcript::parse_transcript(&resp.body)
 }
 
 // ------------------------------------------------------------------ cache

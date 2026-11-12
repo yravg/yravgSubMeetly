@@ -199,6 +199,14 @@ pub fn normalize_query(q: &TrackQuery) -> TrackQuery {
         }
     }
 
+    // Browser tabs often append " - YouTube", " – YouTube", or " — YouTube".
+    // Strip these before splitting so "YouTube" is never misread as the song name.
+    for site in [" - YouTube", " – YouTube", " — YouTube", " | YouTube", " - YouTube Music"] {
+        if let Some(stripped) = title.strip_suffix(site) {
+            title = stripped.trim().to_string();
+        }
+    }
+
     // "Artist - Title" or "Title – Artist" in the title (YouTube/browser sessions).
     if let Some((left, right)) = split_title(&title) {
         if artist.is_empty() || names_artist(left, &artist) {

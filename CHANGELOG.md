@@ -1,5 +1,8 @@
 # Riwayat rilis
 
+## 1.4.5 (2026-11-13)
+- **Universal YouTube CC transcripts for podcasts, seminars, news, and lectures:** Enhanced YouTube closed caption fetching to extract browser session cookies (Chrome, Safari, Edge, Brave, etc.) via `yt-dlp` and directly search via `ytsearch1:`, bypassing YouTube's bot-detection walls (`LOGIN_REQUIRED`) that previously blocked long-form non-music content. Supports instant ahead-of-time synchronized translation, negative-cache retirement to prevent false lockouts, and robust browser title decoration cleaning.
+
 ## 1.4.4 (2026-11-13)
 - **YouTube CC video transcripts with ahead-of-time translation:** When playing a YouTube video (browser or app), the island automatically fetches YouTube's closed captions / timed transcript in advance and begins translating all segments into the user's target language ahead of time. Seeks and timestamp changes instantly sync to the corresponding transcript lines and their translated text without waiting on audio ASR. Includes a `[YouTube CC: On]` toggle in empty state and `[CC On]` / `[CC Off]` during playback on both Pill and Classic themes, seek-priority background translation, and automatic fallback when disabled.
 
