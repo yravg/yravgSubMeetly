@@ -1,7 +1,7 @@
 # Riwayat rilis
 
-## 1.4.3 (2026-11-12)
-- **YouTube CC video transcripts with ahead-of-time translation:** When playing a YouTube video (browser or app), the island automatically fetches YouTube's closed captions / timed transcript in advance and begins translating all segments into the user's target language ahead of time. Seeks and timestamp changes instantly sync to the corresponding transcript lines and their translated text without waiting on audio ASR. Includes a `[CC On]` / `[CC Off]` toggle button on the Media page, seek-priority background translation, and automatic fallback when disabled.
+## 1.4.4 (2026-11-13)
+- **YouTube CC video transcripts with ahead-of-time translation:** When playing a YouTube video (browser or app), the island automatically fetches YouTube's closed captions / timed transcript in advance and begins translating all segments into the user's target language ahead of time. Seeks and timestamp changes instantly sync to the corresponding transcript lines and their translated text without waiting on audio ASR. Includes a `[YouTube CC: On]` toggle in empty state and `[CC On]` / `[CC Off]` during playback on both Pill and Classic themes, seek-priority background translation, and automatic fallback when disabled.
 
 ## 1.4.2 (2026-11-12)
 - **Pill Minutes: transcript side by side, Open Minutes app, and translate transcript into any language:** The pill's Minutes transcript (side by side), Open Minutes app, translate a transcript into any language, Mac Minutes decisions save.
