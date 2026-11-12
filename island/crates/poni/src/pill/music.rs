@@ -31,7 +31,7 @@ use crate::commands::{Command, MediaCmd};
 use crate::gfx::{Image, TextStyle, Weight};
 use crate::icons::Icon;
 use crate::pages::media::{self as classic, Anim, Column, Frame, LyricsCtx};
-use crate::state::{AppState, JaClick};
+use crate::state::{AppState, JaClick, LyricsState, LyricsStatus};
 use crate::ui::{wid, Ui, WidgetId};
 use poni_core::datetime::fmt_duration;
 use poni_core::geom::{lerp, palette, Color, Point, Rect};
@@ -141,7 +141,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) -> bool {
             super::quick_captions::strip(ui, st, r, body);
         }
     } else {
-        draw_empty(ui, area);
+        draw_empty(ui, st, area);
     }
     classic::put_anim(a);
     true
@@ -204,9 +204,19 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     draw_art(ui, m.art.as_ref(), Rect::new(x0, y0, ART, ART), a.art_scale, art_settled.then_some(scale));
 
     // The player's name, the title and the artist, in a column that stops
-    // short of the equalizer.
+    // short of the equalizer and CC toggle.
     let tx = snap(x0 + ART + GAP_ART);
-    let tw = (block.right() - eq_width() - GAP_EQ - tx).max(0.0);
+    let cc_on = st.settings.video_transcript;
+    let cc_label = if cc_on { "CC On" } else { "CC Off" };
+    let cc_style = if cc_on { crate::ui::PillStyle::Primary(accent) } else { crate::ui::PillStyle::Utility };
+    let cc_w = ui.pill_width(cc_label, false, true);
+    let cc_x = block.right() - eq_width() - GAP_EQ - cc_w;
+    let cc_rect = Rect::new(cc_x, y0 + 3.0, cc_w, crate::ui::PILL_SMALL);
+    let mut toggle_cc = false;
+    if ui.pill(wid("pill.media.video_transcript_toggle"), cc_rect, cc_label, None, cc_style).clicked {
+        toggle_cc = true;
+    }
+    let tw = (cc_x - GAP_EQ - tx).max(0.0);
     let source = source_label(&m.app_name, playing);
     let source_st = TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT_FAINT);
     tracked(ui, &source, row(tx, tw, y0 + SOURCE_CAP, source_st.size), &source_st);
@@ -334,6 +344,18 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
     if get_ja_readings {
         st.ja_offer_clicked();
     }
+    if toggle_cc {
+        st.settings.video_transcript = !st.settings.video_transcript;
+        st.cmd(Command::SaveSettings);
+        if !st.settings.video_transcript {
+            if poni_core::video_transcript::is_video_transcript_source(&st.lyrics.source) {
+                st.lyrics = LyricsState::default();
+                st.lyrics.status = LyricsStatus::Idle;
+            }
+        } else {
+            st.cmd(Command::RefetchLyrics);
+        }
+    }
 }
 
 /// The player's name in capitals ("SPOTIFY"), with "PAUSED" while it is, as
@@ -377,12 +399,21 @@ fn tracked(ui: &mut Ui, s: &str, r: Rect, st: &TextStyle) {
 
 /// Nothing playing: the card keeps the player's first row, a blank tile with
 /// the note and what to do, and nothing that would pretend to control.
-fn draw_empty(ui: &mut Ui, area: Rect) {
+fn draw_empty(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let scale = ui.c.scale().max(0.5);
     let (x0, y0) = (classic::snap(area.x, scale), classic::snap(area.y, scale));
     tile(ui, Rect::new(x0, y0, ART, ART), ART_RADIUS, 1.0);
     let tx = classic::snap(x0 + ART + GAP_ART, scale);
-    let tw = (area.right() - tx).max(0.0);
+    let cc_on = st.settings.video_transcript;
+    let cc_label = if cc_on { "YouTube CC: On" } else { "YouTube CC: Off" };
+    let cc_style = if cc_on { crate::ui::PillStyle::Primary(st.media_accent()) } else { crate::ui::PillStyle::Utility };
+    let cc_w = ui.pill_width(cc_label, false, true);
+    let cc_rect = Rect::new(area.right() - cc_w, y0 + 6.0, cc_w, crate::ui::PILL_SMALL);
+    if ui.pill(wid("pill.media.empty_cc_toggle"), cc_rect, cc_label, None, cc_style).clicked {
+        st.settings.video_transcript = !st.settings.video_transcript;
+        st.cmd(Command::SaveSettings);
+    }
+    let tw = (cc_rect.x - GAP_EQ - tx).max(0.0);
     let title = TextStyle::value();
     ui.c.text("Nothing playing", row(tx, tw, y0 + EMPTY_TITLE_CAP, title.size), &title);
     let hint = TextStyle::body().color(palette::TEXT_DIM);

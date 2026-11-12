@@ -332,6 +332,15 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
         super::empty_state(ui, r, Icon::Music, "Nothing playing", "Play music in Spotify, a browser or any media app");
         // Kept video transcripts stay reachable with nothing playing (PMM-023).
         crate::pill::quick_captions::history_button(ui, st, area.right(), area.y + crate::ui::PILL_SMALL / 2.0);
+        let cc_on = st.settings.video_transcript;
+        let cc_label = if cc_on { "YouTube CC: On" } else { "YouTube CC: Off" };
+        let cc_style = if cc_on { crate::ui::PillStyle::Primary(st.media_accent()) } else { crate::ui::PillStyle::Utility };
+        let cc_w = ui.pill_width(cc_label, false, true);
+        let cc_rect = Rect::new(area.right() - cc_w - 76.0, area.y + crate::ui::PILL_SMALL / 2.0, cc_w, crate::ui::PILL_SMALL);
+        if ui.pill(wid("media.empty_cc_toggle"), cc_rect, cc_label, None, cc_style).clicked {
+            st.settings.video_transcript = !st.settings.video_transcript;
+            st.cmd(Command::SaveSettings);
+        }
     }
     put_anim(a);
 }
@@ -404,7 +413,7 @@ fn draw_session(ui: &mut Ui, st: &mut AppState, area: Rect, a: &mut Anim, fr: &F
         let dot = if playing { accent } else { accent.mul_alpha(0.45) };
         draw_source(ui, mid.x, y0 + SOURCE_Y, mid.w, &label, dot, scale);
     }
-    if poni_core::video_transcript::is_video_session(&m.app_id, &m.app_name) {
+    {
         let cc_on = st.settings.video_transcript;
         let cc_label = if cc_on { "CC On" } else { "CC Off" };
         let cc_style = if cc_on { crate::ui::PillStyle::Primary(accent) } else { crate::ui::PillStyle::Utility };

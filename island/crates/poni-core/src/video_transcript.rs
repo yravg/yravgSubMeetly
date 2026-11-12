@@ -47,10 +47,17 @@ pub fn is_video_transcript_source(source: &str) -> bool {
 /// any browser video tab (or explicit YouTube session), excluding dedicated
 /// music web apps like YouTube Music.
 pub fn is_video_session(app_id: &str, app_name: &str) -> bool {
-    if app_name.eq_ignore_ascii_case("YouTube Music") {
+    let name = app_name.trim();
+    if name.eq_ignore_ascii_case("YouTube Music") || name.eq_ignore_ascii_case("Spotify") || name.eq_ignore_ascii_case("Apple Music") || name.eq_ignore_ascii_case("Music") {
         return false;
     }
-    app_name.eq_ignore_ascii_case("YouTube") || nowplaying::is_browser(app_id)
+    let id = app_id.trim();
+    name.eq_ignore_ascii_case("YouTube")
+        || name.to_ascii_lowercase().contains("youtube")
+        || id.to_ascii_lowercase().contains("youtube")
+        || nowplaying::is_browser(id)
+        || nowplaying::is_browser(name)
+        || ["iina", "vlc", "quicktime", "mpv", "safari", "chrome", "firefox", "edge", "brave", "opera", "arc", "zen", "dia"].iter().any(|b| id.to_ascii_lowercase().contains(b) || name.to_ascii_lowercase().contains(b))
 }
 
 /// Whether the lookup should try fetching a video transcript for this session.
