@@ -86,27 +86,30 @@ test('meeting select switches meeting', async () => {
   await page.select('#page [data-mn="meeting"]', 'M1');
 });
 
-test('Open register: Classic | Modern, last choice remembered and shown first', async () => {
-  const kinds = () => page.$$eval('#page .mn-open a[data-register]', (a) => a.map((x) => x.dataset.register));
-  const first = (await kinds())[0];
+// The More menu holds the secondary actions (Draft options, Library, Training, Apply correction, the other register, header, layout).
+const inMore = async (sel) => { await page.click('#page [data-mn="more"]'); await page.waitForSelector('#page .mn-menu'); await page.click(sel); };
+
+test('Open full register: the current kind is the main link, the other one lives in More; last choice remembered', async () => {
+  const top = () => page.$eval('#page .mn-full', (a) => a.dataset.register);
+  const first = await top();
   const other = first === 'modern' ? 'classic' : 'modern';
-  await page.click(`#page .mn-open a[data-register="${other}"]`).catch(() => {});
+  await inMore(`#page .mn-menu a[data-register="${other}"]`).catch(() => {});
   await wait(300);
   await go();
-  assert.equal((await kinds())[0], other);
+  assert.equal(await top(), other);
 });
 
 test('Collapse header hides the summary and chips, and comes back', async () => {
-  await page.click('#page [data-mn="collapse"]');
+  await inMore('#page .mn-menu [data-mn="collapse"]');
   assert.equal(await page.$('#page .mn-sum'), null);
   assert.equal(await page.$('#page .mn-chips'), null);
   assert.ok(await page.$('#page .mn-tabs'), 'tabs stay');
-  await page.click('#page [data-mn="collapse"]');
+  await inMore('#page .mn-menu [data-mn="collapse"]');
   assert.ok(await page.$('#page .mn-sum'));
 });
 
 test('Layout & appearance: density changes row height; Collapse to rail and Reset layout write the register layout', async () => {
-  await page.click('#page [data-mn="layout"]');
+  await inMore('#page .mn-menu [data-mn="layout"]');
   const labels = await page.$$eval('#page .mn-pop [data-density]', (b) => b.map((x) => x.textContent.trim()));
   assert.deepEqual(labels, ['Review', 'Reading', 'Compact']);
   const h0 = await page.$eval('#page .mn-row', (r) => r.getBoundingClientRect().height);
@@ -122,13 +125,21 @@ test('Layout & appearance: density changes row height; Collapse to rail and Rese
 });
 
 test('register-only actions open the register with ?do=…; Issue MoM is the one black button', async () => {
-  if (await page.$('#page .mn-pop')) await page.click('#page [data-mn="layout"]');
+  if (await page.$('#page .mn-pop')) await page.click('#page .mn-sum'); // a click elsewhere closes the layout popover
   await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
-  const labels = await page.$$eval('#page .mn-bar button', (b) => b.map((x) => x.textContent.trim()));
-  for (const l of ['Draft options', 'Library', 'Training', 'Add item', 'Export', 'Apply correction', 'Issue MoM']) assert.ok(labels.includes(l), `${l} in ${labels}`);
+  // The bar: Add item, Export, Issue MoM (the only primary) and More; the rest is in the More menu.
+  const bar = await page.$$eval('#page .mn-bar > button, #page .mn-bar > .mn-more > button', (b) => b.map((x) => x.textContent.trim()));
+  for (const l of ['Add item', 'Export', 'Issue MoM']) assert.ok(bar.some((x) => x.startsWith(l)), `${l} in ${bar}`);
+  await page.click('#page [data-mn="more"]');
+  await page.waitForSelector('#page .mn-menu');
+  const menu = await page.$$eval('#page .mn-menu [role="menuitem"]', (b) => b.map((x) => x.textContent.trim()));
+  for (const l of ['Draft options', 'Library', 'Training', 'Apply correction', 'Collapse header', 'Layout & appearance']) assert.ok(menu.includes(l), `${l} in ${menu}`);
+  await page.click('#page .mn-menu [data-do="draft"]');
+  await wait(400);
   await page.click('#page .mn-bar [data-do="add"]');
   await wait(400);
   const opened = await page.evaluate(() => window.__opened);
+  assert.ok(opened.some((u) => /minutes\.html/.test(u) && /do=draft/.test(u)), JSON.stringify(opened));
   assert.ok(opened.some((u) => /minutes\.html/.test(u) && /do=add/.test(u) && /meeting=M1/.test(u)), JSON.stringify(opened));
   assert.equal(await page.$$eval('#page .mn-bar .pill-b', (b) => b.length), 1);
 });

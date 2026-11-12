@@ -62,7 +62,7 @@ test('theme picker reads "Tide dark" / "Tide light" in Modern; Classic keeps its
   assert.deepEqual(modern, ['Tide dark', 'Tide light']);
   await open('');
   const classic = await page.$$eval('[data-theme-pick] b', (bs) => bs.map((b) => b.textContent.trim()));
-  assert.deepEqual(classic, ['Local · dark', 'Coretax · paper']);
+  assert.deepEqual(classic, ['Dark', 'Light']);
 });
 
 test('theme labels have an Indonesian version', async () => {

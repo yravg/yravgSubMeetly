@@ -63,7 +63,9 @@ import { tile as colourTile } from './lib/colour-icons.js';
 import { renderFeatureMap } from './lib/feature-map.js';
 import { mountAddinsPane, glossaryCaption } from './addins-ui.js';
 import { markedHtml } from './lib/glossary.js';
-import { migrateUiDefaults, shouldAdoptRemote, DEFAULT_RESKIN, DEFAULT_THEME } from './lib/ui-defaults.js';
+import { migrateUiDefaults, shouldAdoptRemote, DEFAULT_RESKIN, DEFAULT_THEME, RESKINS } from './lib/ui-defaults.js';
+import { PALETTES } from './lib/palettes.js';
+import { normalizePalette, applyPalette, setPalette, isPaletteExplicit, watchPalette } from './lib/palette-apply.js';
 import { springProgress, slidingNumber, autoHeight, highlight } from './lib/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -1479,6 +1481,8 @@ function applyTheme() {
     b.classList.toggle('active', b.dataset.theme === theme);
   });
   syncPill('theme-toggle');
+  renderPaletteGallery();
+  applyReskin();
 }
 
 async function setTheme(theme) {
@@ -1509,7 +1513,8 @@ function applyExternalSettings(next) {
   }
   if (
     RESKINS.includes(next.reskin) &&
-    next.reskin !== state.settings.reskin
+    next.reskin !== state.settings.reskin &&
+    !isPaletteExplicit()
   ) {
     state.settings.reskin = next.reskin;
     applyReskin();
@@ -1518,25 +1523,57 @@ function applyExternalSettings(next) {
 
 // TIDE-012: 'tide' memakai theme-tide.css (token merek yravg). Helper belum mencerminkan 'tide'
 // (UI_RESKINS di engine-rs mengabaikan nilai yang tidak dikenal), jadi pilihan ini lokal.
-const RESKINS = ['yraverage', 'coretax', 'modern', 'tide'];
 
-// Reskin pattern: hanya token visual lokal (aksen + radius), bukan branding.
+// Theme = a palette over the one Tide structure (src/palettes.css, generated). The structure is always
+// Tide; only data-palette changes. The earlier reskin names are read as the palette with the same hue.
+function paletteCard(p, mode) {
+  const c = p[mode];
+  const desc = state.settings.uiLang === 'id' ? p.id_ : p.en;
+  return `<button type="button" class="reskin-card" data-reskin="${p.id}" role="radio" aria-checked="false" aria-label="${p.name}: ${desc}">
+    <span class="pal-prev" aria-hidden="true" style="background:${c.bg};border-color:${c.line}">
+      <span class="pal-card" style="background:${c.card};border-color:${c.line}"><i style="background:${c.accent}"></i><b style="background:${c.ink}"></b><b class="s" style="background:${c.ink}"></b></span>
+      <em style="background:${c.accent}"></em>
+    </span>
+    <span class="pal-name">${p.name}<span class="pal-check" aria-hidden="true">✓</span></span>
+    <span class="pal-desc">${desc}</span>
+  </button>`;
+}
+function renderPaletteGallery() {
+  const host = $('reskin-toggle');
+  if (!host) return;
+  const dark = document.documentElement.classList.contains('theme-dark') || (!document.documentElement.classList.contains('theme-light') && matchMedia('(prefers-color-scheme: dark)').matches);
+  host.innerHTML = PALETTES.map((p) => paletteCard(p, dark ? 'dark' : 'light')).join('');
+  host.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setReskin(b.dataset.reskin)));
+  applyReskin(); // marks the chosen card
+}
+
 function applyReskin() {
-  const reskin = RESKINS.includes(state.settings.reskin)
-    ? state.settings.reskin
-    : DEFAULT_RESKIN;
-  document.documentElement.dataset.reskin = reskin;
+  let id = normalizePalette(RESKINS.includes(state.settings.reskin) ? state.settings.reskin : DEFAULT_RESKIN);
+  // A theme picked on another page (the Minutes register) is kept in localStorage: adopt it, so it is not
+  // reverted by the value saved in these settings.
+  let stored = null;
+  try { stored = localStorage.getItem('ysmPalette'); } catch { /* ignore */ }
+  if (stored && isPaletteExplicit() && normalizePalette(stored) !== id) {
+    id = normalizePalette(stored);
+    state.settings.reskin = id;
+    state.settings.reskinExplicit = true;
+    saveSettings().catch(() => {});
+  }
+  document.documentElement.dataset.reskin = 'tide';
+  applyPalette(id);
+  setPalette(id, { explicit: false });
   document.querySelectorAll('#reskin-toggle button').forEach((b) => {
-    const active = b.dataset.reskin === reskin;
+    const active = b.dataset.reskin === id;
     b.classList.toggle('active', active);
     b.setAttribute('aria-checked', String(active));
   });
 }
 
 async function setReskin(reskin) {
-  const next = RESKINS.includes(reskin) ? reskin : DEFAULT_RESKIN;
+  const next = normalizePalette(RESKINS.includes(reskin) ? reskin : DEFAULT_RESKIN);
   state.settings.reskin = next;
   state.settings.reskinExplicit = true;
+  setPalette(next);
   await saveSettings();
   applyReskin();
   pushUiPrefs();
@@ -1584,6 +1621,7 @@ async function pullUiPrefs() {
   if (
     RESKINS.includes(res.prefs?.reskin) &&
     res.prefs.reskin !== state.settings.reskin &&
+    !isPaletteExplicit() &&
     shouldAdoptRemote('reskin', res.prefs.reskin, state.settings)
   ) {
     state.settings.reskin = res.prefs.reskin;
@@ -3320,9 +3358,8 @@ function wire() {
   document.querySelectorAll('#theme-toggle button').forEach((b) =>
     b.addEventListener('click', () => setTheme(b.dataset.theme)),
   );
-  document.querySelectorAll('#reskin-toggle button').forEach((b) =>
-    b.addEventListener('click', () => setReskin(b.dataset.reskin)),
-  );
+  renderPaletteGallery();
+  watchPalette(() => applyReskin());
   document.querySelectorAll('#asr-preset-toggle button').forEach((b) =>
     b.addEventListener('click', async () => {
       const key = ASR_PRESETS[b.dataset.preset];
@@ -3724,6 +3761,7 @@ async function init() {
     if (q.get('view') === 'settings' && SETTINGS_TABS.includes(q.get('stab'))) setSettingsTab(q.get('stab'));
   }
   if (q.get('shell') === '1') document.documentElement.dataset.shell = q.get('view') || 'captions';
+  if (q.get('solo') === '1') document.documentElement.dataset.shell = 'solo';
   if (q.get('shell') === '1' && (q.get('view') === 'files' || q.get('view') === 'history')) {
     mountFilesLayout({
       view: q.get('view'),

@@ -40,7 +40,7 @@ export function defaultLayout() {
     theme: 'dark',
     dockArmMs: 1500,      // hover di dok mini selama ini → membuka sendiri (0 = mati)
     dockAnim: 'wipe',     // 'wipe' | 'slide' | 'fade' | 'scale'
-    dockSpeed: 1,         // pengali durasi buka/tutup        // 'dark' | 'coretax'
+    dockSpeed: 1,         // pengali durasi buka/tutup        // 'dark' | 'paper'
     density: 'comfortable',
     motion: true,
     remember: true,
@@ -66,6 +66,8 @@ export function loadLayout() {
     const raw = localStorage.getItem(LS_LAYOUT);
     if (!raw) return narrowDefaults(defaultLayout());
     const saved = JSON.parse(raw);
+    // 'coretax' was this light theme's old internal name (renamed 'paper', 2026-11-12).
+    if (saved.theme === 'coretax') saved.theme = 'paper';
     const d = defaultLayout();
     return {
       ...d, ...saved,
@@ -145,7 +147,7 @@ export function mountDock(h) {
   const scheme = matchMedia('(prefers-color-scheme: light)');
   scheme.addEventListener('change', () => { if (followSystem) applyAppearance(); });
   function applyAppearance() {
-    document.documentElement.dataset.theme = followSystem ? (scheme.matches ? 'coretax' : 'dark') : L.theme;
+    document.documentElement.dataset.theme = followSystem ? (scheme.matches ? 'paper' : 'dark') : L.theme;
     document.documentElement.dataset.density = L.density;
     document.documentElement.classList.toggle('no-motion', !L.motion);
     // Cincin tunggu dan timer harus sepanjang yang sama, jadi CSS membacanya dari sini.

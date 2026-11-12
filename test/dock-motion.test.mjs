@@ -390,7 +390,7 @@ test('appbar memakai wordmark yravgSubMeetly dan "Minutes" membawa kembali ke ha
 });
 
 test('popover appbar tampil di atas halaman pada kedua tema', async () => {
-  // Tema Coretax memberi .appbar backdrop-filter, yang membuat stacking
+  // Tema Paper memberi .appbar backdrop-filter, yang membuat stacking
   // context: tanpa z-index pada appbar-nya sendiri, popover di dalamnya
   // tercetak di bawah konten meski z-index-nya 60.
   const probe = (id) => page.evaluate((popId) => {
@@ -407,7 +407,7 @@ test('popover appbar tampil di atas halaman pada kedua tema', async () => {
     };
   }, id);
 
-  for (const theme of ['dark', 'coretax']) {
+  for (const theme of ['dark', 'paper']) {
     await page.evaluate(() => document.getElementById('btn-settings').click());
     await wait(250);
     await page.evaluate((t) => document.querySelector(`[data-theme-pick="${t}"]`).click(), theme);

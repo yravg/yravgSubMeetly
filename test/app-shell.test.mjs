@@ -164,18 +164,25 @@ test('Start captions di sidebar benar-benar memulai (bukan hanya membuka Live)',
   await page.evaluate(() => { location.hash = '#today'; });
 });
 
+// The current register is the main "Open full register" link; the other kind lives in the More menu.
+const openMore = async () => { await page.click('#page [data-mn="more"]'); await page.waitForSelector('#page .mn-menu a[data-register]'); };
+const topKind = () => page.$eval('#page .mn-full', (a) => a.dataset.register);
+
 test('A04: Minutes digambar langsung (tanpa iframe); tautan Open register; Klasik = jendela Minutes', async () => {
   await page.evaluate(() => { location.hash = '#minutes?meeting=Y1'; });
   await page.waitForSelector('#page .mn');
   assert.equal(await page.$('#page iframe'), null, 'tanpa iframe register');
-  const r = await page.evaluate(() => ({ modern: document.querySelector('.mn-open a[data-register="modern"]').getAttribute('href'), classic: document.querySelector('.mn-open a[data-register="classic"]').getAttribute('href'), row: document.querySelector('.mn-row')?.dataset.ref }));
-  assert.equal(r.modern, 'minutes.html?lang=en&skin=tide&meeting=Y1');
+  const modern = await page.$eval('#page .mn-full', (a) => a.getAttribute('href'));
+  await openMore();
+  const r = await page.evaluate(() => ({ classic: document.querySelector('.mn-menu a[data-register="classic"]').getAttribute('href'), row: document.querySelector('.mn-row')?.dataset.ref }));
+  assert.equal(modern, 'minutes.html?lang=en&skin=tide&meeting=Y1');
   assert.equal(r.classic, 'minutes.html?lang=en&meeting=Y1', 'tautan Klasik membuka halaman sendiri tanpa skin');
   assert.equal(r.row, 'A2', 'butir rapat Y1 tampil');
   const n = (await browser.pages()).length;
-  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
+  await page.click('#page .mn-menu a[data-register="classic"]'); await wait(900);
   assert.equal((await browser.pages()).length, n + 1, 'jendela Minutes terbuka (lab: window.open bernama)');
-  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
+  // The choice is remembered, so Classic is now the main link: a second click reuses the same window.
+  await page.click('#page .mn-full'); await wait(900);
   assert.equal((await browser.pages()).length, n + 1, 'klik kedua tidak membuka jendela lain');
   for (const p of (await browser.pages()).slice(n)) await p.close();
 });
@@ -184,12 +191,14 @@ test('A04: Modern bawaan; pilihan Open register diingat dan tampil lebih dulu', 
   await page.evaluate(() => { localStorage.removeItem('ysmShellRegister'); location.hash = '#minutes'; });
   await page.reload({ waitUntil: 'networkidle0' });
   await page.waitForSelector('#page .mn');
-  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
+  assert.equal(await topKind(), 'modern');
   const n = (await browser.pages()).length;
-  await page.click('.mn-open a[data-register="classic"]'); await wait(900);
-  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['classic', 'modern']);
-  await page.click('.mn-open a[data-register="modern"]'); await wait(900);
-  assert.deepEqual(await page.$$eval('.mn-open a', (l) => l.map((a) => a.dataset.register)), ['modern', 'classic']);
+  await openMore();
+  await page.click('#page .mn-menu a[data-register="classic"]'); await wait(900);
+  assert.equal(await topKind(), 'classic', 'the last choice becomes the main link');
+  await openMore();
+  await page.click('#page .mn-menu a[data-register="modern"]'); await wait(900);
+  assert.equal(await topKind(), 'modern');
   for (const p of (await browser.pages()).slice(n)) await p.close();
 });
 

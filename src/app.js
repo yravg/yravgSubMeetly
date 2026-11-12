@@ -22,6 +22,10 @@ import { minutesHtml, mountMinutes } from './app-pages/minutes.js';
 import { developerHtml, wireDeveloper } from './app-pages/developer.js';
 import { mountInstalled } from './app-pages/addins-list.js';
 import { migrateUiDefaults } from './lib/ui-defaults.js';
+import { getPalette, applyPalette, watchPalette } from './lib/palette-apply.js';
+// The theme the person picked (in Settings, or in the Minutes register): this shell, and the frames it hosts, follow it.
+applyPalette(getPalette());
+watchPalette();
 
 const IS_EXT = location.protocol === 'chrome-extension:';
 // Engine-hosted (Windows app window): src/web-host.js installed a chrome stand-in, panels are sidepanel.html.
@@ -177,7 +181,10 @@ const ALIAS = { glossary: 'notes', helper: 'settings' }; // #helper is Settings 
 const PANEL = { live: ['captions'], history: ['history'], files: ['files'], addins: ['settings', 'addins'], notes: ['notes'], island: ['settings', 'output'], perf: ['perf'], settings: ['settings'], helper: ['helper'] };
 // Pages whose panel document lays itself out as a board page (src/app-pages/*-layout.js).
 const SHELLED = new Set(['live', 'history', 'files', 'settings']);
-const panelUrl = ([view, stab], shell = false) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}${shell ? '&shell=1' : ''}&lang=${LANG}`;
+// Island and Add-ins are ONE pane of the settings panel: `solo` shows that pane without the dialog around it
+// (no second title, no close button, no search, no tab strip).
+const SOLO = new Set(['addins', 'island']);
+const panelUrl = ([view, stab], shell = false, solo = false) => `${HOSTED ? 'sidepanel.html' : '/panel-test.html'}?view=${view}${stab ? `&stab=${stab}` : ''}${shell ? '&shell=1' : ''}${solo ? '&solo=1' : ''}&lang=${LANG}`;
 
 const state = { trusted: {}, removed: [], userName: '', syncedAt: '', setup: null, meetings: null, error: null, series: '', owner: '', health: undefined, hideNumbers: false, welcomed: true, minutesWin: false, register: 'modern', showPlans: false, developer: !HOSTED };
 const store = {
@@ -412,7 +419,7 @@ function settingsPage(params) {
 
 /* ---------- panel-backed pages ---------- */
 function panelPage(route) {
-  return `<iframe class="frame panel${SHELLED.has(route) ? ' shell' : ''}" title="${esc(T(route))}" src="${esc(panelUrl(PANEL[route], SHELLED.has(route)))}"></iframe>`;
+  return `<iframe class="frame panel${SHELLED.has(route) ? ' shell' : ''}" title="${esc(T(route))}" src="${esc(panelUrl(PANEL[route], SHELLED.has(route), SOLO.has(route)))}"></iframe>`;
 }
 
 /* ---------- router ---------- */

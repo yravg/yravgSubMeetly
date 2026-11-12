@@ -19,6 +19,11 @@ const CONTROLS = JSON.parse(readFileSync(new URL('../docs/design/tide-shell-canv
 const norm = (k) => k.replace(/\d+/g, '#').replace(/\s+/g, ' ').trim();
 // Controls that were deliberately renamed (never removed): old label -> current label.
 const RENAMED = {
+  // The four reskin pills became the nine-theme gallery (scripts/gen-palettes.mjs); Coretax is now Azure.
+  'button|Tide': 'button|Tide: Fresh green on white. The default.',
+  'button|Yraverage Klasik': 'button|Teal: The original yravg teal.',
+  'button|Coretax': 'button|Azure: Calm blue with crisp edges.',
+  'button|Yraverage Modern': 'button|Violet: Soft purple, friendly and warm.',
   'button|Start Task': 'button|Start captions',
   'button|End Task': 'button|Stop captions',
   'button|Load sample data': 'button|Load demo meetings (removable)',
@@ -131,7 +136,11 @@ before(async () => {
   await page.waitForSelector('#page .mn-row', { timeout: 8000 });
   await wait(500);
   add(await dump(page));
-  await page.evaluate(() => document.querySelector('#page [data-mn="layout"]')?.click());
+  // The secondary actions live in the More menu: open it, record it, then open Layout & appearance from it.
+  await page.evaluate(() => document.querySelector('#page [data-mn="more"]')?.click());
+  await wait(300);
+  add(await dump(page));
+  await page.evaluate(() => document.querySelector('#page .mn-menu [data-mn="layout"]')?.click());
   await wait(300);
   add(await dump(page));
 });

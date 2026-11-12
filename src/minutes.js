@@ -35,6 +35,8 @@ import { mountDraftOptions } from './minutes-draft.js';
 import { mountDock } from './minutes-dock.js';
 import { mountThreads, renderThreads } from './minutes-threads.js';
 import { migrateLegacyLocalKeys } from './lib/legacy-keys.js';
+import { PALETTES } from './lib/palettes.js';
+import { getPalette, setPalette, applyPalette, watchPalette } from './lib/palette-apply.js';
 
 /** Lapisan tata letak: panel kiri/kanan/bawah, rel, dan dok tampilan. */
 let dock = null;
@@ -48,14 +50,15 @@ migrateLegacyLocalKeys();
 // A04a "Modern" register: ?skin=tide adds the Tide colour layer. Classic (no parameter) is unchanged (TIDE-024).
 if (new URLSearchParams(globalThis.location?.search || '').get('skin') === 'tide') {
   document.documentElement.dataset.reskin = 'tide';
-  for (const href of ['theme-tide.css', 'minutes-tide.css']) {
+  applyPalette(getPalette());
+  for (const href of ['theme-tide.css', 'minutes-tide.css', 'palettes.css']) {
     const l = document.createElement('link');
     l.rel = 'stylesheet';
     l.href = href;
     document.head.append(l);
   }
   // Owner decision 2026-11-10: the Modern theme picker names its two choices after Tide.
-  for (const [pick, key] of [['dark', 'themeTideDark'], ['coretax', 'themeTideLight']]) {
+  for (const [pick, key] of [['dark', 'themeTideDark'], ['paper', 'themeTideLight']]) {
     document.querySelector(`[data-theme-pick="${pick}"] b`)?.setAttribute('data-t', key);
     document.querySelector(`[data-theme-pick="${pick}"] small`)?.setAttribute('data-t', `${key}Sub`);
   }
@@ -1725,6 +1728,7 @@ function wireEvents() {
   });
   // Tombol Draft dibuat modul di atas, setelah paintStaticStrings boot berjalan.
   syncTitleLabels();
+  mountPalettePicker();
 
   dock = mountDock({
     state: () => state,
@@ -1868,6 +1872,38 @@ function wireEvents() {
 }
 
 /** Tombol appbar yang labelnya dilipat jadi ikon: nama aksesibel = tooltip. */
+/** Modern register: a Palette section in the appearance popover (the same themes as the app and side panel). */
+function mountPalettePicker() {
+  if (!IS_TIDE) return;
+  const pop = document.getElementById('settings-pop');
+  const themeSec = pop?.querySelector('.themes')?.closest('.sec');
+  if (!pop || !themeSec || document.getElementById('pal-grid')) return;
+  const sec = document.createElement('div');
+  sec.className = 'sec';
+  sec.innerHTML = `<h4 data-t="palette"></h4><div class="themes pal-grid" id="pal-grid" role="radiogroup" aria-label="Palette"></div>`;
+  themeSec.after(sec);
+  const grid = sec.querySelector('#pal-grid');
+  const paint = () => {
+    const mode = document.documentElement.dataset.theme === 'paper' ? 'light' : 'dark';
+    const cur = getPalette();
+    grid.innerHTML = PALETTES.map((p) => {
+      const c = p[mode];
+      const d = state.lang === 'id' ? p.id_ : p.en;
+      return `<button type="button" class="theme" role="radio" data-pal="${p.id}" aria-checked="${p.id === cur}" aria-pressed="${p.id === cur}"><span class="sw" style="background:${c.bg};border:1px solid ${c.line}"><i style="background:${c.accent}"></i><i style="background:${c.ink}"></i><i style="background:${c.card};border:1px solid ${c.line}"></i></span><b>${p.name}${p.id === cur ? ' ✓' : ''}</b><small>${d}</small></button>`;
+    }).join('');
+  };
+  grid.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pal]');
+    if (!b) return;
+    setPalette(b.dataset.pal);
+    paint();
+  });
+  paint();
+  new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  watchPalette(paint);
+  paintStaticStrings();
+}
+
 function syncTitleLabels() {
   document.querySelectorAll('.appbar button[title]').forEach((el) => { el.setAttribute('aria-label', el.title); });
 }

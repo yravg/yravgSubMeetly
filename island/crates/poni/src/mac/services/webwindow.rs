@@ -10,11 +10,12 @@ use objc2::runtime::{NSObject, NSObjectProtocol, ProtocolObject};
 use objc2::{define_class, msg_send, sel, MainThreadMarker, MainThreadOnly};
 use objc2::runtime::Sel;
 use objc2_app_kit::{
-    NSAlert, NSAlertFirstButtonReturn, NSApplication, NSMenu, NSMenuItem, NSApplicationActivationPolicy, NSBackingStoreType, NSModalResponseOK, NSSavePanel, NSTextField, NSWindow,
+    NSPrintInfo, NSPrintOperation, NSAlert, NSAlertFirstButtonReturn, NSApplication, NSMenu, NSMenuItem, NSApplicationActivationPolicy, NSBackingStoreType, NSModalResponseOK, NSSavePanel, NSTextField, NSWindow,
     NSWindowStyleMask,
 };
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString, NSURL, NSURLRequest, NSURLResponse};
 use objc2_web_kit::{
+    WKMediaCaptureType, WKPermissionDecision, WKScriptMessage, WKScriptMessageHandler, WKSecurityOrigin, WKUserContentController, WKUserScript, WKUserScriptInjectionTime,
     WKDownload, WKDownloadDelegate, WKFrameInfo, WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKUIDelegate, WKWebView, WKWebViewConfiguration,
     WKWindowFeatures,
 };
@@ -65,6 +66,14 @@ define_class!(
             }
         }
 
+        /// The microphone for the app's own pages (the Live page's Microphone source); nobody else's.
+        #[unsafe(method(webView:requestMediaCapturePermissionForOrigin:initiatedByFrame:type:decisionHandler:))]
+        fn media_permission(&self, _web: &WKWebView, origin: &WKSecurityOrigin, _frame: &WKFrameInfo, _kind: WKMediaCaptureType, done: &block2::DynBlock<dyn Fn(WKPermissionDecision)>) {
+            let host = unsafe { origin.host() }.to_string();
+            let ours = host == "127.0.0.1" || host == "localhost";
+            done.call((if ours { WKPermissionDecision::Grant } else { WKPermissionDecision::Deny },));
+        }
+
         #[unsafe(method(webView:createWebViewWithConfiguration:forNavigationAction:windowFeatures:))]
         fn new_window(&self, _web: &WKWebView, _cfg: &WKWebViewConfiguration, action: &WKNavigationAction, _features: &WKWindowFeatures) -> *mut WKWebView {
             // `window.open` and `target=_blank`: never a second web view of ours, the URL goes where it belongs.
@@ -72,6 +81,16 @@ define_class!(
                 route(&url.to_string());
             }
             std::ptr::null_mut()
+        }
+    }
+
+    /// `window.print()` (the register's Print / PDF) arrives here through the shim script.
+    unsafe impl WKScriptMessageHandler for WebHost {
+        #[unsafe(method(userContentController:didReceiveScriptMessage:))]
+        fn got_message(&self, _controller: &WKUserContentController, message: &WKScriptMessage) {
+            if let Some(web) = unsafe { message.webView() } {
+                print_page(&web);
+            }
         }
     }
 
@@ -115,6 +134,21 @@ define_class!(
         }
     }
 );
+
+/// WKWebView ignores `window.print()`: this makes it the system print panel (which also saves as PDF).
+const PRINT_SHIM: &str = "window.print = function () { window.webkit.messageHandlers.ysmPrint.postMessage(1); };";
+
+fn print_page(web: &WKWebView) {
+    let info = NSPrintInfo::sharedPrintInfo();
+    let op: Retained<NSPrintOperation> = unsafe { msg_send![web, printOperationWithPrintInfo: &*info] };
+    op.setShowsPrintPanel(true);
+    op.setShowsProgressPanel(true);
+    // Without a frame the printed page comes out blank.
+    if let Some(view) = op.view() {
+        view.setFrame(web.bounds());
+    }
+    op.runOperation();
+}
 
 impl WebHost {
     fn new(mtm: MainThreadMarker) -> Retained<Self> {
@@ -243,8 +277,15 @@ fn show(mtm: MainThreadMarker, port: u16, path: &'static str, title: &str) {
     unsafe { window.setReleasedWhenClosed(false) };
     window.setTitle(&NSString::from_str(title));
     window.setMinSize(NSSize::new(760.0, 520.0));
-    let web = unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &WKWebViewConfiguration::new(mtm)) };
     let host = WebHost::new(mtm);
+    let config = unsafe { WKWebViewConfiguration::new(mtm) };
+    unsafe {
+        let script = WKUserScript::initWithSource_injectionTime_forMainFrameOnly(WKUserScript::alloc(mtm), &NSString::from_str(PRINT_SHIM), WKUserScriptInjectionTime::AtDocumentStart, true);
+        let controller = config.userContentController();
+        controller.addUserScript(&script);
+        controller.addScriptMessageHandler_name(ProtocolObject::from_ref(&*host), &NSString::from_str("ysmPrint"));
+    }
+    let web = unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &config) };
     unsafe {
         web.setUIDelegate(Some(ProtocolObject::from_ref(&*host)));
         web.setNavigationDelegate(Some(ProtocolObject::from_ref(&*host)));
