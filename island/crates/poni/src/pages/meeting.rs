@@ -23,6 +23,13 @@ pub(super) const FOOT_H: f32 = 28.0;
 pub(super) const OPEN_APP: &str = "Open Minutes app";
 /// From this page width the transcript sits beside the items; narrower, it takes their place.
 const SPLIT_FROM_W: f32 = 760.0;
+/// The pill widens to this while a record's transcript is open, so it sits beside the items.
+pub(super) const SPLIT_PILL_W: f32 = 860.0;
+
+/// Minutes shows one record with its transcript open (the pill then widens to [`SPLIT_PILL_W`]).
+pub fn transcript_open(st: &AppState) -> bool {
+    st.records.transcript && !(st.records.list && !st.helper.snap.notes.is_empty()) && st.helper.note().is_some_and(|n| !n.transcript.is_empty())
+}
 
 pub fn height(_st: &AppState) -> f32 {
     HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H + hkit::GUIDE_H

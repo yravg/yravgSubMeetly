@@ -324,6 +324,16 @@ pub fn step_tab(p: PageKind, st: &AppState, forward: bool) -> PageKind {
     tabs[if forward { (i + 1) % n } else { (i + n - 1) % n }]
 }
 
+/// The open card's width for `p`: the width set in Settings, wider while Minutes shows a record's
+/// transcript beside its items.
+pub fn content_width(p: PageKind, st: &AppState) -> f32 {
+    if p == PageKind::Meeting && meeting::transcript_open(st) {
+        st.settings.expanded_width.max(meeting::SPLIT_PILL_W)
+    } else {
+        st.settings.expanded_width
+    }
+}
+
 pub fn content_height(p: PageKind, st: &AppState) -> f32 {
     if records::history_shows(st, p) {
         return records::history_height();

@@ -287,7 +287,7 @@ pub fn geom(m: &Mode, st: &AppState) -> Geom {
         Mode::Notice => Geom::new(372.0, 52.0, 24.0),
         Mode::Expanded(p) => {
             let h = pages::HEADER_H + pages::content_height(*p, st) + pages::PAD;
-            Geom::new(st.settings.expanded_width, h.round(), 30.0)
+            Geom::new(pages::content_width(*p, st), h.round(), 30.0)
         }
         Mode::Aside => hidden_strip(),
     }

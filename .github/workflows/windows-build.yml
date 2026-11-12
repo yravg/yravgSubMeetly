@@ -1,0 +1,56 @@
+# Every pull request and every merge to main builds and tests the Windows app on a real Windows
+# runner, then keeps the ready-to-install Setup as an artifact ("windows-setup" on the run's page).
+# A Mac session cannot run the Windows app; this is where it is compiled, tested and packaged.
+name: windows-build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            island
+            engine-rs
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install the extension's dependencies
+        run: npm ci
+
+      - name: Island tests (Windows)
+        working-directory: island
+        run: cargo test -p poni-core -p poni
+
+      - name: Inno Setup 6.5+
+        shell: pwsh
+        run: choco upgrade innosetup -y --no-progress
+
+      # Builds poni.exe and submeetly-engine.exe, the extension pages, then the Setup.
+      - name: Build the Setup
+        shell: pwsh
+        run: island/tools/build-installer.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-setup
+          path: island/dist/yravgSubMeetly-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 14

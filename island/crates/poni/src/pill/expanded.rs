@@ -35,7 +35,7 @@ pub fn geom(p: PageKind, st: &AppState) -> Option<Geom> {
     // Classic's size (header, page, bottom padding), so the window laid out
     // for the tallest page fits the card as well.
     let h = pages::HEADER_H + pages::content_height(p, st) + pages::PAD;
-    Some(Geom::new(st.settings.expanded_width, h.round(), RADIUS))
+    Some(Geom::new(pages::content_width(p, st), h.round(), RADIUS))
 }
 
 /// The header row inside the card `body`: Classic's row with the tabs moved
@@ -157,5 +157,25 @@ mod tests {
         assert_eq!(corner_inset(body, RADIUS, body.y + RADIUS, body.y + 60.0), 0.0);
         assert!(corner_inset(body, RADIUS, body.y + 10.0, body.y + 30.0) > 10.0);
         assert!(corner_inset(body, RADIUS, body.bottom() - 30.0, body.bottom() - 10.0) > 10.0);
+    }
+
+    #[test]
+    fn minutes_widens_while_a_records_transcript_is_open() {
+        let mut st = state(Theme::Pill);
+        let w = st.settings.expanded_width;
+        let body = r#"{"notes":[{"id":"MOM-1","title":"T","date":"2026-11-12","items":[],
+          "transcript":[{"t0":0,"t1":2,"source":"Satu.","translation":"One."}]}]}"#;
+        st.helper.snap.notes = poni_core::helper::parse_notes(body).unwrap();
+        let width = |st: &AppState| activities::geom(&Mode::Expanded(PageKind::Meeting), st).w;
+        assert_eq!(width(&st), w, "closed: the set width");
+        st.records.transcript = true;
+        assert_eq!(width(&st), w.max(860.0), "open on a record: wide enough to sit side by side");
+        st.records.list = true;
+        assert_eq!(width(&st), w, "the list of records keeps the set width");
+        st.records.list = false;
+        st.helper.snap.notes[0].transcript.clear();
+        assert_eq!(width(&st), w, "no transcript, nothing to widen for");
+        st.records.transcript = true;
+        assert_eq!(activities::geom(&Mode::Expanded(PageKind::Live), &st).w, w, "other pages keep the set width");
     }
 }
