@@ -64,12 +64,13 @@ else
   echo "warning: no MEDIAREMOTE_BUILD given, the app is built without macOS's now playing reader" >&2
 fi
 
-# The main window: the native SwiftUI app (mac/build-app.sh), shipped inside this one and opened by
-# the menu's "Open yravgSubMeetly" / "Open Minutes register" (mac/app.rs). MAIN_APP = its .app.
-if [ -n "${MAIN_APP:-}" ]; then
-  cp -R "$MAIN_APP" "$app/Contents/Resources/yravgSubMeetly-window.app"
+# The app's pages (the main window, the Minutes register): the built extension (`npm run build`, ../dist).
+# The engine serves them at /app/ from Contents/Resources/app (the island sets SUBMEETLY_APP_DIR) and the
+# island shows them in a window of its own (mac/services/webwindow.rs).
+if [ -n "${EXTENSION_DIR:-}" ]; then
+  cp -R "$EXTENSION_DIR" "$app/Contents/Resources/app"
 else
-  echo "warning: no MAIN_APP given, the app is built without its main window" >&2
+  echo "warning: no EXTENSION_DIR given, the app is built without its pages (no main window)" >&2
 fi
 
 # Ad-hoc signature: seals the bundle, the adapter's framework too (Apple Silicon refuses unsigned code outright).

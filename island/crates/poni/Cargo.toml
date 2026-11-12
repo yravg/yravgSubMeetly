@@ -121,6 +121,8 @@ block2 = "=0.6.2"
 dispatch2 = "=0.3.1"
 objc2-foundation = "=0.3.2"
 objc2-app-kit = "=0.3.2"
+# The main window: the app's own pages (app.html, minutes.html) in a WKWebView of a normal window.
+objc2-web-kit = "=0.3.2"
 objc2-core-foundation = "=0.3.2"
 objc2-core-graphics = "=0.3.2"
 # Prayer times: where the Mac is (Location Services), only when asked.

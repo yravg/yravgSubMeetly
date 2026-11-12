@@ -49,6 +49,12 @@ fn spawn(exe: &std::path::Path, port: u16) -> std::io::Result<Child> {
     if let Some(dir) = exe.parent() {
         cmd.current_dir(dir);
     }
+    // The app's pages travel in the bundle: Contents/Resources/app (the engine serves them at /app/).
+    if std::env::var_os("SUBMEETLY_APP_DIR").is_none() {
+        if let Some(app) = exe.parent().and_then(|m| m.parent()).map(|c| c.join("Resources").join("app")).filter(|p| p.is_dir()) {
+            cmd.env("SUBMEETLY_APP_DIR", app);
+        }
+    }
     cmd.spawn()
 }
 
