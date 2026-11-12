@@ -932,6 +932,7 @@ impl AppState {
         self.helper.select(id);
         self.meeting_page = 0;
         self.records.list = false;
+        self.records.transcript_scroll = 0.0;
     }
 
     pub fn media_cmd(&mut self, c: MediaCmd) {
@@ -1099,6 +1100,11 @@ pub struct RecordsUi {
     pub page: usize,
     /// Live, Meeting or Media shows its own History instead of its page.
     pub history: Option<PageKind>,
+    /// Minutes shows the open record's transcript beside (or, when narrow, instead of) its items,
+    /// so the minutes can be checked against what was said.
+    pub transcript: bool,
+    /// How far the transcript is scrolled (px from its top).
+    pub transcript_scroll: f32,
 }
 
 pub struct CallSaved {

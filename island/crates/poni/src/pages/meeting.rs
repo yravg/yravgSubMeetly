@@ -19,6 +19,10 @@ pub(super) const HEAD_H: f32 = 30.0;
 pub(super) const ROW_H: f32 = 36.0;
 pub const MAX_ROWS: usize = 5;
 pub(super) const FOOT_H: f32 = 28.0;
+/// The button that opens the full Minutes app (its own window, not the pill).
+pub(super) const OPEN_APP: &str = "Open Minutes app";
+/// From this page width the transcript sits beside the items; narrower, it takes their place.
+const SPLIT_FROM_W: f32 = 760.0;
 
 pub fn height(_st: &AppState) -> f32 {
     HEAD_H + 4.0 + MAX_ROWS as f32 * ROW_H + FOOT_H + hkit::GUIDE_H
@@ -83,6 +87,26 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     if let Some(d) = step {
         st.helper.select_step(d);
         st.meeting_page = 0;
+        st.records.transcript_scroll = 0.0;
+    }
+    // The full Minutes app in its own window, and the transcript beside the items.
+    let w = ui.pill_width(OPEN_APP, false, true);
+    let b = Rect::new(px - PILL_GAP * 2.0 - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+    if ui.pill(wid("meeting.open_app"), b, OPEN_APP, None, PillStyle::Utility).clicked {
+        st.cmd(Command::Menu(crate::tray::MenuCmd::OpenMinutes));
+    }
+    let mut px = b.x;
+    let lines = note.transcript.len();
+    let show_tx = st.records.transcript && lines > 0;
+    if lines > 0 {
+        let label = format!("Transcript {lines}");
+        let w = ui.pill_width(&label, false, true);
+        let b = Rect::new(px - PILL_GAP - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+        let style = if show_tx { PillStyle::Primary(accent) } else { PillStyle::Utility };
+        if ui.pill(wid("meeting.transcript"), b, &label, None, style).clicked {
+            st.records.transcript = !st.records.transcript;
+        }
+        px = b.x;
     }
     let title = if note.date.is_empty() { note.title.clone() } else { format!("{} \u{b7} {}", note.title, note.date) };
     // A meeting held in the room around the laptop (Live, PMM-020): tagged "In-room".
@@ -157,6 +181,22 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let tone = if let Some((_, bad)) = &toast { if *bad { palette::ORANGE } else { palette::GREEN } } else if waiting > 0 && !locked { palette::ORANGE } else { palette::TEXT_DIM };
     ui.c.text(&status, Rect::new(foot.x, fy - 9.0, (b.x - foot.x - 10.0).max(0.0), 18.0), &TextStyle::footnote().weight(Weight::Semibold).color(tone));
 
+    // The transcript beside the items when the page is wide, in their place when it is narrow.
+    let body = Rect::new(area.x, head.bottom() + 4.0, area.w, (foot.y - head.bottom() - 8.0).max(0.0));
+    let area = if show_tx {
+        if area.w >= SPLIT_FROM_W {
+            let tw = (body.w * 0.48).floor();
+            draw_transcript(ui, st, &note, Rect::new(body.x, body.y, tw, body.h));
+            ui.c.fill_rect(Rect::new(body.x + tw + 8.0, body.y, 1.0, body.h), palette::TRACK);
+            Rect::new(body.x + tw + 17.0, area.y, (body.w - tw - 17.0).max(0.0), area.h)
+        } else {
+            draw_transcript(ui, st, &note, body);
+            return;
+        }
+    } else {
+        area
+    };
+
     if note.items.is_empty() {
         let body = Rect::new(area.x, head.bottom(), area.w, foot.y - head.bottom());
         let n = note.transcript.len();
@@ -218,5 +258,80 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
                 st.helper_notice = Some((why.into(), ui.now + 5.0, true));
             }
         }
+    }
+}
+
+/// "m:ss" (or "h:mm:ss") from the start of the recording.
+pub fn stamp(secs: f64) -> String {
+    let s = if secs.is_finite() { secs.max(0.0) as u64 } else { 0 };
+    let (h, m, s) = (s / 3600, (s / 60) % 60, s % 60);
+    if h > 0 { format!("{h}:{m:02}:{s:02}") } else { format!("{m}:{s:02}") }
+}
+
+/// The open record's transcript, oldest first, as the Meeting tab shows captions: each line under
+/// its time and speaker, the translation under it. The wheel scrolls it.
+fn draw_transcript(ui: &mut Ui, st: &mut AppState, note: &helper::Note, r: Rect) {
+    if r.w <= 0.0 || r.h <= 0.0 {
+        return;
+    }
+    let tr = hkit::translation_color(ui, st.settings.translation_color);
+    let show = poni_core::capture::Show::parse(&st.settings.caption_show);
+    let meta = TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT_DIM);
+    let src = TextStyle::footnote().color(palette::TEXT).wrap().top();
+    let tst = TextStyle::footnote().color(tr).wrap().top();
+    const META_H: f32 = 16.0;
+    const GAP: f32 = 8.0;
+    // Each line's height first, so the wheel knows how far it can go.
+    let heights: Vec<(f32, f32)> = note
+        .transcript
+        .iter()
+        .map(|l| {
+            let (main, under) = show.parts(&l.source, &l.translation);
+            let sh = ui.c.measure(main, &src, r.w).1.ceil();
+            let th = under.map_or(0.0, |u| ui.c.measure(u, &tst, r.w).1.ceil() + 2.0);
+            (sh, th)
+        })
+        .collect();
+    let total: f32 = heights.iter().map(|(s, t)| META_H + s + t + GAP).sum();
+    let max = (total - r.h).max(0.0);
+    st.records.transcript_scroll = (st.records.transcript_scroll - ui.wheel_in(r) * ROW_H).clamp(0.0, max);
+    let mut y = r.y - st.records.transcript_scroll;
+    ui.c.clip(r);
+    for (l, (sh, th)) in note.transcript.iter().zip(heights) {
+        let h = META_H + sh + th + GAP;
+        if y + h >= r.y && y <= r.bottom() {
+            let who = if l.speaker.is_empty() { stamp(l.t0) } else { format!("{} \u{b7} {}", stamp(l.t0), l.speaker) };
+            ui.c.text(&who, Rect::new(r.x, y, r.w, META_H), &meta);
+            let (main, under) = show.parts(&l.source, &l.translation);
+            ui.c.text(main, Rect::new(r.x, y + META_H, r.w, sh), &src);
+            if let Some(u) = under {
+                ui.c.text(u, Rect::new(r.x, y + META_H + sh + 2.0, r.w, th), &tst);
+            }
+        }
+        y += h;
+        if y > r.bottom() {
+            break;
+        }
+    }
+    ui.c.unclip();
+    // A scrollbar thumb while there is more than fits.
+    if max > 0.0 {
+        let th = (r.h * r.h / total).max(18.0);
+        let ty = r.y + (r.h - th) * (st.records.transcript_scroll / max);
+        ui.c.fill_rrect(Rect::new(r.right() - 3.0, ty, 3.0, th), 1.5, palette::TRACK);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stamp;
+
+    #[test]
+    fn stamp_reads_minutes_and_hours() {
+        assert_eq!(stamp(0.0), "0:00");
+        assert_eq!(stamp(75.4), "1:15");
+        assert_eq!(stamp(3725.0), "1:02:05");
+        assert_eq!(stamp(f64::NAN), "0:00");
+        assert_eq!(stamp(-3.0), "0:00");
     }
 }
