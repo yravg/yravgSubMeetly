@@ -93,6 +93,7 @@ window.SM_I18N = {
     'dl.source': 'Source on GitHub',
     'dl.sha': 'SHA-256',
     'foot.site': 'This page loads its fonts from Google Fonts and release details from GitHub.',
+    'hero.meta.phone': 'Free · Windows and Mac · version {v}', 'f.files.t': 'Subtitle files', 'f.files.s': 'Save any session as SRT, VTT or TXT.', 'dl.copy': 'Copy', 'dl.copied': 'Copied',
     'lang.label': 'Language'
   },
   id: {
@@ -187,6 +188,7 @@ window.SM_I18N = {
     'dl.source': 'Kode sumber di GitHub',
     'dl.sha': 'SHA-256',
     'foot.site': 'Halaman ini memuat font dari Google Fonts dan info rilis dari GitHub.',
+    'hero.meta.phone': 'Gratis · Windows dan Mac · versi {v}', 'f.files.t': 'Berkas subtitel', 'f.files.s': 'Simpan sesi sebagai SRT, VTT atau TXT.', 'dl.copy': 'Salin', 'dl.copied': 'Tersalin',
     'lang.label': 'Bahasa'
   }
 };

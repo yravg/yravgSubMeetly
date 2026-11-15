@@ -41,7 +41,7 @@
     $('#cta-main-label').textContent = isPhone ? t('hero.phone') : t(main === 'mac' ? 'hero.mac' : 'hero.win');
     $('#cta-alt').hidden = isPhone;
     $('#cta-alt-label').textContent = t(alt === 'mac' ? 'hero.other.mac' : 'hero.other.win');
-    $('#hero-meta').textContent = t('hero.meta', { v: rel.v, size: mb(rel[main].size) });
+    $('#hero-meta').textContent = isPhone ? t('hero.meta.phone', { v: rel.v }) : t('hero.meta', { v: rel.v, size: mb(rel[main].size) });
     $$('.dl').forEach((d) => { const b = $('.btn', d); const mine = !isPhone && d.dataset.os === main; b.classList.toggle('btn-primary', mine || isPhone); b.classList.toggle('btn-ghost', !mine && !isPhone); });
   }
   function paintRelease() {
@@ -49,7 +49,15 @@
       const s = $(`[data-size="${os}"]`); if (s) s.textContent = t('dl.size', { size: mb(rel[os].size), v: rel.v });
       const a = $(`[data-href="${os}"]`); if (a) a.href = rel[os].url;
       const h = $(`[data-sha="${os}"]`);
-      if (h && rel[os].sha) { h.hidden = false; h.innerHTML = `${t('dl.sha')} <code title="${rel[os].sha}">${rel[os].sha}</code>`; }
+      if (h && rel[os].sha) {
+        const full = rel[os].sha;
+        h.hidden = false; h.innerHTML = `${t('dl.sha')} <code title="${full}">${full.slice(0, 6)}…${full.slice(-6)}</code><button type="button" class="sha-copy">${t('dl.copy')}</button>`;
+        $('.sha-copy', h).addEventListener('click', (e) => {
+          const b = e.currentTarget;
+          const done = () => { b.textContent = t('dl.copied'); setTimeout(() => { b.textContent = t('dl.copy'); }, 1600); };
+          (navigator.clipboard ? navigator.clipboard.writeText(full) : Promise.reject()).then(done).catch(() => { const r = document.createRange(); r.selectNodeContents($('code', h)); getSelection().removeAllRanges(); getSelection().addRange(r); });
+        });
+      }
     }
     const c = $('#hero-count');
     if (rel.count >= MIN_COUNT) { c.hidden = false; c.innerHTML = t('hero.count', { n: `<b>${rel.count.toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}</b>` }); }
@@ -72,17 +80,17 @@
     const step = () => {
       words.forEach((w, n) => { w.classList.toggle('lit', n <= i); w.classList.toggle('now', n === i); });
       i++;
-      if (i < words.length) karaokeT = setTimeout(step, 210);
+      if (i < words.length) karaokeT = setTimeout(step, 150);
       else karaokeT = setTimeout(() => { words.forEach((w) => w.classList.remove('now')); h.classList.remove('karaoke'); }, 500);
     };
-    karaokeT = setTimeout(step, 350);
+    karaokeT = setTimeout(step, 200);
   }
 
   /* ---------------- the nav steps aside for the demo's own pill ---------------- */
   const navEl = $('#nav');
   addEventListener('scroll', () => {
     const r = $('#screen').getBoundingClientRect();
-    navEl.classList.toggle('tuck', r.top < 150 && r.bottom > 160);
+    navEl.classList.toggle('tuck', r.top < 84 && r.bottom > 160);
   }, { passive: true });
 
   fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`, { headers: { Accept: 'application/vnd.github+json' } })
@@ -204,7 +212,8 @@
     model: '<path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
     ask: '<path d="M4.5 5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-5 3.5V17h-.5A1.5 1.5 0 0 1 3 15.5v-9A1.5 1.5 0 0 1 4.5 5Z"/><path d="M12 8.2v4.6M9.7 10.5h4.6"/>',
     wave: '<path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/>',
-    cloud: '<path d="M7 18.5h10.2a4 4 0 0 0 .4-8 6 6 0 0 0-11.4 1.6A3.4 3.4 0 0 0 7 18.5Z"/>'
+    cloud: '<path d="M7 18.5h10.2a4 4 0 0 0 .4-8 6 6 0 0 0-11.4 1.6A3.4 3.4 0 0 0 7 18.5Z"/>',
+    file: '<path d="M6.5 3.5h7l4 4v13h-11Z"/><path d="M13.5 3.5v4h4M9 12.5h6M9 16h4"/>'
   };
   $$('[data-ico]').forEach((i) => { i.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[i.dataset.ico] || ''}</svg>`; });
 
@@ -315,7 +324,7 @@
       inner.innerHTML = html;
     }
     function kasiSize() {
-      const k = Math.max(108, Math.min(190, screen.clientWidth * 0.18));
+      const k = Math.max(92, Math.min(150, screen.clientWidth * 0.2));
       $('#hanger').style.setProperty('--kw', k + 'px');
     }
 
@@ -395,9 +404,11 @@
 
     function go(next, fromUser) {
       clear(); state = next;
-      island.dataset.state = next;
+      island.dataset.state = next; island.dataset.rest = restStyle;
       $('#hanger').classList.toggle('sway', next !== 'rest' && !REDUCED);
       $$('#chips button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.state === next)));
+      const chipRow = $('#chips'), cur = $(`#chips [data-state="${next}"]`);
+      if (cur && (cur.offsetLeft < chipRow.scrollLeft || cur.offsetLeft + cur.offsetWidth > chipRow.scrollLeft + chipRow.clientWidth)) chipRow.scrollTo({ left: cur.offsetLeft - 6, behavior: REDUCED ? 'auto' : 'smooth' });
       $('#demo-cap').textContent = t('cap.' + next);
       if (fromUser) $('#demo-live').textContent = t('cap.' + next);
       kasiSize();

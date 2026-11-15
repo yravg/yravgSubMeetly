@@ -133,7 +133,7 @@
     doze: { frame: 'head', lids: 0.62, earAngle: 40, earSquash: 0.6, mouth: 'none', brow: { dip: -18, bump: -34, inner: 2 } },
     listen: { frame: 'head', earAngle: 22, pupil: 1.06, mouth: 'o', brow: { dip: -30, bump: -45, inner: 0 } },
     happy: { frame: 'head', eyes: 'happy', mouth: 'grin', earAngle: 30 },
-    think: { frame: 'head', gaze: [-0.8, -1], lids: 0.18, mouth: 'none', earAngle: 32, tilt: -8, brow: { dip: -18, bump: -40, inner: -2 } },
+    think: { frame: 'head', gaze: [-0.85, -1], chinPaw: true, mouth: 'none', earAngle: 30, tilt: -8, brow: { dip: -26, bump: -42, inner: -2 } },
     worry: { frame: 'head', brow: { dip: -14, bump: -36, inner: 6 }, earAngle: 40, mouth: 'small' }
   };
 
@@ -187,6 +187,8 @@
       }
     } else {
       body += head(o);
+      // a paw under the chin for thinking
+      if (o.chinPaw) body += curve('M34 92 Q36 76 26 62', 13) + hand(24, 58, -8);
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" role="img" aria-label="${o.title}">${body}</svg>`;
   }
@@ -195,7 +197,9 @@
   function icon(size = 1024) {
     const head = svg({ pose: 'mark', mouth: 'small' }).replace(/^<svg[^>]*>|<\/svg>$/g, '');
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${size}" height="${size}" role="img" aria-label="yravgSubMeetly">` +
-      `<path d="M512 0C860 0 1024 164 1024 512S860 1024 512 1024 0 860 0 512 164 0 512 0Z" fill="${C.ink}"/>` +
+      `<path d="M512 0C860 0 1024 164 1024 512S860 1024 512 1024 0 860 0 512 164 0 512 0Z" fill="#4A3526"/>` +
+      // a thin warm rim so the ink tile still reads on dark docks and taskbars
+      `<path d="M512 0C860 0 1024 164 1024 512S860 1024 512 1024 0 860 0 512 164 0 512 0Z" transform="translate(512 512) scale(.972) translate(-512 -512)" fill="${C.ink}"/>` +
       `<g transform="translate(512 470) scale(3.55)">${head}</g>` +
       `<rect x="232" y="806" width="560" height="96" rx="48" fill="${C.accent}"/>` +
       `<g transform="translate(360 812) scale(3.2)">${hand(0, 0, 180).replace(/fill="#E2AE7F"/g, 'fill="#E2AE7F"')}</g>` +

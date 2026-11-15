@@ -6,6 +6,12 @@
 <title>yravgSubMeetly · live captions and minutes, on your computer</title>
 <meta name="description" content="A small pill at the top of your screen that captions your calls and videos, translates them on your computer, and drafts the minutes. Windows and Mac. No account, no cloud.">
 <meta name="theme-color" content="#0C0B09">
+<meta property="og:type" content="website">
+<meta property="og:title" content="yravgSubMeetly: every word, right where you look">
+<meta property="og:description" content="Live captions, translation and meeting minutes in a small pill at the top of your screen. Windows and Mac, on your computer.">
+<meta property="og:image" content="https://yravg.github.io/yravgSubMeetly/assets/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,55 +41,56 @@
 
 <main id="main">
 <section class="hero" id="top">
-  <a class="badge" href="https://github.com/yravg/yravgSubMeetly/blob/main/CHANGELOG.md"><span class="badge-dot" aria-hidden="true"></span><span data-i18n="hero.badge">New in 1.4: captions for any YouTube talk</span></a>
-  <h1 id="h1"><span data-i18n="hero.h1a">Every word,</span> <span class="h1b" data-i18n="hero.h1b">right where you look.</span></h1>
-  <p class="lede" data-i18n="hero.sub">yravgSubMeetly sits at the top of your screen and listens to your calls, videos and the room. It shows live captions, translates them on your computer, and leaves you minutes when the meeting ends.</p>
-  <div class="cta">
-    <a class="btn btn-primary" id="cta-main" href="https://github.com/yravg/yravgSubMeetly/releases/latest">
-      <svg class="os-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span id="cta-main-label" data-i18n="hero.win">Download for Windows</span>
-    </a>
-    <a class="btn btn-ghost" id="cta-alt" href="https://github.com/yravg/yravgSubMeetly/releases/latest"><span id="cta-alt-label" data-i18n="hero.other.mac">Also for Mac</span></a>
-  </div>
-  <p class="meta" id="hero-meta">Version 1.4.5 · 35 MB</p>
-  <p class="meta count" id="hero-count" hidden></p>
-</section>
-
-<section class="demo" id="demo" aria-labelledby="demo-label">
-  <h2 class="sr" id="demo-label" data-i18n="demo.label">Try the pill</h2>
-  <div class="screen" id="screen">
-    <div class="call" aria-hidden="true">
-      <div class="tile" data-who="a"><span class="av">AR</span><span class="nm">Alya</span></div>
-      <div class="tile" data-who="b"><span class="av">WJ</span><span class="nm">Wei Jie</span></div>
-      <div class="tile" data-who="c"><span class="av">DS</span><span class="nm">Dimas</span></div>
-      <div class="tile you" data-who="d"><span class="av" data-i18n="demo.you">You</span><span class="nm" data-i18n="demo.you">You</span></div>
+  <div class="hero-copy">
+    <a class="badge" href="https://github.com/yravg/yravgSubMeetly/blob/main/CHANGELOG.md"><span class="badge-dot" aria-hidden="true"></span><span data-i18n="hero.badge">New in 1.4: captions for any YouTube talk</span></a>
+    <h1 id="h1"><span data-i18n="hero.h1a">Every word,</span> <span class="h1b" data-i18n="hero.h1b">right where you look.</span></h1>
+    <p class="lede" data-i18n="hero.sub">yravgSubMeetly sits at the top of your screen and listens to your calls, videos and the room. It shows live captions, translates them on your computer, and leaves you minutes when the meeting ends.</p>
+    <div class="cta">
+      <a class="btn btn-primary" id="cta-main" href="https://github.com/yravg/yravgSubMeetly/releases/latest">
+        <svg class="os-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="cta-main-label" data-i18n="hero.win">Download for Windows</span>
+      </a>
+      <a class="btn btn-ghost" id="cta-alt" href="https://github.com/yravg/yravgSubMeetly/releases/latest"><span id="cta-alt-label" data-i18n="hero.other.mac">Also for Mac</span></a>
     </div>
-    <div class="island" id="island" data-state="rest">
-      <div class="pill" id="pill"><div class="pill-in" id="pill-in"></div></div>
-      <div class="hanger" id="hanger" data-kasi="demo" aria-hidden="true"></div>
+    <p class="meta" id="hero-meta">Version 1.4.5 · 35 MB</p>
+    <p class="meta count" id="hero-count" hidden></p>
+  </div>
+  <div class="hero-demo" id="demo" aria-labelledby="demo-label">
+    <h2 class="sr" id="demo-label" data-i18n="demo.label">Try the pill</h2>
+    <div class="screen" id="screen">
+      <div class="call" aria-hidden="true">
+        <div class="tile" data-who="a"><span class="av">AR</span><span class="nm">Alya</span></div>
+        <div class="tile" data-who="b"><span class="av">WJ</span><span class="nm">Wei Jie</span></div>
+        <div class="tile" data-who="c"><span class="av">DS</span><span class="nm">Dimas</span></div>
+        <div class="tile you" data-who="d"><span class="av" data-i18n="demo.you">You</span><span class="nm" data-i18n="demo.you">You</span></div>
+      </div>
+      <div class="island" id="island" data-state="rest">
+        <div class="pill" id="pill"><div class="pill-in" id="pill-in"></div></div>
+        <div class="hanger" id="hanger" data-kasi="demo" aria-hidden="true"></div>
+      </div>
+      <div class="chips" role="tablist" id="chips" aria-label="Pill states">
+        <button role="tab" data-state="rest" data-i18n="chip.rest">Resting</button>
+        <button role="tab" data-state="listen" data-i18n="chip.listen">Listening</button>
+        <button role="tab" data-state="live" data-i18n="chip.live">Live captions</button>
+        <button role="tab" data-state="translate" data-i18n="chip.translate">Translate</button>
+        <button role="tab" data-state="minutes" data-i18n="chip.minutes">Minutes</button>
+        <button role="tab" data-state="youtube" data-i18n="chip.youtube">YouTube CC</button>
+        <button role="tab" data-state="today" data-i18n="chip.today">Today</button>
+      </div>
     </div>
+    <p class="demo-cap" id="demo-cap"></p><p class="sr" id="demo-live" aria-live="polite"></p>
+    <p class="demo-note" data-i18n="demo.sample">Sample call and sample text, to show how it works.</p>
   </div>
-  <div class="chips" role="tablist" id="chips" aria-label="Pill states">
-    <button role="tab" data-state="rest" data-i18n="chip.rest">Resting</button>
-    <button role="tab" data-state="listen" data-i18n="chip.listen">Listening</button>
-    <button role="tab" data-state="live" data-i18n="chip.live">Live captions</button>
-    <button role="tab" data-state="translate" data-i18n="chip.translate">Translate</button>
-    <button role="tab" data-state="minutes" data-i18n="chip.minutes">Minutes</button>
-    <button role="tab" data-state="youtube" data-i18n="chip.youtube">YouTube CC</button>
-    <button role="tab" data-state="today" data-i18n="chip.today">Today</button>
-  </div>
-  <p class="demo-cap" id="demo-cap"></p><p class="sr" id="demo-live" aria-live="polite"></p>
-  <p class="demo-note" data-i18n="demo.sample">Sample call and sample text, to show how it works.</p>
 </section>
 
 <section class="kasi" id="kasi" aria-labelledby="kasi-h">
   <div class="kasi-stage" id="kasi-stage">
     <div class="kasi-big" data-kasi="big" aria-hidden="true"></div>
-    <p class="kasi-tip"><span class="tip-hover" data-i18n="kasi.tip"></span><span class="tip-touch" data-i18n="kasi.tip.touch"></span></p>
   </div>
   <div class="kasi-copy">
     <h2 id="kasi-h"><span class="h-line" data-i18n="kasi.h">Meet Kasi.</span> <span class="h-line muted" data-i18n="kasi.h2">Big ears, bigger eyes.</span></h2>
-    <p data-i18n="kasi.p">Kasi is a tarsier, a tiny primate from the forests of Sulawesi with ears that turn toward every sound and eyes larger than its brain. It lives on your pill, hears what you hear and writes it down. Kasi never talks. It listens.</p>
+    <p data-i18n="kasi.p" class="kasi-p">Kasi is a tarsier, a tiny primate from the forests of Sulawesi with ears that turn toward every sound and eyes larger than its brain. It lives on your pill, hears what you hear and writes it down. Kasi never talks. It listens.</p>
+    <p class="kasi-tip"><span class="tip-hover" data-i18n="kasi.tip"></span><span class="tip-touch" data-i18n="kasi.tip.touch"></span></p>
   </div>
   <ol class="states" id="states">
     <li data-pose="listen"><span class="st-k"></span><b data-i18n="kasi.s.listen">Listening</b><span data-i18n="kasi.s.listen.d">Ears up the moment a call or video starts.</span></li>
@@ -113,6 +120,7 @@
     <li><i data-ico="who"></i><div><h3 data-i18n="f.who.t"></h3><p data-i18n="f.who.s"></p></div></li>
     <li><i data-ico="model"></i><div><h3 data-i18n="f.models.t"></h3><p data-i18n="f.models.s"></p></div></li>
     <li><i data-ico="ask"></i><div><h3 data-i18n="f.ask.t"></h3><p data-i18n="f.ask.s"></p></div></li>
+    <li><i data-ico="file"></i><div><h3 data-i18n="f.files.t"></h3><p data-i18n="f.files.s"></p></div></li>
   </ul>
 </section>
 
