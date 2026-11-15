@@ -1,6 +1,6 @@
-# yravgSubMeetly website and Kasi
+# Kasi by yravg: website and brand
 
-The public landing page for yravgSubMeetly and the brand sheet for its mascot, **Kasi** (a tarsier from Sulawesi). Static files, no build step.
+The public landing page for **Kasi by yravg** (formerly yravgSubMeetly) and the brand sheet for its mascot and namesake, Kasi (a tarsier from Sulawesi). Static files, no build step.
 
 | File | What it is |
 | --- | --- |

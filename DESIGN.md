@@ -1,4 +1,6 @@
-# Design: yravgSubMeetly site and Kasi
+# Design: Kasi by yravg (site and mascot)
+
+The product formerly called yravgSubMeetly is **Kasi by yravg** (renamed 2026-11-15; repo, bundle ids and data folders keep the old name). The app and its mascot share the name.
 
 Scope: the public landing page (`site/index.html`) and the brand sheet (`site/brand/index.html`). The app's own UI keeps its tokens in `src/tokens.css` and palettes in `src/palettes.css`; nothing here changes them.
 

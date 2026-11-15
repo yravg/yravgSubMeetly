@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>yravgSubMeetly · live captions and minutes, on your computer</title>
+<title>Kasi by yravg · live captions and minutes, on your computer</title>
 <meta name="description" content="A small pill at the top of your screen that captions your calls and videos, translates them on your computer, and drafts the minutes. Windows and Mac. No account, no cloud.">
 <meta name="theme-color" content="#0C0B09">
 <meta property="og:type" content="website">
-<meta property="og:title" content="yravgSubMeetly: every word, right where you look">
+<meta property="og:title" content="Kasi by yravg: every word, right where you look">
 <meta property="og:description" content="Live captions, translation and meeting minutes in a small pill at the top of your screen. Windows and Mac, on your computer.">
 <meta property="og:image" content="https://yravg.github.io/yravgSubMeetly/assets/og.png">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
@@ -16,15 +16,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@600;700;800;900&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="showcase/desktop.css">
+<link rel="stylesheet" href="showcase/island.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="nav" id="nav">
-  <a class="brand" href="#top" aria-label="yravgSubMeetly home">
+  <a class="brand" href="#top" aria-label="Kasi by yravg, home">
     <span class="brand-kasi" data-kasi="nav" aria-hidden="true"></span>
-    <span class="brand-word"><span class="brand-yr">yravg</span>SubMeetly</span>
+    <span class="brand-word"><span class="brand-name">Kasi</span><span class="brand-by">by yravg</span></span>
   </a>
   <nav class="nav-links" aria-label="Sections">
     <a href="#demo" data-i18n="nav.demo">Demo</a>
@@ -44,7 +46,7 @@
   <div class="hero-copy">
     <a class="badge" href="https://github.com/yravg/yravgSubMeetly/blob/main/CHANGELOG.md"><span class="badge-dot" aria-hidden="true"></span><span data-i18n="hero.badge">New in 1.4: captions for any YouTube talk</span></a>
     <h1 id="h1"><span data-i18n="hero.h1a">Every word,</span> <span class="h1b" data-i18n="hero.h1b">right where you look.</span></h1>
-    <p class="lede" data-i18n="hero.sub">yravgSubMeetly sits at the top of your screen and listens to your calls, videos and the room. It shows live captions, translates them on your computer, and leaves you minutes when the meeting ends.</p>
+    <p class="lede" data-i18n="hero.sub">Kasi sits at the top of your screen and listens to your calls, videos and the room. It shows live captions, translates them on your computer, and leaves you minutes when the meeting ends.</p>
     <div class="cta">
       <a class="btn btn-primary" id="cta-main" href="https://github.com/yravg/yravgSubMeetly/releases/latest">
         <svg class="os-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -57,30 +59,43 @@
   </div>
   <div class="hero-demo" id="demo" aria-labelledby="demo-label">
     <h2 class="sr" id="demo-label" data-i18n="demo.label">Try the pill</h2>
-    <div class="screen" id="screen">
-      <div class="call" aria-hidden="true">
-        <div class="tile" data-who="a"><span class="av">AR</span><span class="nm">Alya</span></div>
-        <div class="tile" data-who="b"><span class="av">WJ</span><span class="nm">Wei Jie</span></div>
-        <div class="tile" data-who="c"><span class="av">DS</span><span class="nm">Dimas</span></div>
-        <div class="tile you" data-who="d"><span class="av" data-i18n="demo.you">You</span><span class="nm" data-i18n="demo.you">You</span></div>
-      </div>
-      <div class="island" id="island" data-state="rest">
-        <div class="pill" id="pill"><div class="pill-in" id="pill-in"></div></div>
-        <div class="hanger" id="hanger" data-kasi="demo" aria-hidden="true"></div>
-      </div>
-      <div class="chips" role="tablist" id="chips" aria-label="Pill states">
-        <button role="tab" data-state="rest" data-i18n="chip.rest">Resting</button>
-        <button role="tab" data-state="listen" data-i18n="chip.listen">Listening</button>
-        <button role="tab" data-state="live" data-i18n="chip.live">Live captions</button>
-        <button role="tab" data-state="translate" data-i18n="chip.translate">Translate</button>
-        <button role="tab" data-state="minutes" data-i18n="chip.minutes">Minutes</button>
-        <button role="tab" data-state="youtube" data-i18n="chip.youtube">YouTube CC</button>
-        <button role="tab" data-state="today" data-i18n="chip.today">Today</button>
-      </div>
+    <div class="os-switch" role="group" data-i18n-attr="aria-label:os.label" aria-label="Computer">
+      <button type="button" data-os="mac" aria-pressed="true">macOS</button>
+      <button type="button" data-os="win" aria-pressed="false">Windows</button>
+    </div>
+    <div class="zoom" id="zoom"><div class="zoom-desk" id="zoom-desk"></div></div>
+    <div class="chips" role="tablist" id="chips" aria-label="Pill states">
+      <button role="tab" data-beat="idle" data-i18n="chip.rest">Resting</button>
+      <button role="tab" data-beat="captions" data-i18n="chip.captions">Captions</button>
+      <button role="tab" data-beat="live" data-i18n="chip.live">Live</button>
+      <button role="tab" data-beat="minutes" data-i18n="chip.minutes">Minutes</button>
+      <button role="tab" data-beat="media" data-i18n="chip.youtube">YouTube CC</button>
+      <button role="tab" data-beat="today" data-i18n="chip.today">Today</button>
     </div>
     <p class="demo-cap" id="demo-cap"></p><p class="sr" id="demo-live" aria-live="polite"></p>
-    <p class="demo-note" data-i18n="demo.sample">Sample call and sample text, to show how it works.</p>
+    <p class="demo-note" data-i18n="demo.sample"></p>
   </div>
+</section>
+
+<section class="desk" id="desk" aria-labelledby="desk-h">
+  <div class="sec-head">
+    <h2 id="desk-h" data-i18n="desk.h">On your Mac. On your PC.</h2>
+    <p data-i18n="desk.p"></p>
+  </div>
+  <div class="desk-bar">
+    <div class="os-switch" role="group" data-i18n-attr="aria-label:os.label" aria-label="Computer">
+      <button type="button" data-os="mac" aria-pressed="true">macOS</button>
+      <button type="button" data-os="win" aria-pressed="false">Windows</button>
+    </div>
+    <div class="seg" role="group" data-i18n-attr="aria-label:desk.scene" aria-label="Scene">
+      <button type="button" data-scene="call" aria-pressed="true" data-i18n="desk.call">Meeting</button>
+      <button type="button" data-scene="video" aria-pressed="false" data-i18n="desk.video">Video</button>
+      <button type="button" data-scene="menu" aria-pressed="false" data-i18n="desk.menu">Menu</button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="desk-overlay" checked> <span data-i18n="desk.overlay">Subtitle window</span></label>
+  </div>
+  <div class="desk-stage" id="desk-stage"></div>
+  <p class="desk-note" data-i18n="desk.note"></p>
 </section>
 
 <section class="kasi" id="kasi" aria-labelledby="kasi-h">
@@ -165,14 +180,14 @@
         <button type="button" class="rest" data-rest="clock" aria-pressed="false"><span class="mini-pill"><span class="t">14:32</span><span class="b">82%</span></span><span data-i18n="yours.rest.clock">Clock</span></button>
         <button type="button" class="rest" data-rest="kasi" aria-pressed="true"><span class="mini-pill"><span class="mk" data-kasi="pill"></span><span class="t">14:32</span></span><span data-i18n="yours.rest.eyes">Kasi</span></button>
         <button type="button" class="rest" data-rest="min" aria-pressed="false"><span class="mini-pill thin"></span><span data-i18n="yours.rest.min">Minimal</span></button>
-        <button type="button" class="rest" data-rest="status" aria-pressed="false"><span class="mini-pill"><span class="dot"></span><span class="t">CC</span></span><span data-i18n="yours.rest.status">Status</span></button>
+        <div class="rest rest-static"><span class="mini-pill"><span class="dot"></span><span class="t">CC</span></span><span data-i18n="yours.rest.status">Status</span></div>
       </div>
     </div>
   </div>
 </section>
 
 <section class="download" id="download" aria-labelledby="dl-h">
-  <div class="dl-head"><span class="dl-kasi" data-kasi="dl" aria-hidden="true"></span><h2 id="dl-h" data-i18n="dl.h">Get yravgSubMeetly.</h2></div>
+  <div class="dl-head"><span class="dl-kasi" data-kasi="dl" aria-hidden="true"></span><h2 id="dl-h" data-i18n="dl.h">Get Kasi.</h2></div>
   <div class="dl-grid">
     <div class="dl" id="dl-win" data-os="win">
       <svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3Zm0 13 7.5 1.1v-7H3Zm8.5 1.3L21 21.2V12.6h-9.5Zm0-15.6v7.4H21V2.8Z" fill="currentColor"/></svg>
@@ -203,12 +218,13 @@
   <details><summary data-i18n="faq.3.q"></summary><p data-i18n="faq.3.a"></p></details>
   <details><summary data-i18n="faq.4.q"></summary><p data-i18n="faq.4.a"></p></details>
   <details><summary data-i18n="faq.5.q"></summary><p data-i18n="faq.5.a"></p></details>
+  <details><summary data-i18n="faq.6.q"></summary><p data-i18n="faq.6.a"></p></details>
 </section>
 </main>
 
 <footer class="foot">
   <span class="foot-kasi" data-kasi="foot" aria-hidden="true"></span>
-  <p><b>yravgSubMeetly</b> · <span data-i18n="foot.made">Part of the yravg family.</span></p>
+  <p><b>Kasi</b> · <span data-i18n="foot.made">Kasi by yravg. Part of the yravg family.</span></p>
   <p class="foot-note" data-i18n="foot.site"></p>
   <nav aria-label="Footer">
     <a href="https://github.com/yravg/yravgSubMeetly" data-i18n="foot.github">GitHub</a>
@@ -219,6 +235,8 @@
 
 <script src="i18n.js"></script>
 <script src="kasi.js"></script>
+<script src="showcase/desktop.js"></script>
+<script src="showcase/island.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

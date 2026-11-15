@@ -1,0 +1,374 @@
+/* The top-of-screen pill, replicated for the web (island.js mounts it).
+   Every size is in DIPs, the unit the desktop app draws in, and the whole
+   thing is scaled by one variable, --isl-scale (CSS px per DIP).
+   Colours are the app's own looks (island/crates/poni-core/src/look.rs):
+   SUBMEETLY_PAPER (.isl-paper, the default) and SUBMEETLY (.isl-pill, dark).
+   The app paints content as "ink at an opacity" over its ground, so
+   colours here are rgba(var(--isl-ink), a). Every class starts with isl-. */
+
+/* --isl-scale can come from the host (any ancestor) with opts.scale 'css'. */
+.isl-root {
+  --isl-h: 400;
+  position: relative;
+  width: 100%;
+  height: calc(var(--isl-h) * var(--isl-scale, 1) * 1px);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.isl-root *,
+.isl-root *::before,
+.isl-root *::after {
+  box-sizing: border-box;
+}
+
+/* Platform fonts: the app writes in the system UI font. */
+.isl-root.isl-win {
+  --isl-font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+.isl-root.isl-mac {
+  --isl-font: -apple-system, "SF Pro Text", system-ui, sans-serif;
+}
+
+/* Paper (the default theme): white ground, navy ink, the canvas accents. */
+.isl-root.isl-paper {
+  --isl-ground: #ffffff;
+  --isl-ink: 19, 27, 68;
+  --isl-border: #e0e2e9;
+  --isl-green: 23, 116, 74;
+  --isl-green-t: #17744a;
+  --isl-orange: 217, 154, 0;
+  --isl-orange-t: #7a5200;
+  --isl-red: 176, 42, 30;
+  --isl-red-t: #b02a1e;
+  --isl-blue: 31, 95, 158;
+  --isl-blue-t: #1f5f9e;
+  --isl-cyan: 11, 110, 131;
+  --isl-cyan-t: #0b6e83;
+  --isl-purple: 74, 60, 148;
+  --isl-purple-t: #4a3c94;
+  --isl-tr: #4a3c94; /* Settings > Translation colour: Indigo */
+}
+
+/* Pill (dark): charcoal ground, near-white ink, the product's dark tokens. */
+.isl-root.isl-pill {
+  --isl-ground: #181818;
+  --isl-ink: 245, 245, 245;
+  --isl-border: #3a3a3a;
+  --isl-green: 20, 183, 137;
+  --isl-green-t: #6ce0b8;
+  --isl-orange: 224, 176, 92;
+  --isl-orange-t: #e0b05c;
+  --isl-red: 224, 108, 117;
+  --isl-red-t: #e06c75;
+  --isl-blue: 26, 115, 232;
+  --isl-blue-t: #8ab4f8;
+  --isl-cyan: 79, 184, 201;
+  --isl-cyan-t: #7fd4e0;
+  --isl-purple: 169, 159, 208;
+  --isl-purple-t: #b79ce0;
+  --isl-tr: #7fd4e0; /* dark looks show the translation in cyan */
+}
+
+.isl-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  transform: scale(var(--isl-scale, 1));
+  font-family: var(--isl-font);
+  color: rgba(var(--isl-ink), 0.96);
+  line-height: normal;
+}
+
+.isl-island {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Where the island takes the pointer: the body and the gap above it at rest,
+   the card and an 11 DIP margin when open. */
+.isl-hit {
+  position: absolute;
+  background: transparent;
+}
+
+/* The body. Key shadow black 0.32, 4 down, sigma 6; contact shadow 0.20,
+   1 down, sigma 1.5; a 1 DIP hairline just inside the edge (shape.rs). */
+.isl-shape {
+  position: absolute;
+  overflow: hidden;
+  background: var(--isl-ground);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.32),
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    inset 0 0 0 1px var(--isl-border);
+  will-change: left, top, width, height, border-radius;
+}
+
+.isl-shape.isl-tucked {
+  box-shadow: none;
+}
+
+/* A MacBook's notch (opts.notch, mac only): black hardware over the pill. */
+.isl-notch {
+  position: absolute;
+  background: #000;
+  border-radius: 0 0 10px 10px;
+  pointer-events: none;
+}
+
+.isl-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: opacity, transform;
+}
+.isl-layer.isl-fill {
+  width: 100%;
+  height: 100%;
+}
+
+/* Text: one line, centred in its box and cut with an ellipsis, as the
+   app's TextStyle draws it; .isl-wrap for wrapped, top-aligned text. */
+.isl-t {
+  position: absolute;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+.isl-t.isl-wrap {
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+.isl-tab-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.isl-ico {
+  position: absolute;
+  display: block;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.isl-ico .isl-f {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* Buttons: the app's capsule pills (ui.rs PillStyle), 28 DIP small size. */
+.isl-btn {
+  position: absolute;
+  height: 28px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 28px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: default;
+  background: rgba(var(--isl-ink), 0.08);
+  color: rgba(var(--isl-ink), 0.62);
+}
+.isl-btn.isl-neutral {
+  color: rgba(var(--isl-ink), 0.96);
+}
+.isl-btn.isl-utility.isl-hot,
+.isl-btn.isl-neutral.isl-hot {
+  background: rgba(var(--isl-ink), 0.15);
+  color: rgba(var(--isl-ink), 0.96);
+}
+.isl-btn.isl-utility.isl-down,
+.isl-btn.isl-neutral.isl-down {
+  background: rgba(var(--isl-ink), 0.22);
+}
+.isl-btn.isl-primary {
+  background: rgba(var(--isl-pf), 0.2);
+  color: var(--isl-pt);
+}
+.isl-btn.isl-primary.isl-hot {
+  background: rgba(var(--isl-pf), 0.28);
+}
+.isl-btn.isl-primary.isl-down {
+  background: rgba(var(--isl-pf), 0.36);
+}
+.isl-btn.isl-ghost {
+  visibility: hidden;
+}
+.isl-click {
+  cursor: pointer;
+}
+
+/* Header: tabs, the selection pill, hover wash, the hover label. */
+.isl-tabsel {
+  position: absolute;
+  height: 28px;
+  border-radius: 14px;
+  background: rgba(var(--isl-ink), 0.14);
+}
+.isl-tab {
+  position: absolute;
+  height: 28px;
+  border-radius: 14px;
+  color: rgba(var(--isl-ink), 0.5);
+}
+.isl-tab.isl-hot {
+  background: rgba(var(--isl-ink), 0.08);
+  color: rgba(var(--isl-ink), 0.96);
+}
+.isl-tab.isl-on {
+  color: rgba(var(--isl-ink), 0.96);
+}
+.isl-tab.isl-on.isl-hot {
+  background: transparent;
+}
+.isl-tablab {
+  position: absolute;
+  left: 28px;
+  top: 0;
+  height: 28px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 28px;
+  color: rgba(var(--isl-ink), 0.96);
+}
+.isl-ibtn {
+  position: absolute;
+  border-radius: 14px;
+  color: rgba(var(--isl-ink), 0.5);
+}
+.isl-ibtn.isl-hot {
+  background: rgba(var(--isl-ink), 0.15);
+  color: rgba(var(--isl-ink), 0.5);
+}
+.isl-tip {
+  position: absolute;
+  height: 22px;
+  border-radius: 11px;
+  font-size: 12px;
+  line-height: 22px;
+  text-align: center;
+  white-space: nowrap;
+  color: rgba(var(--isl-ink), 0.96);
+  background: color-mix(in srgb, rgb(var(--isl-ink)) 16%, var(--isl-ground));
+  opacity: 0;
+  transition: opacity 80ms linear;
+  pointer-events: none;
+}
+.isl-tip.isl-show {
+  opacity: 1;
+}
+
+/* Pages slide and fade inside this window under the header. */
+.isl-pages {
+  position: absolute;
+  left: 0;
+  top: 44px;
+  width: 620px;
+  overflow: hidden;
+}
+.isl-page {
+  position: absolute;
+  left: 0;
+  top: -44px;
+  width: 620px;
+  will-change: opacity, transform;
+}
+
+.isl-dot {
+  position: absolute;
+  border-radius: 50%;
+}
+.isl-box {
+  position: absolute;
+}
+.isl-chip {
+  position: absolute;
+  height: 18px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  white-space: nowrap;
+  background: rgba(var(--isl-cf), 0.16);
+  color: var(--isl-ct);
+}
+
+/* The equalizer on the Media page. */
+.isl-eq {
+  position: absolute;
+  width: 4px;
+  border-radius: 2px;
+}
+
+/* Lyric / caption rows in the Media page's right column. */
+.isl-lyr {
+  position: absolute;
+  transform-origin: 0 0;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.isl-lyr i {
+  display: block;
+  font-style: normal;
+  font-weight: 500;
+  line-height: normal;
+  margin-top: 1px;
+}
+
+/* The pointer the scripted loop moves (the visitor's own one does the same). */
+.isl-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 10;
+}
+.isl-cursor.isl-show {
+  opacity: 1;
+}
+.isl-cursor svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  transform-origin: 2px 2px;
+  transition: transform 0.12s ease;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}
+.isl-cursor.isl-press svg {
+  transform: scale(0.86);
+}
+
+/* The optional hover ring (opts.ring): the reviewed demo's cue, not the app's. */
+.isl-ring {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  transform: rotate(-90deg);
+}

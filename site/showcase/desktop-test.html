@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desktop mockups test</title>
+<link rel="stylesheet" href="desktop.css">
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: #f3f1ec;
+    color: #1d2333;
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #15161a; color: #e9e9ee; } }
+  h1 { margin: 0 0 4px; font-size: 18px; }
+  p { margin: 0 0 16px; opacity: .7; overflow-wrap: anywhere; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 20px; }
+  .bar label { display: inline-flex; gap: 6px; align-items: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 32px 24px; align-items: start; }
+  .grid figure { margin: 0; }
+  .grid figcaption { margin-top: 10px; font-size: 12px; opacity: .65; }
+  /* A stand-in for the island (the caption pill, 300 x 52 DIPs) to check the slot. */
+  .probe {
+    width: calc(var(--dsk-pt) * 300);
+    height: calc(var(--dsk-pt) * 52);
+    border-radius: calc(var(--dsk-pt) * 26);
+    background: #fff;
+    color: #1f2a52;
+    box-shadow: 0 calc(var(--dsk-pt) * 4) calc(var(--dsk-pt) * 16) rgba(0, 0, 0, .3);
+    display: grid;
+    place-items: center;
+    font: 600 calc(var(--dsk-pt) * 13) / 1 system-ui, sans-serif;
+  }
+</style>
+</head>
+<body>
+<h1>Desktop mockups</h1>
+<p>desktop.js / desktop.css. Query: ?scene=call|video|empty&amp;lang=en|id&amp;overlay=1&amp;menu=1&amp;frame=0&amp;probe=1&amp;one=mac|win</p>
+<div class="bar">
+  <label>Scene
+    <select id="scene"><option>call</option><option>video</option><option>empty</option></select>
+  </label>
+  <label>Language
+    <select id="lang"><option>en</option><option>id</option></select>
+  </label>
+  <label><input type="checkbox" id="overlay" checked> Subtitle overlay</label>
+  <label><input type="checkbox" id="menu"> Kasi menu</label>
+  <label><input type="checkbox" id="probe"> Island stand-in</label>
+  <label><input type="checkbox" id="frame" checked> Laptop frame</label>
+</div>
+<div class="grid" id="grid">
+  <figure><div id="mac"></div><figcaption>macOS · island floats 40 DIPs from the top (notch 32 + 8)</figcaption></figure>
+  <figure><div id="win"></div><figcaption>Windows 11 · island floats 8 DIPs from the top</figcaption></figure>
+</div>
+<script src="desktop.js"></script>
+<script>
+  var q = new URLSearchParams(location.search);
+  var $ = function (id) { return document.getElementById(id); };
+  var opts = {
+    scene: q.get('scene') || 'call',
+    lang: q.get('lang') || 'en',
+    overlay: q.get('overlay') !== '0',
+    menu: q.get('menu') === '1',
+    frame: q.get('frame') !== '0',
+    clock: q.get('clock') || null
+  };
+  $('scene').value = opts.scene;
+  $('lang').value = opts.lang;
+  $('overlay').checked = opts.overlay;
+  $('menu').checked = opts.menu;
+  $('frame').checked = opts.frame;
+  $('probe').checked = q.get('probe') === '1';
+
+  var desks = [];
+  function build() {
+    desks.forEach(function (d) { d.destroy(); });
+    desks = [];
+    ['mac', 'win'].forEach(function (os) {
+      var host = $(os);
+      host.parentNode.style.display = q.get('one') && q.get('one') !== os ? 'none' : '';
+      var d = SMDesktop.mount(host, Object.assign({}, opts, { os: os, frame: $('frame').checked }));
+      desks.push(d);
+    });
+    probe();
+  }
+  function probe() {
+    desks.forEach(function (d) {
+      d.islandSlot.innerHTML = $('probe').checked ? '<div class="probe">island slot</div>' : '';
+    });
+  }
+  $('scene').onchange = function () { desks.forEach(function (d) { d.setScene($('scene').value); }); };
+  $('lang').onchange = function () { desks.forEach(function (d) { d.setLang($('lang').value); }); };
+  $('overlay').onchange = function () { desks.forEach(function (d) { d.showOverlay($('overlay').checked); }); };
+  $('menu').onchange = function () { desks.forEach(function (d) { d.showMenu($('menu').checked); }); };
+  $('probe').onchange = probe;
+  $('frame').onchange = build;
+  build();
+</script>
+</body>
+</html>
