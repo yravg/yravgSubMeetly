@@ -14,7 +14,7 @@ delegated *(inferred)*: plain static HTML, CSS and JavaScript in `site/`, no bui
 
 ## Users
 
-People who sit in many online meetings and watch talks or videos in a language that is not their first, on a Windows laptop or a Mac. The owner is a project engineer in Indonesia working with Chinese and Thai counterparts *(inferred from owner context)*: meetings in English, Mandarin and Indonesian, minutes that must be issued after.
+People who sit in many online meetings and watch talks or videos in a language that is not their first, on a Windows laptop or a Mac: project and office teams that meet across languages (for example English, Mandarin and Indonesian) and must issue minutes afterwards *(inferred)*.
 
 ## Product Purpose
 

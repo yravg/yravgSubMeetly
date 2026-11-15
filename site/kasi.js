@@ -51,6 +51,8 @@
       const d = side < 0 ? `M${cx - 13} ${cy - 10} L${cx + 9} ${cy} L${cx - 13} ${cy + 10}` : `M${cx + 13} ${cy - 10} L${cx - 9} ${cy} L${cx + 13} ${cy + 10}`;
       return `<path d="${d}" fill="none" stroke="${C.ink}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`;
     }
+    // A fully shut eye is a lash line, not a fur disc (a disc reads as sunglasses).
+    if (o.lids >= 0.9) return `<path d="M${f(cx - R * 0.62)} ${cy + 2} Q${f(cx)} ${f(cy + R * 0.42)} ${f(cx + R * 0.62)} ${cy + 2}" fill="none" stroke="${C.deep}" stroke-width="5" stroke-linecap="round"/>`;
     const rx = R * sx;
     const lid = Math.max(0, Math.min(1, o.lids));
     let g = `<g class="kasi-eye"><clipPath id="${id}"><ellipse cx="${f(cx)}" cy="${cy}" rx="${f(rx)}" ry="${R}"/></clipPath>`;

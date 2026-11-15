@@ -23,30 +23,68 @@
     $$('.lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
     paintRelease();
     paintCta();
+    karaoke();
+    if (typeof paintBento === 'function') paintBento();
     if (demo) demo.repaint();
   }
   $$('.lang button').forEach((b) => b.addEventListener('click', () => { lang = b.dataset.lang; store.set('smLang', lang); applyLang(); }));
 
   /* ---------------- downloads ---------------- */
   const ua = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent;
-  const isMac = /mac/i.test(ua) && !/iphone|ipad/i.test(navigator.userAgent);
+  const isPhone = /iphone|ipad|android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /mac/i.test(ua) && !matchMedia('(hover: hover)').matches);
+  const isMac = /mac/i.test(ua) && !isPhone;
   const rel = { v: '1.4.5', win: { url: `https://github.com/${REPO}/releases/latest`, size: 35053230 }, mac: { url: `https://github.com/${REPO}/releases/latest`, size: 67415940 }, count: null };
   const mb = (n) => (n / 1e6).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' MB';
   function paintCta() {
     const main = isMac ? 'mac' : 'win', alt = isMac ? 'win' : 'mac';
-    $('#cta-main').href = rel[main].url; $('#cta-alt').href = rel[alt].url;
-    $('#cta-main-label').textContent = t(main === 'mac' ? 'hero.mac' : 'hero.win');
+    $('#cta-main').href = isPhone ? '#download' : rel[main].url; $('#cta-alt').href = rel[alt].url;
+    $('#cta-main-label').textContent = isPhone ? t('hero.phone') : t(main === 'mac' ? 'hero.mac' : 'hero.win');
+    $('#cta-alt').hidden = isPhone;
     $('#cta-alt-label').textContent = t(alt === 'mac' ? 'hero.other.mac' : 'hero.other.win');
     $('#hero-meta').textContent = t('hero.meta', { v: rel.v, size: mb(rel[main].size) });
+    $$('.dl').forEach((d) => { const b = $('.btn', d); const mine = !isPhone && d.dataset.os === main; b.classList.toggle('btn-primary', mine || isPhone); b.classList.toggle('btn-ghost', !mine && !isPhone); });
   }
   function paintRelease() {
     for (const os of ['win', 'mac']) {
       const s = $(`[data-size="${os}"]`); if (s) s.textContent = t('dl.size', { size: mb(rel[os].size), v: rel.v });
       const a = $(`[data-href="${os}"]`); if (a) a.href = rel[os].url;
+      const h = $(`[data-sha="${os}"]`);
+      if (h && rel[os].sha) { h.hidden = false; h.innerHTML = `${t('dl.sha')} <code title="${rel[os].sha}">${rel[os].sha}</code>`; }
     }
     const c = $('#hero-count');
     if (rel.count >= MIN_COUNT) { c.hidden = false; c.innerHTML = t('hero.count', { n: `<b>${rel.count.toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}</b>` }); }
   }
+  $('#cta-main').addEventListener('click', (e) => {
+    if (!isPhone || !navigator.share) return;
+    e.preventDefault();
+    navigator.share({ title: 'yravgSubMeetly', url: location.href.split('#')[0] }).catch(() => { location.hash = 'download'; });
+  });
+
+  /* ---------------- the headline captions itself ---------------- */
+  let karaokeT = 0;
+  function karaoke() {
+    const h = $('#h1'); if (!h) return;
+    clearTimeout(karaokeT);
+    $$('[data-i18n]', h).forEach((sp) => { sp.innerHTML = sp.textContent.split(' ').map((w) => `<span class="w">${w}</span>`).join(' '); });
+    if (REDUCED) return;
+    const words = $$('.w', h); let i = 0;
+    h.classList.add('karaoke');
+    const step = () => {
+      words.forEach((w, n) => { w.classList.toggle('lit', n <= i); w.classList.toggle('now', n === i); });
+      i++;
+      if (i < words.length) karaokeT = setTimeout(step, 210);
+      else karaokeT = setTimeout(() => { words.forEach((w) => w.classList.remove('now')); h.classList.remove('karaoke'); }, 500);
+    };
+    karaokeT = setTimeout(step, 350);
+  }
+
+  /* ---------------- the nav steps aside for the demo's own pill ---------------- */
+  const navEl = $('#nav');
+  addEventListener('scroll', () => {
+    const r = $('#screen').getBoundingClientRect();
+    navEl.classList.toggle('tuck', r.top < 150 && r.bottom > 160);
+  }, { passive: true });
+
   fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`, { headers: { Accept: 'application/vnd.github+json' } })
     .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
     .then((list) => {
@@ -54,8 +92,9 @@
       const latest = stable[0]; if (!latest) return;
       rel.v = latest.tag_name.replace(/^v/, '');
       for (const a of latest.assets) {
-        if (/\.exe$/i.test(a.name)) rel.win = { url: a.browser_download_url, size: a.size };
-        if (/-mac\.dmg$/i.test(a.name)) rel.mac = { url: a.browser_download_url, size: a.size };
+        const sha = (a.digest || '').startsWith('sha256:') ? a.digest.slice(7) : '';
+        if (/\.exe$/i.test(a.name)) rel.win = { url: a.browser_download_url, size: a.size, sha };
+        if (/-mac\.dmg$/i.test(a.name)) rel.mac = { url: a.browser_download_url, size: a.size, sha };
       }
       // installers only: the apps' own update checks fetch latest.json and are not downloads
       rel.count = stable.flatMap((r) => r.assets).filter((a) => /\.(exe|dmg)$/i.test(a.name)).reduce((n, a) => n + a.download_count, 0) || null;
@@ -87,7 +126,7 @@
         const o = Object.assign({}, this.base, this.extra);
         if ((o.eyes || 'open') === 'open' && !this.busy && this.el.isConnected && visible(this.el)) {
           const lids = o.lids || 0;
-          this.render({ lids: 1 }); setTimeout(() => this.render({ lids: Math.max(lids, 0) }), 120);
+          [[0, 0.6], [40, 1], [100, 0.6], [150, lids]].forEach(([ms, l]) => setTimeout(() => { if (!this.busy) this.render({ lids: Math.max(l, lids) }); }, ms));
         }
         this.blinkLoop();
       }, next);
@@ -109,14 +148,22 @@
 
   const nav = new Actor($('[data-kasi="nav"]'), { pose: 'mark', mouth: 'small' }, { follow: true });
   const big = new Actor($('[data-kasi="big"]'), { pose: 'head' }, { follow: true });
-  new Actor($('[data-kasi="hush"]'), { pose: 'hush' }, { blink: false });
+  new Actor($('[data-kasi="flow"]'), { pose: 'listen', small: true, mouth: 'small' }, { follow: true });
+  new Actor($('[data-kasi="dl"]'), { pose: 'sit', eyes: 'happy', mouth: 'grin' }, { blink: false });
   new Actor($('[data-kasi="pill"]'), { pose: 'mark', mouth: 'small' }, { follow: true });
   new Actor($('[data-kasi="foot"]'), { pose: 'mark', mouth: 'small' }, { follow: true });
   const STATE_POSES = {
     listen: { pose: 'listen' }, write: { pose: 'scribe' },
     translate: { pose: 'head', yaw: 0.75, earAngle: 30 }, think: { pose: 'think' }, done: { pose: 'happy' }, rest: { pose: 'doze' }
   };
-  $$('#states li').forEach((li) => new Actor($('.st-k', li), STATE_POSES[li.dataset.pose], { blink: li.dataset.pose !== 'rest' && li.dataset.pose !== 'done' }));
+  const STATE_DEMO = { listen: 'listen', write: 'live', translate: 'translate', think: 'minutes', done: 'minutes', rest: 'rest' };
+  $$('#states li').forEach((li) => {
+    const a = new Actor($('.st-k', li), STATE_POSES[li.dataset.pose], { blink: li.dataset.pose !== 'rest' && li.dataset.pose !== 'done' });
+    li.tabIndex = 0; li.setAttribute('role', 'button');
+    const play = () => { if (li.dataset.pose === 'translate') swivel(a, 1); demo.go(STATE_DEMO[li.dataset.pose], true); $('#screen').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' }); };
+    li.addEventListener('click', play);
+    li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); } });
+  });
 
   // Ears listen to the room on the big Kasi: a small twitch now and then.
   if (!REDUCED) setInterval(() => {
@@ -168,13 +215,16 @@
   /* ---------------- tabs: drag to reorder ---------------- */
   (() => {
     const row = $('#tabs-row'); if (!row) return;
-    const TABS = ['Live', 'Minutes', 'Media', 'Today', 'Captions', 'Focus', 'Shelf', 'Prayer'];
+    const TABS = ['Live', 'Minutes', 'Media', 'Today', 'Captions', 'Tasks'];
     row.innerHTML = TABS.map((n) => `<li tabindex="0" aria-label="${n}">${n}</li>`).join('');
     let drag = null;
+    let press = 0;
     row.addEventListener('pointerdown', (e) => {
       const li = e.target.closest('li'); if (!li) return;
-      drag = li; li.classList.add('lift'); li.setPointerCapture(e.pointerId);
+      const start = () => { drag = li; li.classList.add('lift'); row.classList.add('dragging'); try { li.setPointerCapture(e.pointerId); } catch {} };
+      if (e.pointerType === 'mouse') start(); else press = setTimeout(start, 260);
     });
+    row.addEventListener('pointerleave', () => clearTimeout(press));
     row.addEventListener('pointermove', (e) => {
       if (!drag) return;
       const over = document.elementsFromPoint(e.clientX, e.clientY).find((n) => n.parentNode === row && n !== drag);
@@ -182,7 +232,7 @@
       const r = over.getBoundingClientRect();
       row.insertBefore(drag, e.clientX < r.left + r.width / 2 ? over : over.nextSibling);
     });
-    const drop = () => { if (drag) drag.classList.remove('lift'); drag = null; };
+    const drop = () => { clearTimeout(press); if (drag) drag.classList.remove('lift'); row.classList.remove('dragging'); drag = null; };
     row.addEventListener('pointerup', drop); row.addEventListener('pointercancel', drop);
     row.addEventListener('keydown', (e) => {
       const li = e.target.closest('li'); if (!li) return;
@@ -191,26 +241,45 @@
     });
   })();
 
+  let restStyle = 'kasi';
+  $$('.rest').forEach((b) => b.addEventListener('click', () => {
+    restStyle = b.dataset.rest;
+    $$('.rest').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    if (demo.state() === 'rest') demo.go('rest', true);
+  }));
+
+  /* ---------------- feature cards: small pills with sample text ---------------- */
+  function paintBento() {
+    const s = SAMPLE[lang];
+    const v = (k) => $(`[data-viz="${k}"]`);
+    v('live').innerHTML = `<div class="mp"><div class="p-head"><span class="rec"></span>${esc(s.live)} · ${esc(s.call)}</div><div class="cap-lines" style="padding:6px 0 2px">` +
+      s.lines.slice(0, 2).map(([w, x], n) => `<div class="cap-line ${n ? 'now' : ''}"><b>${esc(w)}</b>${esc(x)}</div>`).join('') + '</div></div>';
+    v('tr').innerHTML = `<div class="mp"><div class="p-head">中文 → ${lang === 'id' ? 'Indonesia' : 'English'}</div><div class="cap-lines" style="padding:6px 0 2px">` +
+      s.trLines.slice(0, 2).map(([a, b], n) => `<div class="cap-line ${n ? 'now' : ''}"><span class="src">${esc(a)}</span><span class="tr">${esc(b)}</span></div>`).join('') + '</div></div>';
+    v('min').innerHTML = `<div class="mp"><div class="p-head">${esc(s.minutes)}<span class="sp"></span></div><div class="reg">` +
+      s.reg.map(([k, tag, tx]) => `<div class="reg-row"><span class="tag ${k}">${esc(tag)}</span><span class="tx">${esc(tx)}</span></div>`).join('') + '</div></div>';
+  }
+
   /* ---------------- the live pill demo ---------------- */
   const SAMPLE = {
     en: {
       call: 'Teams call', live: 'Live', you: 'You',
-      lines: [['Alya', 'Okay, so the island build is ready for review.'], ['Wei Jie', 'Can we ship it on Friday?'], ['Alya', 'Yes, if Dimas books the demo room today.'], ['Dimas', 'I’ll book it after this call.']],
+      lines: [['Alya', 'Okay, the new build is ready for review.'], ['Wei Jie', 'Can we ship it on Friday?'], ['Alya', 'Yes, if Dimas books the demo room today.'], ['Dimas', 'I’ll book it after this call.']],
       trLines: [['我们周五发布。', 'We ship on Friday.'], ['演示室还没订。', 'The demo room isn’t booked yet.'], ['谁负责应用商店页面？', 'Who owns the store listing?']],
       minutes: 'Weekly sync', wait: '3 to review',
-      reg: [['d', 'Decision', 'Ship the island on Friday', 'Accept'], ['a', 'Action', 'Book the demo room · Dimas', 'Assign'], ['q', 'Question', 'Who owns the store listing?', 'Carry']],
+      reg: [['d', 'Decision', 'Ship the new build on Friday', 'Accept'], ['a', 'Action', 'Book the demo room · Dimas', 'Assign'], ['q', 'Question', 'Who owns the store listing?', 'Carry']],
       yt: 'Designing for small screens · Lecture 4', ready: 'CC ready',
-      ytLines: [['Every pixel at the edge of the screen', 'Setiap piksel di tepi layar'], ['has to earn its place.', 'harus layak ada di sana.']],
+      ytLines: [['画面の端にあるピクセルは', 'Every pixel at the edge of the screen'], ['そこにいる理由が必要です。', 'has to earn its place.']], ytPair: '日本語 → English',
       today: [['09:00', 'Stand-up', 'done'], ['11:00', 'Weekly sync', 'join'], ['14:30', 'Vendor review', '']], join: 'Join', done: 'Done', todayH: 'Today'
     },
     id: {
       call: 'Rapat Teams', live: 'Langsung', you: 'Anda',
-      lines: [['Alya', 'Oke, build island sudah siap ditinjau.'], ['Wei Jie', 'Bisa kita rilis hari Jumat?'], ['Alya', 'Bisa, kalau Dimas pesan ruang demo hari ini.'], ['Dimas', 'Saya pesan setelah rapat ini.']],
+      lines: [['Alya', 'Oke, build baru sudah siap ditinjau.'], ['Wei Jie', 'Bisa kita rilis hari Jumat?'], ['Alya', 'Bisa, kalau Dimas pesan ruang demo hari ini.'], ['Dimas', 'Saya pesan setelah rapat ini.']],
       trLines: [['我们周五发布。', 'Kita rilis hari Jumat.'], ['演示室还没订。', 'Ruang demo belum dipesan.'], ['谁负责应用商店页面？', 'Siapa yang pegang halaman toko aplikasi?']],
       minutes: 'Rapat mingguan', wait: '3 perlu ditinjau',
-      reg: [['d', 'Keputusan', 'Rilis island hari Jumat', 'Terima'], ['a', 'Tindak lanjut', 'Pesan ruang demo · Dimas', 'Tugaskan'], ['q', 'Pertanyaan', 'Siapa yang pegang halaman toko?', 'Bawa']],
+      reg: [['d', 'Keputusan', 'Rilis build baru hari Jumat', 'Terima'], ['a', 'Tindak lanjut', 'Pesan ruang demo · Dimas', 'Tugaskan'], ['q', 'Pertanyaan', 'Siapa yang pegang halaman toko?', 'Bawa']],
       yt: 'Merancang untuk layar kecil · Kuliah 4', ready: 'CC siap',
-      ytLines: [['Every pixel at the edge of the screen', 'Setiap piksel di tepi layar'], ['has to earn its place.', 'harus layak ada di sana.']],
+      ytLines: [['Every pixel at the edge of the screen', 'Setiap piksel di tepi layar'], ['has to earn its place.', 'harus layak ada di sana.']], ytPair: 'English → Indonesia',
       today: [['09:00', 'Stand-up', 'done'], ['11:00', 'Rapat mingguan', 'join'], ['14:30', 'Tinjauan vendor', '']], join: 'Join', done: 'Selesai', todayH: 'Hari ini'
     }
   };
@@ -223,7 +292,7 @@
     const island = $('#island'), pill = $('#pill'), inner = $('#pill-in'), screen = $('#screen');
     const hanger = new Actor($('#hanger'), { pose: 'hang' }, { follow: 'hang' });
     const mini = document.createElement('span'); mini.className = 'p-mk';
-    let state = 'rest', timers = [], auto = true, autoT = 0, idleT = 0;
+    let state = 'rest', timers = [], auto = true, autoT = 0, idleT = 0, lastW = innerWidth;
     const clear = () => { timers.forEach(clearTimeout); timers.forEach(clearInterval); timers = []; };
     const later = (fn, ms) => timers.push(setTimeout(fn, ms));
     const every = (fn, ms) => timers.push(setInterval(fn, ms));
@@ -253,8 +322,11 @@
     const SCENES = {
       rest() {
         hanger.set({ pose: 'hang', lids: 0.6, earAngle: 40 });
-        paint(`<div class="p-row"><span class="p-mk" data-mk></span><span class="p-time">${clock()}</span><span class="sp"></span><span class="p-dim">82%</span></div>`, 196);
-        const mk = $('[data-mk]', inner); mk.innerHTML = Kasi.svg({ pose: 'doze', small: true });
+        const style = restStyle;
+        if (style === 'min') { paint('', 110); pill.style.setProperty('--ph', '12px'); pill.style.borderRadius = '8px'; }
+        else if (style === 'clock') paint(`<div class="p-row"><span class="p-time">${clock()}</span><span class="sp"></span><span class="p-dim">82%</span></div>`, 164);
+        else if (style === 'status') paint(`<div class="p-row"><span class="rec" style="background:var(--yellow);box-shadow:none;animation:none"></span><span class="p-time">CC</span><span class="sp"></span><span class="p-dim">${clock()}</span></div>`, 164);
+        else { paint(`<div class="p-row"><span class="p-mk" data-mk></span><span class="p-time">${clock()}</span><span class="sp"></span><span class="p-dim">82%</span></div>`, 196); $('[data-mk]', inner).innerHTML = Kasi.svg({ pose: 'doze', small: true }); }
         speaking('');
       },
       listen() {
@@ -306,7 +378,7 @@
         const s = S(); let i = 0;
         const draw = (first) => {
           const [src, tr] = s.ytLines[i];
-          const html = `<div class="yt-title"><span class="ytb"></span>${esc(s.yt)}<span class="ready">${esc(s.ready)}</span></div><div class="cap-lines"><div class="cap-line now"><span class="src">${esc(src)}</span><span class="tr">${esc(lang === 'id' ? tr : src)}</span></div></div>`;
+          const html = `<div class="yt-title"><span class="ytb"></span>${esc(s.yt)}<span class="ready">${esc(s.ready)}</span></div><div class="p-head" style="padding-top:8px">${esc(s.ytPair)}</div><div class="cap-lines"><div class="cap-line now"><span class="src">${esc(src)}</span><span class="tr">${esc(tr)}</span></div></div>`;
           if (first) paint(html, 520); else { size(520, html); inner.innerHTML = html; }
         };
         draw(true); speaking('');
@@ -327,6 +399,7 @@
       $('#hanger').classList.toggle('sway', next !== 'rest' && !REDUCED);
       $$('#chips button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.state === next)));
       $('#demo-cap').textContent = t('cap.' + next);
+      if (fromUser) $('#demo-live').textContent = t('cap.' + next);
       kasiSize();
       SCENES[next]();
       clearTimeout(autoT);
@@ -344,8 +417,8 @@
       const i = ORDER.indexOf(state) + (e.key === 'ArrowRight' ? 1 : -1);
       const n = ORDER[(i + ORDER.length) % ORDER.length]; go(n, true); $(`#chips [data-state="${n}"]`).focus();
     });
-    addEventListener('resize', () => { kasiSize(); go(state); });
-    return { start: () => go('rest'), repaint: () => go(state) };
+    addEventListener('resize', () => { if (innerWidth === lastW) return; lastW = innerWidth; kasiSize(); go(state); });
+    return { start: () => go('rest'), repaint: () => go(state), go, state: () => state };
   })();
 
   applyLang();
