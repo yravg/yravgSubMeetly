@@ -35,4 +35,4 @@ The page asks the GitHub releases API for the latest version, installer sizes an
 
 ## Publishing
 
-Not published yet. GitHub Pages can serve this folder (Settings › Pages, or a workflow that uploads `site/`); that makes it public at `https://yravg.github.io/yravgSubMeetly/`.
+Live at https://yravg.github.io/yravgSubMeetly/. `.github/workflows/pages.yml` uploads this folder to GitHub Pages on every push to `main` that touches `site/` (or run it by hand from the Actions tab). Everything in `site/` is public, including `brand/`.
