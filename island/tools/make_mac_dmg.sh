@@ -13,10 +13,10 @@ ln -s /Applications "$stage/Applications"
 if [ "$kind" = test ]; then
   cat > "$stage/READ ME FIRST.txt" <<'T'
 This build is signed ad hoc (no Apple Developer ID yet).
-Drag yravgSubMeetly to Applications. The first time, macOS says it can't verify it:
+Drag Kasi to Applications. The first time, macOS says it can't verify it:
 open System Settings > Privacy & Security, scroll down and press "Open Anyway".
 T
 fi
 rm -f "$dmg"
-hdiutil create -volname "yravgSubMeetly" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$dmg" > /dev/null
+hdiutil create -volname "Kasi" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$dmg" > /dev/null
 echo "made $dmg"

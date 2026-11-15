@@ -86,10 +86,10 @@ const CHIP_GAP: f32 = 6.0;
 const THEMES: [(Theme, &str); 4] = [(Theme::Classic, "Classic"), (Theme::Glass, "Glass"), (Theme::Paper, "Paper"), (Theme::Pill, "Pill")];
 
 /// An idle look's name in the picker.
-fn idle_name(s: IdleStyle, eyes: &'static str) -> &'static str {
+fn idle_name(s: IdleStyle) -> &'static str {
     match s {
         IdleStyle::Clock => "Clock",
-        IdleStyle::Eyes => eyes,
+        IdleStyle::Kasi => "Kasi",
         IdleStyle::Minimal => "Minimal",
         IdleStyle::Hidden => "Hidden",
         IdleStyle::Status => "Status",
@@ -161,7 +161,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let theme_names: Vec<&str> = THEMES.iter().map(|t| t.1).collect();
     let theme_sel = THEMES.iter().position(|t| t.0 == st.settings.theme).unwrap_or(0);
     let looks = status::looks(st.settings.theme);
-    let look_names: Vec<&str> = looks.iter().map(|s| idle_name(*s, "Eyes")).collect();
+    let look_names: Vec<&str> = looks.iter().map(|s| idle_name(*s)).collect();
     let look_sel = looks.iter().position(|s| *s == status::shown(st.settings.theme, st.settings.idle_style)).unwrap_or(0);
     // Side by side under their labels when both fit their columns, each
     // closed up only as far as it needs; else a row each. Whether they fit is
@@ -440,9 +440,9 @@ fn draw_sheet(ui: &mut Ui, st: &mut AppState, area: Rect, rel: &Release) {
     text_with_dim(ui, title, &rel.version, Rect::new(x, cy - 19.0, w, 20.0), TextStyle::headline());
     let size = rel.download(cfg!(target_os = "macos")).map(|d| fmt_bytes(d.size)).unwrap_or_default();
     let line = if ready {
-        "A new version of yravgSubMeetly is ready to be installed.".to_string()
+        "A new version of Kasi is ready to be installed.".to_string()
     } else {
-        format!("A new version of yravgSubMeetly is ready to download ({size}).")
+        format!("A new version of Kasi is ready to download ({size}).")
     };
     ui.c.text(&line, Rect::new(x, cy + 1.0, w, 17.0), &TextStyle::footnote().color(palette::TEXT_DIM));
 
@@ -462,7 +462,7 @@ fn draw_sheet(ui: &mut Ui, st: &mut AppState, area: Rect, rel: &Release) {
         };
         vec![(Get::InstallNow, Icon::Download, "Install now".to_string(), "Closes, updates and opens again"), next]
     } else if cfg!(target_os = "macos") {
-        vec![(Get::Download, Icon::Download, format!("Download {}", rel.version), "Downloads the DMG: open it and drag yravgSubMeetly to Applications.")]
+        vec![(Get::Download, Icon::Download, format!("Download {}", rel.version), "Downloads the DMG: open it and drag Kasi to Applications.")]
     } else {
         vec![(Get::Download, Icon::Download, format!("Download {}", rel.version), "Opens its release page: run the Setup there, your settings stay.")]
     };
@@ -478,7 +478,7 @@ fn draw_sheet(ui: &mut Ui, st: &mut AppState, area: Rect, rel: &Release) {
         }
     }
 
-    let notes = format!("See what's new in yravgSubMeetly {}", rel.version);
+    let notes = format!("See what's new in Kasi {}", rel.version);
     let nw = ui.pill_width(&notes, true, true).min(area.w);
     let nr = Rect::new(area.x, area.y + NOTES_Y, nw, PILL_SMALL);
     if ui.pill(wid("update.notes"), nr, &notes, Some(Icon::Open), PillStyle::Utility).clicked {

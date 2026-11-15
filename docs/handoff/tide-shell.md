@@ -31,7 +31,7 @@ Owner 2026-11-10: "I agree with all you recommend … refer to latest canvas". W
 ## Facts
 
 - Before capture of app.html (1600x900): `docs/design/tide-shell-canvas/shots/app-before.png`.
-- Tide art source: `E:/dev/yravgBuds` (`assets/mascot/tide/*.svg`, `assets/3d/tide/webp/*.webp`,
+- Since 1.4.6 the app shows Kasi, not the Tide otter (`src/lib/kasi-art.js`, `src/kasi/`; HANDOFF "Island 1.4.6"). The palette keeps the name Tide. Former Tide art source: `E:/dev/yravgBuds` (`assets/mascot/tide/*.svg`, `assets/3d/tide/webp/*.webp`,
   `brand/tokens.css`), head 68f4292.
 - Oyenza chat spec summary: `ref/oyenza-chat-spec.md` (from Drive capture pack R01).
 

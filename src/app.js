@@ -1,5 +1,5 @@
 /**
- * App shell yravgSubMeetly (TIDE-002..005, 008, 014 — papan A01, A04, A09).
+ * App shell Kasi (yravgSubMeetly) (TIDE-002..005, 008, 014 — papan A01, A04, A09).
  *
  * Halaman (hash): today · live · minutes · notes · history · files · addins ·
  * island · perf · settings · helper. Today dan Minutes digambar di sini; halaman
@@ -18,6 +18,7 @@ import { TYPE_COLOR } from './lib/notes-schema.js';
 import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minutes-window.js';
 import { mountAskTide } from './ask-tide.js';
 import { heroHtml, heroPose } from './app-pages/home.js';
+import { kasiImg } from './lib/kasi-art.js';
 import { minutesHtml, mountMinutes } from './app-pages/minutes.js';
 import { developerHtml, wireDeveloper } from './app-pages/developer.js';
 import { mountInstalled } from './app-pages/addins-list.js';
@@ -57,7 +58,7 @@ const STR = {
     noOverlay: 'No page overlay in this window', noOverlayBody: 'Press Start and share a tab, window or screen with audio. Captions appear here and in the island pill; the overlay on a web page needs the Chrome extension.',
     loading: 'Reading your register…', errTitle: 'The register could not be read.', errBody: (m) => `${m} Reload the page; if it keeps failing, export your minutes from the Minutes page.`, reload: 'Reload',
     emptyTitle: 'No meetings yet', emptyBody: 'Start captions in a meeting, or import a sample series from the Library on the Minutes page.', openMinutes: 'Open Minutes',
-    welcomeTitle: 'Welcome to yravgSubMeetly', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it', setupTitle: 'Set up in three steps', setupEngine: 'Engine running', setupEngineFix: 'Start the engine', setupAsr: 'Speech model on this device', setupAsrFix: 'Download one', setupTest: 'Try a test caption', setupTestGo: 'Start captions', setupDone: 'Ready', setupTodo: 'To do', setupChecking: 'Checking…',
+    welcomeTitle: 'Welcome to Kasi', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it', setupTitle: 'Set up in three steps', setupEngine: 'Engine running', setupEngineFix: 'Start the engine', setupAsr: 'Speech model on this device', setupAsrFix: 'Download one', setupTest: 'Try a test caption', setupTestGo: 'Start captions', setupDone: 'Ready', setupTodo: 'To do', setupChecking: 'Checking…',
     caughtUp: 'All caught up: nothing overdue and yesterday is issued.',
     registerStyle: 'Style', openRegister: 'Open register', classic: 'Classic ↗', openWindow: 'Open Minutes window ↗', windowOpen: 'Minutes window is open · Focus',
     minutesHint: 'Classic and Modern are the same register; edits show in both.', modern: 'Modern ↗',
@@ -106,7 +107,7 @@ const STR = {
     noOverlay: 'Tidak ada overlay halaman di jendela ini', noOverlayBody: 'Tekan Mulai lalu bagikan tab, jendela, atau layar beserta audionya. Teks muncul di sini dan di pil island; overlay di halaman web butuh ekstensi Chrome.',
     loading: 'Membaca register…', errTitle: 'Register tidak terbaca.', errBody: (m) => `${m} Muat ulang halaman; bila tetap gagal, ekspor notulen dari halaman Notulen.`, reload: 'Muat ulang',
     emptyTitle: 'Belum ada rapat', emptyBody: 'Mulai teks di rapat, atau impor seri contoh dari Library di halaman Notulen.', openMinutes: 'Buka Notulen',
-    welcomeTitle: 'Selamat datang di yravgSubMeetly', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti', setupTitle: 'Siapkan dalam tiga langkah', setupEngine: 'Engine berjalan', setupEngineFix: 'Nyalakan engine', setupAsr: 'Model suara di perangkat ini', setupAsrFix: 'Unduh satu', setupTest: 'Coba teks uji', setupTestGo: 'Mulai teks', setupDone: 'Siap', setupTodo: 'Belum', setupChecking: 'Memeriksa…',
+    welcomeTitle: 'Selamat datang di Kasi', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti', setupTitle: 'Siapkan dalam tiga langkah', setupEngine: 'Engine berjalan', setupEngineFix: 'Nyalakan engine', setupAsr: 'Model suara di perangkat ini', setupAsrFix: 'Unduh satu', setupTest: 'Coba teks uji', setupTestGo: 'Mulai teks', setupDone: 'Siap', setupTodo: 'Belum', setupChecking: 'Memeriksa…',
     caughtUp: 'Semua beres: tidak ada yang lewat tenggat dan notulen kemarin sudah terbit.',
     registerStyle: 'Gaya', openRegister: 'Buka register', classic: 'Klasik ↗', openWindow: 'Buka jendela Notulen ↗', windowOpen: 'Jendela Notulen terbuka · Fokus',
     minutesHint: 'Klasik dan Modern adalah register yang sama; suntingan tampil di keduanya.', modern: 'Modern ↗',
@@ -199,9 +200,9 @@ const fmtShort = (v) => new Intl.DateTimeFormat(LANG === 'id' ? 'id-ID' : 'en-GB
 const hm = (min) => T('hm', Math.floor(min / 60), min % 60);
 const num = (v) => `<span class="num" data-num>${esc(v)}</span>`;
 
-/* ---------- Tide states (A09) ---------- */
-const tide = (pose, cls = '') => `<img class="tide-art ${cls}" src="tide/tide-${pose}.webp" alt="" />`;
-const stateCard = ({ pose, title, body, actions = '', cls = '' }) => `<div class="st ${cls}">${pose ? tide(pose, 'st-art') : ''}<h3>${esc(title)}</h3><p>${esc(body)}</p>${actions ? `<div class="st-act">${actions}</div>` : ''}</div>`;
+/* ---------- States (A09): Kasi for welcome, empty, thinking and done; errors get words only ---------- */
+const kasi = (state, cls = '') => kasiImg(state, cls);
+const stateCard = ({ kasi: k, title, body, actions = '', cls = '' }) => `<div class="st ${cls}">${k ? kasi(k, 'st-art') : ''}<h3>${esc(title)}</h3><p>${esc(body)}</p>${actions ? `<div class="st-act">${actions}</div>` : ''}</div>`;
 const errorCard = (msg) => `<div class="callout danger" role="alert">${ic('info', 20)}<div><b>${esc(T('errTitle'))}</b><p>${esc(T('errBody', msg))}</p><button type="button" class="btn" data-act="reload">${esc(T('reload'))}</button></div></div>`;
 const lockedCard = (title, body, action = '') => `<div class="callout locked">${ic('lock', 20)}<div><b>${esc(title)}</b><p>${esc(body)}</p>${action}</div></div>`;
 
@@ -320,15 +321,15 @@ function setupList() {
 
 function todayPage() {
   if (state.error) return errorCard(state.error);
-  if (!state.meetings) return stateCard({ pose: 'compass', title: T('loading'), body: '', cls: 'loading' });
+  if (!state.meetings) return stateCard({ kasi: 'thinking', title: T('loading'), body: '', cls: 'loading' });
   const now = new Date();
   const t = computeToday(seriesMeetings(), { now, owner: state.owner || null, me: state.userName });
   const welcome = !state.welcomed;
   const caughtUp = !t.empty && !t.yesterdayOpen && !t.overdue.count;
-  // Satu maskot per layar, di bilah tanya: sambutan (wave) > kosong (sleep) > beres (celebrate) > biasa (shell).
+  // Satu maskot per layar, Kasi di bilah tanya: sambutan (listening) > kosong (dozing) > beres (got it) > siap (idle).
   const pose = heroPose({ welcome, empty: t.empty, caughtUp });
   const eye = `<button type="button" class="icon-b eye" data-act="eye" aria-pressed="${state.hideNumbers}" aria-label="${esc(T(state.hideNumbers ? 'showNumbers' : 'hideNumbers'))}" title="${esc(T(state.hideNumbers ? 'showNumbers' : 'hideNumbers'))}">${ic(state.hideNumbers ? 'eyeOff' : 'eye', 18)}</button>`;
-  const hero = heroHtml({ T, ic, esc, tide, num, hm, fmtDate, now, t, state, greetKey: greetingKey(now), pose, caughtUp, eye, synced: state.syncedAt });
+  const hero = heroHtml({ T, ic, esc, kasi, num, hm, fmtDate, now, t, state, greetKey: greetingKey(now), pose, caughtUp, eye, synced: state.syncedAt });
   // Sambutan dan kosong tidak menggantikan hero: kartu ringkas di bawahnya.
   const band = welcome ? stateCard({ title: T('welcomeTitle'), body: T('welcomeBody'), actions: `<button type="button" class="pill-b" data-act="welcomed">${esc(T('gotIt'))}</button>`, cls: 'band' }).replace('</p>', `</p>${setupList()}`)
     : t.empty ? stateCard({ title: T('emptyTitle'), body: T('emptyBody'), actions: `<a class="pill-b" href="#live" data-start>${ic('play', 16)}${esc(T('startCaptions'))}</a><a class="btn" href="#minutes">${esc(T('openMinutes'))}</a>`, cls: 'band' }) : '';
@@ -363,7 +364,7 @@ function todayPage() {
 const registerSrc = (kind, meeting, embed) => `minutes.html?lang=${LANG}${kind === 'modern' ? '&skin=tide' : ''}${embed ? '&follow=system' : ''}${meeting ? `&meeting=${encodeURIComponent(meeting)}` : ''}`;
 function minutesPage(params) {
   if (state.error) return errorCard(state.error);
-  return minutesHtml({ lang: LANG, esc, ic, tide, meetings: state.meetings, series: state.series, register: state.register, me: state.userName, meetingParam: params.get('meeting'), registerSrc: (kind, x = {}) => `${registerSrc(kind, x.meeting)}${x.do ? `&do=${x.do}` : ''}${x.view ? `&view=${x.view}` : ''}` });
+  return minutesHtml({ lang: LANG, esc, ic, kasi, meetings: state.meetings, series: state.series, register: state.register, me: state.userName, meetingParam: params.get('meeting'), registerSrc: (kind, x = {}) => `${registerSrc(kind, x.meeting)}${x.do ? `&do=${x.do}` : ''}${x.view ? `&view=${x.view}` : ''}` });
 }
 
 /* ---------- Add-ins + all features (A06) ---------- */
@@ -437,7 +438,7 @@ let lastStab = '';
 let devCleanup = null; // timers and listeners of the native pages (Developer, All features rows)
 function render() {
   const { route, params } = parseHash();
-  document.title = `${T(route)} · yravgSubMeetly`;
+  document.title = `${T(route)} · Kasi`;
   $('#page-title').textContent = T(route);
   paintNav(route);
   paintBell();

@@ -123,7 +123,7 @@ const itemLine = (i) => {
 export function buildGrounding(meetings = [], { meetingId = null } = {}) {
   const sorted = [...meetings].sort(byNewest);
   const m = sorted.find((x) => x.id === meetingId) || sorted[0];
-  const lines = ['You are Tide, the assistant inside yravgSubMeetly. Answer from the register below and say so when it does not cover the question. Keep answers short and put the key figure in bold. You cannot change anything yourself: changes are proposed and the user confirms them.'];
+  const lines = ['You are Tide, the assistant inside Kasi. Answer from the register below and say so when it does not cover the question. Keep answers short and put the key figure in bold. You cannot change anything yourself: changes are proposed and the user confirms them.'];
   lines.push('MEETING');
   lines.push(m ? `${m.title} (${m.date}) · series ${m.seriesId} · meeting ${m.seq || 1}${m.issuedAt ? ' · issued' : ' · draft'}` : 'No meeting in the register yet.');
   if (m && textOf(m.summary)) lines.push(`Summary: ${textOf(m.summary)}`);
@@ -227,7 +227,7 @@ export function exportAnswer(question, meetings = [], { now = new Date() } = {})
   const name = `${label.toLowerCase().replace(/\s+/g, '-')}-${day}.md`;
   const content = [
     `# ${title}`, '',
-    `Exported from yravgSubMeetly on ${day} · ${plural(rows.length, 'row')}`, '',
+    `Exported from Kasi on ${day} · ${plural(rows.length, 'row')}`, '',
     '| Ref | Item | Owner | Due | Status | Meeting |',
     '| --- | --- | --- | --- | --- | --- |',
     ...rows.map((i) => `| ${[i.ref, textOf(i.text), i.owner, i.due, i.status, titles.get(i.meetingId)].map(cell).join(' | ')} |`), '',

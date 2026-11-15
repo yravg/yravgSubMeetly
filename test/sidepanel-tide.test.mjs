@@ -91,14 +91,14 @@ test('gelap: dengan "Otomatis" yang dipilih sendiri, sistem gelap memberi token 
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
 });
 
-test('Riwayat kosong: Tide tertidur; tab tetap lima', async () => {
+test('Riwayat kosong: Kasi terkantuk; tab tetap lima', async () => {
   // chrome-mock membawa satu sesi demo; kosongkan dulu supaya keadaan kosong tampil.
   await page.evaluate(() => chrome.storage.local.set({ history: [] }));
   await page.reload({ waitUntil: 'networkidle0' });
   await page.evaluate(() => document.querySelector('.bottom-nav-item[data-view="history"]').click());
   await wait(400);
   const bg = await page.$eval('#history-list > .empty', (e) => getComputedStyle(e, '::before').backgroundImage);
-  assert.match(bg, /tide-sleep\.webp/);
+  assert.match(bg, /kasi\/kasi-dozing\.svg/);
   assert.equal(await page.$$eval('.bottom-nav-item', (l) => l.length), 5);
 });
 

@@ -167,7 +167,7 @@ fn headline(text: &str, version: &str) -> String {
     let clean: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
     let mut line = clean.split_whitespace().collect::<Vec<_>>().join(" ");
     if line.is_empty() {
-        line = format!("yravgSubMeetly {version}");
+        line = format!("Kasi {version}");
     }
     if line.chars().count() > HEADLINE_MAX {
         line = line.chars().take(HEADLINE_MAX - 1).collect::<String>().trim_end().to_string() + "…";
@@ -352,7 +352,7 @@ mod tests {
         let r = parse_payload(&payload(V, "").replace("Sing along from the closed island", &format!("{long}\\nmore"))).unwrap();
         assert!(r.headline.chars().count() <= HEADLINE_MAX && r.headline.ends_with('…') && !r.headline.contains('\n'), "{}", r.headline);
         let r = parse_payload(&payload(V, "").replace("Sing along from the closed island", "")).unwrap();
-        assert_eq!(r.headline, "yravgSubMeetly 0.2.3");
+        assert_eq!(r.headline, "Kasi 0.2.3");
     }
 
     #[test]

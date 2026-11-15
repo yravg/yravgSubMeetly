@@ -1,16 +1,17 @@
 //! The resting pill (`Mode::Idle`): the time on the left, the battery on
 //! the right (its percentage and a drawn battery, a bolt inside while it
 //! charges); on a PC without a battery, the time alone in the middle.
-//! `IdleStyle` still picks what rests there (Clock, Minimal, Eyes, Hidden,
+//! `IdleStyle` still picks what rests there (Clock, Minimal, Kasi, Hidden,
 //! and Status, which [`super::status`] draws). `None` / `false` = Classic's
 //! layout. [`battery`] is the drawn battery for the other Pill surfaces.
 
 use crate::gfx::{Canvas, TextStyle, Weight};
 use crate::island::Geom;
+use crate::kasi;
 use crate::state::AppState;
 use crate::ui::Ui;
 use poni_core::datetime::fmt_clock;
-use poni_core::geom::{palette, Color, Rect};
+use poni_core::geom::{palette, Color, Point, Rect};
 use poni_core::settings::IdleStyle;
 use poni_core::svgpath::Seg;
 
@@ -34,8 +35,9 @@ const PCT_INK: Color = Color::white(0.55);
 /// Minimal: a small blank capsule, nothing in it but something to hover.
 const MINIMAL_W: f32 = 96.0;
 const MINIMAL_H: f32 = 24.0;
-/// Eyes: Classic's two eyes, centred in a clock-sized capsule.
-const EYES_W: f32 = 84.0;
+/// Kasi (the brand sheet's resting pill): the mark at the left end, this
+/// far in, then the time; the right end keeps `SIDE`. 100 and 128 wide.
+const KASI_LEAD: f32 = 10.0;
 
 /// The battery glyph at its own size (DIPs): a 20 x 10 body, then the nub
 /// 0.75 away and 1.75 wide. [`battery`] scales it with its rect's height.
@@ -53,7 +55,7 @@ pub fn geom(st: &AppState) -> Option<Geom> {
         // Where the status bar leaves the resting pill to us, it is the clock.
         IdleStyle::Clock | IdleStyle::Status => Some(Geom::new(clock_width(st), H, H / 2.0)),
         IdleStyle::Minimal => Some(Geom::new(MINIMAL_W, MINIMAL_H, MINIMAL_H / 2.0)),
-        IdleStyle::Eyes => Some(Geom::new(EYES_W, H, H / 2.0)),
+        IdleStyle::Kasi => Some(Geom::new(kasi_width(st), H, H / 2.0)),
         // Classic's invisible strip: it only catches the pointer at the edge.
         IdleStyle::Hidden => None,
     }
@@ -68,15 +70,19 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, body: Rect) -> bool {
             draw_clock(ui, st, body);
             true
         }
+        IdleStyle::Kasi => {
+            draw_kasi(ui, st, body);
+            true
+        }
         IdleStyle::Minimal => true,
-        // Classic draws the eyes (centred, blinking on its own wake) and the
-        // invisible strip.
-        IdleStyle::Eyes | IdleStyle::Hidden => false,
+        // Classic draws the invisible strip.
+        IdleStyle::Hidden => false,
     }
 }
 
 /// The next time the resting pill changes by itself (beyond the minute
-/// tick the app already wakes for).
+/// tick the app already wakes for). Kasi's blinks wake the island in every
+/// theme (`activities::next_wake`).
 pub fn next_wake(_st: &AppState) -> Option<f64> {
     None
 }
@@ -97,6 +103,23 @@ fn clock_width(st: &AppState) -> f32 {
     }
     let time = if h24 { TIME_SLOT } else { TIME_12H_SLOT };
     (SIDE + time + MID_GAP + PCT_SLOT + PCT_GAP + BATTERY_W + SIDE).round()
+}
+
+fn kasi_width(st: &AppState) -> f32 {
+    let time = if st.settings.use_24h { TIME_SLOT } else { TIME_12H_SLOT };
+    (KASI_LEAD + kasi::MARK_W + kasi::MARK_GAP + time + SIDE).round()
+}
+
+/// Kasi at the left end, blinking and now and then twitching an ear, its
+/// eyes on the pointer while it hovers; the time beside it.
+fn draw_kasi(ui: &mut Ui, st: &AppState, body: Rect) {
+    let centre = Point::new(body.x + KASI_LEAD + kasi::MARK_W / 2.0, body.center().y);
+    let gaze = kasi::gaze_at(ui.input.mouse, centre, body.w);
+    kasi::draw_resting(ui, st, centre, gaze);
+    let time = fmt_clock(&st.local, st.settings.use_24h);
+    let ts = TextStyle::headline().tabular().color(Color::white(1.0));
+    let x = centre.x + kasi::MARK_W / 2.0 + kasi::MARK_GAP;
+    ui.c.text(&time, Rect::new(x, body.y, (body.right() - x).max(0.0), body.h), &ts);
 }
 
 /// "13:27" at the left end, "99%" and the battery at the right one (ref2).
@@ -207,8 +230,11 @@ mod tests {
         assert_eq!(battery_state(&state(false, true)), None);
         st.settings.idle_style = IdleStyle::Minimal;
         assert_eq!(geom(&st), Some(Geom::new(96.0, 24.0, 12.0)));
-        st.settings.idle_style = IdleStyle::Eyes;
-        assert_eq!(geom(&st), Some(Geom::new(84.0, 32.0, 16.0)));
+        // Kasi: the mark, then the time (24 h and 12 h).
+        st.settings.idle_style = IdleStyle::Kasi;
+        assert_eq!(geom(&st), Some(Geom::new(100.0, 32.0, 16.0)));
+        st.settings.use_24h = false;
+        assert_eq!(geom(&st), Some(Geom::new(128.0, 32.0, 16.0)));
         // Hidden stays Classic's invisible strip.
         st.settings.idle_style = IdleStyle::Hidden;
         assert_eq!(geom(&st), None);

@@ -1,4 +1,4 @@
-; yravgSubMeetly installer (Inno Setup 6.5+, for the PNG wizard images).
+; Kasi by yravg (yravgSubMeetly) installer (Inno Setup 6.5+, for the PNG wizard images).
 ;
 ; Structure follows Oyenza Studio's installer/poni.iss (MIT, see LICENSE and
 ; THIRD-PARTY-NOTICES.txt); the art, texts, native-host and engine parts are ours.
@@ -6,7 +6,7 @@
 ; Build with tools\build-installer.ps1 (builds poni.exe and submeetly-engine.exe, then
 ; runs ISCC with the right paths and version), or by hand:
 ;   iscc /DAppVersion=1.3.12 /DExeSource=...\poni.exe /DEngineSource=...\submeetly-engine.exe installer\yravgsubmeetly.iss
-;   -> dist\yravgSubMeetly-Setup-1.3.12.exe   (the name tools/make_update_feed.py looks for)
+;   -> dist\Kasi-Setup-1.3.12.exe   (the name tools/make_update_feed.py looks for)
 ;
 ; Per-user install: no admin rights, no UAC prompt. The app goes to
 ; %LOCALAPPDATA%\Programs\yravgSubMeetly. The person's own data stays when uninstalling:
@@ -30,7 +30,12 @@
 #ifndef EngineSource
   #define EngineSource "..\..\engine-rs\target\release\submeetly-engine.exe"
 #endif
-#define AppName "yravgSubMeetly"
+; The names people see say Kasi (Start menu, Setup, Apps & features). What carries an install over stays
+; yravgSubMeetly: the AppId, the folder, the exe, the Run value (AppKey, autostart.rs writes the same name),
+; the data folders and the island's window class.
+#define AppName "Kasi"
+#define AppLongName "Kasi by yravg"
+#define AppKey "yravgSubMeetly"
 #define AppDir "yravgSubMeetly"
 #define AppPublisher "yraverage"
 #define AppExe "yravgSubMeetly.exe"
@@ -53,7 +58,7 @@ AppCopyright=Copyright (C) 2026 {#AppPublisher}
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
-VersionInfoProductName={#AppName}
+VersionInfoProductName={#AppLongName}
 PrivilegesRequired=lowest
 DefaultDirName={localappdata}\Programs\{#AppDir}
 DisableDirPage=yes
@@ -66,9 +71,9 @@ OutputDir=..\dist
 OutputBaseFilename={#AppName}-Setup-{#AppVersion}
 SetupIconFile=art\yravgsubmeetly.ico
 UninstallDisplayIcon={app}\{#AppExe}
-UninstallDisplayName={#AppName}
+UninstallDisplayName={#AppLongName}
 WizardStyle=modern
-; Our wordmark and tokens (installer/make_art.py). Setup picks the file closest to its image area.
+; Kasi under the pill and the app icon (installer/make_art.cjs, from site/kasi.js). Setup picks the file closest to its image area.
 WizardImageFile=art\wizard.png,art\wizard-150.png,art\wizard-200.png
 WizardSmallImageFile=art\wizard-small-55.png,art\wizard-small-83.png,art\wizard-small-110.png
 Compression=lzma2/max
@@ -103,6 +108,14 @@ Source: "..\crates\poni-core\data\ja-readings.dic.zst"; DestDir: "{app}\addons\j
 Source: "..\addons\ja\NOTICE.txt"; DestDir: "{app}\addons\ja"; Flags: ignoreversion
 Source: "..\addons\downloader\NOTICE.txt"; DestDir: "{app}\addons\downloader"; Flags: ignoreversion
 
+[InstallDelete]
+; The Start menu entries of the versions before the rename to Kasi (same targets, old names).
+Type: files; Name: "{autoprograms}\yravgSubMeetly.lnk"
+Type: files; Name: "{autoprograms}\Open yravgSubMeetly (full app).lnk"
+Type: files; Name: "{autoprograms}\yravgSubMeetly Minutes register.lnk"
+Type: files; Name: "{autoprograms}\Set up the yravgSubMeetly Chrome extension.lnk"
+Type: files; Name: "{autoprograms}\yravgSubMeetly engine.lnk"
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; Comment: "Live transcription and minutes at the edge of your screen"
 Name: "{autoprograms}\Open {#AppName} (full app)"; Filename: "{app}\{#AppExe}"; Parameters: "--open app"; Comment: "Today, live captions, minutes, history, files and settings in a window of their own"
@@ -112,7 +125,7 @@ Name: "{autoprograms}\{#AppName} engine"; Filename: "{app}\{#EngineExe}"; Commen
 
 [Registry]
 ; Same value the app writes from its "Start with Windows" menu item (autostart.rs): the quoted exe path.
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppName}"; ValueData: """{app}\{#AppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppKey}"; ValueData: """{app}\{#AppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
 ; Native Messaging host for the Chrome extension: Chrome, Edge and Chromium find it by these keys
 ; (same keys native/install-host.bat writes). Always: the extension ID is fixed (see FixedExtId).
 Root: HKCU; Subkey: "Software\Google\Chrome\NativeMessagingHosts\{#HostName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#HostName}.json"; Flags: uninsdeletekey
@@ -258,7 +271,7 @@ begin
     { Unticking "Start with Windows" on a reinstall turns it off, even if the app's menu turned it on.
       A silent update has no ticks to read: it leaves the value as the person set it. }
     if (not WizardSilent) and (not WizardIsTaskSelected('autostart')) then
-      RegDeleteValue(HKEY_CURRENT_USER, RunKey, '{#AppName}');
+      RegDeleteValue(HKEY_CURRENT_USER, RunKey, '{#AppKey}');
   end;
 end;
 
@@ -269,5 +282,5 @@ begin
     StopIsland();
   { The app may have written the Run value itself; never leave it pointing at a removed exe. }
   if CurUninstallStep = usPostUninstall then
-    RegDeleteValue(HKEY_CURRENT_USER, RunKey, '{#AppName}');
+    RegDeleteValue(HKEY_CURRENT_USER, RunKey, '{#AppKey}');
 end;

@@ -34,7 +34,7 @@ impl Tray {
                 hIcon: icon,
                 ..Default::default()
             };
-            let tip: Vec<u16> = format!("yravgSubMeetly {}", crate::version::VERSION).encode_utf16().collect();
+            let tip: Vec<u16> = format!("Kasi {}", crate::version::VERSION).encode_utf16().collect();
             nid.szTip[..tip.len()].copy_from_slice(&tip);
             if !Shell_NotifyIconW(NIM_ADD, &nid).as_bool() {
                 return Err(windows::core::Error::from_win32());
@@ -78,14 +78,14 @@ pub enum MenuCmd {
     OpenSettings,
     ReloadSettings,
     OpenDataFolder,
-    /// "About yravgSubMeetly 0.2.3 (…)": opens this version's release notes.
+    /// "About Kasi 0.2.3 (…)": opens this version's release notes.
     About,
     /// "Lyrics by LRCLIB": opens lrclib.net.
     LyricsCredit,
     AppleMusicToken,
     AppleMusicHelp,
     AppleMusicForget,
-    /// "Update to yravgSubMeetly 0.2.5…" (`crate::updates`).
+    /// "Update to Kasi 0.2.5…" (`crate::updates`).
     Update,
     /// "Check for updates…": read the update file now (`crate::updates`).
     CheckForUpdates,
@@ -128,7 +128,7 @@ fn item(label: &str, cmd: MenuCmd, checked: bool) -> MenuItem {
 fn idle_label(s: IdleStyle) -> &'static str {
     match s {
         IdleStyle::Clock => "Clock",
-        IdleStyle::Eyes => "Eyes",
+        IdleStyle::Kasi => "Kasi",
         IdleStyle::Minimal => "Minimal",
         IdleStyle::Hidden => "Hidden until hover",
         IdleStyle::Status => "Status bar",
@@ -170,8 +170,8 @@ pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &Engin
     let style = |st: IdleStyle| item(idle_label(st), MenuCmd::ToggleIdleStyle(st), shown == st);
     let theme = |label: &str, t: Theme| item(label, MenuCmd::SetTheme(t), s.theme == t);
     let fullscreen = |label: &str, hide: bool| item(label, MenuCmd::SetHideFullscreen(hide), s.hide_in_fullscreen == hide);
-    let mut items = vec![MenuItem::Info { label: "yravgSubMeetly".into() }];
-    for (label, cmd) in [("Open yravgSubMeetly", MenuCmd::OpenApp), ("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenCall), ("Minutes", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
+    let mut items = vec![MenuItem::Info { label: "Kasi by yravg".into() }];
+    for (label, cmd) in [("Open Kasi", MenuCmd::OpenApp), ("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenCall), ("Minutes", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
         items.push(item(label, cmd, false));
     }
     items.push(MenuItem::Separator);
@@ -233,10 +233,10 @@ pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &Engin
     items.push(MenuItem::Separator);
     // Which version and build this is, as the Mac menu says it.
     items.push(item(&crate::version::about_label(), MenuCmd::About, false));
-    items.push(item("Quit yravgSubMeetly", MenuCmd::Quit, false));
+    items.push(item("Quit Kasi", MenuCmd::Quit, false));
     // A new version first, until it is installed.
     if let UpdateLine::Offer(v) = update {
-        items.splice(0..0, [item(&format!("Update to yravgSubMeetly {v}…"), MenuCmd::Update, false), MenuItem::Separator]);
+        items.splice(0..0, [item(&format!("Update to Kasi {v}…"), MenuCmd::Update, false), MenuItem::Separator]);
     }
     items
 }
@@ -364,7 +364,7 @@ mod tests {
             .collect();
         assert_eq!(
             labels,
-            ["yravgSubMeetly", "Open yravgSubMeetly", "Open Minutes register", "Live captions", "Meeting", "Minutes", "Inbox", "Subtitle overlay", "Pause or resume the overlay", "Copy the current caption", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…", "Copy caption"]
+            ["Kasi by yravg", "Open Kasi", "Open Minutes register", "Live captions", "Meeting", "Minutes", "Inbox", "Subtitle overlay", "Pause or resume the overlay", "Copy the current caption", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…", "Copy caption"]
         );
     }
 
@@ -415,7 +415,7 @@ mod tests {
     fn quit_is_last_and_the_version_line_sits_above_it() {
         let labels = flat(&items(&Settings::default(), UpdateLine::None, &engine(true, true, false)));
         let about = labels.iter().position(|l| l.1 == MenuCmd::About).expect("no About line");
-        assert!(labels[about].0.starts_with(&format!("About yravgSubMeetly {}", env!("CARGO_PKG_VERSION"))), "{}", labels[about].0);
+        assert!(labels[about].0.starts_with(&format!("About Kasi {}", env!("CARGO_PKG_VERSION"))), "{}", labels[about].0);
         assert_eq!(labels.last().map(|l| l.1), Some(MenuCmd::Quit));
         assert_eq!(about + 1, labels.len() - 1);
     }
@@ -427,7 +427,7 @@ mod tests {
             Some(MenuItem::Item { label, cmd, .. }) => Some((label, cmd)),
             _ => None,
         };
-        assert_eq!(first(UpdateLine::Offer("0.2.5".into())), Some(("Update to yravgSubMeetly 0.2.5…".to_string(), MenuCmd::Update)));
+        assert_eq!(first(UpdateLine::Offer("0.2.5".into())), Some(("Update to Kasi 0.2.5…".to_string(), MenuCmd::Update)));
         assert_eq!(first(UpdateLine::None), None);
         let c = |update: UpdateLine| cmds(&Settings::default(), update, &e);
         assert!(c(UpdateLine::Check).contains(&MenuCmd::CheckForUpdates));
@@ -471,7 +471,7 @@ mod tests {
     fn status_bar_is_listed_only_in_the_pill_theme() {
         let pill = Settings { theme: Theme::Pill, idle_style: IdleStyle::Status, ..Settings::default() };
         let labels: Vec<String> = idle_choices(&pill).into_iter().map(|c| c.0).collect();
-        assert_eq!(labels, ["Clock", "Eyes", "Minimal", "Hidden until hover", "Status bar"]);
+        assert_eq!(labels, ["Clock", "Kasi", "Minimal", "Hidden until hover", "Status bar"]);
         assert_eq!(idle_choices(&pill).last(), Some(&("Status bar".to_string(), true)));
         // Another theme draws the clock for the status bar: Clock is checked,
         // and Status comes back with Pill.

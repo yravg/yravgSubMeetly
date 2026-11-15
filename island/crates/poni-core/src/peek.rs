@@ -1,11 +1,11 @@
-//! The Eyes look on a MacBook's notch plays hide and seek with the camera:
-//! the eyes peek out beside it on the side the pointer is on and look at the
-//! pointer wherever it is on the screen. When the pointer crosses to the
-//! other side, they duck behind the camera and come out there. The notch
-//! has no pixels, so the Mac itself hides their way across.
+//! The Kasi look on a MacBook's notch plays hide and seek with the camera:
+//! Kasi's head peeks out beside it on the side the pointer is on, its eyes
+//! on the pointer wherever it is on the screen. When the pointer crosses to
+//! the other side, Kasi ducks behind the camera and comes out there. The
+//! notch has no pixels, so the Mac itself hides its way across.
 //!
-//! Only the numbers live here (where the eyes are on their way, where they
-//! look); the Mac app draws them (`mac/notch.rs`).
+//! Only the numbers live here (where Kasi is on its way, where its eyes
+//! look; "the eyes" below); the Mac app draws it (`mac/notch.rs`).
 
 use crate::geom::Point;
 

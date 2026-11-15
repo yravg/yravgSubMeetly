@@ -1,10 +1,11 @@
 /**
  * Beranda Today — hero (papan A01): pemandangan pelabuhan, sapaan dengan nama, angka kunci,
- * bilah Tanya Tide dengan Tide mengintip, dan empat chip. Selalu tampil utuh: keadaan sambutan
+ * bilah Tanya Tide dengan Kasi mengintip di atasnya, dan empat chip. Selalu tampil utuh: keadaan sambutan
  * dan kosong menjadi kartu ringkas DI BAWAH hero, tidak menggantikannya.
  *
- * Murni: menerima konteks dari app.js (T, ic, esc, tide, num) dan mengembalikan HTML.
- * Satu maskot per layar: pose di bilah = sambutan (wave) > kosong (sleep) > beres (celebrate) > biasa (shell).
+ * Murni: menerima konteks dari app.js (T, ic, esc, kasi, num) dan mengembalikan HTML.
+ * Satu maskot per layar: Kasi di bilah = sambutan (welcome) > kosong (empty) > beres (done) > siap (ready);
+ * keadaannya dipetakan ke stiker di src/lib/kasi-art.js.
  */
 
 /** Pelabuhan: matahari, mercusuar, dermaga, ombak. Warna dari token Tide, jadi gelap ikut sendiri. */
@@ -18,16 +19,16 @@ export function greeting(base, name) {
   return n ? `${String(base).replace(/[.!]$/, '')}, ${n}.` : base;
 }
 
-/** Pose maskot di bilah tanya. */
+/** Keadaan Kasi di bilah tanya (kunci KASI_STATES). */
 export function heroPose({ welcome, empty, caughtUp }) {
-  return welcome ? 'wave' : empty ? 'sleep' : caughtUp ? 'celebrate' : 'shell';
+  return welcome ? 'welcome' : empty ? 'empty' : caughtUp ? 'done' : 'ready';
 }
 
 /**
- * @param c konteks: { T, ic, esc, tide, num, hm, fmtDate, now, t (computeToday), state, greetKey, pose, caughtUp, eye, synced }
+ * @param c konteks: { T, ic, esc, kasi, num, hm, fmtDate, now, t (computeToday), state, greetKey, pose, caughtUp, eye, synced }
  */
 export function heroHtml(c) {
-  const { T, ic, esc, tide, num, state, t, now, pose, caughtUp, eye } = c;
+  const { T, ic, esc, kasi, num, state, t, now, pose, caughtUp, eye } = c;
   const chipIcons = ['chat', 'flag', 'list', 'globe'];
   const sub = [num(T('nMeetings', t.meetingsToday.length)), c.synced ? esc(T('lastSynced', c.synced)) : '', caughtUp ? esc(T('caughtUp')) : ''].filter(Boolean).join(' · ');
   return `<section class="hero${state.hideNumbers ? ' masked' : ''}">
@@ -36,7 +37,7 @@ export function heroHtml(c) {
     <div class="dateline">${esc(T('todayLine', c.fmtDate(now)))} ${eye}</div>
     <div class="bignum"><b>${num(c.hm(t.minutesToday))}</b><span>${esc(T('captured'))}</span></div>
     <div class="sub">${sub}</div>
-    <div class="askbar"><span class="peek">${tide(pose, 'peek-art')}</span>${ic('sparkle', 20)}<input type="text" data-act="askbar" placeholder="${esc(T('askBar'))}" aria-label="${esc(T('askBar'))}" /><button type="button" class="send" data-act="askgo" aria-label="${esc(T('send'))}">${ic('send', 20)}</button></div>
+    <div class="askbar"><span class="peek">${kasi(pose, 'peek-art')}</span>${ic('sparkle', 20)}<input type="text" data-act="askbar" placeholder="${esc(T('askBar'))}" aria-label="${esc(T('askBar'))}" /><button type="button" class="send" data-act="askgo" aria-label="${esc(T('send'))}">${ic('send', 20)}</button></div>
     <div class="chips">${T('chips').map((x, i) => `<button type="button" class="chip" data-act="chip" data-i="${i}">${ic(chipIcons[i], 18)}${esc(x)}</button>`).join('')}</div>
   </section>`;
 }

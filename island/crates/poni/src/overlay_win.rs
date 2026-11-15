@@ -79,7 +79,7 @@ fn create() -> Option<Overlay> {
         };
         // Registered again after the first time: the call fails harmlessly.
         RegisterClassExW(&wc);
-        let hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, CLASS, w!("yravgSubMeetly overlay"), WS_POPUP, 0, 0, 1, 1, None, None, hinst, None).ok()?;
+        let hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, CLASS, w!("Kasi overlay"), WS_POPUP, 0, 0, 1, 1, None, None, hinst, None).ok()?;
         Some(Overlay { hwnd, shown: None, placed: RECT::default(), click_through: false })
     }
 }

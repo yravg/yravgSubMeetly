@@ -36,7 +36,7 @@ pub fn bench_fetch(sink: EventSink, port: u16) {
 fn bench_read(port: u16) -> Result<poni_core::speed::Report, String> {
     let (code, body) = helper::request(port, "GET", "/models/bench", None).map_err(|e| format!("The engine is not answering ({e})."))?;
     if code == 404 {
-        return Err("This engine is too old to test model speed. Update yravgSubMeetly.".into());
+        return Err("This engine is too old to test model speed. Update Kasi.".into());
     }
     if code != 200 {
         return Err(format!("The engine answered {code} for /models/bench."));

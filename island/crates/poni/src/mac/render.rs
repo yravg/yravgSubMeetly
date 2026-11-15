@@ -11,7 +11,7 @@
 //! place (the smoke run's screenshots show the real one). Pill floats below
 //! the top edge, or around a notch rests inside it and floats below the menu
 //! bar for everything else (notch.rs). Around a
-//! notch, the last picture is the Eyes look's hide and seek with the camera
+//! notch, the last picture is the Kasi look's hide and seek with the camera
 //! as it moves, a frame a row (`render_peek`).
 //!
 //! The music scenes use made-up data to test the drawing; the Mac app shows
@@ -94,7 +94,7 @@ const JA_DICT: &str = "crates/poni-core/data/ja-readings.dic.zst";
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Scene {
     IdleClock,
-    IdleEyes,
+    IdleKasi,
     Hover,
     Timer,
     Media,
@@ -148,7 +148,7 @@ enum Scene {
 
 const SCENES: [Scene; 16] = [
     Scene::IdleClock,
-    Scene::IdleEyes,
+    Scene::IdleKasi,
     Scene::Hover,
     Scene::Timer,
     Scene::Media,
@@ -218,7 +218,7 @@ impl Scene {
     fn name(self) -> String {
         match self {
             Scene::IdleClock => "idle-clock".into(),
-            Scene::IdleEyes => "idle-eyes".into(),
+            Scene::IdleKasi => "idle-kasi".into(),
             Scene::Hover => "idle-hover".into(),
             Scene::Timer => "timer-activity".into(),
             Scene::Media => "media-activity".into(),
@@ -345,7 +345,7 @@ pub fn run(dir: &str, args: &[String]) -> i32 {
         }
     }
     let next = next + settings_shots().len();
-    // Around a notch, last: the Eyes look's hide and seek with the camera.
+    // Around a notch, last: the Kasi look's hide and seek with the camera.
     if let Some(n) = notch {
         let path = out.join(format!("{next:02}-peek-frames{suffix}.png"));
         match render_peek(&mut gfx, theme, n, &path) {
@@ -541,11 +541,11 @@ fn render_morph(gfx: &mut Gfx, theme: Theme, notch: Option<Notch>, path: &Path) 
     crate::png::save_pbgra(path, w_px as u32, h_px as u32, &px)
 }
 
-/// The Eyes look around notch `n` as it moves (stills can't show it), a
+/// The Kasi look around notch `n` as it moves (stills can't show it), a
 /// frame a row, a fifteenth of a second apart: the pointer (drawn, so each
-/// frame says what the eyes follow) wanders right of the camera and crosses
-/// over; the eyes (Oyen, in his theme) duck behind the camera and come out
-/// on its left, follow it up into the menu bar and back under the camera.
+/// frame says what Kasi's eyes follow) wanders right of the camera and
+/// crosses over; Kasi ducks behind the camera and comes out on its left,
+/// follows it up into the menu bar and back under the camera.
 fn render_peek(gfx: &mut Gfx, theme: Theme, n: Notch, path: &Path) -> Result<(), String> {
     /// The pointer from the island's top centre (DIPs) at each time
     /// (seconds), in a straight line from one to the next.
@@ -561,7 +561,7 @@ fn render_peek(gfx: &mut Gfx, theme: Theme, n: Notch, path: &Path) -> Result<(),
     const FPS: f64 = 15.0;
     const CELL: (f32, f32) = (560.0, 140.0);
     let mut st = base_state(theme);
-    st.settings.idle_style = IdleStyle::Eyes;
+    st.settings.idle_style = IdleStyle::Kasi;
     let mode = Mode::Idle;
     let g = notch::geom(&mode, &st, n, activities::geom(&mode, &st));
     let frames = (WAY[WAY.len() - 1].0 * FPS).round() as usize + 1;
@@ -780,7 +780,7 @@ fn fake_release() -> poni_core::update::Release {
         headline: "Updates install themselves on a Mac".into(),
         notes: format!("{repo}/tag/v{version}"),
         windows: None,
-        mac: Some(poni_core::update::Download { url: format!("{repo}/download/v{version}/yravgSubMeetly-{version}-mac.dmg"), size: 4_300_000, sha256: "0".repeat(64) }),
+        mac: Some(poni_core::update::Download { url: format!("{repo}/download/v{version}/Kasi-{version}-mac.dmg"), size: 4_300_000, sha256: "0".repeat(64) }),
         version,
     }
 }
@@ -876,15 +876,15 @@ fn render_scene(gfx: &mut Gfx, scene: Scene, theme: Theme, notch: Option<Notch>,
         // Around a notch the eyes look at the pointer: down at it in the
         // window under the menu bar (Oyen rests again a while after it
         // moved), and over the notch while it hovers there.
-        Scene::IdleEyes => {
-            st.settings.idle_style = IdleStyle::Eyes;
+        Scene::IdleKasi => {
+            st.settings.idle_style = IdleStyle::Kasi;
             if let Some(n) = notch {
                 st.ui.peek.point(Point::new(240.0, 320.0), NOW_MONO - 10.0, n.w / 2.0);
             }
             Mode::Idle
         }
         Scene::Hover => {
-            st.settings.idle_style = IdleStyle::Eyes;
+            st.settings.idle_style = IdleStyle::Kasi;
             hovering = true;
             if let Some(n) = notch {
                 st.ui.peek.point(Point::new(20.0, n.h / 2.0), NOW_MONO - 0.5, n.w / 2.0);

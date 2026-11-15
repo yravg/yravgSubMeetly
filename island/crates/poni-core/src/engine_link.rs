@@ -67,7 +67,7 @@ impl Default for EngineInfo {
 pub fn offline_message(info: &EngineInfo, why: &str, port: u16) -> (&'static str, String, bool) {
     match info.action {
         _ if info.running => ("Connecting to the engine…", format!("The engine answers on {port}; this page fills in on the next read. ({why})"), false),
-        Action::Missing => ("Engine not found", "submeetly-engine.exe is not next to the island. Reinstall yravgSubMeetly, then press Try again.".into(), true),
+        Action::Missing => ("Engine not found", "submeetly-engine.exe is not next to the island. Reinstall Kasi, then press Try again.".into(), true),
         Action::Failed => ("Engine would not start", format!("The island started it {MAX_SPAWNS} times and it never answered on {port}. Check that nothing else uses that port, then press Try again."), true),
         _ => ("Starting the engine…", "The island is launching it. This page fills in when it answers.".into(), false),
     }

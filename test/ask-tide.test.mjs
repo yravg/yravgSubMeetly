@@ -141,7 +141,7 @@ test('exportAnswer: "Export open actions to Markdown" → kartu export + berkas 
   assert.equal(r.file.mime, 'text/markdown');
   assert.equal(r.file.content, [
     '# Open actions', '',
-    'Exported from yravgSubMeetly on 2026-11-09 · 2 rows', '',
+    'Exported from Kasi on 2026-11-09 · 2 rows', '',
     '| Ref | Item | Owner | Due | Status | Meeting |',
     '| --- | --- | --- | --- | --- | --- |',
     '| A1 | A1 text | Mei | 2026-11-06 | open | Meeting B |',
