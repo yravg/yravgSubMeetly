@@ -39,7 +39,7 @@ const ICONSET = [['icon_16x16', 16], ['icon_16x16@2x', 32], ['icon_32x32', 32], 
 const SQUIRCLE = 'M512 0C860 0 1024 164 1024 512S860 1024 512 1024 0 860 0 512 164 0 512 0Z';
 
 function loadPuppeteer() {
-  const tries = [process.env.PUPPETEER_DIR, 'puppeteer', '/Users/Shared/yravgSubMeetly/wt-mac-release/node_modules/puppeteer'];
+  const tries = [process.env.PUPPETEER_DIR, 'puppeteer', require('path').join(__dirname, '..', '..', '..', 'node_modules', 'puppeteer')];
   for (const t of tries) { if (!t) continue; try { return require(t); } catch (_) { /* next */ } }
   throw new Error('puppeteer not found: set PUPPETEER_DIR to a puppeteer install');
 }

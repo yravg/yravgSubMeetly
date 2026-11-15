@@ -429,7 +429,12 @@
       const n = ORDER[(i + ORDER.length) % ORDER.length]; go(n, true); $(`#chips [data-state="${n}"]`).focus();
     });
     addEventListener('resize', () => { if (innerWidth === lastW) return; lastW = innerWidth; kasiSize(); go(state); });
-    return { start: () => go('rest'), repaint: () => go(state), go, state: () => state };
+    // a fade on the toolbar's right edge while more chips sit out of view
+    const chipRow = $('#chips');
+    const fade = () => chipRow.classList.toggle('more', chipRow.scrollWidth > chipRow.clientWidth + 2 && chipRow.scrollLeft + chipRow.clientWidth < chipRow.scrollWidth - 4);
+    chipRow.addEventListener('scroll', fade, { passive: true }); addEventListener('resize', fade); setTimeout(fade, 300);
+    // open on Listening so the first frame always shows Kasi hanging under the pill
+    return { start: () => { go('listen'); fade(); }, repaint: () => { go(state); fade(); }, go, state: () => state };
   })();
 
   applyLang();
