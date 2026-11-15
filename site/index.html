@@ -16,6 +16,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@600;700;800;900&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="showcase/desktop.css">
+<link rel="stylesheet" href="showcase/island.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -57,30 +59,43 @@
   </div>
   <div class="hero-demo" id="demo" aria-labelledby="demo-label">
     <h2 class="sr" id="demo-label" data-i18n="demo.label">Try the pill</h2>
-    <div class="screen" id="screen">
-      <div class="call" aria-hidden="true">
-        <div class="tile" data-who="a"><span class="av">AR</span><span class="nm">Alya</span></div>
-        <div class="tile" data-who="b"><span class="av">WJ</span><span class="nm">Wei Jie</span></div>
-        <div class="tile" data-who="c"><span class="av">DS</span><span class="nm">Dimas</span></div>
-        <div class="tile you" data-who="d"><span class="av" data-i18n="demo.you">You</span><span class="nm" data-i18n="demo.you">You</span></div>
-      </div>
-      <div class="island" id="island" data-state="rest">
-        <div class="pill" id="pill"><div class="pill-in" id="pill-in"></div></div>
-        <div class="hanger" id="hanger" data-kasi="demo" aria-hidden="true"></div>
-      </div>
-      <div class="chips" role="tablist" id="chips" aria-label="Pill states">
-        <button role="tab" data-state="rest" data-i18n="chip.rest">Resting</button>
-        <button role="tab" data-state="listen" data-i18n="chip.listen">Listening</button>
-        <button role="tab" data-state="live" data-i18n="chip.live">Live captions</button>
-        <button role="tab" data-state="translate" data-i18n="chip.translate">Translate</button>
-        <button role="tab" data-state="minutes" data-i18n="chip.minutes">Minutes</button>
-        <button role="tab" data-state="youtube" data-i18n="chip.youtube">YouTube CC</button>
-        <button role="tab" data-state="today" data-i18n="chip.today">Today</button>
-      </div>
+    <div class="os-switch" role="group" data-i18n-attr="aria-label:os.label" aria-label="Computer">
+      <button type="button" data-os="mac" aria-pressed="true">macOS</button>
+      <button type="button" data-os="win" aria-pressed="false">Windows</button>
+    </div>
+    <div class="zoom" id="zoom"><div class="zoom-desk" id="zoom-desk"></div></div>
+    <div class="chips" role="tablist" id="chips" aria-label="Pill states">
+      <button role="tab" data-beat="idle" data-i18n="chip.rest">Resting</button>
+      <button role="tab" data-beat="captions" data-i18n="chip.captions">Captions</button>
+      <button role="tab" data-beat="live" data-i18n="chip.live">Live</button>
+      <button role="tab" data-beat="minutes" data-i18n="chip.minutes">Minutes</button>
+      <button role="tab" data-beat="media" data-i18n="chip.youtube">YouTube CC</button>
+      <button role="tab" data-beat="today" data-i18n="chip.today">Today</button>
     </div>
     <p class="demo-cap" id="demo-cap"></p><p class="sr" id="demo-live" aria-live="polite"></p>
-    <p class="demo-note" data-i18n="demo.sample">Sample call and sample text, to show how it works.</p>
+    <p class="demo-note" data-i18n="demo.sample"></p>
   </div>
+</section>
+
+<section class="desk" id="desk" aria-labelledby="desk-h">
+  <div class="sec-head">
+    <h2 id="desk-h" data-i18n="desk.h">On your Mac. On your PC.</h2>
+    <p data-i18n="desk.p"></p>
+  </div>
+  <div class="desk-bar">
+    <div class="os-switch" role="group" data-i18n-attr="aria-label:os.label" aria-label="Computer">
+      <button type="button" data-os="mac" aria-pressed="true">macOS</button>
+      <button type="button" data-os="win" aria-pressed="false">Windows</button>
+    </div>
+    <div class="seg" role="group" data-i18n-attr="aria-label:desk.scene" aria-label="Scene">
+      <button type="button" data-scene="call" aria-pressed="true" data-i18n="desk.call">Meeting</button>
+      <button type="button" data-scene="video" aria-pressed="false" data-i18n="desk.video">Video</button>
+      <button type="button" data-scene="menu" aria-pressed="false" data-i18n="desk.menu">Menu</button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="desk-overlay" checked> <span data-i18n="desk.overlay">Subtitle window</span></label>
+  </div>
+  <div class="desk-stage" id="desk-stage"></div>
+  <p class="desk-note" data-i18n="desk.note"></p>
 </section>
 
 <section class="kasi" id="kasi" aria-labelledby="kasi-h">
@@ -165,7 +180,7 @@
         <button type="button" class="rest" data-rest="clock" aria-pressed="false"><span class="mini-pill"><span class="t">14:32</span><span class="b">82%</span></span><span data-i18n="yours.rest.clock">Clock</span></button>
         <button type="button" class="rest" data-rest="kasi" aria-pressed="true"><span class="mini-pill"><span class="mk" data-kasi="pill"></span><span class="t">14:32</span></span><span data-i18n="yours.rest.eyes">Kasi</span></button>
         <button type="button" class="rest" data-rest="min" aria-pressed="false"><span class="mini-pill thin"></span><span data-i18n="yours.rest.min">Minimal</span></button>
-        <button type="button" class="rest" data-rest="status" aria-pressed="false"><span class="mini-pill"><span class="dot"></span><span class="t">CC</span></span><span data-i18n="yours.rest.status">Status</span></button>
+        <div class="rest rest-static"><span class="mini-pill"><span class="dot"></span><span class="t">CC</span></span><span data-i18n="yours.rest.status">Status</span></div>
       </div>
     </div>
   </div>
@@ -220,6 +235,8 @@
 
 <script src="i18n.js"></script>
 <script src="kasi.js"></script>
+<script src="showcase/desktop.js"></script>
+<script src="showcase/island.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

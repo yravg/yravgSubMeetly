@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pill replica check</title>
+<link rel="stylesheet" href="island.css">
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    padding: 24px 16px 48px;
+    background: #e9ecf2;
+    font: 14px/1.4 system-ui, sans-serif;
+    color: #131b44;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { margin: 0 0 16px; color: #5c6385; }
+  .row { display: grid; gap: 24px; max-width: 1200px; margin: 0 auto; }
+  .screen {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(160deg, #cfd8ea 0%, #e8e3f0 55%, #f3efe7 100%);
+    box-shadow: 0 1px 2px rgba(19, 27, 68, .12), 0 8px 24px rgba(19, 27, 68, .10);
+  }
+  .screen h2 {
+    position: absolute; left: 12px; bottom: 8px; margin: 0;
+    font-size: 12px; font-weight: 600; color: rgba(19, 27, 68, .55);
+  }
+  .bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+  button {
+    font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid rgba(19, 27, 68, .18); background: #fff; color: #131b44; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="row">
+  <div>
+    <h1>Pill replica</h1>
+    <p>Both mounts play the loop. Hover a pill to take over; it resumes a few seconds after you leave.</p>
+    <div class="bar" id="bar"></div>
+  </div>
+  <div class="screen" id="mac"><h2>macOS</h2></div>
+  <div class="screen" id="win"><h2>Windows</h2></div>
+</div>
+<script src="../kasi.js"></script>
+<script src="island.js"></script>
+<script>
+  const q = new URLSearchParams(location.search);
+  const common = { lang: q.get('lang') || 'en', idle: q.get('idle') || 'clock', screen: +(q.get('screen') || 1100), height: 380 };
+  if (q.get('ring')) common.ring = true;
+  if (q.get('theme')) common.theme = q.get('theme');
+  const mac = SMIsland.mount(document.getElementById('mac'), Object.assign({ os: 'mac' }, common));
+  const win = SMIsland.mount(document.getElementById('win'), Object.assign({ os: 'win' }, common));
+  const both = [mac, win];
+  const beat = q.get('beat');
+  if (beat) both.forEach(c => c.go(beat, { snap: q.get('snap') === '1' }));
+  else both.forEach(c => c.play());
+  const bar = document.getElementById('bar');
+  const add = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; bar.appendChild(b); };
+  add('Play', () => both.forEach(c => c.play()));
+  add('Pause', () => both.forEach(c => c.pause()));
+  ['idle', 'captions', 'hover', 'live', 'minutes', 'accept', 'inbox', 'media', 'today', 'fold'].forEach(b => add(b, () => both.forEach(c => c.go(b))));
+  add('EN', () => both.forEach(c => c.setLang('en')));
+  add('ID', () => both.forEach(c => c.setLang('id')));
+</script>
+</body>
+</html>

@@ -25,7 +25,7 @@
     paintCta();
     karaoke();
     if (typeof paintBento === 'function') paintBento();
-    if (demo) demo.repaint();
+    if (typeof shows !== 'undefined' && shows) shows.setLang(lang);
   }
   $$('.lang button').forEach((b) => b.addEventListener('click', () => { lang = b.dataset.lang; store.set('smLang', lang); applyLang(); }));
 
@@ -89,7 +89,7 @@
   /* ---------------- the nav steps aside for the demo's own pill ---------------- */
   const navEl = $('#nav');
   addEventListener('scroll', () => {
-    const r = $('#screen').getBoundingClientRect();
+    const r = $('#zoom').getBoundingClientRect();
     navEl.classList.toggle('tuck', r.top < 84 && r.bottom > 160);
   }, { passive: true });
 
@@ -164,11 +164,11 @@
     listen: { pose: 'listen' }, write: { pose: 'scribe' },
     translate: { pose: 'head', yaw: 0.75, earAngle: 30 }, think: { pose: 'think' }, done: { pose: 'happy' }, rest: { pose: 'doze' }
   };
-  const STATE_DEMO = { listen: 'listen', write: 'live', translate: 'translate', think: 'minutes', done: 'minutes', rest: 'rest' };
+  const STATE_DEMO = { listen: 'captions', write: 'live', translate: 'live', think: 'minutes', done: 'minutes', rest: 'idle' };
   $$('#states li').forEach((li) => {
     const a = new Actor($('.st-k', li), STATE_POSES[li.dataset.pose], { blink: li.dataset.pose !== 'rest' && li.dataset.pose !== 'done' });
     li.tabIndex = 0; li.setAttribute('role', 'button');
-    const play = () => { if (li.dataset.pose === 'translate') swivel(a, 1); demo.go(STATE_DEMO[li.dataset.pose], true); $('#screen').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' }); };
+    const play = () => { if (li.dataset.pose === 'translate') swivel(a, 1); if (shows) shows.go(STATE_DEMO[li.dataset.pose], true); $('#zoom').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' }); };
     li.addEventListener('click', play);
     li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); } });
   });
@@ -250,11 +250,9 @@
     });
   })();
 
-  let restStyle = 'kasi';
-  $$('.rest').forEach((b) => b.addEventListener('click', () => {
-    restStyle = b.dataset.rest;
-    $$('.rest').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    if (demo.state() === 'rest') demo.go('rest', true);
+  $$('.rest[data-rest]').forEach((b) => b.addEventListener('click', () => {
+    $$('.rest[data-rest]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    if (shows) shows.setIdle(b.dataset.rest);
   }));
 
   /* ---------------- feature cards: small pills with sample text ---------------- */
@@ -292,151 +290,120 @@
       today: [['09:00', 'Stand-up', 'done'], ['11:00', 'Rapat mingguan', 'join'], ['14:30', 'Tinjauan vendor', '']], join: 'Join', done: 'Selesai', todayH: 'Hari ini'
     }
   };
-  const ORDER = ['rest', 'listen', 'live', 'translate', 'minutes', 'youtube', 'today'];
-  const DUR = { rest: 3600, listen: 3400, live: 9000, translate: 8200, minutes: 6200, youtube: 6400, today: 5200 };
-  const clock = () => new Date().toLocaleTimeString(lang === 'id' ? 'id-ID' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
-  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const esc = (x) => x.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
-  const demo = (() => {
-    const island = $('#island'), pill = $('#pill'), inner = $('#pill-in'), screen = $('#screen');
-    const hanger = new Actor($('#hanger'), { pose: 'hang' }, { follow: 'hang' });
-    const mini = document.createElement('span'); mini.className = 'p-mk';
-    let state = 'rest', timers = [], auto = true, autoT = 0, idleT = 0, lastW = innerWidth;
-    const clear = () => { timers.forEach(clearTimeout); timers.forEach(clearInterval); timers = []; };
-    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
-    const every = (fn, ms) => timers.push(setInterval(fn, ms));
-    const S = () => SAMPLE[lang];
-    const speaking = (who) => $$('.tile', screen).forEach((tl) => tl.classList.toggle('speaking', tl.querySelector('.nm').textContent === who));
-
-    function size(w, html) {
-      const max = screen.clientWidth - 28;
-      const width = Math.min(w, max);
-      const m = document.createElement('div');
-      m.className = 'pill-in'; m.style.cssText = `position:absolute;visibility:hidden;inset:auto;width:${width}px;height:auto;`;
-      m.innerHTML = html; screen.appendChild(m);
-      const h = Math.max(38, m.offsetHeight); m.remove();
-      pill.style.setProperty('--pw', width + 'px'); pill.style.setProperty('--ph', h + 'px');
-      pill.style.borderRadius = h > 44 ? '26px' : '22px';
+  /* ---------------- the real pill, on a real Mac or Windows screen ---------------- */
+  // site/showcase/island.js is a replica of the app's pill drawn from its Rust code;
+  // site/showcase/desktop.js draws the Mac and Windows screens it sits on.
+  const BEATS = ['idle', 'captions', 'live', 'minutes', 'media', 'today'];
+  const DUR = { idle: 3200, captions: 4400, live: 6000, minutes: 6600, media: 5800, today: 5600 };
+  const CAP = { idle: 'cap.rest', captions: 'cap.listen', live: 'cap.live', minutes: 'cap.minutes', media: 'cap.youtube', today: 'cap.today' };
+  // The subtitle window shows the same lines as the pill, as it does in the app.
+  const OVERLAY = {
+    en: [['Let us review the launch plan.', 'Mari kita tinjau rencana peluncuran.'], ['We ship on Friday if QA passes.', 'Kita rilis hari Jumat jika QA lulus.']],
+    id: [['Let us review the launch plan.', 'Mari kita tinjau rencana peluncuran.'], ['We ship on Friday if QA passes.', 'Kita rilis hari Jumat jika QA lulus.']]
+  };
+  const shows = (() => {
+    if (!window.SMDesktop || !window.SMIsland) return null;
+    const zoom = $('#zoom'), zdesk = $('#zoom-desk'), stage = $('#desk-stage');
+    const SW = { mac: 1512, win: 1536 };
+    let os = /win/i.test(ua) && !isPhone ? 'win' : 'mac';
+    let idle = 'kasi', scene = 'call', overlay = true, beat = 'idle';
+    let timer = 0, idleT = 0, auto = true, hovering = false, lastW = innerWidth;
+    const hero = {}, full = {};
+    const island = (slot) => SMIsland.mount(slot, { os, lang, idle, theme: 'paper', scale: 'css', reducedMotion: REDUCED });
+    function fitHero() {
+      const k = Math.min(1, zoom.clientWidth / 700);
+      zdesk.style.width = Math.round(SW[os] * k) + 'px';
     }
-    function paint(html, w) {
-      size(w, html);
-      inner.classList.remove('fade'); void inner.offsetWidth; inner.classList.add('fade');
-      inner.innerHTML = html;
+    // one screen point in CSS px, as the desktop worked it out; the replica wants it as a plain number
+    function syncScale(h) {
+      if (!h.isl || !h.desk) return;
+      const pt = parseFloat(getComputedStyle(h.desk.islandSlot).getPropertyValue('--dsk-pt')) || 1;
+      h.isl.root.style.setProperty('--isl-scale', String(pt));
+      h.isl.resize();
     }
-    function kasiSize() {
-      const k = Math.max(92, Math.min(150, screen.clientWidth * 0.2));
-      $('#hanger').style.setProperty('--kw', k + 'px');
+    function resizeIslands() { requestAnimationFrame(() => { syncScale(hero); syncScale(full); }); }
+    function fullBeat() {
+      if (!full.isl) return;
+      if (scene === 'video') full.isl.go('media');
+      else if (scene === 'menu') full.isl.go('idle');
+      else if (!REDUCED) full.isl.play(); else full.isl.go('captions');
     }
-
-    const SCENES = {
-      rest() {
-        hanger.set({ pose: 'hang', lids: 0.6, earAngle: 40 });
-        const style = restStyle;
-        if (style === 'min') { paint('', 110); pill.style.setProperty('--ph', '12px'); pill.style.borderRadius = '8px'; }
-        else if (style === 'clock') paint(`<div class="p-row"><span class="p-time">${clock()}</span><span class="sp"></span><span class="p-dim">82%</span></div>`, 164);
-        else if (style === 'status') paint(`<div class="p-row"><span class="rec" style="background:var(--yellow);box-shadow:none;animation:none"></span><span class="p-time">CC</span><span class="sp"></span><span class="p-dim">${clock()}</span></div>`, 164);
-        else { paint(`<div class="p-row"><span class="p-mk" data-mk></span><span class="p-time">${clock()}</span><span class="sp"></span><span class="p-dim">82%</span></div>`, 196); $('[data-mk]', inner).innerHTML = Kasi.svg({ pose: 'doze', small: true }); }
-        speaking('');
-      },
-      listen() {
-        hanger.set({ pose: 'hang', earAngle: 22, mouth: 'o', pupil: 1.06, brow: { dip: -30, bump: -45, inner: 0 } });
-        paint(`<div class="p-row"><span class="rec"></span><span>${esc(S().call)}</span><span class="sp"></span><span class="bars"><i></i><i></i><i></i><i></i><i></i></span></div>`, 300);
-        speaking('Alya');
-        every(() => hanger.set({ pose: 'hang', earAngle: 22 + (Math.random() - 0.5) * 10, earL: (Math.random() - .5) * 10, earR: (Math.random() - .5) * 10, mouth: 'o' }), 700);
-      },
-      live() {
-        hanger.set({ pose: 'write' });
-        const lines = S().lines; let i = 0, w = 0; const done = [];
-        const draw = () => {
-          const cur = lines[i], words = cur[1].split(' ');
-          const rows = done.slice(-2).map(([who, s]) => `<div class="cap-line"><b>${esc(who)}</b>${esc(s)}</div>`).join('') +
-            `<div class="cap-line now"><b>${esc(cur[0])}</b>${esc(words.slice(0, w).join(' '))}<span class="caret"></span></div>`;
-          const html = `<div class="p-head"><span class="rec"></span>${esc(S().live)} · ${esc(S().call)}<span class="sp"></span></div><div class="cap-lines">${rows}</div>`;
-          if (w === 0 && i === 0) paint(html, 540); else { size(540, html); inner.innerHTML = html; }
-          speaking(cur[0]);
-        };
-        draw();
-        every(() => {
-          const words = lines[i][1].split(' ');
-          if (w < words.length) { w++; draw(); return; }
-          done.push(lines[i]); i = (i + 1) % lines.length; w = 0; draw();
-        }, REDUCED ? 900 : 170);
-      },
-      translate() {
-        hanger.set({ pose: 'hang', earAngle: 30 });
-        const L = S().trLines; let i = 0;
-        const draw = (first) => {
-          const rows = L.slice(Math.max(0, i - 1), i + 1).map(([src, tr], n, arr) => `<div class="cap-line ${n === arr.length - 1 ? 'now' : ''}"><span class="src">${esc(src)}</span><span class="tr">${esc(tr)}</span></div>`).join('');
-          const html = `<div class="p-head">中文 → ${lang === 'id' ? 'Indonesia' : 'English'}<span class="sp"></span><span class="bars"><i></i><i></i><i></i></span></div><div class="cap-lines">${rows}</div>`;
-          if (first) paint(html, 540); else { size(540, html); inner.innerHTML = html; }
-          speaking('Wei Jie');
-        };
-        draw(true);
-        later(() => swivel(hanger, 1), 500);
-        every(() => { i = (i + 1) % L.length; draw(false); swivel(hanger, i % 2 ? -1 : 1); }, 2600);
-      },
-      minutes() {
-        hanger.set({ pose: 'hang', eyes: 'happy', mouth: 'grin', earAngle: 30 });
-        const s = S();
-        paint(`<div class="p-head">${esc(s.minutes)}<span class="sp"></span><span style="color:var(--yellow)">${esc(s.wait)}</span></div><div class="reg">` +
-          s.reg.map(([k, tag, tx, b], n) => `<div class="reg-row"><span class="tag ${k}">${esc(tag)}</span><span class="tx">${esc(tx)}</span><span class="mbtn ${n === 0 ? 'y' : ''}">${esc(b)}</span></div>`).join('') + '</div>', 560);
-        speaking('');
-      },
-      youtube() {
-        hanger.set({ pose: 'hang', earAngle: 26, gaze: [0, -0.6] });
-        const s = S(); let i = 0;
-        const draw = (first) => {
-          const [src, tr] = s.ytLines[i];
-          const html = `<div class="yt-title"><span class="ytb"></span>${esc(s.yt)}<span class="ready">${esc(s.ready)}</span></div><div class="p-head" style="padding-top:8px">${esc(s.ytPair)}</div><div class="cap-lines"><div class="cap-line now"><span class="src">${esc(src)}</span><span class="tr">${esc(tr)}</span></div></div>`;
-          if (first) paint(html, 520); else { size(520, html); inner.innerHTML = html; }
-        };
-        draw(true); speaking('');
-        every(() => { i = (i + 1) % s.ytLines.length; draw(false); }, 2400);
-      },
-      today() {
-        hanger.set({ pose: 'hang', pose2: 'think', gaze: [0.6, -0.8], earAngle: 30, mouth: 'small' });
-        const s = S();
-        paint(`<div class="p-head">${esc(s.todayH)}<span class="sp"></span>${clock()}</div><div class="reg" style="gap:0">` +
-          s.today.map(([tm, tx, st]) => `<div class="today-row"><span class="tm">${tm}</span><span class="tx">${esc(tx)}</span>${st === 'join' ? `<span class="mbtn y">${esc(s.join)}</span>` : st === 'done' ? `<span class="p-dim">${esc(s.done)}</span>` : ''}</div>`).join('') + '</div>', 460);
-        speaking('');
-      }
-    };
-
-    function go(next, fromUser) {
-      clear(); state = next;
-      island.dataset.state = next; island.dataset.rest = restStyle;
-      $('#hanger').classList.toggle('sway', next !== 'rest' && !REDUCED);
-      $$('#chips button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.state === next)));
-      const chipRow = $('#chips'), cur = $(`#chips [data-state="${next}"]`);
-      if (cur && (cur.offsetLeft < chipRow.scrollLeft || cur.offsetLeft + cur.offsetWidth > chipRow.scrollLeft + chipRow.clientWidth)) chipRow.scrollTo({ left: cur.offsetLeft - 6, behavior: REDUCED ? 'auto' : 'smooth' });
-      $('#demo-cap').textContent = t('cap.' + next);
-      if (fromUser) $('#demo-live').textContent = t('cap.' + next);
-      kasiSize();
-      SCENES[next]();
-      clearTimeout(autoT);
-      if (fromUser) { auto = false; clearTimeout(idleT); idleT = setTimeout(() => { auto = true; schedule(); }, 30000); }
-      schedule();
+    function mountIslands() {
+      [hero, full].forEach((h) => { if (h.isl) { h.isl.destroy(); h.isl = null; } });
+      hero.isl = island(hero.desk.islandSlot);
+      full.isl = island(full.desk.islandSlot);
+      resizeIslands();
+      setTimeout(() => { hero.isl.go(beat, { snap: true }); fullBeat(); }, 60);
+    }
+    function build() {
+      [hero, full].forEach((h) => {
+        if (h.isl) { h.isl.destroy(); h.isl = null; }
+        if (h.desk) { h.desk.destroy(); h.desk = null; }
+      });
+      zdesk.innerHTML = ''; stage.innerHTML = '';
+      fitHero();
+      hero.desk = SMDesktop.mount(zdesk, { os, scene: 'call', lang, frame: false, overlay: false });
+      full.desk = SMDesktop.mount(stage, { os, scene: scene === 'video' ? 'video' : 'call', lang, frame: true, overlay, menu: scene === 'menu' });
+      full.desk.setCaptions(OVERLAY[lang]);
+      $$('.os-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.os === os)));
+      mountIslands();
     }
     function schedule() {
-      clearTimeout(autoT);
-      if (!auto || REDUCED) return;
-      autoT = setTimeout(() => { if (visible(screen)) go(ORDER[(ORDER.indexOf(state) + 1) % ORDER.length]); else schedule(); }, DUR[state]);
+      clearTimeout(timer);
+      if (!auto || REDUCED || hovering) return;
+      timer = setTimeout(() => {
+        if (visible(zoom)) go(BEATS[(BEATS.indexOf(beat) + 1) % BEATS.length]); else schedule();
+      }, DUR[beat]);
     }
-    $$('#chips button').forEach((b) => b.addEventListener('click', () => go(b.dataset.state, true)));
+    function go(b, fromUser) {
+      beat = b;
+      if (hero.isl) hero.isl.go(b);
+      $$('#chips button').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.beat === b)));
+      const row = $('#chips'), cur = $('#chips [data-beat="' + b + '"]');
+      if (cur && (cur.offsetLeft < row.scrollLeft || cur.offsetLeft + cur.offsetWidth > row.scrollLeft + row.clientWidth)) {
+        row.scrollTo({ left: cur.offsetLeft - 6, behavior: REDUCED ? 'auto' : 'smooth' });
+      }
+      $('#demo-cap').textContent = t(CAP[b]);
+      if (fromUser) {
+        $('#demo-live').textContent = t(CAP[b]);
+        auto = false; clearTimeout(idleT); idleT = setTimeout(() => { auto = true; schedule(); }, 30000);
+      }
+      schedule();
+    }
+    // the visitor's own hover drives the pill; the tour waits until they leave
+    zoom.addEventListener('pointerenter', () => { hovering = true; clearTimeout(timer); });
+    zoom.addEventListener('pointerleave', () => { hovering = false; schedule(); });
+    $$('#chips button').forEach((b) => b.addEventListener('click', () => go(b.dataset.beat, true)));
     $('#chips').addEventListener('keydown', (e) => {
-      if (!['ArrowRight', 'ArrowLeft'].includes(e.key)) return;
-      const i = ORDER.indexOf(state) + (e.key === 'ArrowRight' ? 1 : -1);
-      const n = ORDER[(i + ORDER.length) % ORDER.length]; go(n, true); $(`#chips [data-state="${n}"]`).focus();
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const i = BEATS.indexOf(beat) + (e.key === 'ArrowRight' ? 1 : -1);
+      const n = BEATS[(i + BEATS.length) % BEATS.length];
+      go(n, true); $('#chips [data-beat="' + n + '"]').focus();
     });
-    addEventListener('resize', () => { if (innerWidth === lastW) return; lastW = innerWidth; kasiSize(); go(state); });
-    // a fade on the toolbar's right edge while more chips sit out of view
-    const chipRow = $('#chips');
-    const fade = () => chipRow.classList.toggle('more', chipRow.scrollWidth > chipRow.clientWidth + 2 && chipRow.scrollLeft + chipRow.clientWidth < chipRow.scrollWidth - 4);
-    chipRow.addEventListener('scroll', fade, { passive: true }); addEventListener('resize', fade); setTimeout(fade, 300);
-    // open on Listening so the first frame always shows Kasi hanging under the pill
-    return { start: () => { go('listen'); fade(); }, repaint: () => { go(state); fade(); }, go, state: () => state };
+    $$('.os-switch button').forEach((b) => b.addEventListener('click', () => { if (b.dataset.os !== os) { os = b.dataset.os; build(); } }));
+    $$('.desk-bar [data-scene]').forEach((b) => b.addEventListener('click', () => {
+      scene = b.dataset.scene;
+      $$('.desk-bar [data-scene]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      full.desk.setScene(scene === 'video' ? 'video' : 'call');
+      full.desk.showMenu(scene === 'menu');
+      fullBeat();
+    }));
+    $('#desk-overlay').addEventListener('change', (e) => { overlay = e.target.checked; full.desk.showOverlay(overlay); });
+    addEventListener('resize', () => { if (innerWidth === lastW) return; lastW = innerWidth; fitHero(); resizeIslands(); });
+    build();
+    return {
+      go,
+      setLang(l) {
+        [hero, full].forEach((h) => { if (h.desk) h.desk.setLang(l); if (h.isl) h.isl.setLang(l); });
+        if (full.desk) full.desk.setCaptions(OVERLAY[l]);
+        $('#demo-cap').textContent = t(CAP[beat]);
+      },
+      setIdle(st) { idle = st; mountIslands(); }
+    };
   })();
 
   applyLang();
-  demo.start();
+  if (shows) shows.go('idle');
 })();
