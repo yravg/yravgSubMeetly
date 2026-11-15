@@ -41,7 +41,7 @@ Everything runs on the computer. Speech recognition (Whisper) and translation (O
 
 ## Brand Commitments
 
-- Name: **yravgSubMeetly**, part of the yravg family (lowercase `yravg`). Older internal name yraverageSubMin.
+- Name: **Kasi by yravg** (short: Kasi), renamed from yravgSubMeetly on 2026-11-15 by the owner. Scope: every name users see (site, app window, tray, pill, About, installer and DMG). Bundle ids, data folders, storage keys and the GitHub repo `yravg/yravgSubMeetly` keep the old name so updates, permissions and saved minutes carry over. Older internal name yraverageSubMin. Part of the yravg family (lowercase `yravg`).
 - Every UI string in English and Indonesian.
 - Mascot: the owner rejected Bud (green plush seedling, yravgBuds) as "too generic" and wants a mascot on par with top-chart apps of 2026 *(owner, 2026-11-15)*. Tide (white otter) is the current in-app mascot from yravgBuds.
 - Style reference for the landing page: rama2555.github.io/nusa *(owner, 2026-11-15)*: dark, one big live demo of the notch, short sections, EN/ID switch. Borrow structure and feel, not its words, art or purple look.

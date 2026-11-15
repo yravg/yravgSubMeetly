@@ -1,4 +1,4 @@
-/* yravgSubMeetly landing page: language, downloads, the live pill demo, and Kasi. */
+/* Kasi by yravg landing page (repo: yravgSubMeetly): language, downloads, the live pill demo, and Kasi. */
 (() => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -65,7 +65,7 @@
   $('#cta-main').addEventListener('click', (e) => {
     if (!isPhone || !navigator.share) return;
     e.preventDefault();
-    navigator.share({ title: 'yravgSubMeetly', url: location.href.split('#')[0] }).catch(() => { location.hash = 'download'; });
+    navigator.share({ title: 'Kasi by yravg', url: location.href.split('#')[0] }).catch(() => { location.hash = 'download'; });
   });
 
   /* ---------------- the headline captions itself ---------------- */

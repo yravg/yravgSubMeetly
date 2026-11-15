@@ -56,8 +56,9 @@ section { width: min(var(--wrap), 100% - 2 * var(--gut)); margin-inline: auto; }
 .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; padding-right: 8px; }
 .brand-kasi { width: 40px; height: 40px; margin: -2px 0 0; display: block; }
 .brand-kasi svg { width: 100%; height: 100%; overflow: visible; }
-.brand-word { font: 800 1.08rem/1 var(--display); letter-spacing: -0.02em; white-space: nowrap; }
-.brand-yr { color: var(--text-3); font-weight: 700; }
+.brand-word { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.brand-name { font: 800 1.28rem/1 var(--display); letter-spacing: -0.02em; }
+.brand-by { font: 600 .78rem/1 var(--body); color: var(--text-3); }
 .nav-links { display: flex; gap: 2px; }
 .nav-links a, .lang button { font: 600 .92rem/1 var(--body); color: var(--text-2); text-decoration: none; padding: 10px 12px; border-radius: 99px; transition: color .2s, background .2s; }
 .nav-links a:hover { color: var(--text); background: rgba(255,255,255,.07); }
@@ -349,7 +350,7 @@ details p { color: var(--text-2); padding: 0 0 24px; max-width: 64ch; }
   body { font-size: 16px; }
   .nav { height: 48px; gap: 4px; }
   .brand-word { font-size: .98rem; }
-  .brand-yr { display: none; }
+  .brand-by { display: none; }
   .nav-cta { padding: 11px 13px; font-size: .86rem; }
   .hero { padding-top: 104px; }
   .screen { aspect-ratio: 3 / 4; border-radius: 26px; }

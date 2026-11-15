@@ -1,4 +1,4 @@
-/* Kasi, the yravgSubMeetly tarsier. One parametric drawing for every pose.
+/* Kasi, the tarsier behind Kasi by yravg (formerly yravgSubMeetly). One parametric drawing for every pose.
    Kasi.svg(opts) returns an <svg> string; the head centre is the origin.
    Flat colours only, so it stays crisp from 16 px up and animates by
    re-rendering with new numbers (ears, lids, gaze, yaw). */
@@ -196,7 +196,7 @@
   // The app icon: Kasi's head on an ink squircle, two pads holding a subtitle-yellow bar.
   function icon(size = 1024) {
     const head = svg({ pose: 'mark', mouth: 'small' }).replace(/^<svg[^>]*>|<\/svg>$/g, '');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${size}" height="${size}" role="img" aria-label="yravgSubMeetly">` +
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${size}" height="${size}" role="img" aria-label="Kasi">` +
       `<path d="M512 0C860 0 1024 164 1024 512S860 1024 512 1024 0 860 0 512 164 0 512 0Z" fill="#4A3526"/>` +
       // a thin warm rim so the ink tile still reads on dark docks and taskbars
       `<path d="M512 0C860 0 1024 164 1024 512S860 1024 512 1024 0 860 0 512 164 0 512 0Z" transform="translate(512 512) scale(.972) translate(-512 -512)" fill="${C.ink}"/>` +

@@ -1,4 +1,4 @@
-// Builds yravgSubMeetly's brand icon set and the social share image from site/kasi.js.
+// Builds Kasi's (formerly yravgSubMeetly) brand icon set and the social share image from site/kasi.js.
 // Run from anywhere: node site/brand/icons/build.cjs
 //
 // Writes, under site/brand/icons/:
@@ -75,7 +75,7 @@ function smallSvg(size, uid = 's' + size) {
   const u = 1024 / size;                    // viewBox units per pixel
   const bh = Math.max(3, Math.round(size * 0.17)), bm = Math.round(size * 0.11), side = Math.round(size * 0.14);
   const bar = { x: side * u, y: (size - bm - bh) * u, w: (size - 2 * side) * u, h: bh * u };
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${size}" height="${size}" role="img" aria-label="yravgSubMeetly">` +
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${size}" height="${size}" role="img" aria-label="Kasi">` +
     // one-pixel warm rim so the tile reads on dark taskbars (matches Kasi.icon)
     `<path d="${SQUIRCLE}" fill="#4A3526"/>` +
     `<path d="${SQUIRCLE}" transform="translate(512 512) scale(${f2((1024 - 2 * u) / 1024)}) translate(-512 -512)" fill="${C.ink}"/>` +
@@ -301,7 +301,7 @@ function previewHtml(before) {
 </head>
 <body>
 <main>
-  <h1>yravgSubMeetly app icon</h1>
+  <h1>Kasi app icon</h1>
   <p class="lead">Kasi's head on an ink squircle, holding a subtitle-yellow caption bar. Drawn by <code>Kasi.icon()</code> in <code>site/kasi.js</code>; every file here comes from <code>build.cjs</code>. For review only: nothing is wired into the app yet.</p>
 
   <h2>Every size</h2>
