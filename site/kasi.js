@@ -64,8 +64,8 @@
       `<circle cx="${f(cx + R * 0.33 * sx)}" cy="${f(cy + R * 0.33)}" r="${f(R * 0.1)}" fill="${C.hi}" opacity=".85"/></g>`;
     if (lid > 0) {
       const top = cy - R - 2, y = top + lid * (2 * R + 4), sag = R * 0.3 * (1 - Math.abs(lid - 0.5));
-      g += `<path d="M${f(cx - rx - 2)} ${top} H${f(cx + rx + 2)} V${f(y)} Q${f(cx)} ${f(y + sag)} ${f(cx - rx - 2)} ${f(y)}Z" fill="${C.fur}"/>` +
-        `<path d="M${f(cx - rx - 2)} ${f(y)} Q${f(cx)} ${f(y + sag)} ${f(cx + rx + 2)} ${f(y)}" fill="none" stroke="${C.deep}" stroke-width="3.2"/>`;
+      g += `<path d="M${f(cx - rx - 2)} ${top} H${f(cx + rx + 2)} V${f(y)} Q${f(cx)} ${f(y + sag)} ${f(cx - rx - 2)} ${f(y)}Z" fill="${C.mask}"/>` +
+        `<path d="M${f(cx - rx - 2)} ${f(y)} Q${f(cx)} ${f(y + sag)} ${f(cx + rx + 2)} ${f(y)}" fill="none" stroke="${C.deep}" stroke-width="4" stroke-linecap="round"/>`;
     }
     return g + '</g></g>';
   }
