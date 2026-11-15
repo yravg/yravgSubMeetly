@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>yravgSubMeetly · live captions and minutes, on your computer</title>
+<meta name="description" content="A small pill at the top of your screen that captions your calls and videos, translates them on your computer, and drafts the minutes. Windows and Mac. No account, no cloud.">
+<meta name="theme-color" content="#0C0B09">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@600;700;800;900&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="yravgSubMeetly home">
+    <span class="brand-kasi" data-kasi="nav" aria-hidden="true"></span>
+    <span class="brand-word"><span class="brand-yr">yravg</span>SubMeetly</span>
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#demo" data-i18n="nav.demo">Demo</a>
+    <a href="#kasi" data-i18n="nav.kasi">Kasi</a>
+    <a href="#features" data-i18n="nav.features">Features</a>
+    <a href="#private" data-i18n="nav.private">Private</a>
+  </nav>
+  <div class="lang" role="group" data-i18n-attr="aria-label:lang.label" aria-label="Language">
+    <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    <button type="button" data-lang="id" aria-pressed="false">ID</button>
+  </div>
+  <a class="nav-cta" href="#download" data-i18n="nav.download">Download</a>
+</header>
+
+<main id="main">
+<section class="hero" id="top">
+  <p class="badge" data-i18n="hero.badge">Free for Windows 10, 11 and macOS</p>
+  <h1><span data-i18n="hero.h1a">Every word,</span> <span class="h1b" data-i18n="hero.h1b">right where you look.</span></h1>
+  <p class="lede" data-i18n="hero.sub">yravgSubMeetly sits at the top of your screen and listens to your calls, videos and the room. It shows live captions, translates them on your computer, and leaves you minutes when the meeting ends.</p>
+  <div class="cta">
+    <a class="btn btn-primary" id="cta-main" href="https://github.com/yravg/yravgSubMeetly/releases/latest">
+      <svg class="os-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span id="cta-main-label" data-i18n="hero.win">Download for Windows</span>
+    </a>
+    <a class="btn btn-ghost" id="cta-alt" href="https://github.com/yravg/yravgSubMeetly/releases/latest"><span id="cta-alt-label" data-i18n="hero.other.mac">Also for Mac</span></a>
+  </div>
+  <p class="meta" id="hero-meta">Version 1.4.5 · 35 MB</p>
+  <p class="meta count" id="hero-count" hidden></p>
+</section>
+
+<section class="demo" id="demo" aria-labelledby="demo-label">
+  <h2 class="sr" id="demo-label" data-i18n="demo.label">Try the pill</h2>
+  <div class="screen" id="screen">
+    <div class="call" aria-hidden="true">
+      <div class="tile" data-who="a"><span class="av">AR</span><span class="nm">Alya</span></div>
+      <div class="tile" data-who="b"><span class="av">WJ</span><span class="nm">Wei Jie</span></div>
+      <div class="tile" data-who="c"><span class="av">DS</span><span class="nm">Dimas</span></div>
+      <div class="tile you" data-who="d"><span class="av">You</span><span class="nm">You</span></div>
+    </div>
+    <div class="island" id="island" data-state="rest">
+      <div class="pill" id="pill"><div class="pill-in" id="pill-in"></div></div>
+      <div class="hanger" id="hanger" data-kasi="demo" aria-hidden="true"></div>
+    </div>
+  </div>
+  <div class="chips" role="tablist" id="chips" aria-label="Pill states">
+    <button role="tab" data-state="rest" data-i18n="chip.rest">Resting</button>
+    <button role="tab" data-state="listen" data-i18n="chip.listen">Listening</button>
+    <button role="tab" data-state="live" data-i18n="chip.live">Live captions</button>
+    <button role="tab" data-state="translate" data-i18n="chip.translate">Translate</button>
+    <button role="tab" data-state="minutes" data-i18n="chip.minutes">Minutes</button>
+    <button role="tab" data-state="youtube" data-i18n="chip.youtube">YouTube CC</button>
+    <button role="tab" data-state="today" data-i18n="chip.today">Today</button>
+  </div>
+  <p class="demo-cap" id="demo-cap" aria-live="polite"></p>
+  <p class="demo-note" data-i18n="demo.sample">Sample call and sample text, to show how it works.</p>
+</section>
+
+<section class="kasi" id="kasi" aria-labelledby="kasi-h">
+  <div class="kasi-stage" id="kasi-stage">
+    <div class="kasi-big" data-kasi="big" aria-hidden="true"></div>
+    <p class="kasi-tip" data-i18n="kasi.tip">Move your pointer. Kasi is watching.</p>
+  </div>
+  <div class="kasi-copy">
+    <h2 id="kasi-h"><span class="h-line" data-i18n="kasi.h">Meet Kasi.</span> <span class="h-line muted" data-i18n="kasi.h2">Big ears, bigger eyes.</span></h2>
+    <p data-i18n="kasi.p">Kasi is a tarsier, a tiny primate from the forests of Sulawesi with ears that turn toward every sound and eyes larger than its brain. It lives on your pill, hears what you hear and writes it down. Kasi never talks. It listens.</p>
+  </div>
+  <ol class="states" id="states">
+    <li data-pose="listen"><span class="st-k"></span><b data-i18n="kasi.s.listen">Listening</b><span data-i18n="kasi.s.listen.d">Ears up the moment a call or video starts.</span></li>
+    <li data-pose="write"><span class="st-k"></span><b data-i18n="kasi.s.write">Writing</b><span data-i18n="kasi.s.write.d">Pencil out while captions run.</span></li>
+    <li data-pose="translate"><span class="st-k"></span><b data-i18n="kasi.s.translate">Translating</b><span data-i18n="kasi.s.translate.d">Turns its head from one language to the other.</span></li>
+    <li data-pose="think"><span class="st-k"></span><b data-i18n="kasi.s.think">Thinking</b><span data-i18n="kasi.s.think.d">Drafting the minutes after the call.</span></li>
+    <li data-pose="done"><span class="st-k"></span><b data-i18n="kasi.s.done">Done</b><span data-i18n="kasi.s.done.d">Minutes ready. One clap.</span></li>
+    <li data-pose="rest"><span class="st-k"></span><b data-i18n="kasi.s.rest">Resting</b><span data-i18n="kasi.s.rest.d">Nothing playing. One eye open.</span></li>
+  </ol>
+</section>
+
+<section class="features" id="features" aria-labelledby="feat-h">
+  <div class="sec-head">
+    <h2 id="feat-h" data-i18n="feat.h">Everything you hear, in words.</h2>
+    <p data-i18n="feat.p">Hover the pill to open it. Move away and it closes. Captions start by themselves when a call or a video plays.</p>
+  </div>
+  <ul class="flist">
+    <li><i data-ico="cc"></i><div><h3 data-i18n="f.live.t">Captions from anything</h3><p data-i18n="f.live.d"></p></div></li>
+    <li><i data-ico="tr"></i><div><h3 data-i18n="f.tr.t">Translation on your computer</h3><p data-i18n="f.tr.d"></p></div></li>
+    <li><i data-ico="meet"></i><div><h3 data-i18n="f.meet.t">Knows a meeting from a video</h3><p data-i18n="f.meet.d"></p></div></li>
+    <li><i data-ico="min"></i><div><h3 data-i18n="f.min.t">Minutes, not just a transcript</h3><p data-i18n="f.min.d"></p></div></li>
+    <li><i data-ico="yt"></i><div><h3 data-i18n="f.yt.t">YouTube captions ahead of time</h3><p data-i18n="f.yt.d"></p></div></li>
+    <li><i data-ico="again"></i><div><h3 data-i18n="f.again.t">Translate a meeting again</h3><p data-i18n="f.again.d"></p></div></li>
+    <li><i data-ico="cal"></i><div><h3 data-i18n="f.today.t">Today, with Join</h3><p data-i18n="f.today.d"></p></div></li>
+    <li><i data-ico="who"></i><div><h3 data-i18n="f.who.t">Who said it</h3><p data-i18n="f.who.d"></p></div></li>
+    <li><i data-ico="model"></i><div><h3 data-i18n="f.models.t">Pick your models</h3><p data-i18n="f.models.d"></p></div></li>
+    <li><i data-ico="ask"></i><div><h3 data-i18n="f.ask.t">Ask your meetings</h3><p data-i18n="f.ask.d"></p></div></li>
+  </ul>
+</section>
+
+<section class="private" id="private" aria-labelledby="priv-h">
+  <div class="priv-copy">
+    <h2 id="priv-h" data-i18n="priv.h">Nothing leaves your computer.</h2>
+    <p data-i18n="priv.p"></p>
+  </div>
+  <div class="flow" aria-hidden="true">
+    <div class="node"><i data-ico="wave"></i><span data-i18n="priv.flow.in">Call, video, room</span></div>
+    <div class="wire"></div>
+    <div class="node mid"><span class="flow-kasi" data-kasi="hush"></span><span data-i18n="priv.flow.mid">Your computer</span></div>
+    <div class="wire"></div>
+    <div class="node"><i data-ico="min"></i><span data-i18n="priv.flow.out">Captions and minutes</span></div>
+    <div class="net"><i data-ico="cloud"></i><span data-i18n="priv.flow.no">Internet</span></div>
+  </div>
+  <ul class="three">
+    <li><h3 data-i18n="priv.a.t">No account</h3><p data-i18n="priv.a.d"></p></li>
+    <li><h3 data-i18n="priv.b.t">No cloud</h3><p data-i18n="priv.b.d"></p></li>
+    <li><h3 data-i18n="priv.c.t">Your files</h3><p data-i18n="priv.c.d"></p></li>
+  </ul>
+</section>
+
+<section class="yours" id="yours" aria-labelledby="yours-h">
+  <div class="sec-head">
+    <h2 id="yours-h" data-i18n="yours.h">Make it yours.</h2>
+    <p data-i18n="yours.p"></p>
+  </div>
+  <div class="yours-grid">
+    <div class="yours-block">
+      <h3 data-i18n="yours.tabs">Tabs, in your order</h3>
+      <ul class="tabs-row" id="tabs-row" aria-describedby="tabs-hint"></ul>
+      <p class="hint" id="tabs-hint" data-i18n="yours.tabs.hint">Drag a tab, or focus it and use the arrow keys.</p>
+      <h3 data-i18n="yours.pal" style="margin-top:34px">Palettes</h3>
+      <div class="swatches" id="swatches"></div>
+    </div>
+    <div class="yours-block">
+      <h3 data-i18n="yours.rest">When it rests</h3>
+      <div class="rests" id="rests">
+        <div class="rest"><div class="mini-pill"><span class="t">14:32</span><span class="b">82%</span></div><span data-i18n="yours.rest.clock">Clock</span></div>
+        <div class="rest"><div class="mini-pill"><span class="mk" data-kasi="pill"></span><span class="t">14:32</span></div><span data-i18n="yours.rest.eyes">Kasi</span></div>
+        <div class="rest"><div class="mini-pill thin"></div><span data-i18n="yours.rest.min">Minimal</span></div>
+        <div class="rest"><div class="mini-pill"><span class="dot"></span><span class="t">CC</span></div><span data-i18n="yours.rest.status">Status</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="new" id="new" aria-labelledby="new-h">
+  <div class="sec-head">
+    <h2 id="new-h" data-i18n="new.h">New in 1.4.</h2>
+    <p data-i18n="new.p"></p>
+  </div>
+  <ul class="nlist">
+    <li><b data-i18n="new.1.t"></b><span data-i18n="new.1.d"></span><em>1.4.5</em></li>
+    <li><b data-i18n="new.2.t"></b><span data-i18n="new.2.d"></span><em>1.4.2</em></li>
+    <li><b data-i18n="new.3.t"></b><span data-i18n="new.3.d"></span><em>1.4.2</em></li>
+    <li><b data-i18n="new.4.t"></b><span data-i18n="new.4.d"></span><em>1.4.0</em></li>
+    <li><b data-i18n="new.5.t"></b><span data-i18n="new.5.d"></span><em>1.4.0</em></li>
+    <li><b data-i18n="new.6.t"></b><span data-i18n="new.6.d"></span><em>1.4.0</em></li>
+  </ul>
+  <a class="textlink" href="https://github.com/yravg/yravgSubMeetly/blob/main/CHANGELOG.md" data-i18n="new.all">Read the full changelog</a>
+</section>
+
+<section class="download" id="download" aria-labelledby="dl-h">
+  <h2 id="dl-h" data-i18n="dl.h">Get yravgSubMeetly.</h2>
+  <div class="dl-grid">
+    <div class="dl" id="dl-win">
+      <svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3Zm0 13 7.5 1.1v-7H3Zm8.5 1.3L21 21.2V12.6h-9.5Zm0-15.6v7.4H21V2.8Z" fill="currentColor"/></svg>
+      <h3 data-i18n="dl.win.t">Windows</h3>
+      <p class="req" data-i18n="dl.win.req">Windows 10 or 11, 64-bit</p>
+      <p class="size" data-size="win">35.1 MB · version 1.4.5</p>
+      <a class="btn btn-primary" data-href="win" href="https://github.com/yravg/yravgSubMeetly/releases/latest" data-i18n="dl.win.btn">Download Setup</a>
+      <p class="note" data-i18n="dl.win.note"></p>
+    </div>
+    <div class="dl" id="dl-mac">
+      <svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.9-.9-3.1-.8-1.6 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.6s-2.4-1-2.4-3.7ZM14.2 5.6c.6-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.1 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.3Z" fill="currentColor"/></svg>
+      <h3 data-i18n="dl.mac.t">macOS</h3>
+      <p class="req" data-i18n="dl.mac.req">Apple silicon and Intel</p>
+      <p class="size" data-size="mac">67.4 MB · version 1.4.5</p>
+      <a class="btn btn-primary" data-href="mac" href="https://github.com/yravg/yravgSubMeetly/releases/latest" data-i18n="dl.mac.btn">Download DMG</a>
+      <p class="note" data-i18n="dl.mac.note"></p>
+    </div>
+  </div>
+  <p class="dl-after"><span data-i18n="dl.models"></span> <a class="textlink" href="https://github.com/yravg/yravgSubMeetly/releases" data-i18n="dl.all">All releases on GitHub</a></p>
+</section>
+
+<section class="faq" id="faq" aria-labelledby="faq-h">
+  <h2 id="faq-h" data-i18n="faq.h">Questions</h2>
+  <details><summary data-i18n="faq.1.q"></summary><p data-i18n="faq.1.a"></p></details>
+  <details><summary data-i18n="faq.2.q"></summary><p data-i18n="faq.2.a"></p></details>
+  <details><summary data-i18n="faq.3.q"></summary><p data-i18n="faq.3.a"></p></details>
+  <details><summary data-i18n="faq.4.q"></summary><p data-i18n="faq.4.a"></p></details>
+  <details><summary data-i18n="faq.5.q"></summary><p data-i18n="faq.5.a"></p></details>
+</section>
+</main>
+
+<footer class="foot">
+  <span class="foot-kasi" data-kasi="foot" aria-hidden="true"></span>
+  <p><b>yravgSubMeetly</b> · <span data-i18n="foot.made">Part of the yravg family.</span></p>
+  <nav aria-label="Footer">
+    <a href="https://github.com/yravg/yravgSubMeetly" data-i18n="foot.github">GitHub</a>
+    <a href="https://github.com/yravg/yravgSubMeetly/blob/main/CHANGELOG.md" data-i18n="foot.changelog">Changelog</a>
+    <a href="https://github.com/yravg/yravgSubMeetly/issues" data-i18n="foot.issues">Report a problem</a>
+  </nav>
+</footer>
+
+<script src="i18n.js"></script>
+<script src="kasi.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
