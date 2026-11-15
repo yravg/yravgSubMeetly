@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kasi brand sheet</title>
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@600;700;800;900&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+<style>
+  body { padding: 0 0 80px; }
+  .bs { width: min(1180px, 100% - 32px); margin: 0 auto; }
+  .bs-head { padding: 64px 0 24px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  .bs-head h1 { font: 900 clamp(2.4rem, 6vw, 4.4rem)/1 var(--display); letter-spacing: -0.04em; }
+  .bs-head p { color: var(--text-2); max-width: 60ch; }
+  .bs h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); margin: 72px 0 8px; }
+  .bs .lead { color: var(--text-2); max-width: 66ch; margin-bottom: 24px; }
+  .grid { display: grid; gap: 16px; }
+  .g4 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .g6 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .tile { background: var(--bg-2); border-radius: 22px; box-shadow: inset 0 0 0 1px var(--line); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .tile.cream { background: #F4EFE6; color: #1B120B; }
+  .tile .art { display: grid; place-items: center; min-height: 150px; }
+  .tile .art > svg { width: 100%; height: 170px; overflow: visible; }
+  .tile .art > svg[width] { width: auto; height: auto; }
+  .tile b { font: 700 1rem/1.2 var(--display); }
+  .tile > span { color: var(--text-3); font-size: .9rem; line-height: 1.4; }
+  .tile.cream > span { color: #6B5A49; }
+  .lock { display: flex; align-items: center; gap: 12px; font: 800 1.7rem/1 var(--display); letter-spacing: -0.03em; white-space: nowrap; }
+  .lock .y { color: var(--text-3); font-weight: 700; }
+  .tile.cream .lock .y { color: #8A7660; }
+  .ladder { display: flex; align-items: end; gap: 18px; flex-wrap: wrap; }
+  .ladder div { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-3); font-size: .8rem; }
+  .sw2 { height: 84px; border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .rules ul { margin: 0; padding-left: 20px; color: var(--text-2); display: grid; gap: 8px; }
+  .rules h3 { margin-bottom: 12px; }
+  .type-big { font: 900 4rem/1 var(--display); letter-spacing: -0.04em; }
+  .type-body { font: 400 1.1rem/1.55 var(--body); color: var(--text-2); max-width: 60ch; }
+  @media (max-width: 760px) { .rules { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="bs">
+  <header class="bs-head">
+    <span id="hdr-k" style="width:96px;height:96px;display:block"></span>
+    <div><h1>Kasi &amp; yravgSubMeetly</h1><p>Brand sheet: the mascot, the marks, colour, type, motion and the rules. Every Kasi on this page is drawn live by <code>kasi.js</code>; the SVG files are in <code>site/assets/</code>.</p><p style="margin-top:10px"><a class="textlink" href="stickers/">Animated stickers</a> · <a class="textlink" href="icons/">App icon set</a> · <a class="textlink" href="../">Landing page</a></p></div>
+  </header>
+
+  <h2>Who Kasi is</h2>
+  <p class="lead">A tarsier from the forests of Sulawesi: ears that turn toward every sound, eyes larger than its brain. Kasi hangs under the pill, hears what you hear and writes it down. Kasi never talks. Its job is the product's job: listen, write, translate, keep the minutes.</p>
+
+  <h2>Marks</h2>
+  <div class="grid g4" id="marks"></div>
+
+  <h2>Size ladder</h2>
+  <p class="lead">The full head with amber eye rims from 64 px up. Below 64 px use the mark: no rims, larger eyes, no mouth. Below 16 px use the app icon or the word.</p>
+  <div class="tile"><div class="ladder" id="ladder"></div></div>
+
+  <h2>Model sheet</h2>
+  <p class="lead">Front, three-quarter and back. The 180° head turn is Kasi's signature move and plays when captions are translated.</p>
+  <div class="grid g6" id="turn"></div>
+
+  <h2>Expressions</h2>
+  <p class="lead">The top edge of the face plate is the brow line: raise it for surprise, drop the inner ends for worry. Ears carry the rest.</p>
+  <div class="grid g6" id="faces"></div>
+
+  <h2>Poses</h2>
+  <div class="grid g4" id="poses"></div>
+
+  <h2>Kasi in the product</h2>
+  <div class="grid g6" id="moments"></div>
+
+  <h2>Colour</h2>
+  <div class="grid g6" id="colors"></div>
+
+  <h2>Type</h2>
+  <div class="tile"><p class="type-big">Every word, right where you look.</p><p style="color:var(--text-3)">Gabarito 800–900 · display, tracking −0.035 to −0.04em</p>
+    <p class="type-body" style="margin-top:16px">Figtree 400–700 for body and interface. Plain, second person, short sentences. Every string ships in English and Indonesian.</p></div>
+
+  <h2>Rules</h2>
+  <div class="rules">
+    <div class="tile"><h3>Do</h3><ul>
+      <li>One Kasi per screen, attached to the pill or standing alone.</li>
+      <li>Hang under the pill. The pill touches the top of the screen, so Kasi is never above it.</li>
+      <li>Let ears and eyes do the acting; keep the mouth small.</li>
+      <li>Use the mark (no rims) under 64 px and inside the 32 px resting pill.</li>
+      <li>Keep the colours flat: fur, shade, ear, face plate, ink, amber, subtitle yellow.</li>
+    </ul></div>
+    <div class="tile"><h3>Don't</h3><ul>
+      <li>Give Kasi words, speech bubbles or captions of its own. It listens.</li>
+      <li>Show eyes only in the pill: that reads as another app's notch. Always the head with ears.</li>
+      <li>Point the ears sideways past 40° except in hush and doze; flat ears read as Gizmo.</li>
+      <li>Add gradients, outlines, blush or a cat mouth.</li>
+      <li>Put Kasi on real error states. Errors get plain words: what stopped and what to do.</li>
+    </ul></div>
+  </div>
+
+  <h2>Motion</h2>
+  <div class="grid g4">
+    <div class="tile"><b>Blink</b><span>120 ms, every 2.4–6 s at random. Never while happy or asleep.</span></div>
+    <div class="tile"><b>Ears listen</b><span>Each ear twitches up to ±7° every 0.7–1.7 s while sound plays.</span></div>
+    <div class="tile"><b>Head turn</b><span>900 ms: front → ¾ → back → ¾ → front, on each translated line.</span></div>
+    <div class="tile"><b>Drop in</b><span>Captions start: Kasi drops from the pill on a spring (0.7 s), then sways ±2.2° every 3.2 s.</span></div>
+  </div>
+</div>
+<script src="../kasi.js"></script>
+<script>
+  const S = (o) => Kasi.svg(o);
+  document.getElementById('hdr-k').innerHTML = S({ pose: 'happy' });
+  const tile = (art, b, s, cls = '') => `<div class="tile ${cls}"><div class="art">${art}</div><b>${b}</b><span>${s}</span></div>`;
+  const word = '<span class="y">yravg</span>SubMeetly';
+  const mark = (h) => S({ pose: 'mark', mouth: 'small' }).replace('<svg', `<svg width="${h}" height="${h}"`);
+  document.getElementById('marks').innerHTML =
+    tile(Kasi.icon(150), 'App icon', 'Kasi’s head on an ink squircle, two pads holding a subtitle-yellow caption bar.') +
+    tile(`<div class="lock">${mark(54)}<span>${word}</span></div>`, 'Lockup on dark', 'Mark at 1.6× the cap height, then the word. “yravg” in the muted tone.') +
+    tile(`<div class="lock">${mark(54)}<span>${word}</span></div>`, 'Lockup on light', 'Same lockup on paper.', 'cream') +
+    tile(`<div style="background:#000;border-radius:99px;height:40px;display:flex;align-items:center;gap:8px;padding:0 16px 0 6px;color:#fff;font-weight:700">${mark(32)}14:32</div>`, 'Resting pill', 'The Kasi resting style: mark plus clock, 32 px tall.');
+  document.getElementById('ladder').innerHTML = [[128, 0], [96, 0], [64, 0], [48, 1], [32, 1], [24, 1], [16, 1]].map(([s, m]) =>
+    `<div>${S(m ? { pose: 'mark' } : {}).replace('<svg', `<svg width="${s}" height="${s}"`)}${s}px</div>`).join('');
+  document.getElementById('turn').innerHTML = [[{}, 'Front'], [{ yaw: .55 }, '¾ right'], [{ yaw: .95 }, 'Turned'], [{ back: true }, 'Back'], [{ yaw: -.55 }, '¾ left']].map(([o, n]) => tile(S(o), n, '')).join('');
+  document.getElementById('faces').innerHTML = [['listen', 'Listening', 'Ears up, pupils wide.'], ['happy', 'Got it', 'Eyes ^ ^, a grin.'], ['think', 'Thinking', 'Looks up and away, lids low.'], ['doze', 'Dozing', 'Lids half down, ears back.'], ['worry', 'Unsure', 'Inner brows drop.'], ['scribe', 'Writing', 'Pencil behind the ear, eyes down.']].map(([p, n, s]) => tile(S({ pose: p }), n, s)).join('');
+  document.getElementById('poses').innerHTML = [['hang', 'Hang', 'Both hands on the pill’s lower edge. The default with the pill.'], ['write', 'Scribe', 'Hanging, pencil behind the ear, eyes on the caption.'], ['hush', 'Hush', 'Hands over the ears: paused, private, nothing leaves.'], ['sit', 'Sit', 'Standing alone: onboarding, empty pages.']].map(([p, n, s]) => tile(S({ pose: p, pill: p === 'hang' || p === 'write' }), n, s, 'cream')).join('');
+  document.getElementById('moments').innerHTML = [['doze', 'Resting', 'Nothing playing.'], ['listen', 'Captions start', 'A call or video begins.'], ['scribe', 'Live captions', 'Lines being written.'], [{ yaw: .8 }, 'Translating', 'Head turn per line.'], ['think', 'Drafting minutes', 'After the call.'], ['happy', 'Minutes ready', 'Decisions and actions drafted.']].map(([p, n, s]) => tile(S(typeof p === 'string' ? { pose: p } : p), n, s)).join('');
+  const C = Kasi.colors;
+  document.getElementById('colors').innerHTML = [['Ink', '#0C0B09', 'Page ground'], ['Pill', '#000000', 'The island'], ['Subtitle yellow', '#FFD23F', 'The one accent: actions, captions'], ['Text', '#F6F1E8', 'On dark'], ['Fur', C.fur, 'Kasi'], ['Shade', C.shade, 'Kasi tail, ridges'], ['Ear', C.earIn, 'Inner ear, pads'], ['Face plate', C.mask, 'Kasi'], ['Amber', C.amber, 'Eye rim ≥ 64 px'], ['Kasi ink', C.ink, 'Eyes, nose']].map(([n, c, s]) => `<div class="tile"><div class="sw2" style="background:${c}"></div><b>${n}</b><span>${c} · ${s}</span></div>`).join('');
+</script>
+</body>
+</html>
