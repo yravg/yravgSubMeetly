@@ -71,10 +71,10 @@ html[data-reskin="tide"][data-theme="paper"] :focus-visible { outline-color: var
 html[data-reskin="tide"] .type { color: var(--text); }
 html[data-reskin="tide"] .type i { width: 8px; height: 8px; border-radius: 50%; }
 
-/* Perbaikan A04a: register kosong dengan Tide tertidur (satu maskot). */
+/* Perbaikan A04a: register kosong dengan Kasi terkantuk (satu maskot; pose diam bila gerak dikurangi). */
 html[data-reskin="tide"] #empty-state .empty::before {
   content: ''; display: block; width: 120px; height: 120px; margin: 0 auto 12px;
-  background: url('tide/tide-sleep.webp') center / contain no-repeat;
+  background: url('kasi/kasi-dozing.svg') center / contain no-repeat;
 }
 html[data-reskin="tide"] #empty-state .empty { text-align: center; }
 
@@ -148,9 +148,12 @@ html[data-reskin="tide"] .rev[data-r="ai"] { background: color-mix(in srgb, var(
 html[data-reskin="tide"] .rev[data-r="ai"].low { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 html[data-reskin="tide"] .srcrow .conf i { background: var(--tide-green); }
 
-/* A04a-empty: a meeting with no items. Tide sleeps, two actions, the summary band stays at zero. */
+/* A04a-empty: a meeting with no items. Kasi dozes, two actions, the summary band stays at zero. */
 html[data-reskin="tide"] #pane .empty-items { padding: 36px 20px 28px; color: var(--muted); }
-html[data-reskin="tide"] #pane .empty-items::before { content: ''; display: block; width: 120px; height: 120px; margin: 0 auto 12px; background: url('tide/tide-sleep.webp') center / contain no-repeat; }
+html[data-reskin="tide"] #pane .empty-items::before { content: ''; display: block; width: 120px; height: 120px; margin: 0 auto 12px; background: url('kasi/kasi-dozing.svg') center / contain no-repeat; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-reskin="tide"] #empty-state .empty::before, html[data-reskin="tide"] #pane .empty-items::before { background-image: url('kasi/kasi-doze.svg'); }
+}
 html[data-reskin="tide"] #pane .empty-items h3 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
 html[data-reskin="tide"] #pane .empty-items p { max-width: 46ch; margin: 0 auto; font-size: 13.5px; line-height: 1.5; }
 html[data-reskin="tide"] #pane .empty-items .empty-act { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
@@ -162,8 +165,8 @@ html[data-reskin="tide"] #crumb-trail.crumb-line span { overflow: visible; text-
 html[data-reskin="tide"] #crumb-trail.crumb-line .now { color: var(--text); font-weight: 700; }
 @media (max-width: 1100px) { html[data-reskin="tide"] #crumb-trail.crumb-line { display: flex; } }
 
-/* A04a rest: wordmark as drawn (Tide mark tile, yravg in ink, SubMeetly in green-ink, no filled pill). */
-html[data-reskin="tide"] .brand::before { content: ''; width: 28px; height: 28px; margin-right: 8px; background: url('tide/01-tide-mark-green.svg') center / contain no-repeat; flex: none; }
+/* A04a rest: wordmark as drawn (Kasi's mark, yravg in ink, SubMeetly in green-ink, no filled pill). */
+html[data-reskin="tide"] .brand::before { content: ''; width: 28px; height: 28px; margin-right: 8px; background: url('kasi/kasi-mark.svg') center / contain no-repeat; flex: none; }
 html[data-reskin="tide"] .brand-word { color: var(--text); }
 html[data-reskin="tide"] .brand-pill { background: none; color: var(--accent-soft); padding: 0; margin: 0; top: 0; font-size: 1em; border-radius: 0; -webkit-mask: none; mask: none; }
 @media (max-width: 720px) { html[data-reskin="tide"] .brand-word { display: inline; } }

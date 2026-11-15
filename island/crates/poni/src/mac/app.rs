@@ -2763,12 +2763,12 @@ impl App {
         self.request_frame();
     }
 
-    /// The Eyes look around a notch follows the pointer anywhere on the
+    /// The Kasi look around a notch follows the pointer anywhere on the
     /// screen (`notch::draw_peek`). The global monitor already brings every
-    /// move here, so the eyes cost a redraw only when their side or where
-    /// they look changes.
+    /// move here, so Kasi costs a redraw only when its side or where its
+    /// eyes look changes.
     fn peek_at(&mut self, p: Point) {
-        let Some(n) = self.screen.notch.filter(|_| self.st.settings.idle_style == IdleStyle::Eyes) else { return };
+        let Some(n) = self.screen.notch.filter(|_| self.st.settings.idle_style == IdleStyle::Kasi) else { return };
         let now = clock::mono().max(self.st.now);
         let before = notch::peek_key(&self.st, n, now);
         self.st.ui.peek.point(Point::new(p.x - self.notch_cx, p.y), now, n.w / 2.0);
@@ -4205,7 +4205,7 @@ impl App {
             // the camera, and the eyes cross over behind it and peek out there.
             "notch-eyes" => {
                 self.leave();
-                self.st.settings.idle_style = IdleStyle::Eyes;
+                self.st.settings.idle_style = IdleStyle::Kasi;
                 self.collapse();
                 if let Some(n) = self.screen.notch {
                     let p = Point::new(self.cx - n.w / 2.0 - 260.0, 140.0);
@@ -4364,7 +4364,7 @@ impl App {
             // At rest: back inside the notch, or the eyes beside it.
             Some(n) => {
                 let fit = notch::fit(&self.mode, &self.st);
-                let want = if self.st.settings.idle_style == IdleStyle::Eyes { Fit::Ears } else { Fit::Inside };
+                let want = if self.st.settings.idle_style == IdleStyle::Kasi { Fit::Ears } else { Fit::Inside };
                 let ok = self.mode == Mode::Idle && !self.island.floating() && body.y == 0.0 && fit == want;
                 (ok, format!("resting in the menu bar's line ({fit:?} around a {:.0}x{:.0} notch)", n.w, n.h))
             }

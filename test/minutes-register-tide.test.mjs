@@ -172,16 +172,16 @@ test('Classic (no ?skin) is unchanged: no density control, no hover actions, upp
   assert.equal(await page.$eval('tbody tr[data-ref] .rev', (e) => getComputedStyle(e).textTransform), 'uppercase');
 });
 
-test('empty register in Modern: Tide asleep', async () => {
+test('empty register in Modern: Kasi dozing', async () => {
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${ORIGIN}/dist/minutes.html?skin=tide`, { waitUntil: 'networkidle0' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle0' });
   const bg = await page.$eval('#empty-state .empty', (e) => getComputedStyle(e, '::before').backgroundImage);
-  assert.match(bg, /tide-sleep/);
+  assert.match(bg, /kasi\/kasi-dozing\.svg/);
 });
 
-test('a meeting with no items shows Tide asleep, "No items yet", Draft options and Add item; the band stays at zero', async () => {
+test('a meeting with no items shows Kasi dozing, "No items yet", Draft options and Add item; the band stays at zero', async () => {
   await open('?skin=tide');
   await page.evaluate(async () => {
     const env = JSON.parse(localStorage.getItem('minutesRegister'));
@@ -197,7 +197,7 @@ test('a meeting with no items shows Tide asleep, "No items yet", Draft options a
   });
   assert.equal(r.h, 'No items yet');
   assert.deepEqual(r.btns, ['Draft options', 'Add item']);
-  assert.match(r.img, /tide-sleep/);
+  assert.match(r.img, /kasi\/kasi-dozing\.svg/);
   // Add item here opens the same editor as the toolbar button.
   await page.click('#pane .empty-items [data-empty-act="add"]');
   await page.waitForFunction(() => !document.querySelector('#drawer').hidden, { timeout: 4000 });
@@ -228,7 +228,7 @@ test('?view= and ?do= from the shell page: the register opens on that view and r
   await page.waitForFunction(() => { const o = document.querySelector('.lt-overlay'); return o && !o.hidden && getComputedStyle(o).display !== 'none'; }, { timeout: 6000 });
 });
 
-test('wordmark: Tide mark tile + yravg in ink + SubMeetly in green-ink, no black pill', async () => {
+test('wordmark: Kasi mark + yravg in ink + SubMeetly in green-ink, no black pill', async () => {
   await open('?skin=tide');
   const r = await page.evaluate(() => {
     const pill = document.querySelector('.brand-pill'); const b = document.querySelector('.brand');
@@ -236,7 +236,7 @@ test('wordmark: Tide mark tile + yravg in ink + SubMeetly in green-ink, no black
   });
   assert.equal(r.text, 'yravgSubMeetly');
   assert.equal(r.bg, 'rgba(0, 0, 0, 0)', 'no filled pill');
-  assert.match(r.img, /tide-mark/);
+  assert.match(r.img, /kasi\/kasi-mark\.svg/);
 });
 
 test('Needs review only / Group / Mine sit in the toolbar above the table and still work', async () => {

@@ -12,19 +12,19 @@
 //! * **Below**: notices, pop-ups and the open island hang under the notch:
 //!   a strip the notch's height on top, the usual content under it.
 //!
-//! The Eyes look rests in the ears too, and plays hide and seek with the
-//! camera ([`draw_peek`]): the eyes peek out beside it
-//! on the side the pointer is on and look at the pointer wherever it is on
-//! the screen; when it crosses over they duck behind the camera and come out
-//! on the other side. Minimal and Hidden rest inside the notch.
+//! The Kasi look rests in the ears too, and plays hide and seek with the
+//! camera ([`draw_peek`]): Kasi's head peeks out beside it on the side the
+//! pointer is on, its eyes on the pointer wherever it is on the screen;
+//! when it crosses over Kasi ducks behind the camera and comes out on the
+//! other side. Minimal and Hidden rest inside the notch.
 //!
 //! The Pill theme is the pill or the notch, never both ([`pill_fit`]): at
 //! rest it goes back into the notch (the menu bar beside it already shows
 //! the time and the battery), and whatever shows (music, from the first note
 //! to the end of a pause, timers, pop-ups, the open card) floats as the pill
 //! `pill::TOP_GAP` under the menu bar ([`floats`]), every corner rounded, no
-//! strip behind the camera and no ears beside it. Only the Eyes look still
-//! peeks out beside the camera. On its way between the two the island's gap
+//! strip behind the camera and no ears beside it. Only Kasi still peeks
+//! out beside the camera. On its way between the two the island's gap
 //! moves on its own spring (island.rs, `pill::motion::TOP`) and the outline
 //! lets go of the edge smoothly ([`detached_segments`]).
 //!
@@ -35,6 +35,7 @@ use crate::activities::{self, Activity, Mode};
 use crate::gfx::{Canvas, TextStyle, Weight};
 use crate::icons::Icon;
 use crate::island::{Geom, SHOULDER};
+use crate::kasi;
 use crate::pill;
 use crate::state::AppState;
 use crate::ui::Ui;
@@ -70,15 +71,10 @@ const BELOW_EAR: f32 = 24.0;
 const EARS_R: f32 = 14.0;
 /// The one neutral track under every progress ring (as in activities.rs).
 const RING_TRACK: Color = Color::white(0.14);
-/// The Eyes look's ears: room for the eyes to peek out on either
-/// side of the camera, this far from its edge.
+/// The Kasi look's ears: room for Kasi's head (`kasi::MARK_W` wide) to
+/// peek out on either side of the camera, this far from its edge.
 const PEEK_EAR: f32 = 46.0;
 const PEEK_GAP: f32 = 6.0;
-/// The pair of eyes from one's outer edge to the other's (activities.rs
-/// draws them 6.5 DIPs wide, 22 apart).
-const EYES_W: f32 = 22.0 + 6.5;
-/// How far the eyes turn toward the pointer (DIPs, across and down).
-const LOOK: (f32, f32) = (2.5, 2.0);
 
 pub fn fit(m: &Mode, st: &AppState) -> Fit {
     if pill::on(st.settings.theme) {
@@ -86,8 +82,8 @@ pub fn fit(m: &Mode, st: &AppState) -> Fit {
     }
     match m {
         // The status bar look is the Pill theme's; the other themes show the
-        // clock for it. The eyes peek out beside the camera (`draw_peek`).
-        Mode::Idle if matches!(st.settings.idle_style, IdleStyle::Clock | IdleStyle::Status | IdleStyle::Eyes) => Fit::Ears,
+        // clock for it. Kasi peeks out beside the camera (`draw_peek`).
+        Mode::Idle if matches!(st.settings.idle_style, IdleStyle::Clock | IdleStyle::Status | IdleStyle::Kasi) => Fit::Ears,
         // Windows only (`AppState::aside`): a Mac never steps aside.
         Mode::Idle | Mode::Aside => Fit::Inside,
         // The music pill sings the current line (every theme), which needs
@@ -99,14 +95,14 @@ pub fn fit(m: &Mode, st: &AppState) -> Fit {
     }
 }
 
-/// The Pill theme around a notch: at rest the real notch alone (the eyes
-/// still peek out beside it), everything else the floating pill. The music
+/// The Pill theme around a notch: at rest the real notch alone (Kasi
+/// still peeks out beside it), everything else the floating pill. The music
 /// pill floats for as long as it shows, so it never jumps up into the
 /// menu bar's line when a song has no line to sing (the intro, a break, a
 /// pause, a song without synced lyrics) and back down at the next one.
 fn pill_fit(m: &Mode, st: &AppState) -> Fit {
     match m {
-        Mode::Idle if st.settings.idle_style == IdleStyle::Eyes => Fit::Ears,
+        Mode::Idle if st.settings.idle_style == IdleStyle::Kasi => Fit::Ears,
         Mode::Idle | Mode::Aside => Fit::Inside,
         Mode::Activity(_) | Mode::Hud(_) | Mode::Notice | Mode::Expanded(_) => Fit::Below,
     }
@@ -146,7 +142,7 @@ pub fn strip(m: &Mode, st: &AppState, n: Notch) -> f32 {
 /// Width of each ear in an ears fit.
 fn ear(m: &Mode, st: &AppState) -> f32 {
     match m {
-        Mode::Idle if st.settings.idle_style == IdleStyle::Eyes => PEEK_EAR,
+        Mode::Idle if st.settings.idle_style == IdleStyle::Kasi => PEEK_EAR,
         Mode::Idle => {
             if st.settings.use_24h {
                 64.0
@@ -268,7 +264,7 @@ pub fn draw_pill_body(c: &mut Canvas, body: Rect, radius: f32, shoulder: f32, de
 /// Draw `m`'s ears content. Returns false when the shared activity drawing
 /// already fits (album art and equalizer sit at the island's two ends).
 pub fn draw_ears(ui: &mut Ui, st: &mut AppState, m: &Mode, body: Rect, n: Notch) -> bool {
-    if *m == Mode::Idle && st.settings.idle_style == IdleStyle::Eyes {
+    if *m == Mode::Idle && st.settings.idle_style == IdleStyle::Kasi {
         draw_peek(ui, st, body, n);
         return true;
     }
@@ -322,40 +318,39 @@ pub fn draw_ears(ui: &mut Ui, st: &mut AppState, m: &Mode, body: Rect, n: Notch)
     }
 }
 
-/// The Eyes look around a notch: the eyes peek out
-/// beside the camera on the pointer's side and look at it, wherever it is
-/// on the screen. When it crosses over, they duck behind the camera, which
-/// hides their way across, and come out on the other side. The same in
-/// every theme: Pill and Glass rest in the menu bar's line in black here.
+/// The Kasi look around a notch: Kasi's head peeks out beside the camera
+/// on the pointer's side and looks at it, wherever it is on the screen,
+/// blinking and twitching an ear as in the pill. When the pointer crosses
+/// over, Kasi ducks behind the camera, which hides its way across, and
+/// comes out on the other side. The same in every theme: Pill and Glass
+/// rest in the menu bar's line in black here.
 fn draw_peek(ui: &mut Ui, st: &mut AppState, body: Rect, n: Notch) {
     let now = st.now;
     let (spot, moving) = peek_spot(st, n, now);
     if moving {
         ui.request_anim();
     }
-    let look = peek_look(st, spot, now);
-    let x = body.center().x + spot.x;
-    let (gx, gy) = look.unwrap_or((0.0, 0.0));
-    activities::draw_eyes(ui, st, x, body.center().y + gy * LOOK.1, gx * LOOK.0);
+    let gaze = peek_look(st, spot, now).unwrap_or((0.0, 0.0));
+    kasi::draw_resting(ui, st, Point::new(body.center().x + spot.x, body.center().y), gaze);
 }
 
-/// Where the peeking eyes are at `now`, from the
-/// island's top centre, and whether they are on their way across.
+/// Where the peeking Kasi is at `now`, from the
+/// island's top centre, and whether it is on its way across.
 fn peek_spot(st: &AppState, n: Notch, now: f64) -> (Point, bool) {
-    let w = EYES_W;
+    let w = kasi::MARK_W;
     let (along, moving) = st.ui.peek.along(now);
     (Point::new(along * (n.w / 2.0 + PEEK_GAP + w / 2.0), n.h / 2.0), moving)
 }
 
-/// Where the eyes at `spot` look at `now` (-1 to 1 each way): at the
+/// Where Kasi's eyes at `spot` look at `now` (-1 to 1 each way): at the
 /// pointer, wherever it is.
 fn peek_look(st: &AppState, spot: Point, _now: f64) -> Option<(f32, f32)> {
     let p = &st.ui.peek;
     p.pointer.map(|at| peek::gaze(spot, at))
 }
 
-/// What the peeking eyes show at `now` for the pointer they have: their
-/// side and where they look. The app redraws them when it changes.
+/// What the peeking Kasi shows at `now` for the pointer it has: its side
+/// and where it looks. The app redraws it when that changes.
 pub fn peek_key(st: &AppState, n: Notch, now: f64) -> (bool, Option<(f32, f32)>) {
     let (spot, _) = peek_spot(st, n, now);
     (st.ui.peek.left, peek_look(st, spot, now))

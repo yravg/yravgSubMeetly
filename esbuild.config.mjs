@@ -65,8 +65,8 @@ await cp(path.join(root, 'src/app-pages'), path.join(dist, 'app-pages'), { recur
 await cp(path.join(root, 'icons'), path.join(dist, 'icons'), { recursive: true });
 // Fredoka + Plus Jakarta Sans (SIL OFL 1.1) for theme-tide.css, with their licences.
 await cp(path.join(root, 'src/fonts'), path.join(dist, 'fonts'), { recursive: true });
-// Tide mascot poses + mark (yravgBuds, owner's brand) for the app shell.
-await cp(path.join(root, 'src/tide'), path.join(dist, 'tide'), { recursive: true });
+// Kasi, the mascot: stickers, still poses, the mark and the small app icon (src/lib/kasi-art.js).
+await cp(path.join(root, 'src/kasi'), path.join(dist, 'kasi'), { recursive: true });
 
 // ---- vendor runtime assets (must ship in package: MV3 forbids CDN) ------
 // Copy EVERY ort-wasm-simd-threaded* variant (plain/jsep/asyncify/jspi) — the

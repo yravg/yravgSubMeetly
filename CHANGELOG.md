@@ -1,5 +1,10 @@
 # Riwayat rilis
 
+## 1.4.6 (2026-11-15)
+- **Kasi, the new mascot, in the app.** The resting style that showed two eyes is now **Kasi**: the tarsier's head (ears, curl, face plate, big eyes; no amber rims at this size) beside the time in the 32 px pill, blinking every few seconds and now and then twitching an ear. Its eyes follow the pointer over the pill; around a MacBook's notch Kasi peeks out beside the camera instead of the eyes. Menus and pickers say "Kasi"; settings files keep the old `"eyes"` value, so updating and going back both keep the choice. Drawn from the same numbers as `site/kasi.js`.
+- **New app icons.** The Windows exe, tray and Setup use Kasi's icon set from `site/brand/icons/` (small-size variant at 16-32 px); the Mac app's `.icns` is built from the brand iconset. Setup's wizard shows Kasi hanging under the pill.
+- **The app window's states use Kasi instead of the Tide otter:** welcome (listening), empty (dozing), loading (thinking), all caught up (got it) and the home page at rest (idle), as animated stickers that turn into still poses when the system asks for less motion. Errors keep plain words and no mascot. The Ask dialog's "thinking" row uses the sparkle and says "Thinking…".
+
 ## 1.4.5 (2026-11-13)
 - **Universal YouTube CC transcripts for podcasts, seminars, news, and lectures:** Enhanced YouTube closed caption fetching to extract browser session cookies (Chrome, Safari, Edge, Brave, etc.) via `yt-dlp` and directly search via `ytsearch1:`, bypassing YouTube's bot-detection walls (`LOGIN_REQUIRED`) that previously blocked long-form non-music content. Supports instant ahead-of-time synchronized translation, negative-cache retirement to prevent false lockouts, and robust browser title decoration cleaning.
 

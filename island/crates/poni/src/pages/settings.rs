@@ -86,10 +86,10 @@ const CHIP_GAP: f32 = 6.0;
 const THEMES: [(Theme, &str); 4] = [(Theme::Classic, "Classic"), (Theme::Glass, "Glass"), (Theme::Paper, "Paper"), (Theme::Pill, "Pill")];
 
 /// An idle look's name in the picker.
-fn idle_name(s: IdleStyle, eyes: &'static str) -> &'static str {
+fn idle_name(s: IdleStyle) -> &'static str {
     match s {
         IdleStyle::Clock => "Clock",
-        IdleStyle::Eyes => eyes,
+        IdleStyle::Kasi => "Kasi",
         IdleStyle::Minimal => "Minimal",
         IdleStyle::Hidden => "Hidden",
         IdleStyle::Status => "Status",
@@ -161,7 +161,7 @@ pub fn draw(ui: &mut Ui, st: &mut AppState, area: Rect) {
     let theme_names: Vec<&str> = THEMES.iter().map(|t| t.1).collect();
     let theme_sel = THEMES.iter().position(|t| t.0 == st.settings.theme).unwrap_or(0);
     let looks = status::looks(st.settings.theme);
-    let look_names: Vec<&str> = looks.iter().map(|s| idle_name(*s, "Eyes")).collect();
+    let look_names: Vec<&str> = looks.iter().map(|s| idle_name(*s)).collect();
     let look_sel = looks.iter().position(|s| *s == status::shown(st.settings.theme, st.settings.idle_style)).unwrap_or(0);
     // Side by side under their labels when both fit their columns, each
     // closed up only as far as it needs; else a row each. Whether they fit is

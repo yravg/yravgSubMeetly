@@ -128,7 +128,7 @@ fn item(label: &str, cmd: MenuCmd, checked: bool) -> MenuItem {
 fn idle_label(s: IdleStyle) -> &'static str {
     match s {
         IdleStyle::Clock => "Clock",
-        IdleStyle::Eyes => "Eyes",
+        IdleStyle::Kasi => "Kasi",
         IdleStyle::Minimal => "Minimal",
         IdleStyle::Hidden => "Hidden until hover",
         IdleStyle::Status => "Status bar",
@@ -471,7 +471,7 @@ mod tests {
     fn status_bar_is_listed_only_in_the_pill_theme() {
         let pill = Settings { theme: Theme::Pill, idle_style: IdleStyle::Status, ..Settings::default() };
         let labels: Vec<String> = idle_choices(&pill).into_iter().map(|c| c.0).collect();
-        assert_eq!(labels, ["Clock", "Eyes", "Minimal", "Hidden until hover", "Status bar"]);
+        assert_eq!(labels, ["Clock", "Kasi", "Minimal", "Hidden until hover", "Status bar"]);
         assert_eq!(idle_choices(&pill).last(), Some(&("Status bar".to_string(), true)));
         // Another theme draws the clock for the status bar: Clock is checked,
         // and Status comes back with Pill.

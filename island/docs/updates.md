@@ -6,12 +6,12 @@ yravgSubMeetly installs with one Setup and learns about new versions from one si
 
 | What | Where |
 |---|---|
-| Installer script (Inno Setup 6.5) | `installer/yravgsubmeetly.iss`, art by `installer/make_art.py` |
+| Installer script (Inno Setup 6.5) | `installer/yravgsubmeetly.iss`, art by `installer/make_art.cjs` (Kasi, from `site/kasi.js`; it also copies the brand `.ico` to `crates/poni/res/poni.ico`) |
 | Build the Setup | `tools/build-installer.ps1` -> `dist/yravgSubMeetly-Setup-<version>.exe` (git-ignored) |
 | Make and sign the update file | `tools/make_update_feed.py` |
 | Public keys the app trusts | `crates/poni-core/data/update-keys.txt` |
 | Release repository (one constant) | `poni_core::update::REPO` = `yravg/yravgSubMeetly` |
-| Mac app bundle and DMG | `tools/make_mac_app.sh` (+ `make_mac_dmg.sh`, `make_mac_icon.py`, `installer/mac/Info.plist`) -> `dist/yravgSubMeetly-<version>-mac.dmg` |
+| Mac app bundle and DMG | `tools/make_mac_app.sh` (+ `make_mac_dmg.sh`, `installer/mac/Info.plist`, the icon from `site/brand/icons/yravgSubMeetly.iconset`) -> `dist/yravgSubMeetly-<version>-mac.dmg` |
 | Mac update self-test | `tools/mac-update-test.sh` (an installed copy swaps in a newer one) |
 | Release workflow | `.github/workflows/release.yml`: `windows` and `mac` build in parallel, `publish` releases both and signs `latest.json` |
 
@@ -67,4 +67,4 @@ Debug builds only: set `YRAVG_UPDATE_BASE=http://127.0.0.1:PORT` (and `PONI_HOME
 
 When an Apple Developer ID exists: sign with `--options runtime --entitlements installer/mac/poni.entitlements`, notarize the DMG (`xcrun notarytool submit ... --wait`), staple it, and keep the same team on every release (the updater refuses a different team).
 
-Locally: `cargo build -p poni --release --target aarch64-apple-darwin` (and `x86_64-apple-darwin`), `python3 tools/make_mac_icon.py build/y.iconset && iconutil -c icns build/y.iconset -o build/yravgSubMeetly.icns`, then `tools/make_mac_app.sh <arm64> <x86_64> build/yravgSubMeetly.icns dist` and `bash tools/mac-update-test.sh dist/yravgSubMeetly.app`.
+Locally: `cargo build -p poni --release --target aarch64-apple-darwin` (and `x86_64-apple-darwin`), `iconutil -c icns ../site/brand/icons/yravgSubMeetly.iconset -o build/yravgSubMeetly.icns`, then `tools/make_mac_app.sh <arm64> <x86_64> build/yravgSubMeetly.icns dist` and `bash tools/mac-update-test.sh dist/yravgSubMeetly.app`.

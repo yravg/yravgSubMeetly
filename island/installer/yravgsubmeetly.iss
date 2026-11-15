@@ -68,7 +68,7 @@ SetupIconFile=art\yravgsubmeetly.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
 WizardStyle=modern
-; Our wordmark and tokens (installer/make_art.py). Setup picks the file closest to its image area.
+; Kasi under the pill and the app icon (installer/make_art.cjs, from site/kasi.js). Setup picks the file closest to its image area.
 WizardImageFile=art\wizard.png,art\wizard-150.png,art\wizard-200.png
 WizardSmallImageFile=art\wizard-small-55.png,art\wizard-small-83.png,art\wizard-small-110.png
 Compression=lzma2/max

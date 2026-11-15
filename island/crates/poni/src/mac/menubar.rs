@@ -106,7 +106,7 @@ pub fn menu_items(s: &Settings, pinned: bool, login: Login, update: UpdateLine) 
     let style = |st: IdleStyle| {
         let label = match st {
             IdleStyle::Clock => "Clock",
-            IdleStyle::Eyes => "Eyes",
+            IdleStyle::Kasi => "Kasi",
             IdleStyle::Minimal => "Minimal",
             IdleStyle::Hidden => "Hidden until hover",
             IdleStyle::Status => "Status bar",

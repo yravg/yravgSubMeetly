@@ -11,8 +11,12 @@ pub enum IdleStyle {
     Clock,
     /// Small blank pill (like a MacBook notch).
     Minimal,
-    /// A friendly pair of blinking eyes.
-    Eyes,
+    /// Kasi, the tarsier: its head mark (ears, curl, face plate, big eyes)
+    /// beside the time, blinking and twitching an ear now and then. It was
+    /// the Eyes look, so files keep saying "eyes" (an older copy still
+    /// reads them); "kasi" is read too.
+    #[serde(rename = "eyes", alias = "kasi")]
+    Kasi,
     /// Nothing visible until the cursor reaches the top edge.
     Hidden,
     /// A wider pill like a status bar: the date and time, the volume and
@@ -588,8 +592,16 @@ mod tests {
     fn partial_json_fills_defaults() {
         // An old file's "water" block (the page Health replaced) is ignored.
         let s: Settings = serde_json::from_str(r#"{"idle_style":"eyes","water":{"goal_ml":1500}}"#).unwrap();
-        assert_eq!(s.idle_style, IdleStyle::Eyes);
+        assert_eq!(s.idle_style, IdleStyle::Kasi);
         assert_eq!(s.pomodoro.focus_min, 25);
+    }
+
+    #[test]
+    fn the_eyes_look_is_kasi_and_its_files_stay_readable_both_ways() {
+        let s: Settings = serde_json::from_str(r#"{"idle_style":"kasi"}"#).unwrap();
+        assert_eq!(s.idle_style, IdleStyle::Kasi);
+        // Written as "eyes", so a copy from before Kasi still reads the file.
+        assert_eq!(serde_json::to_string(&IdleStyle::Kasi).unwrap(), r#""eyes""#);
     }
 
     #[test]

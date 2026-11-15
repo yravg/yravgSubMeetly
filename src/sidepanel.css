@@ -1023,12 +1023,13 @@ input[type="range"] { accent-color: var(--accent); width: 130px; }
 .pal-check { display: none; color: var(--accent-strong); font-size: var(--text-sm); }
 .reskin-card.active .pal-check { display: inline; }
 .pal-desc { font-size: var(--text-xs); line-height: 1.35; color: var(--muted); font-weight: 400; }
-/* TIDE-012: dengan Tide, maskot hanya di keadaan kosong (satu per layar). */
+/* TIDE-012: dengan palet Tide, maskot (Kasi) hanya di keadaan kosong (satu per layar). */
 :root[data-reskin='tide'] body { font-family: var(--font-ui); }
 :root[data-reskin='tide'] #history-list > .empty::before {
   content: ''; display: block; width: 88px; height: 88px; margin: 0 auto 8px;
-  background: url('tide/tide-sleep.webp') center / contain no-repeat;
+  background: url('kasi/kasi-dozing.svg') center / contain no-repeat;
 }
+@media (prefers-reduced-motion: reduce) { :root[data-reskin='tide'] #history-list > .empty::before { background-image: url('kasi/kasi-doze.svg'); } }
 .reskin-foot { display: flex; justify-content: flex-end; margin-top: var(--space-2); }
 
 /* ---- Responsive layout: narrow side-panel vs wide/lab surfaces ---------- */

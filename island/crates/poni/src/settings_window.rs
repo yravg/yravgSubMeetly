@@ -662,7 +662,7 @@ fn nearest(list: &[(u32, &str)], ms: u32) -> Option<usize> {
 fn idle_name(s: IdleStyle, _theme: Theme) -> &'static str {
     match s {
         IdleStyle::Clock => "Clock",
-        IdleStyle::Eyes => "Eyes",
+        IdleStyle::Kasi => "Kasi",
         IdleStyle::Minimal => "Minimal",
         IdleStyle::Hidden => "Hidden",
         IdleStyle::Status => "Status",

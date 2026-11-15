@@ -93,7 +93,8 @@ a.chip:hover { background: var(--card2); }
 .st { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 28px 20px; }
 .st.in-hero { display: grid; grid-template-columns: 92px minmax(0, 1fr); column-gap: 18px; row-gap: 6px; align-items: start; justify-items: start; text-align: left; margin-top: 18px; padding: 20px 22px; border-radius: var(--radius-xl); background: var(--card); box-shadow: var(--tide-shadow), inset 0 0 0 1px var(--border); max-width: 640px; }
 .st.in-hero .st-art { grid-row: 1 / span 3; width: 92px; }
-.st-art { width: 120px; }
+/* Kasi's head 92 px wide in a state card, a sticker or a still alike. */
+.st-art { width: calc(92px * var(--kasi-zoom, 1)); }
 .st h3 { font-size: var(--text-xl); font-weight: 800; }
 .st p { color: var(--muted); font-size: var(--text-md); max-width: 460px; }
 .setup { list-style: none; margin: 4px 0 8px; padding: 0; flex: 1 0 100%; display: grid; gap: 2px; text-align: left; }
@@ -101,8 +102,6 @@ a.chip:hover { background: var(--card2); }
 .setup a { color: var(--accent-soft); font-weight: var(--font-semibold); padding: 4px 0; }
 .st-act { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 .st.loading { min-height: 50vh; justify-content: center; }
-.st.loading .st-art { animation: tide-bob 1.6s var(--ease-spring) infinite alternate; }
-@keyframes tide-bob { from { transform: translateY(0); } to { transform: translateY(-8px); } }
 .callout { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--radius-lg); }
 .callout p { font-size: var(--text-md); margin: 2px 0 8px; }
 .callout.danger { background: var(--danger-bg); color: var(--danger); }
@@ -187,8 +186,11 @@ a.over:hover { filter: brightness(0.97); }
 .askbar:focus-within { box-shadow: var(--tide-shadow), inset 0 0 0 2px var(--accent-soft); }
 .send { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--pill-bg); color: var(--pill-fg); display: grid; place-items: center; flex: none; cursor: pointer; }
 .send.off, .send:disabled { background: var(--border); color: var(--muted); cursor: default; }
-.peek { position: absolute; right: 80px; bottom: 100%; margin-bottom: -10px; width: 92px; pointer-events: none; }
-.peek-art { width: 92px; display: block; }
+/* Kasi peeks over the ask bar. The box is the head's width; the picture is wider by its frame's
+   zoom (a sticker has room round the head) and drops by its foot, so the chin rests 4 px into the
+   bar (src/lib/kasi-art.js sets --kasi-zoom and --kasi-foot on the picture). */
+.peek { position: absolute; right: 80px; bottom: 100%; margin-bottom: -4px; width: 92px; pointer-events: none; }
+.peek-art { display: block; width: calc(100% * var(--kasi-zoom, 1)); max-width: none; margin-left: calc(100% * (1 - var(--kasi-zoom, 1)) / 2); transform: translateY(calc(100% * var(--kasi-foot, 0))); }
 .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 .chips .chip { height: 42px; cursor: pointer; border: 0; }
 .chips .chip:hover { background: var(--card2); }
@@ -219,8 +221,8 @@ a.over:hover { filter: brightness(0.97); }
 .steps[open] summary > svg:last-child { transform: rotate(180deg); }
 .steps > div { padding: 4px 0 0 24px; }
 .typing { display: flex; align-items: center; gap: 10px; }
-.typing .avm { width: 26px; height: 26px; border-radius: 50%; background: var(--tide-green, var(--accent-soft)); display: grid; place-items: center; }
-.typing .avm img { width: 16px; height: 16px; }
+.typing .avm { width: 26px; height: 26px; border-radius: 50%; background: var(--card2); color: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--border); display: grid; place-items: center; }
+.typing .avm svg { width: 16px; height: 16px; }
 .typing .dots { display: flex; gap: 5px; padding: 12px 14px; border-radius: var(--radius-full); background: var(--card2); box-shadow: inset 0 0 0 1px var(--border); }
 .typing .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: 0.4; animation: ask-dot 1.2s ease-in-out infinite; }
 .typing .dots i:nth-child(2) { animation-delay: 0.2s; }
@@ -370,8 +372,7 @@ a.over:hover { filter: brightness(0.97); }
   .ask-pick-wrap { width: 100%; }
   .ask-pick { width: 100%; }
   .askbar input { font-size: 15px; }
-  .peek { right: 56px; width: 72px; }
-  .peek-art { width: 72px; }
+  .peek { right: 56px; width: 72px; margin-bottom: -3px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0ms !important; animation: none !important; }

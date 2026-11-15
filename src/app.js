@@ -18,6 +18,7 @@ import { TYPE_COLOR } from './lib/notes-schema.js';
 import { openMinutesWindow, isMinutesWindowOpen, WIN_ID_KEY } from './lib/minutes-window.js';
 import { mountAskTide } from './ask-tide.js';
 import { heroHtml, heroPose } from './app-pages/home.js';
+import { kasiImg } from './lib/kasi-art.js';
 import { minutesHtml, mountMinutes } from './app-pages/minutes.js';
 import { developerHtml, wireDeveloper } from './app-pages/developer.js';
 import { mountInstalled } from './app-pages/addins-list.js';
@@ -199,9 +200,9 @@ const fmtShort = (v) => new Intl.DateTimeFormat(LANG === 'id' ? 'id-ID' : 'en-GB
 const hm = (min) => T('hm', Math.floor(min / 60), min % 60);
 const num = (v) => `<span class="num" data-num>${esc(v)}</span>`;
 
-/* ---------- Tide states (A09) ---------- */
-const tide = (pose, cls = '') => `<img class="tide-art ${cls}" src="tide/tide-${pose}.webp" alt="" />`;
-const stateCard = ({ pose, title, body, actions = '', cls = '' }) => `<div class="st ${cls}">${pose ? tide(pose, 'st-art') : ''}<h3>${esc(title)}</h3><p>${esc(body)}</p>${actions ? `<div class="st-act">${actions}</div>` : ''}</div>`;
+/* ---------- States (A09): Kasi for welcome, empty, thinking and done; errors get words only ---------- */
+const kasi = (state, cls = '') => kasiImg(state, cls);
+const stateCard = ({ kasi: k, title, body, actions = '', cls = '' }) => `<div class="st ${cls}">${k ? kasi(k, 'st-art') : ''}<h3>${esc(title)}</h3><p>${esc(body)}</p>${actions ? `<div class="st-act">${actions}</div>` : ''}</div>`;
 const errorCard = (msg) => `<div class="callout danger" role="alert">${ic('info', 20)}<div><b>${esc(T('errTitle'))}</b><p>${esc(T('errBody', msg))}</p><button type="button" class="btn" data-act="reload">${esc(T('reload'))}</button></div></div>`;
 const lockedCard = (title, body, action = '') => `<div class="callout locked">${ic('lock', 20)}<div><b>${esc(title)}</b><p>${esc(body)}</p>${action}</div></div>`;
 
@@ -320,15 +321,15 @@ function setupList() {
 
 function todayPage() {
   if (state.error) return errorCard(state.error);
-  if (!state.meetings) return stateCard({ pose: 'compass', title: T('loading'), body: '', cls: 'loading' });
+  if (!state.meetings) return stateCard({ kasi: 'thinking', title: T('loading'), body: '', cls: 'loading' });
   const now = new Date();
   const t = computeToday(seriesMeetings(), { now, owner: state.owner || null, me: state.userName });
   const welcome = !state.welcomed;
   const caughtUp = !t.empty && !t.yesterdayOpen && !t.overdue.count;
-  // Satu maskot per layar, di bilah tanya: sambutan (wave) > kosong (sleep) > beres (celebrate) > biasa (shell).
+  // Satu maskot per layar, Kasi di bilah tanya: sambutan (listening) > kosong (dozing) > beres (got it) > siap (idle).
   const pose = heroPose({ welcome, empty: t.empty, caughtUp });
   const eye = `<button type="button" class="icon-b eye" data-act="eye" aria-pressed="${state.hideNumbers}" aria-label="${esc(T(state.hideNumbers ? 'showNumbers' : 'hideNumbers'))}" title="${esc(T(state.hideNumbers ? 'showNumbers' : 'hideNumbers'))}">${ic(state.hideNumbers ? 'eyeOff' : 'eye', 18)}</button>`;
-  const hero = heroHtml({ T, ic, esc, tide, num, hm, fmtDate, now, t, state, greetKey: greetingKey(now), pose, caughtUp, eye, synced: state.syncedAt });
+  const hero = heroHtml({ T, ic, esc, kasi, num, hm, fmtDate, now, t, state, greetKey: greetingKey(now), pose, caughtUp, eye, synced: state.syncedAt });
   // Sambutan dan kosong tidak menggantikan hero: kartu ringkas di bawahnya.
   const band = welcome ? stateCard({ title: T('welcomeTitle'), body: T('welcomeBody'), actions: `<button type="button" class="pill-b" data-act="welcomed">${esc(T('gotIt'))}</button>`, cls: 'band' }).replace('</p>', `</p>${setupList()}`)
     : t.empty ? stateCard({ title: T('emptyTitle'), body: T('emptyBody'), actions: `<a class="pill-b" href="#live" data-start>${ic('play', 16)}${esc(T('startCaptions'))}</a><a class="btn" href="#minutes">${esc(T('openMinutes'))}</a>`, cls: 'band' }) : '';
@@ -363,7 +364,7 @@ function todayPage() {
 const registerSrc = (kind, meeting, embed) => `minutes.html?lang=${LANG}${kind === 'modern' ? '&skin=tide' : ''}${embed ? '&follow=system' : ''}${meeting ? `&meeting=${encodeURIComponent(meeting)}` : ''}`;
 function minutesPage(params) {
   if (state.error) return errorCard(state.error);
-  return minutesHtml({ lang: LANG, esc, ic, tide, meetings: state.meetings, series: state.series, register: state.register, me: state.userName, meetingParam: params.get('meeting'), registerSrc: (kind, x = {}) => `${registerSrc(kind, x.meeting)}${x.do ? `&do=${x.do}` : ''}${x.view ? `&view=${x.view}` : ''}` });
+  return minutesHtml({ lang: LANG, esc, ic, kasi, meetings: state.meetings, series: state.series, register: state.register, me: state.userName, meetingParam: params.get('meeting'), registerSrc: (kind, x = {}) => `${registerSrc(kind, x.meeting)}${x.do ? `&do=${x.do}` : ''}${x.view ? `&view=${x.view}` : ''}` });
 }
 
 /* ---------- Add-ins + all features (A06) ---------- */
