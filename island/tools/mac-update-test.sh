@@ -30,7 +30,7 @@ for key in CFBundleShortVersionString CFBundleVersion; do
   plutil -replace "$key" -string "$next" "$work/new/yravgSubMeetly.app/Contents/Info.plist"
 done
 codesign --force --deep --sign - "$work/new/yravgSubMeetly.app"
-dmg="$work/home/cache/update/yravgSubMeetly-$next-mac.dmg"
+dmg="$work/home/cache/update/Kasi-$next-mac.dmg"
 bash "$root/tools/make_mac_dmg.sh" "$work/new/yravgSubMeetly.app" "$dmg" test
 size="$(stat -f %z "$dmg")"
 sha="$(shasum -a 256 "$dmg" | cut -d ' ' -f 1)"
@@ -46,7 +46,7 @@ cat > "$work/home/update.json" << JSON
     "headline": "The update test",
     "notes": "$release/tag/v$next",
     "windows": null,
-    "mac": { "url": "$release/download/v$next/yravgSubMeetly-$next-mac.dmg", "size": $size, "sha256": "$sha" }
+    "mac": { "url": "$release/download/v$next/Kasi-$next-mac.dmg", "size": $size, "sha256": "$sha" }
   },
   "announced": "$next",
   "ran": "$running",

@@ -213,7 +213,7 @@ pub fn create(mtm: MainThreadMarker) -> f32 {
     let style = NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Miniaturizable | NSWindowStyleMask::FullSizeContentView;
     let window: Retained<SettingsWindow> =
         unsafe { msg_send![SettingsWindow::alloc(mtm), initWithContentRect: rect, styleMask: style, backing: NSBackingStoreType::Buffered, defer: false] };
-    window.setTitle(ns_string!("yravgSubMeetly Advanced Settings"));
+    window.setTitle(ns_string!("Kasi Advanced Settings"));
     window.setTitleVisibility(NSWindowTitleVisibility::Hidden);
     window.setTitlebarAppearsTransparent(true);
     window.setAcceptsMouseMovedEvents(true);

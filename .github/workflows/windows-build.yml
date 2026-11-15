@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-setup
-          path: island/dist/yravgSubMeetly-Setup-*.exe
+          path: island/dist/Kasi-Setup-*.exe
           if-no-files-found: error
           retention-days: 14

@@ -58,7 +58,7 @@ thread_local! {
 /// The idle looks a theme offers, in the pickers' order. Status is the Pill
 /// theme's own: the other themes draw the clock for it.
 pub fn looks(theme: Theme) -> &'static [IdleStyle] {
-    const ALL: [IdleStyle; 5] = [IdleStyle::Clock, IdleStyle::Eyes, IdleStyle::Minimal, IdleStyle::Hidden, IdleStyle::Status];
+    const ALL: [IdleStyle; 5] = [IdleStyle::Clock, IdleStyle::Kasi, IdleStyle::Minimal, IdleStyle::Hidden, IdleStyle::Status];
     if super::on(theme) {
         &ALL
     } else {
@@ -211,7 +211,7 @@ mod tests {
             assert_eq!(looks(theme), &looks(Theme::Pill)[..4], "{theme:?}");
             // They draw the clock for it, so a picker marks Clock.
             assert_eq!(shown(theme, IdleStyle::Status), IdleStyle::Clock, "{theme:?}");
-            assert_eq!(shown(theme, IdleStyle::Eyes), IdleStyle::Eyes, "{theme:?}");
+            assert_eq!(shown(theme, IdleStyle::Kasi), IdleStyle::Kasi, "{theme:?}");
         }
     }
 

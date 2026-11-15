@@ -30,7 +30,7 @@ const STR = {
     markDone: 'Mark as done', more: (n) => `+${n} more`, listFoot: (n, m) => `${n} ${n === 1 ? 'item' : 'items'} in ${m} ${m === 1 ? 'meeting' : 'meetings'}`,
     consentTitle: 'Turn on cloud answers?', consentBody: (m) => `Your question and the register lines Tide needs are sent to OpenRouter (${m}). Audio never leaves this device. Cloud answers cost credits once the account server exists.`, cancel: 'Cancel', turnOn: 'Turn on cloud',
     srcRegister: 'From your register', srcLocal: 'Local model · Qwen', srcCloud: (m) => `Cloud model · ${m} · text was sent to OpenRouter`,
-    looked: 'Steps', thinking: 'Tide is thinking…',
+    looked: 'Steps', thinking: 'Thinking…',
     errOffline: 'The Native Helper is not running, so the local model cannot answer.', errNoAsk: 'This helper has no Ask route yet. Update the helper to use the local model.',
     errCloud: 'Cloud is not connected: the helper has no OpenRouter key.', errHttp: (s) => `The helper answered with an error (${s}).`, errModel: (m) => `The model stopped: ${m}`,
     useRegister: 'Answer from the register', useLocal: 'Use Local',
@@ -47,7 +47,7 @@ const STR = {
     markDone: 'Tandai selesai', more: (n) => `+${n} lagi`, listFoot: (n, m) => `${n} butir di ${m} rapat`,
     consentTitle: 'Nyalakan jawaban awan?', consentBody: (m) => `Pertanyaan dan baris register yang diperlukan dikirim ke OpenRouter (${m}). Audio tidak pernah keluar dari perangkat ini. Jawaban awan memakai kredit setelah server akun tersedia.`, cancel: 'Batal', turnOn: 'Nyalakan awan',
     srcRegister: 'Dari register Anda', srcLocal: 'Model lokal · Qwen', srcCloud: (m) => `Model awan · ${m} · teks dikirim ke OpenRouter`,
-    looked: 'Langkah', thinking: 'Tide sedang berpikir…',
+    looked: 'Langkah', thinking: 'Sedang berpikir…',
     errOffline: 'Native Helper tidak berjalan, jadi model lokal tidak bisa menjawab.', errNoAsk: 'Helper ini belum punya rute Ask. Perbarui helper untuk memakai model lokal.',
     errCloud: 'Awan belum tersambung: helper tidak punya kunci OpenRouter.', errHttp: (s) => `Helper menjawab dengan galat (${s}).`, errModel: (m) => `Model berhenti: ${m}`,
     useRegister: 'Jawab dari register', useLocal: 'Pakai Lokal',
@@ -167,7 +167,7 @@ export function mountAskTide({ lang = 'en', showCredits = false, getCredits = sa
       body.innerHTML = (c?.balance > 0 ? banner : '') + state.turns.map((t, ti) => (t.role === 'user'
         ? `<div class="u-bub">${esc(t.content)}</div>`
         : `<div class="a-turn">${t.steps?.length ? step(t) : ''}
-            ${t.typing ? `<div class="typing" role="status" aria-label="${esc(T('thinking'))}"><span class="avm"><img src="tide/01-tide-mark-green.svg" alt="" /></span><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></div>` : ''}
+            ${t.typing ? `<div class="typing" role="status" aria-label="${esc(T('thinking'))}"><span class="avm">${SPARK}</span><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></div>` : ''}
             ${t.error ? `<div class="callout danger" role="alert"><p>${esc(t.error)}</p></div>` : ''}
             ${t.content ? `<div class="a-txt">${md(t.content)}</div>` : ''}
             ${t.source && !t.typing && !t.error ? `<div class="src">${esc(srcOf(t))}</div>` : ''}

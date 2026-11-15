@@ -511,7 +511,7 @@ fn open_pc() -> Result<(u32, Running), MicError> {
             let _: () = msg_send![&*d, setPrivateTap: true];
         }
         if answers(sel!(setName:)) {
-            let _: () = msg_send![&*d, setName: &*NSString::from_str("yravgSubMeetly live captions")];
+            let _: () = msg_send![&*d, setName: &*NSString::from_str("Kasi live captions")];
         }
         d
     };
@@ -579,7 +579,7 @@ fn aggregate(output_uid: &str, tap_uid: &str) -> Result<u32, MicError> {
     let tap = dict(vec![("uid", any(s(tap_uid))), ("drift", any(NSNumber::new_bool(true)))]);
     let unique = format!("com.yraverage.submeetly.captions.{}", std::process::id());
     let desc = dict(vec![
-        ("name", any(s("yravgSubMeetly live captions"))),
+        ("name", any(s("Kasi live captions"))),
         ("uid", any(s(&unique))),
         ("master", any(s(output_uid))),
         ("private", any(NSNumber::new_bool(true))),

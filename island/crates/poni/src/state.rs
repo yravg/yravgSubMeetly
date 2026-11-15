@@ -382,8 +382,8 @@ pub struct PageUiState {
     pub before_settings: Option<PageKind>,
     /// Start with Windows, as last read off the UI thread (None until Settings first opens).
     pub autostart: Option<bool>,
-    /// The Eyes look on a MacBook's notch: the pointer the eyes follow and
-    /// the side of the camera they peek out from (`mac/notch.rs`).
+    /// The Kasi look on a MacBook's notch: the pointer Kasi's eyes follow
+    /// and the side of the camera it peeks out from (`mac/notch.rs`).
     #[cfg(target_os = "macos")]
     pub peek: poni_core::peek::Peek,
     /// The Downloads page: its link field, mode and scroll.

@@ -24,6 +24,7 @@ pub mod glass;
 pub mod hdr;
 pub mod helper;
 pub mod history_cards;
+pub mod kasi;
 pub mod look;
 pub mod lrc;
 pub mod lang_prefs;

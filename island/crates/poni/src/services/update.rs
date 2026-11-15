@@ -235,7 +235,7 @@ fn check_app(app: &Path, version: &str) -> Result<(), String> {
     let plist = app.join("Contents/Info.plist");
     let key = |k: &str| output(Command::new("/usr/bin/plutil").args(["-extract", k, "raw", "-o", "-"]).arg(&plist));
     if key("CFBundleIdentifier")?.trim() != BUNDLE_ID {
-        return Err("it isn't yravgSubMeetly".into());
+        return Err("it isn't Kasi".into());
     }
     let v = key("CFBundleShortVersionString")?;
     if v.trim() != version {

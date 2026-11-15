@@ -9,6 +9,7 @@
 use crate::gfx::{TextStyle, Weight};
 use crate::icons::Icon;
 use crate::island::Geom;
+use crate::kasi;
 use crate::pages::{self, PageKind};
 use crate::state::{AppState, FpsAccess, HudKind, InlineAction, Notice};
 use crate::ui::{wid, PillStyle, Ui, PILL_SMALL};
@@ -251,7 +252,11 @@ pub fn geom(m: &Mode, st: &AppState) -> Geom {
                 Geom::new(base + badge, 30.0, 14.0)
             }
             IdleStyle::Minimal => Geom::new(150.0, 26.0, 12.0),
-            IdleStyle::Eyes => Geom::new(118.0, 30.0, 14.0),
+            // Kasi beside the clock: the clock's width plus the mark's.
+            IdleStyle::Kasi => {
+                let base = if st.settings.use_24h { 84.0 } else { 104.0 };
+                Geom::new(base + kasi::MARK_W + kasi::MARK_GAP, 30.0, 14.0)
+            }
             IdleStyle::Hidden => hidden_strip(),
         },
         Mode::Activity(Activity::Media) => {
@@ -312,9 +317,9 @@ pub fn is_live(m: &Mode, st: &AppState) -> bool {
     }
 }
 
-/// Next time the collapsed content changes on its own: eye blinks, a paused
-/// pill giving way to idle, the title peek ending. One-shot wakes, so the
-/// app stays at zero CPU in between.
+/// Next time the collapsed content changes on its own: Kasi's blinks and
+/// ear twitches, a paused pill giving way to idle, the title peek ending.
+/// One-shot wakes, so the app stays at zero CPU in between.
 pub fn next_wake(m: &Mode, st: &AppState) -> Option<f64> {
     let now = st.now;
     let mut next: Option<f64> = None;
@@ -323,9 +328,8 @@ pub fn next_wake(m: &Mode, st: &AppState) -> Option<f64> {
             next = Some(next.map_or(t, |n: f64| n.min(t)));
         }
     };
-    if *m == Mode::Idle && st.settings.idle_style == IdleStyle::Eyes {
-        let phase = now % BLINK_PERIOD;
-        consider(if phase < BLINK_LEN { now - phase + BLINK_LEN } else { now - phase + BLINK_PERIOD });
+    if *m == Mode::Idle && st.settings.idle_style == IdleStyle::Kasi {
+        consider(poni_core::kasi::next_change(now));
     }
     if !matches!(m, Mode::Expanded(_)) {
         if let Some(end) = media_grace_end(st) {
@@ -350,9 +354,6 @@ pub fn next_wake(m: &Mode, st: &AppState) -> Option<f64> {
     }
     next
 }
-
-const BLINK_PERIOD: f64 = 5.5;
-const BLINK_LEN: f64 = 0.14;
 
 /// Oyen sleeps from midnight to five.
 pub(crate) fn night(st: &AppState) -> bool {
@@ -409,24 +410,20 @@ fn draw_idle(ui: &mut Ui, st: &mut AppState, body: Rect) {
             }
             ui.c.text(&time, Rect::new(x0 + bw + BADGE_GAP, body.y, tw + 2.0, body.h), &ts);
         }
-        IdleStyle::Eyes => {
-            // Eyes glance toward the cursor while hovering.
-            let look = ui.input.mouse.map(|p| ((p.x - body.center().x) / body.w).clamp(-0.5, 0.5) * 6.0).unwrap_or(0.0);
-            draw_eyes(ui, st, body.center().x, cy, look);
+        IdleStyle::Kasi => {
+            // The mark and the time, centred as one group; Kasi's eyes
+            // follow the pointer while it hovers.
+            let time = fmt_clock(&st.local, st.settings.use_24h);
+            let ts = TextStyle::body().weight(Weight::Semibold).tabular();
+            let (tw, _) = ui.c.measure(&time, &ts, 400.0);
+            let x0 = body.center().x - (kasi::MARK_W + kasi::MARK_GAP + tw) / 2.0;
+            let centre = Point::new(x0 + kasi::MARK_W / 2.0, cy);
+            let gaze = kasi::gaze_at(ui.input.mouse, centre, body.w);
+            kasi::draw_resting(ui, st, centre, gaze);
+            let tx = x0 + kasi::MARK_W + kasi::MARK_GAP;
+            ui.c.text(&time, Rect::new(tx, body.y, tw + 2.0, body.h), &ts);
         }
         IdleStyle::Minimal | IdleStyle::Hidden => {}
-    }
-}
-
-/// The Eyes look's pair of eyes, centred on (`cx`, `cy`) and turned `look`
-/// DIPs sideways, blinking on their own wake ([`next_wake`]). A Mac's notch
-/// draws them beside the camera (`mac/notch.rs`).
-pub fn draw_eyes(ui: &mut Ui, st: &AppState, cx: f32, cy: f32, look: f32) {
-    let blink = (st.now % BLINK_PERIOD) < BLINK_LEN;
-    for dx in [-11.0f32, 11.0] {
-        let c = Point::new(cx + dx + look, cy);
-        let h = if blink { 2.5 } else { 11.0 };
-        ui.c.fill_rrect(Rect::from_center(c, 6.5, h), 3.25, Color::white(0.95));
     }
 }
 

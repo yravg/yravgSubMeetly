@@ -188,7 +188,7 @@ fn is_engine(url: &str) -> bool {
 fn route(url: &str) {
     match url.split_once("/app/").filter(|_| is_engine(url)).map(|(_, rest)| rest.split(['?', '#']).next().unwrap_or("")) {
         Some("minutes.html") => open("/app/minutes.html", "Minutes register"),
-        Some("app.html") | Some("") => open("/app/app.html", "yravgSubMeetly"),
+        Some("app.html") | Some("") => open("/app/app.html", "Kasi"),
         _ => super::open(url),
     }
 }
@@ -236,7 +236,7 @@ fn install_main_menu(mtm: MainThreadMarker) {
     };
     let bar = NSMenu::new(mtm);
     // The first entry is the application menu (its title is the app's name in the bar).
-    let (app_holder, _app_menu) = submenu("yravgSubMeetly", vec![]);
+    let (app_holder, _app_menu) = submenu("Kasi", vec![]);
     bar.addItem(&app_holder);
     let (edit, _e) = submenu(
         "Edit",

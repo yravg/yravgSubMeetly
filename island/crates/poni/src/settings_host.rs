@@ -99,7 +99,7 @@ impl SettingsWindow {
             CreateWindowExW(
                 WS_EX_LAYERED | WS_EX_APPWINDOW,
                 CLASS,
-                w!("yravgSubMeetly Advanced Settings"),
+                w!("Kasi Advanced Settings"),
                 WS_POPUP | WS_SYSMENU | WS_MINIMIZEBOX,
                 x,
                 y,

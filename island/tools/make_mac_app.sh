@@ -5,7 +5,7 @@
 #
 # The app is ad-hoc signed (no Apple Developer ID yet), so macOS asks once, in System Settings >
 # Privacy & Security > Open Anyway, before it first opens. The DMG is named like a release's
-# (yravgSubMeetly-<version>-mac.dmg), which is what make_update_feed.py looks for. When an Apple
+# (Kasi-<version>-mac.dmg), which is what make_update_feed.py looks for. When an Apple
 # Developer ID exists, sign with it (--options runtime, installer/mac/poni.entitlements) and notarize.
 set -euo pipefail
 
@@ -34,6 +34,11 @@ printf 'APPL????' > "$app/Contents/PkgInfo"
 if [ "$icns" != "-" ]; then
   cp "$icns" "$app/Contents/Resources/yravgSubMeetly.icns"
 fi
+# The name people see is Kasi (Info.plist has LSHasLocalizedDisplayName): Finder, Launchpad and
+# Spotlight read it from here, while the bundle's folder keeps its name for the install path.
+mkdir -p "$app/Contents/Resources/en.lproj"
+printf '"CFBundleDisplayName" = "Kasi";\n"CFBundleName" = "Kasi";\n' > "$app/Contents/Resources/en.lproj/InfoPlist.strings"
+plutil -lint "$app/Contents/Resources/en.lproj/InfoPlist.strings"
 
 # The local engine (captions, translation, the model library): the island starts it from Contents/MacOS
 # (services/engine.rs) and stops it on quit. ENGINE_ARM / ENGINE_INTEL are its release binaries
@@ -77,7 +82,7 @@ fi
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 
-dmg="$out/yravgSubMeetly-$version-mac.dmg"
+dmg="$out/Kasi-$version-mac.dmg"
 bash "$root/tools/make_mac_dmg.sh" "$app" "$dmg" test
 shasum -a 256 "$dmg"
 echo "built $dmg"

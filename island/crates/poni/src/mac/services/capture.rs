@@ -34,10 +34,10 @@ impl CaptureService {
 /// What a closed source says to the person, in words.
 fn why(what: &str, e: &MicError) -> String {
     match (what, e) {
-        ("microphone", MicError::Denied) => "The microphone is off for yravgSubMeetly. Allow it in System Settings \u{203a} Privacy & Security \u{203a} Microphone.".into(),
+        ("microphone", MicError::Denied) => "The microphone is off for Kasi. Allow it in System Settings \u{203a} Privacy & Security \u{203a} Microphone.".into(),
         ("microphone", MicError::NoDevice) => "No microphone. Captions resume when one is plugged in.".into(),
         (_, MicError::NoDevice) => "The Mac's sound can't be captured on this macOS (it needs 14.2 or later) or has no output device.".into(),
-        (_, MicError::Denied) => "The Mac's sound is off for yravgSubMeetly. Allow it in System Settings \u{203a} Privacy & Security \u{203a} Screen & System Audio Recording.".into(),
+        (_, MicError::Denied) => "The Mac's sound is off for Kasi. Allow it in System Settings \u{203a} Privacy & Security \u{203a} Screen & System Audio Recording.".into(),
         (_, MicError::Failed(e)) => format!("The {what} could not be captured ({e})."),
     }
 }

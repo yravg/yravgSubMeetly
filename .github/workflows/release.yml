@@ -52,7 +52,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-setup
-          path: island/dist/yravgSubMeetly-Setup-*.exe
+          path: island/dist/Kasi-Setup-*.exe
           if-no-files-found: error
 
   mac:
@@ -91,13 +91,12 @@ jobs:
           cargo build -p submeetly-engine --release --target aarch64-apple-darwin
           cargo build -p submeetly-engine --release --target x86_64-apple-darwin
 
+      # Kasi's app icon on Apple's grid, from the brand set (node site/brand/icons/build.cjs).
       - name: App icon
         working-directory: island
         run: |
-          python3 -m venv .icon-venv
-          .icon-venv/bin/pip install --quiet pillow
-          .icon-venv/bin/python tools/make_mac_icon.py build/yravgSubMeetly.iconset
-          iconutil -c icns build/yravgSubMeetly.iconset -o build/yravgSubMeetly.icns
+          mkdir -p build
+          iconutil -c icns ../site/brand/icons/yravgSubMeetly.iconset -o build/yravgSubMeetly.icns
 
       # What plays, from macOS's own now playing: the MediaRemote adapter (third_party/mediaremote-adapter).
       - name: MediaRemote adapter
@@ -131,7 +130,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: mac-dmg
-          path: island/dist/yravgSubMeetly-*-mac.dmg
+          path: island/dist/Kasi-*-mac.dmg
           if-no-files-found: error
 
   publish:

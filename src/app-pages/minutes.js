@@ -119,15 +119,15 @@ const write = (k, v) => { try { if (v == null) localStorage.removeItem(k); else 
 export const density = () => { const d = read(DENSITY_KEY); return d === 'review' || d === 'compact' ? d : 'reading'; };
 
 /**
- * @param c { lang, esc, ic, tide, meetings, series, register ('classic'|'modern'), me, meetingParam, registerSrc(kind, extra) }
+ * @param c { lang, esc, ic, kasi, meetings, series, register ('classic'|'modern'), me, meetingParam, registerSrc(kind, extra) }
  */
 export function minutesHtml(c) {
-  const { lang, esc, ic, tide, meetings } = c;
+  const { lang, esc, ic, kasi, meetings } = c;
   const t = S[lang] || S.en;
   const NT = makeT(lang);
-  if (!meetings) return `<div class="mn"><div class="st loading">${tide('compass', 'st-art')}<h3>${esc(t.loading)}</h3></div></div>`;
+  if (!meetings) return `<div class="mn"><div class="st loading">${kasi('thinking', 'st-art')}<h3>${esc(t.loading)}</h3></div></div>`;
   if (!meetings.length) {
-    return `<div class="mn"><nav class="mn-crumb"><a href="#today">${esc(t.back)}</a></nav><div class="st mn-empty">${tide('sleep', 'st-art')}<h3>${esc(t.emptyTitle)}</h3><p>${esc(t.emptyBody)}</p><div class="st-act"><button type="button" class="pill-b" data-mn="demo">${esc(t.loadDemo)}</button></div></div></div>`;
+    return `<div class="mn"><nav class="mn-crumb"><a href="#today">${esc(t.back)}</a></nav><div class="st mn-empty">${kasi('empty', 'st-art')}<h3>${esc(t.emptyTitle)}</h3><p>${esc(t.emptyBody)}</p><div class="st-act"><button type="button" class="pill-b" data-mn="demo">${esc(t.loadDemo)}</button></div></div></div>`;
   }
   const meeting = meetings.find((m) => m.id === ui.meetingId)
     || meetings.find((m) => m.id === c.meetingParam)
