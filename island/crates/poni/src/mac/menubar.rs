@@ -46,7 +46,7 @@ pub enum MenuCmd {
     ReloadSettings,
     OpenDataFolder,
     About,
-    /// "Update to yravgSubMeetly 0.2.5…" (`crate::updates`).
+    /// "Update to Kasi 0.2.5…" (`crate::updates`).
     Update,
     /// "Check for updates…": read the update file now (`crate::updates`).
     CheckForUpdates,
@@ -114,8 +114,8 @@ pub fn menu_items(s: &Settings, pinned: bool, login: Login, update: UpdateLine) 
         item(label, MenuCmd::SetIdleStyle(st), shown == st)
     };
     let mut items = vec![
-        MenuItem::Info { label: "yravgSubMeetly".into() },
-        item("Open yravgSubMeetly", MenuCmd::OpenApp, false),
+        MenuItem::Info { label: "Kasi by yravg".into() },
+        item("Open Kasi", MenuCmd::OpenApp, false),
         item("Open Minutes register", MenuCmd::OpenMinutes, false),
         item("Live captions", MenuCmd::OpenLive, false),
         item("Meeting", MenuCmd::OpenCall, false),
@@ -152,7 +152,7 @@ pub fn menu_items(s: &Settings, pinned: bool, login: Login, update: UpdateLine) 
         item("Lyrics by LRCLIB", MenuCmd::LyricsCredit, false),
         item(&crate::version::about_label(), MenuCmd::About, false),
         MenuItem::Separator,
-        MenuItem::Item { label: "Quit yravgSubMeetly".into(), cmd: MenuCmd::Quit, checked: false, key: "q" },
+        MenuItem::Item { label: "Quit Kasi".into(), cmd: MenuCmd::Quit, checked: false, key: "q" },
     ];
     // Only while the island sits off the middle, under Keep island open.
     if s.island_x.is_some() {
@@ -162,7 +162,7 @@ pub fn menu_items(s: &Settings, pinned: bool, login: Login, update: UpdateLine) 
     match update {
         // A new version first, until it is installed.
         UpdateLine::Offer(v) => {
-            items.splice(0..0, [item(&format!("Update to yravgSubMeetly {v}…"), MenuCmd::Update, false), MenuItem::Separator]);
+            items.splice(0..0, [item(&format!("Update to Kasi {v}…"), MenuCmd::Update, false), MenuItem::Separator]);
         }
         // Otherwise a look on request, under About (as in most Mac apps).
         UpdateLine::Check => {
@@ -236,7 +236,7 @@ impl MenuBar {
                 Some(img) => button.setImage(Some(&img)),
                 None => button.setTitle(&NSString::from_str("Poni")),
             }
-            button.setToolTip(Some(&NSString::from_str(&format!("yravgSubMeetly {}", crate::version::VERSION))));
+            button.setToolTip(Some(&NSString::from_str(&format!("Kasi {}", crate::version::VERSION))));
         }
         let target: Retained<MenuTarget> = unsafe { objc2::msg_send![MenuTarget::alloc(mtm), init] };
         let menu = build(mtm, &target, &menu_items(s, pinned, login, update));

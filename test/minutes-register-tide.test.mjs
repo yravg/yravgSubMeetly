@@ -228,14 +228,15 @@ test('?view= and ?do= from the shell page: the register opens on that view and r
   await page.waitForFunction(() => { const o = document.querySelector('.lt-overlay'); return o && !o.hidden && getComputedStyle(o).display !== 'none'; }, { timeout: 6000 });
 });
 
-test('wordmark: Kasi mark + yravg in ink + SubMeetly in green-ink, no black pill', async () => {
+test('wordmark: Kasi mark + Kasi in ink + "by yravg" small and muted, no filled pill', async () => {
   await open('?skin=tide');
   const r = await page.evaluate(() => {
-    const pill = document.querySelector('.brand-pill'); const b = document.querySelector('.brand');
-    return { bg: getComputedStyle(pill).backgroundColor, img: getComputedStyle(b, '::before').backgroundImage, text: b.textContent.replace(/\s+/g, '') };
+    const by = document.querySelector('.brand-by'); const b = document.querySelector('.brand');
+    return { bg: getComputedStyle(by).backgroundColor, small: parseFloat(getComputedStyle(by).fontSize) < parseFloat(getComputedStyle(b).fontSize), img: getComputedStyle(b, '::before').backgroundImage, text: b.textContent.replace(/\s+/g, ''), pill: !!b.querySelector('.brand-pill') };
   });
-  assert.equal(r.text, 'yravgSubMeetly');
+  assert.equal(r.text, 'Kasibyyravg');
   assert.equal(r.bg, 'rgba(0, 0, 0, 0)', 'no filled pill');
+  assert.ok(r.small && !r.pill, '"by yravg" small, no pill');
   assert.match(r.img, /kasi\/kasi-mark\.svg/);
 });
 

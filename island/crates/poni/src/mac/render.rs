@@ -780,7 +780,7 @@ fn fake_release() -> poni_core::update::Release {
         headline: "Updates install themselves on a Mac".into(),
         notes: format!("{repo}/tag/v{version}"),
         windows: None,
-        mac: Some(poni_core::update::Download { url: format!("{repo}/download/v{version}/yravgSubMeetly-{version}-mac.dmg"), size: 4_300_000, sha256: "0".repeat(64) }),
+        mac: Some(poni_core::update::Download { url: format!("{repo}/download/v{version}/Kasi-{version}-mac.dmg"), size: 4_300_000, sha256: "0".repeat(64) }),
         version,
     }
 }

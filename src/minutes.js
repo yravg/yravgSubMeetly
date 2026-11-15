@@ -635,7 +635,7 @@ function viewDoc() {
       <div class="dist">
         <span class="mono">${esc(m.id)} · ${esc(T('rev'))} ${esc(rev)}</span>
         ${distribution ? `<span>${esc(T('distribution'))}: ${esc(distribution)}</span>` : ''}
-        <span>${esc(T('preparedBy'))}: yravgSubMeetly · ${esc(T('onDevice'))}</span>
+        <span>${esc(T('preparedBy'))}: Kasi · ${esc(T('onDevice'))}</span>
       </div>
     </div>
   </div></div>`;

@@ -7,7 +7,7 @@ yravgSubMeetly installs with one Setup and learns about new versions from one si
 | What | Where |
 |---|---|
 | Installer script (Inno Setup 6.5) | `installer/yravgsubmeetly.iss`, art by `installer/make_art.cjs` (Kasi, from `site/kasi.js`; it also copies the brand `.ico` to `crates/poni/res/poni.ico`) |
-| Build the Setup | `tools/build-installer.ps1` -> `dist/yravgSubMeetly-Setup-<version>.exe` (git-ignored) |
+| Build the Setup | `tools/build-installer.ps1` -> `dist/Kasi-Setup-<version>.exe` (git-ignored; `yravgSubMeetly-Setup-*` up to 1.4.5) |
 | Make and sign the update file | `tools/make_update_feed.py` |
 | Public keys the app trusts | `crates/poni-core/data/update-keys.txt` |
 | Release repository (one constant) | `poni_core::update::REPO` = `yravg/yravgSubMeetly` |
@@ -63,7 +63,7 @@ Debug builds only: set `YRAVG_UPDATE_BASE=http://127.0.0.1:PORT` (and `PONI_HOME
 
 ## The Mac app
 
-`tools/make_mac_app.sh` makes `yravgSubMeetly.app` (bundle id `com.yraverage.submeetly`, fixed: the updater refuses another) from the arm64 and x86_64 binaries, signs it ad hoc and wraps it in `yravgSubMeetly-<version>-mac.dmg`. Without an Apple Developer ID the first open needs System Settings > Privacy & Security > **Open Anyway** (the DMG says so in `READ ME FIRST.txt`). The updater's own checks (bundle id, version, `codesign --verify --deep --strict`) pass with an ad-hoc signature, and the app replaces itself in place: the new app is taken out of the DMG, swapped into the old one's place, and opened.
+`tools/make_mac_app.sh` makes `yravgSubMeetly.app`, shown as Kasi (CFBundleName, CFBundleDisplayName and `en.lproj/InfoPlist.strings`; the folder keeps its name so the install path and updates in place carry over; bundle id `com.yraverage.submeetly`, fixed: the updater refuses another) from the arm64 and x86_64 binaries, signs it ad hoc and wraps it in `Kasi-<version>-mac.dmg` (`yravgSubMeetly-<version>-mac.dmg` up to 1.4.5). Without an Apple Developer ID the first open needs System Settings > Privacy & Security > **Open Anyway** (the DMG says so in `READ ME FIRST.txt`). The updater's own checks (bundle id, version, `codesign --verify --deep --strict`) pass with an ad-hoc signature, and the app replaces itself in place: the new app is taken out of the DMG, swapped into the old one's place, and opened.
 
 When an Apple Developer ID exists: sign with `--options runtime --entitlements installer/mac/poni.entitlements`, notarize the DMG (`xcrun notarytool submit ... --wait`), staple it, and keep the same team on every release (the updater refuses a different team).
 

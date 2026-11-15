@@ -111,7 +111,7 @@ def release(released):
 def headline(notes, version):
     """The notes' first bold line ("**Sing along from the closed island.**")."""
     m = re.search(r"\*\*(.+?)\*\*", notes or "", re.S)
-    text = " ".join(m.group(1).split()).rstrip(".") if m else f"yravgSubMeetly {version}"
+    text = " ".join(m.group(1).split()).rstrip(".") if m else f"Kasi {version}"
     if len(text) > HEADLINE_MAX:
         text = text[: HEADLINE_MAX - 1].rsplit(" ", 1)[0].rstrip(",;:") + "…"
     return text
@@ -144,9 +144,9 @@ def payload(released):
         die(f'the release "{rel["tag_name"]}" is not a version tag')
     if rel.get("draft") or rel.get("prerelease"):
         die(f"v{version} is a draft or a pre-release")
-    windows = asset(rel, f"yravgSubMeetly-Setup-{version}.exe", version)
+    windows = asset(rel, f"Kasi-Setup-{version}.exe", version)
     if windows is None:
-        die(f"v{version} has no yravgSubMeetly-Setup-{version}.exe")
+        die(f"v{version} has no Kasi-Setup-{version}.exe")
     p = {
         "schema": SCHEMA,
         "version": version,
@@ -156,7 +156,7 @@ def payload(released):
         "windows": windows,
     }
     # No DMG on the release: the file says nothing to Macs.
-    mac = asset(rel, f"yravgSubMeetly-{version}-mac.dmg", version)
+    mac = asset(rel, f"Kasi-{version}-mac.dmg", version)
     if mac is not None:
         p["mac"] = mac
     return p

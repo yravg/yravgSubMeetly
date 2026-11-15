@@ -1,5 +1,5 @@
 /**
- * App shell yravgSubMeetly (TIDE-002..005, 008, 014 — papan A01, A04, A09).
+ * App shell Kasi (yravgSubMeetly) (TIDE-002..005, 008, 014 — papan A01, A04, A09).
  *
  * Halaman (hash): today · live · minutes · notes · history · files · addins ·
  * island · perf · settings · helper. Today dan Minutes digambar di sini; halaman
@@ -58,7 +58,7 @@ const STR = {
     noOverlay: 'No page overlay in this window', noOverlayBody: 'Press Start and share a tab, window or screen with audio. Captions appear here and in the island pill; the overlay on a web page needs the Chrome extension.',
     loading: 'Reading your register…', errTitle: 'The register could not be read.', errBody: (m) => `${m} Reload the page; if it keeps failing, export your minutes from the Minutes page.`, reload: 'Reload',
     emptyTitle: 'No meetings yet', emptyBody: 'Start captions in a meeting, or import a sample series from the Library on the Minutes page.', openMinutes: 'Open Minutes',
-    welcomeTitle: 'Welcome to yravgSubMeetly', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it', setupTitle: 'Set up in three steps', setupEngine: 'Engine running', setupEngineFix: 'Start the engine', setupAsr: 'Speech model on this device', setupAsrFix: 'Download one', setupTest: 'Try a test caption', setupTestGo: 'Start captions', setupDone: 'Ready', setupTodo: 'To do', setupChecking: 'Checking…',
+    welcomeTitle: 'Welcome to Kasi', welcomeBody: 'Captions, translation and minutes stay on this device. Start captions when your meeting begins; the minutes build themselves.', gotIt: 'Got it', setupTitle: 'Set up in three steps', setupEngine: 'Engine running', setupEngineFix: 'Start the engine', setupAsr: 'Speech model on this device', setupAsrFix: 'Download one', setupTest: 'Try a test caption', setupTestGo: 'Start captions', setupDone: 'Ready', setupTodo: 'To do', setupChecking: 'Checking…',
     caughtUp: 'All caught up: nothing overdue and yesterday is issued.',
     registerStyle: 'Style', openRegister: 'Open register', classic: 'Classic ↗', openWindow: 'Open Minutes window ↗', windowOpen: 'Minutes window is open · Focus',
     minutesHint: 'Classic and Modern are the same register; edits show in both.', modern: 'Modern ↗',
@@ -107,7 +107,7 @@ const STR = {
     noOverlay: 'Tidak ada overlay halaman di jendela ini', noOverlayBody: 'Tekan Mulai lalu bagikan tab, jendela, atau layar beserta audionya. Teks muncul di sini dan di pil island; overlay di halaman web butuh ekstensi Chrome.',
     loading: 'Membaca register…', errTitle: 'Register tidak terbaca.', errBody: (m) => `${m} Muat ulang halaman; bila tetap gagal, ekspor notulen dari halaman Notulen.`, reload: 'Muat ulang',
     emptyTitle: 'Belum ada rapat', emptyBody: 'Mulai teks di rapat, atau impor seri contoh dari Library di halaman Notulen.', openMinutes: 'Buka Notulen',
-    welcomeTitle: 'Selamat datang di yravgSubMeetly', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti', setupTitle: 'Siapkan dalam tiga langkah', setupEngine: 'Engine berjalan', setupEngineFix: 'Nyalakan engine', setupAsr: 'Model suara di perangkat ini', setupAsrFix: 'Unduh satu', setupTest: 'Coba teks uji', setupTestGo: 'Mulai teks', setupDone: 'Siap', setupTodo: 'Belum', setupChecking: 'Memeriksa…',
+    welcomeTitle: 'Selamat datang di Kasi', welcomeBody: 'Teks, terjemahan dan notulen tetap di perangkat ini. Mulai teks saat rapat dimulai; notulennya tersusun sendiri.', gotIt: 'Mengerti', setupTitle: 'Siapkan dalam tiga langkah', setupEngine: 'Engine berjalan', setupEngineFix: 'Nyalakan engine', setupAsr: 'Model suara di perangkat ini', setupAsrFix: 'Unduh satu', setupTest: 'Coba teks uji', setupTestGo: 'Mulai teks', setupDone: 'Siap', setupTodo: 'Belum', setupChecking: 'Memeriksa…',
     caughtUp: 'Semua beres: tidak ada yang lewat tenggat dan notulen kemarin sudah terbit.',
     registerStyle: 'Gaya', openRegister: 'Buka register', classic: 'Klasik ↗', openWindow: 'Buka jendela Notulen ↗', windowOpen: 'Jendela Notulen terbuka · Fokus',
     minutesHint: 'Klasik dan Modern adalah register yang sama; suntingan tampil di keduanya.', modern: 'Modern ↗',
@@ -438,7 +438,7 @@ let lastStab = '';
 let devCleanup = null; // timers and listeners of the native pages (Developer, All features rows)
 function render() {
   const { route, params } = parseHash();
-  document.title = `${T(route)} · yravgSubMeetly`;
+  document.title = `${T(route)} · Kasi`;
   $('#page-title').textContent = T(route);
   paintNav(route);
   paintBell();

@@ -752,7 +752,7 @@ impl App {
         }
         if self.first_run && self.smoke.is_none() {
             let place = if self.screen.notch.is_some() { "Point at the notch to open it" } else { "Point at the island to open it" };
-            self.st.notify(Icon::CheckCircle, self.st.accent, "yravgSubMeetly is on", place, 6.0, None);
+            self.st.notify(Icon::CheckCircle, self.st.accent, "Kasi is on", place, 6.0, None);
         }
         if self.smoke.is_some() {
             self.set_timer(Timer::Smoke, 600);
@@ -1295,7 +1295,7 @@ impl App {
             // The app's own pages in a normal window of their own (services/webwindow.rs).
             MenuCmd::OpenApp => {
                 self.engine_start();
-                services::webwindow::open("/app/app.html", "yravgSubMeetly");
+                services::webwindow::open("/app/app.html", "Kasi");
             }
             MenuCmd::OpenMinutes => {
                 self.engine_start();
@@ -1366,7 +1366,7 @@ impl App {
                 pinfo!("start at login: {now:?}");
                 if now == Login::NeedsApproval {
                     services::login::open_settings();
-                    self.st.notify(Icon::Sliders, palette::ORANGE, "Allow yravgSubMeetly to start at login", "Turn it on in Login Items", 8.0, None);
+                    self.st.notify(Icon::Sliders, palette::ORANGE, "Allow Kasi to start at login", "Turn it on in Login Items", 8.0, None);
                 }
             }
         }
@@ -1608,7 +1608,7 @@ impl App {
             if let Some(dmg) = self.updater.as_ref().and_then(|u| u.downloaded(&self.st)) {
                 services::open(&dmg.to_string_lossy());
                 self.collapse();
-                self.st.notify(Icon::Download, self.st.accent, "Install it by hand this time", "Drag yravgSubMeetly to Applications in the window that opened", 10.0, None);
+                self.st.notify(Icon::Download, self.st.accent, "Install it by hand this time", "Drag Kasi to Applications in the window that opened", 10.0, None);
                 return;
             }
         }
@@ -3967,7 +3967,7 @@ impl App {
                 self.st.pomodoro.start(self.st.now);
             }
             "notice" => {
-                self.st.notify(Icon::CheckCircle, self.st.accent, "yravgSubMeetly is on", "Point at the island to open it", 30.0, None);
+                self.st.notify(Icon::CheckCircle, self.st.accent, "Kasi is on", "Point at the island to open it", 30.0, None);
             }
             "volume-hud" => {
                 self.st.notice = None;

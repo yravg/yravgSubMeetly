@@ -356,14 +356,15 @@ test('halaman tidak meluber mendatar di jendela sempit; appbar dan dok tetap ter
   await page.waitForSelector('#btn-settings');
 });
 
-test('appbar memakai wordmark yravgSubMeetly dan "Minutes" membawa kembali ke halaman utama', async () => {
+test('appbar memakai wordmark Kasi by yravg dan "Minutes" membawa kembali ke halaman utama', async () => {
   const brand = await page.evaluate(() => {
     const el = document.querySelector('.brand');
-    return { teks: el.textContent.replace(/\s+/g, ''), adaPil: !!el.querySelector('.brand-pill'),
+    const by = el.querySelector('.brand-by');
+    return { teks: el.textContent.replace(/\s+/g, ''), kecil: by ? parseFloat(getComputedStyle(by).fontSize) < parseFloat(getComputedStyle(el).fontSize) : false,
       adaIkonLama: !!el.querySelector('svg') };
   });
-  assert.equal(brand.teks, 'yravgSubMeetly');
-  assert.equal(brand.adaPil, true, 'pil SubMeetly tidak terbentuk');
+  assert.equal(brand.teks, 'Kasibyyravg');
+  assert.equal(brand.kecil, true, '"by yravg" lebih kecil dari "Kasi"');
   assert.equal(brand.adaIkonLama, false, 'ikon generik lama masih ada di sebelah wordmark');
 
   // Jejak remah ditulis ulang tiap render; tautan pulang tidak boleh ikut hilang.
