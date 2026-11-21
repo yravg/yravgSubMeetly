@@ -87,6 +87,10 @@ pub struct Speed {
     /// When the last look ended (app clock), and whether one is under way.
     pub checked_at: Option<f64>,
     pub busy: bool,
+    /// Speech models this island queued a test for by itself (`model_pick::bench_due`): asked once.
+    pub asked: Vec<String>,
+    /// The too-slow model whose switch offer was already shown this run (one notice, not one a poll).
+    pub offered: Option<String>,
 }
 
 impl Speed {

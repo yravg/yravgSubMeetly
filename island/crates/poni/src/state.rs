@@ -146,6 +146,8 @@ pub enum NoticeAction {
     OpenApp(String),
     /// Download the speech model the captions wait for (Settings shows the progress).
     DownloadModel,
+    /// Switch captions to this speech model (the one in use is too slow here).
+    UseModel(String),
 }
 
 /// A one-click action shown as a small pill inside a notice (doesn't expand).

@@ -276,6 +276,42 @@ fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     rows
 }
 
+/// Settings › Models › Speech recognition: the preset, the model rows with this PC's measured speed,
+/// and, when the model in use is too slow for live captions here, a one-click switch to the fastest
+/// downloaded one that keeps up. Nothing switches without that click.
+fn speech_items(st: &AppState) -> Vec<Item> {
+    use poni_core::model_pick::{self as pick, Preset};
+    let m = &st.models;
+    let mut rows = model_items(m, Kind::Asr);
+    let chosen = m.chosen(Kind::Asr);
+    if let (Some(x), Some(first)) = (chosen.as_deref().and_then(|id| pick::speed_of(&st.speed, id)), rows.first_mut()) {
+        first.sub = Some(format!("{} \u{b7} {}", first.sub.take().unwrap_or_default(), pick::speed_note(x)));
+    }
+    if let Some((id, x)) = pick::switch_offer(m, &st.speed) {
+        rows.insert(1, item(Key::SpeechSwitch, &format!("Switch to {}", m.label_of(&id)), Some(&format!("{}: keeps up with live captions on this PC", pick::speed_note(x))), Ctl::Button("Switch")));
+    }
+    if m.step(Kind::Asr, 1).is_some() {
+        let sub = if pick::on_gpu(&st.helper.snap.health.device) {
+            "Battery saver: Base on the CPU \u{b7} Balanced: Small \u{b7} Best quality: large-v3-turbo on the graphics card"
+        } else {
+            "Battery saver: Base on the CPU \u{b7} Balanced: Small \u{b7} Best quality needs a graphics card"
+        };
+        let now = chosen.as_deref().and_then(pick::preset_of).map_or("Custom", Preset::name);
+        rows.insert(0, item(Key::SpeechPreset, "Preset", Some(sub), Ctl::Stepper(now.to_string())));
+    }
+    rows
+}
+
+/// The person chose `id` for `k`: a model on disk switches at once, one not yet downloaded waits
+/// for its Download button.
+fn choose_model(st: &mut AppState, k: Kind, id: String) {
+    let now = st.models.selected(k).as_deref() == Some(id.as_str());
+    if st.models.switchable(k, &id) {
+        st.cmd(Command::ModelSelect(k, id.clone()));
+    }
+    st.models.set_pick(k, (!now).then_some(id));
+}
+
 /// Settings › Models › Summaries and AI: the engine's custom AI connector and default summary template.
 fn ai_items(ai: &crate::ai::AiView) -> Vec<Item> {
     let set = |v: &str, empty: &'static str| if v.is_empty() { empty.to_string() } else { v.to_string() };
@@ -434,6 +470,10 @@ pub enum Key {
     LyricsTranslate,
     /// The choice of a model (steps through the engine's catalog).
     ModelPick(poni_core::models::Kind),
+    /// Speech recognition › Preset: Battery saver, Balanced, Best quality (`model_pick::Preset`).
+    SpeechPreset,
+    /// The speech model in use is too slow here: switch to the fastest one that keeps up.
+    SpeechSwitch,
     /// The Download (or Retry) button of a model.
     ModelPull(poni_core::models::Kind),
     /// The folder a model is stored in, and its Choose button.
@@ -811,7 +851,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
             .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai)), Block::Group(Some("Caption translation service"), provider_items(&st.ai))])
-            .chain([Kind::Asr, Kind::Translate].into_iter().map(|k| Block::Group(Some(if k == Kind::Asr { "Speech recognition" } else { "Translation" }), model_items(&st.models, k))))
+            .chain([Block::Group(Some("Speech recognition"), speech_items(st)), Block::Group(Some("Translation"), model_items(&st.models, Kind::Translate))])
             .chain([Block::Speed, Block::Group(Some("Library"), library_items(st))])
             .collect(),
         Section::Popups => vec![Block::Group(
@@ -1132,11 +1172,22 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         Key::ModelPick(k) => {
             // A model not on disk waits for its Download button; one that is switches at once.
             let Some(id) = st.models.step(k, step).filter(|_| step != 0) else { return };
-            let now = st.models.selected(k).as_deref() == Some(id.as_str());
-            if st.models.switchable(k, &id) {
-                st.cmd(Command::ModelSelect(k, id.clone()));
+            choose_model(st, k, id);
+            return;
+        }
+        Key::SpeechPreset => {
+            use poni_core::model_pick as pick;
+            let now = st.models.chosen(Kind::Asr).as_deref().and_then(pick::preset_of);
+            let p = pick::step_preset(now, step, pick::on_gpu(&st.helper.snap.health.device));
+            let Some(id) = pick::preset_model(p, &st.models).filter(|_| step != 0) else { return };
+            choose_model(st, Kind::Asr, id);
+            st.cmd(Command::EngineDevice(p.device().to_string()));
+            return;
+        }
+        Key::SpeechSwitch => {
+            if let Some((id, _)) = poni_core::model_pick::switch_offer(&st.models, &st.speed) {
+                choose_model(st, Kind::Asr, id);
             }
-            st.models.set_pick(k, (!now).then_some(id));
             return;
         }
         Key::ModelPull(k) => {
@@ -2264,6 +2315,7 @@ fn draw_speed(ui: &mut Ui, st: &mut AppState, r: Rect, view: Rect, sf: &Surfaces
             let (value, value_color) = match (&row.state, &row.latest) {
                 (State::Testing(p), _) => (format!("Testing {:.0}%", p * 100.0), palette::YELLOW),
                 (State::Queued, _) => ("Waiting\u{2026}".to_string(), palette::TEXT_DIM),
+                (_, Some(run)) if g == Group::Speech && poni_core::model_pick::too_slow(run.speed) => (speed::value_text(g, run), palette::ORANGE),
                 (_, Some(run)) => (speed::value_text(g, run), palette::TEXT),
                 _ => (String::new(), palette::TEXT_DIM),
             };
@@ -2307,7 +2359,8 @@ fn draw_speed(ui: &mut Ui, st: &mut AppState, r: Rect, view: Rect, sf: &Surfaces
             }
             // How it was measured: the time per window or sentence, how many, which day.
             if let Some(run) = row.latest.as_ref().filter(|_| matches!(row.state, State::Tested)) {
-                let detail = format!("{} \u{b7} {} timed \u{b7} {}", speed::latency_text(g, run), run.samples, speed::day(&run.at));
+                let slow = if g == Group::Speech && poni_core::model_pick::too_slow(run.speed) { "Too slow for live captions \u{b7} " } else { "" };
+                let detail = format!("{slow}{} \u{b7} {} timed \u{b7} {}", speed::latency_text(g, run), run.samples, speed::day(&run.at));
                 ui.c.text(&detail, Rect::new(x0, rr.y + 44.0, x1 - x0, 15.0), &TextStyle::footnote().color(palette::TEXT_FAINT));
             }
         }
@@ -2653,6 +2706,38 @@ mod tests {
         st.cmds.clear();
         apply(&mut st, Key::ModelManual(Kind::Asr), Act::Press);
         assert!(st.cmds.contains(&Command::OpenUrl("https://www.modelscope.cn/models/openai-mirror/whisper-base/files".into())));
+    }
+
+    #[test]
+    fn a_speech_model_too_slow_here_is_offered_a_switch_and_presets_pick_by_click() {
+        use poni_core::models::{parse, Kind};
+        use poni_core::speed::Run;
+        let mut st = state();
+        let body = r#"{"models":[{"key":"asr","id":"openai/whisper-medium","loaded":true,"downloaded":true}],
+            "catalog":[{"kind":"asr","id":"openai/whisper-base","label":"Base","downloaded":true},{"kind":"asr","id":"openai/whisper-small","label":"Small","downloaded":false},
+                       {"kind":"asr","id":"openai/whisper-medium","label":"Medium","downloaded":true}]}"#;
+        st.models.apply(Ok(parse(body).unwrap()), 1.0);
+        let run = |speed| vec![Run { speed, unit: "x real time".into(), ..Run::default() }];
+        st.speed.report.runs.insert("openai/whisper-base".into(), run(2.7));
+        st.speed.report.runs.insert("openai/whisper-medium".into(), run(0.3));
+        let pick = row(Section::Models, &st, Key::ModelPick(Kind::Asr)).unwrap();
+        assert!(pick.sub.unwrap().ends_with("0.3\u{d7} real time, too slow for live captions"));
+        let switch = row(Section::Models, &st, Key::SpeechSwitch).expect("a switch is offered");
+        assert_eq!((switch.label.as_str(), switch.ctl), ("Switch to Base", Ctl::Button("Switch")));
+        assert_eq!(row(Section::Models, &st, Key::SpeechPreset).map(|i| i.ctl), Some(Ctl::Stepper("Best quality".into())));
+        // Nothing switched by itself: only the click does.
+        assert!(st.cmds.iter().all(|c| !matches!(c, Command::ModelSelect(..))));
+        apply(&mut st, Key::SpeechSwitch, Act::Press);
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(Kind::Asr, id) if id == "openai/whisper-base")));
+        // Balanced is Small, not on disk: it waits for Download; Battery saver also turns the GPU off.
+        st.cmds.clear();
+        st.models.set_pick(Kind::Asr, None);
+        apply(&mut st, Key::SpeechPreset, Act::Step(-1));
+        assert_eq!(st.models.chosen(Kind::Asr).as_deref(), Some("openai/whisper-small"));
+        assert!(!st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(..))));
+        apply(&mut st, Key::SpeechPreset, Act::Step(1));
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(Kind::Asr, id) if id == "openai/whisper-base")));
+        assert!(st.cmds.contains(&Command::EngineDevice("cpu".into())));
     }
 
     #[test]

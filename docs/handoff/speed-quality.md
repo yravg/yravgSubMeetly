@@ -9,7 +9,7 @@ Roadmap: `docs/roadmap/speed-quality.md`.
 | Item 10 warm models at start, item 18 SRT/VTT from captions window | done, not yet installed | b11b295 |
 | A GPU speech | in progress | worker wp-a-gpu |
 | B Clean input | in progress | worker wp-b-clean |
-| D Right model | in progress | worker wp-d-model |
+| D Right model | done on branch, not merged | worker wp-d-model, branch worktree-agent-a74d1b5539e9da413: poni-core `model_pick` (1.2x line, switch offer, bench after download / first use, presets), Settings › Models › Speech recognition rows; latency readout already existed (Captions › Display) |
 | C Cloud speech | in progress | worker wp-c-cloud |
 | E Better words | open | |
 | F Live feel | open | |

@@ -216,6 +216,8 @@ pub enum Command {
     SpeedTest(String),
     /// Run the speed test of every downloaded model.
     SpeedTestAll,
+    /// Where the engine runs its models (`POST /engine/device`: auto, cpu or cuda); a speech preset sets it.
+    EngineDevice(String),
     /// The Downloads page (`pages::downloads`).
     Download(DownloadCmd),
     /// A Windows language feature (`poni_core::winlang`): Settings' rows and
