@@ -6,7 +6,7 @@ Roadmap: `docs/roadmap/speed-quality.md`.
 |---|---|---|
 | 1.4.7 backlog fix + captions window | done, installed on the laptop | 0c01d33, 740c454; Kasi-Setup-1.4.7.exe sha256 e6358f7b…9e6b |
 | Folder-away fallback | done, not yet installed | see git log |
-| A GPU speech | in progress | worker wp-a-gpu |
+| A GPU speech | done on branch wp-a-gpu, not merged | whisper.cpp + Vulkan, 3 ggml/ rows; turbo-q5 on RTX 4060 181-187 ms warm for a 4.9 s zh clip (candle CPU base 1.9 s, medium 16 s); CPU fallback without a Vulkan driver checked; build needs Vulkan SDK + libclang + target dir <= 22 chars |
 | B Clean input | in progress | worker wp-b-clean |
 | D Right model | in progress | worker wp-d-model |
 | C Cloud speech | in progress | worker wp-c-cloud |

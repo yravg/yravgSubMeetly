@@ -1,3 +1,14 @@
 [env]
 # whisper.cpp: build for every x86-64 CPU with AVX2, not only the build machine's (-march=native).
 GGML_NATIVE = "OFF"
+# The cmake crate writes MSVC's per-config flags without any optimisation (/O2), which leaves
+# whisper.cpp's CPU code about 50x slower; whisper-rs-sys passes CMAKE_* through as defines.
+CMAKE_C_FLAGS_RELEASE = "/O2 /Ob2 /DNDEBUG"
+CMAKE_CXX_FLAGS_RELEASE = "/O2 /Ob2 /DNDEBUG"
+CMAKE_C_FLAGS_RELWITHDEBINFO = "/O2 /Ob1 /DNDEBUG"
+CMAKE_CXX_FLAGS_RELWITHDEBINFO = "/O2 /Ob1 /DNDEBUG"
+
+# Static C and C++ runtime: whisper.cpp is C++, and without this the engine would need the
+# VC++ redistributable (MSVCP140.dll, VCRUNTIME140_1.dll), which a fresh Windows lacks.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
