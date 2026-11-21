@@ -2544,6 +2544,7 @@ const FALSE_LINES: &[&str] = &[
     "likeandsubscribe",
     "dontforgettosubscribe",
     "seeyouinthenextvideo",
+    "music",
     // id
     "terimakasih",
     "terimakasihtelahmenonton",
@@ -2593,7 +2594,7 @@ fn line_key(line: &str) -> String {
 }
 
 /// Whisper's made-up line: only `FALSE_LINES` (once or repeated, "Thank you. Thank you."),
-/// or a credit from `FALSE_LINE_STARTS` with whatever follows it.
+/// a credit from `FALSE_LINE_STARTS` with whatever follows it, or no words at all ("♪♪").
 fn false_line(line: &str) -> bool {
     let key = line_key(line);
     let mut rest = key.as_str();
@@ -2612,7 +2613,7 @@ fn false_line(line: &str) -> bool {
         };
         rest = &rest[len..];
     }
-    !key.is_empty()
+    true
 }
 
 fn draft_source_ok(source: &str, samples: usize) -> bool {
@@ -2834,6 +2835,9 @@ mod tests {
             "ご視聴ありがとうございました",
             "시청해 주셔서 감사합니다.",
             "Terima kasih telah menonton!",
+            "[Music]",
+            "♪ ♪",
+            "...",
         ] {
             assert!(false_line(line), "{line}");
             assert!(!draft_source_ok(line, 64_000), "{line}");
@@ -2850,7 +2854,6 @@ mod tests {
             assert!(!false_line(line), "{line}");
             assert!(draft_source_ok(line, 64_000), "{line}");
         }
-        assert!(!false_line("") && !false_line("..."));
     }
 
     #[test]
