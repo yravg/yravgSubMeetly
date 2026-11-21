@@ -5,7 +5,8 @@ Roadmap: `docs/roadmap/speed-quality.md`.
 | WP | State | Evidence |
 |---|---|---|
 | 1.4.7 backlog fix + captions window | done, installed on the laptop | 0c01d33, 740c454; Kasi-Setup-1.4.7.exe sha256 e6358f7b…9e6b |
-| Folder-away fallback | done, not yet installed | see git log |
+| Folder-away fallback | done, not yet installed | 4ffe2ad |
+| Item 10 warm models at start, item 18 SRT/VTT from captions window | done, not yet installed | b11b295 |
 | A GPU speech | in progress | worker wp-a-gpu |
 | B Clean input | in progress | worker wp-b-clean |
 | D Right model | in progress | worker wp-d-model |
