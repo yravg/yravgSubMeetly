@@ -585,6 +585,15 @@ pub struct Draft {
     pub source: String,
     pub translation: String,
     pub translate: Option<crate::capture::TranslateState>,
+    /// Where the line was heard: "local", or the cloud speech provider ("groq", "openai").
+    pub asr_via: String,
+}
+
+impl Draft {
+    /// Heard by the person's cloud speech service, not this computer.
+    pub fn cloud(&self) -> bool {
+        !self.asr_via.is_empty() && self.asr_via != "local"
+    }
 }
 
 /// The engine's answer to `/draft`: the line, or the reason as one sentence. A 409
@@ -598,6 +607,7 @@ pub fn parse_draft(code: u16, body: &str) -> Result<Draft, String> {
             source: text(&v, "source").unwrap_or_default(),
             translation: text(&v, "translation").unwrap_or_default(),
             translate: text(&v, "translateState").and_then(|s| crate::capture::TranslateState::parse(&s)),
+            asr_via: text(&v, "asr_via").unwrap_or_default(),
         });
     }
     if code == 409 && v.as_ref().and_then(|v| text(v, "code")).as_deref() == Some("model-not-downloaded") {
@@ -971,6 +981,10 @@ mod tests {
         assert_eq!(t(r#"{"source":"a","translation":"","translateState":"missing"}"#), Some(S::Missing));
         assert_eq!(t(r#"{"source":"a","translation":"b","translateState":"ready"}"#), Some(S::Ready));
         assert_eq!((t(r#"{"source":"a","translateState":"x"}"#), t(r#"{"source":"a"}"#)), (None, None));
+        // asr_via says where the line was heard; an older engine says nothing: this computer.
+        let cloud = |b: &str| parse_draft(200, b).unwrap().cloud();
+        assert!(cloud(r#"{"source":"a","asr_via":"groq"}"#));
+        assert!(!cloud(r#"{"source":"a","asr_via":"local"}"#) && !cloud(r#"{"source":"a"}"#));
         assert_eq!(parse_draft(500, &format!(r#"{{"error":"{}"}}"#, "x".repeat(400))).unwrap_err().len(), 160);
     }
 

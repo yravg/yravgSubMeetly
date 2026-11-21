@@ -27,6 +27,8 @@ pub struct AiView {
     pub default_template: Option<String>,
     /// The caption translation provider (`/translate/provider`).
     pub provider: ProviderView,
+    /// Cloud speech-to-text with the person's own key (`/speech/provider`, same shape).
+    pub speech: ProviderView,
 }
 
 /// The engine's caption translation provider, without its secrets.
@@ -49,6 +51,8 @@ pub struct ProviderView {
     pub has_secret: bool,
     /// (id, label), "On this device" first.
     pub providers: Vec<(String, String)>,
+    /// Who receives the audio, for "Audio is sent to …" (cloud speech only).
+    pub sent_to: String,
 }
 
 impl ProviderView {
@@ -147,14 +151,21 @@ pub enum AiCmd {
     ProviderPaste(ProvField),
     ProviderSet(ProvField, String),
     ProviderTest,
+    /// The same for cloud speech-to-text (`/speech/provider`).
+    SpeechPick(String),
+    SpeechEnable(bool),
+    SpeechPaste(ProvField),
+    SpeechSet(ProvField, String),
+    SpeechTest,
 }
 
 /// Carry out a command from Settings: a paste reads `clipboard` first (nothing copied is said, not guessed).
 pub fn handle(sink: EventSink, port: u16, cmd: AiCmd, clipboard: impl FnOnce() -> Option<String>) {
-    if let AiCmd::ProviderPaste(field) = cmd {
+    if let AiCmd::ProviderPaste(field) | AiCmd::SpeechPaste(field) = cmd {
+        let speech = matches!(cmd, AiCmd::SpeechPaste(_));
         let text = clipboard().map(|t| t.trim().to_string()).filter(|t| !t.is_empty() && t.len() < 2048 && !t.contains('\n'));
         return match text {
-            Some(t) => run(sink, port, AiCmd::ProviderSet(field, t)),
+            Some(t) => run(sink, port, if speech { AiCmd::SpeechSet(field, t) } else { AiCmd::ProviderSet(field, t) }),
             None => sink.send(AppEvent::Ai(AiEvent { view: None, notice: Some((false, "Nothing to paste".into(), format!("Copy {} (one line) first, then press Paste", field.what()))) })),
         };
     }
@@ -206,25 +217,37 @@ fn read(port: u16) -> Result<AiView, String> {
     // An engine older than this feature has no provider route: captions stay on the device.
     if let Ok((200, t)) = helper::request(port, "GET", "/translate/provider", None) {
         if let Ok(v) = serde_json::from_str::<Value>(&t) {
-            let text = |k: &str| v[k].as_str().unwrap_or("").to_string();
-            view.provider = ProviderView {
-                id: text("provider"),
-                label: text("label"),
-                enabled: v["enabled"].as_bool().unwrap_or(false),
-                off_device: v["offDevice"].as_bool().unwrap_or(false),
-                needs: v["needs"].as_array().map(|a| a.iter().filter_map(|n| n.as_str().map(str::to_string)).collect()).unwrap_or_default(),
-                base_url: text("baseUrl"),
-                default_base_url: text("defaultBaseUrl"),
-                model: text("model"),
-                app_id: text("appId"),
-                has_key: v["hasKey"].as_bool().unwrap_or(false),
-                key_hint: text("keyHint"),
-                has_secret: v["hasSecret"].as_bool().unwrap_or(false),
-                providers: v["providers"].as_array().map(|a| a.iter().filter_map(|p| Some((p["id"].as_str()?.to_string(), p["label"].as_str()?.to_string()))).collect()).unwrap_or_default(),
-            };
+            view.provider = provider_view(&v);
+        }
+    }
+    // Older engines have no cloud speech: speech stays on the device.
+    if let Ok((200, t)) = helper::request(port, "GET", "/speech/provider", None) {
+        if let Ok(v) = serde_json::from_str::<Value>(&t) {
+            view.speech = provider_view(&v);
         }
     }
     Ok(view)
+}
+
+/// A `/translate/provider` or `/speech/provider` answer, without its secrets.
+fn provider_view(v: &Value) -> ProviderView {
+    let text = |k: &str| v[k].as_str().unwrap_or("").to_string();
+    ProviderView {
+        id: text("provider"),
+        label: text("label"),
+        enabled: v["enabled"].as_bool().unwrap_or(false),
+        off_device: v["offDevice"].as_bool().unwrap_or(false),
+        needs: v["needs"].as_array().map(|a| a.iter().filter_map(|n| n.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+        base_url: text("baseUrl"),
+        default_base_url: text("defaultBaseUrl"),
+        model: text("model"),
+        app_id: text("appId"),
+        has_key: v["hasKey"].as_bool().unwrap_or(false),
+        key_hint: text("keyHint"),
+        has_secret: v["hasSecret"].as_bool().unwrap_or(false),
+        providers: v["providers"].as_array().map(|a| a.iter().filter_map(|p| Some((p["id"].as_str()?.to_string(), p["label"].as_str()?.to_string()))).collect()).unwrap_or_default(),
+        sent_to: text("sentTo"),
+    }
 }
 
 fn error_text(body: &str, code: u16) -> String {
@@ -269,6 +292,24 @@ pub fn run(sink: EventSink, port: u16, cmd: AiCmd) {
                     let v: Value = serde_json::from_str(&b).map_err(|_| "The engine's answer was not JSON.".to_string())?;
                     if v["ok"].as_bool() == Some(true) {
                         notice = Some((true, "The service answers".into(), format!("{} ms", v["ms"].as_u64().unwrap_or(0))));
+                        Ok(())
+                    } else {
+                        Err(v["error"].as_str().unwrap_or("The service did not answer.").to_string())
+                    }
+                }),
+                AiCmd::SpeechPick(id) => post("/speech/provider", json!({ "provider": id, "enabled": false })).and_then(|(c, b)| if c == 200 { Ok(()) } else { Err(error_text(&b, c)) }),
+                AiCmd::SpeechEnable(on) => post("/speech/provider", json!({ "enabled": on })).and_then(|(c, b)| if c == 200 { Ok(b) } else { Err(error_text(&b, c)) }).map(|b| {
+                    if *on {
+                        let to = serde_json::from_str::<Value>(&b).ok().and_then(|v| v["sentTo"].as_str().map(str::to_string)).unwrap_or_else(|| "the service".into());
+                        notice = Some((true, "Cloud speech on".into(), format!("Audio is sent to {to}. This computer hears a line when the service fails or takes over 3 s")));
+                    }
+                }),
+                AiCmd::SpeechPaste(_) => Ok(()),
+                AiCmd::SpeechSet(field, v) => post("/speech/provider", json!({ field.json_key(): v.trim() })).and_then(|(c, b)| if c == 200 { Ok(()) } else { Err(error_text(&b, c)) }),
+                AiCmd::SpeechTest => post("/speech/provider/test", json!({})).and_then(|(_, b)| {
+                    let v: Value = serde_json::from_str(&b).map_err(|_| "The engine's answer was not JSON.".to_string())?;
+                    if v["ok"].as_bool() == Some(true) {
+                        notice = Some((true, "The speech service answers".into(), format!("{} ms", v["ms"].as_u64().unwrap_or(0))));
                         Ok(())
                     } else {
                         Err(v["error"].as_str().unwrap_or("The service did not answer.").to_string())

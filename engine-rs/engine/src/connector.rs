@@ -81,9 +81,13 @@ pub fn load(dir: &Path) -> Config {
 }
 
 pub fn save(dir: &Path, cfg: &Config) -> Result<()> {
-    std::fs::create_dir_all(dir)?;
     let body = json!({ "enabled": cfg.enabled, "baseUrl": cfg.base_url, "apiKey": cfg.api_key, "model": cfg.model });
-    let target = path(dir);
+    write_private(dir, &path(dir), &body.to_string())
+}
+
+/// Write a file that holds a key: readable by its owner only (Unix), replaced in one step.
+pub(crate) fn write_private(dir: &Path, target: &Path, body: &str) -> Result<()> {
+    std::fs::create_dir_all(dir)?;
     let tmp = target.with_extension("json.tmp");
     #[cfg(unix)]
     {
@@ -95,11 +99,11 @@ pub fn save(dir: &Path, cfg: &Config) -> Result<()> {
             .truncate(true)
             .mode(0o600)
             .open(&tmp)?;
-        f.write_all(body.to_string().as_bytes())?;
+        f.write_all(body.as_bytes())?;
     }
     #[cfg(not(unix))]
-    std::fs::write(&tmp, body.to_string())?;
-    std::fs::rename(&tmp, &target)?;
+    std::fs::write(&tmp, body)?;
+    std::fs::rename(&tmp, target)?;
     Ok(())
 }
 

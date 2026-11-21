@@ -29,6 +29,8 @@ pub struct Log {
     interim: Option<String>,
     /// How long each kept line took to come back (the latency readout), aligned with `lines`.
     ms: Vec<Option<u32>>,
+    /// Heard by the person's cloud speech service (the "cloud" mark), aligned with `lines`.
+    cloud: Vec<bool>,
 }
 
 pub type SessionLog = Arc<Mutex<Log>>;
@@ -47,6 +49,14 @@ impl Log {
         self.interim = None;
         self.lines.push(helper::Line { t0: (end - span_s).max(0.0), t1: end, source, translation, speaker: String::new() });
         self.ms.push(None);
+        self.cloud.push(false);
+    }
+
+    /// The newest kept line was heard in the cloud.
+    pub(crate) fn set_last_cloud(&mut self, cloud: bool) {
+        if let Some(last) = self.cloud.last_mut() {
+            *last = cloud;
+        }
     }
 
     /// Names who spoke the newest kept line.
@@ -81,9 +91,18 @@ impl Log {
 
     /// The readout of each line `tail(n)` returns, in the same order (the interim has none).
     pub fn tail_ms(&self, n: usize) -> Vec<Option<u32>> {
-        let mut out = self.ms[self.ms.len().saturating_sub(n)..].to_vec();
+        self.tail_of(&self.ms, n, None)
+    }
+
+    /// Which lines `tail(n)` returns were heard in the cloud, in the same order (the interim never is).
+    pub fn tail_cloud(&self, n: usize) -> Vec<bool> {
+        self.tail_of(&self.cloud, n, false)
+    }
+
+    fn tail_of<T: Clone>(&self, all: &[T], n: usize, interim: T) -> Vec<T> {
+        let mut out = all[all.len().saturating_sub(n)..].to_vec();
         if self.interim.is_some() {
-            out.push(None);
+            out.push(interim);
             if out.len() > n {
                 out.remove(0);
             }
@@ -123,12 +142,14 @@ impl Log {
     pub fn take(&mut self) -> Vec<helper::Line> {
         self.interim = None;
         self.ms.clear();
+        self.cloud.clear();
         std::mem::take(&mut self.lines)
     }
 
     /// Lines whose save failed go back in front of what came since.
     pub fn restore(&mut self, mut lines: Vec<helper::Line>) {
         self.ms.splice(0..0, std::iter::repeat_n(None, lines.len()));
+        self.cloud.splice(0..0, std::iter::repeat_n(false, lines.len()));
         lines.append(&mut self.lines);
         self.lines = lines;
     }
@@ -436,10 +457,12 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
                     health.interim();
                 } else {
                     let span = window.len() as f64 / poni_core::capture::RATE as f64;
+                    let cloud = d.cloud();
                     let mut l = log.lock().unwrap_or_else(|e| e.into_inner());
                     l.push(poni_core::capture::tagged(side, &d.source), d.translation, span);
                     l.set_last_speaker(who);
                     l.set_last_ms(asked.elapsed().as_millis().min(u32::MAX as u128) as u32);
+                    l.set_last_cloud(cloud);
                     drop(l);
                     health.heard();
                 }
@@ -565,8 +588,10 @@ mod tests {
         log.push("a".into(), String::new(), 1.0);
         log.set_last_ms(820);
         log.push("b".into(), String::new(), 1.0);
+        log.set_last_cloud(true);
         log.set_interim(Some("c".into()));
         assert!(log.interim_shown());
+        assert_eq!(log.tail_cloud(5), vec![false, true, false], "the cloud mark follows its line");
         assert_eq!(log.tail_ms(5), vec![Some(820), None, None], "the interim has no readout");
         assert_eq!(log.tail_ms(2), vec![None, None], "a window of 2 keeps the newest line and the interim");
         let saved = log.take();

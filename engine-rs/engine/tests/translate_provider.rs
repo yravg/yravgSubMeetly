@@ -154,3 +154,44 @@ fn a_dead_service_reports_an_error_from_the_test_route() {
         "{v}"
     );
 }
+
+#[test]
+fn cloud_speech_is_off_by_default_keeps_its_key_and_its_test_reaches_the_service() {
+    let app = app();
+    let (code, v) = call(&app, "GET", "/speech/provider", Value::Null);
+    assert_eq!(
+        (code, v["provider"].as_str(), v["enabled"].as_bool()),
+        (200, Some("local"), Some(false))
+    );
+    let (code, v) = call(
+        &app,
+        "POST",
+        "/speech/provider",
+        json!({ "provider": "groq", "enabled": true }),
+    );
+    assert_eq!(code, 400, "no key, not on: {v}");
+    let (code, v) = call(
+        &app,
+        "POST",
+        "/speech/provider",
+        json!({ "provider": "groq", "apiKey": "gsk_route_secret_42", "enabled": true }),
+    );
+    assert_eq!(code, 200, "{v}");
+    assert!(
+        !v.to_string().contains("gsk_route"),
+        "the key is never shown: {v}"
+    );
+    assert_eq!(
+        (v["hasKey"].as_bool(), v["sentTo"].as_str()),
+        (Some(true), Some("Groq"))
+    );
+    let (url, h) = mock(r#"{"text":""}"#);
+    let (_, v) = call(
+        &app,
+        "POST",
+        "/speech/provider/test",
+        json!({ "baseUrl": url }),
+    );
+    assert_eq!(v["ok"], true, "{v}");
+    assert!(h.join().unwrap().contains("POST /audio/transcriptions"));
+}

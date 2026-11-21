@@ -732,27 +732,52 @@ impl App {
         }
         let language = q.get("language").map(String::as_str).unwrap_or(src);
         let language = (!language.is_empty() && language != "auto").then_some(language);
-        // An interim only goes when the model is free; a final waits less than the island's 25 s.
-        let wait = if interim { 0 } else { 20 };
-        let Some(source) = self.ml.text_within(
-            &pcm,
-            language,
-            Task::Transcribe,
-            std::time::Duration::from_secs(wait),
-        )?
-        else {
-            return Ok(self.json_response(
-                request,
-                503,
-                json!({ "code": "busy", "error": "the speech model is still on an earlier caption" }),
-            ));
+        // The person's cloud speech service, when on, hears a final line first (within 3 s); on any
+        // failure this device hears it in the same request and `asrError` says why. Interims stay here.
+        let cloud = if interim {
+            None
+        } else {
+            crate::cloud_speech::try_transcribe(&self.state_dir, &pcm, language)
+        };
+        let (asr_via, asr_error, cloud_text) = match cloud {
+            Some(Ok((text, via))) => (via, None, Some(text)),
+            Some(Err(e)) => ("local", Some(e), None),
+            None => ("local", None, None),
+        };
+        let asr = |mut v: Value| -> Value {
+            v["asr_via"] = json!(asr_via);
+            if let Some(e) = &asr_error {
+                v["asrError"] = json!(e);
+            }
+            v
+        };
+        let source = match cloud_text {
+            Some(text) => text,
+            None => {
+                // An interim only goes when the model is free; a final waits less than the island's 25 s.
+                let wait = if interim { 0 } else { 20 };
+                let Some(source) = self.ml.text_within(
+                    &pcm,
+                    language,
+                    Task::Transcribe,
+                    std::time::Duration::from_secs(wait),
+                )?
+                else {
+                    return Ok(self.json_response(
+                        request,
+                        503,
+                        asr(json!({ "code": "busy", "error": "the speech model is still on an earlier caption" })),
+                    ));
+                };
+                source
+            }
         };
         let asr_ms = ms();
         if !draft_source_ok(&source, pcm.len()) {
             return Ok(self.json_response(
                 request,
                 200,
-                json!({ "source": "", "translation": "", "ms": ms(), "asr_ms": asr_ms }),
+                asr(json!({ "source": "", "translation": "", "ms": ms(), "asr_ms": asr_ms })),
             ));
         }
         // The person's translation provider, when one is on: its answer is the caption's translation.
@@ -763,11 +788,11 @@ impl App {
             match crate::providers::try_translate(&self.state_dir, &source, src, tgt) {
                 Some(Ok((translation, via))) => {
                     let translate_ms = ms().saturating_sub(asr_ms);
-                    self.record_live(&source, &translation, ms(), pcm.len());
+                    self.record_live_via(asr_via, &source, &translation, ms(), pcm.len());
                     return Ok(self.json_response(
                         request,
                         200,
-                        json!({
+                        asr(json!({
                             "source": source,
                             "translation": translation,
                             "ms": ms(),
@@ -775,7 +800,7 @@ impl App {
                             "translate_ms": translate_ms,
                             "translate_via": via,
                             "translateState": "ready",
-                        }),
+                        })),
                     ));
                 }
                 Some(Err(e)) => provider_error = Some(e),
@@ -786,7 +811,7 @@ impl App {
             if let Some(e) = &provider_error {
                 v["translateError"] = json!(e);
             }
-            v
+            asr(v)
         };
         let downloaded = self.ml.translate_downloaded();
         let (mt, state) = draft_translation(
@@ -817,7 +842,7 @@ impl App {
                 let translation = self.ml.text(&pcm, language, Task::Translate)?;
                 let translate_ms = mt_start.elapsed().as_millis() as u64;
                 if !interim {
-                    self.record_live(&source, &translation, ms(), pcm.len());
+                    self.record_live_via(asr_via, &source, &translation, ms(), pcm.len());
                 }
                 return Ok(self.json_response(
                     request,
@@ -837,7 +862,7 @@ impl App {
                 // Same language needs no translation; otherwise the translation is empty.
                 let translation = if src == tgt { source.as_str() } else { "" };
                 if !interim {
-                    self.record_live(&source, translation, ms(), pcm.len());
+                    self.record_live_via(asr_via, &source, translation, ms(), pcm.len());
                 }
                 return Ok(self.json_response(
                     request,
@@ -861,7 +886,7 @@ impl App {
         };
         let translate_ms = mt_start.elapsed().as_millis() as u64;
         if !interim {
-            self.record_live(&source, &translation, ms(), pcm.len());
+            self.record_live_via(asr_via, &source, &translation, ms(), pcm.len());
         }
         Ok(self.json_response(
             request,
@@ -880,6 +905,18 @@ impl App {
     /// Remember the latest caption for `GET /live` (same fields as server.py).
     /// `samples` is the 16 kHz audio length, so `rtf` = compute / audio seconds.
     pub fn record_live(&self, source: &str, translation: &str, ms: u64, samples: usize) {
+        self.record_live_via("local", source, translation, ms, samples)
+    }
+
+    /// [`Self::record_live`] of a line heard by `asr_via` ("local", or a cloud speech provider id).
+    pub fn record_live_via(
+        &self,
+        asr_via: &str,
+        source: &str,
+        translation: &str,
+        ms: u64,
+        samples: usize,
+    ) {
         if source.trim().is_empty() {
             return;
         }
@@ -901,6 +938,7 @@ impl App {
             "audio_s": round3(audio_s),
             "source": source.trim(),
             "translation": translation.trim(),
+            "asr_via": asr_via,
         }));
         drop(lines);
         *live = json!({
@@ -1804,6 +1842,11 @@ impl App {
                 200,
                 crate::providers::load(&self.state_dir).public(),
             )),
+            "/speech/provider" => Some(self.json_response(
+                request,
+                200,
+                crate::cloud_speech::load(&self.state_dir).public(),
+            )),
             _ => None,
         }
     }
@@ -1819,6 +1862,8 @@ impl App {
                 | "/notes/templates/default"
                 | "/translate/provider"
                 | "/translate/provider/test"
+                | "/speech/provider"
+                | "/speech/provider/test"
         ) {
             return None;
         }
@@ -1827,6 +1872,9 @@ impl App {
         };
         if path.starts_with("/translate/provider") {
             return Some(self.provider_post(request, path, &body));
+        }
+        if path.starts_with("/speech/provider") {
+            return Some(self.speech_post(request, path, &body));
         }
         let current = crate::connector::load(&self.state_dir);
         Some(match path {
@@ -1883,6 +1931,28 @@ impl App {
         }
         match crate::providers::apply_patch(&current, body)
             .and_then(|cfg| crate::providers::save(&self.state_dir, &cfg).map(|()| cfg))
+        {
+            Ok(cfg) => self.json_response(request, 200, cfg.public()),
+            Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
+        }
+    }
+
+    /// `POST /speech/provider` (cloud speech-to-text with the person's key) and
+    /// `POST /speech/provider/test` (one second of silence through it, enabled or not).
+    fn speech_post(&self, request: &Request, path: &str, body: &Value) -> Response {
+        let current = crate::cloud_speech::load(&self.state_dir);
+        if path == "/speech/provider/test" {
+            let mut probe = body.clone();
+            probe["enabled"] = json!(false);
+            return match crate::cloud_speech::apply_patch(&current, &probe) {
+                Ok(cfg) => self.json_response(request, 200, crate::cloud_speech::test(&cfg)),
+                Err(e) => {
+                    self.json_response(request, 400, json!({ "ok": false, "error": e.to_string() }))
+                }
+            };
+        }
+        match crate::cloud_speech::apply_patch(&current, body)
+            .and_then(|cfg| crate::cloud_speech::save(&self.state_dir, &cfg).map(|()| cfg))
         {
             Ok(cfg) => self.json_response(request, 200, cfg.public()),
             Err(e) => self.json_response(request, 400, json!({ "error": e.to_string() })),
