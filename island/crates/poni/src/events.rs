@@ -192,6 +192,8 @@ pub enum AppEvent {
     Speed(Result<poni_core::speed::Report, String>),
     /// A speed test was refused by the engine (the reason).
     SpeedStarted(Result<(), String>),
+    /// The engine saved its device choice: `true` when it needs a restart to use it.
+    DeviceSet(Result<bool, String>),
     /// Free-form log line from a service thread.
     Log(String),
     /// The Glass theme's screen copy has new pixels (or stopped).

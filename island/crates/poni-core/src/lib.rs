@@ -37,6 +37,7 @@ pub mod note_export;
 pub mod meeting_source;
 pub mod mediaremote;
 pub mod library;
+pub mod model_pick;
 pub mod models;
 pub mod notifications;
 pub mod nowplaying;

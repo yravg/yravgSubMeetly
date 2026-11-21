@@ -58,6 +58,23 @@ pub fn bench_start(sink: EventSink, port: u16, body: String) {
         .ok();
 }
 
+/// Tell the engine where to run its models (`auto`, `cpu` or `cuda`); `AppEvent::DeviceSet` says
+/// whether it needs a restart to use it.
+pub fn set_device(sink: EventSink, port: u16, device: String) {
+    std::thread::Builder::new()
+        .name("poni-device".into())
+        .spawn(move || {
+            let body = serde_json::json!({ "device": device }).to_string();
+            let result = match helper::request(port, "POST", "/engine/device", Some(&body)) {
+                Ok((200, reply)) => Ok(serde_json::from_str::<Value>(&reply).ok().and_then(|v| v.get("restart_required").and_then(Value::as_bool)).unwrap_or(false)),
+                Ok((code, reply)) => Err(sentence(&reply, code)),
+                Err(e) => Err(format!("The engine is not answering ({e}).")),
+            };
+            sink.send(AppEvent::DeviceSet(result));
+        })
+        .ok();
+}
+
 /// Download `id`; `AppEvent::Models` says how far it is, `AppEvent::ModelPulled` how it ended.
 /// `source`: `huggingface` or `modelscope` (Settings › Models › Download from).
 pub fn pull(sink: EventSink, port: u16, kind: Kind, id: String, source: String) {

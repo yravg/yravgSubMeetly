@@ -2948,7 +2948,7 @@ impl App {
             match n.action {
                 Some(NoticeAction::OpenPage(p)) => self.st.page = p,
                 Some(NoticeAction::OpenUpdate) => self.st.open_update(),
-                Some(NoticeAction::OpenApp(_) | NoticeAction::DownloadModel) => {}
+                Some(NoticeAction::OpenApp(_) | NoticeAction::DownloadModel | NoticeAction::UseModel(_)) => {}
                 Some(NoticeAction::StartFocus) => {
                     self.st.page = PageKind::Focus;
                     if !self.st.pomodoro.is_active() {

@@ -1024,6 +1024,10 @@ impl App {
                     opened = true;
                 }
                 Some(NoticeAction::DownloadModel) => self.pull_model(poni_core::models::Kind::Asr),
+                Some(NoticeAction::UseModel(id)) => {
+                    self.st.models.set_pick(poni_core::models::Kind::Asr, None);
+                    self.select_model(poni_core::models::Kind::Asr, id);
+                }
                 None => {}
             }
         }
@@ -1832,6 +1836,8 @@ impl App {
         }
         self.forget_origin_if_back();
         self.st.helper.capturing = self.st.capture.running();
+        // Starting: is the speech model fast enough here? Stopping: test it if it never was.
+        self.refresh_speed();
         self.request_frame();
     }
 
@@ -2357,6 +2363,29 @@ impl App {
         services::models::bench_start(self.sink.clone(), poni_core::helper::configured_port(), body);
     }
 
+    /// After a look at the speed tests: test the speech model in use if it never was (not while
+    /// captions run, the test would slow them down), and once per model, while captions run, offer
+    /// the fastest downloaded one that keeps up when it is too slow. Only a tap switches.
+    fn after_speed(&mut self) {
+        use poni_core::model_pick as pick;
+        if !self.st.capture.running() {
+            if let Some(id) = pick::bench_due(&self.st.models, &self.st.speed) {
+                self.st.speed.asked.push(id.clone());
+                self.run_speed_test(serde_json::json!({ "id": id }).to_string());
+            }
+            return;
+        }
+        let (Some(now), Some((id, x))) = (self.st.models.chosen(poni_core::models::Kind::Asr), pick::switch_offer(&self.st.models, &self.st.speed)) else { return };
+        if self.st.speed.offered.as_deref() == Some(now.as_str()) {
+            return;
+        }
+        self.st.speed.offered = Some(now.clone());
+        let slow = pick::speed_of(&self.st.speed, &now).unwrap_or_default();
+        let title = format!("{} is too slow for live captions", self.st.models.label_of(&now));
+        let sub = format!("{slow:.1}\u{d7} real time on this PC. Tap to use {} ({x:.1}\u{d7})", self.st.models.label_of(&id));
+        self.st.notify(Icon::Gauge, palette::ORANGE, title, sub, 12.0, Some(NoticeAction::UseModel(id)));
+    }
+
     // ------------------------------------------------------------ the subtitle overlay
 
     /// What the overlay should show now: sample captions while a preview runs, what it showed while
@@ -2494,6 +2523,11 @@ impl App {
         if kind == poni_core::models::Kind::Translate && self.st.models.failed.is_none() {
             self.start_lyric_translation();
         }
+        // A new speech model gets its speed test now, so Settings can say whether it keeps up.
+        if kind == poni_core::models::Kind::Asr && self.st.models.failed.is_none() {
+            self.st.speed.asked.push(id.clone());
+            self.run_speed_test(serde_json::json!({ "id": id }).to_string());
+        }
         self.refresh_models();
         let title = if self.st.models.failed.is_none() { format!("{} downloaded", kind.label()) } else { format!("{} download failed", kind.label()) };
         let (icon, color) = if self.st.models.failed.is_none() { (Icon::Check, palette::GREEN) } else { (Icon::Download, palette::RED) };
@@ -2533,6 +2567,8 @@ impl App {
         if let Err(e) = result {
             self.st.models.set_pick(kind, None);
             self.st.notify(Icon::Download, palette::ORANGE, format!("{} not switched", kind.label()), e, 6.0, None);
+        } else if kind == poni_core::models::Kind::Asr {
+            self.refresh_speed();
         }
         self.refresh_models();
     }
@@ -3249,7 +3285,21 @@ impl App {
             AppEvent::ModelSelected { kind, result } => self.on_model_selected(kind, result),
             AppEvent::ModelDeleted { id, result } => self.on_model_deleted(id, result),
             AppEvent::ModelPlaced { kind, result } => self.on_model_placed(kind, result),
-            AppEvent::Speed(r) => self.st.speed.apply(r, now),
+            AppEvent::Speed(r) => {
+                self.st.speed.apply(r, now);
+                self.after_speed();
+            }
+            AppEvent::DeviceSet(r) => match r {
+                // A restart would cut running captions: they pick it up at the next engine start.
+                Ok(true) if !self.st.capture.running() => {
+                    if let Some(svc) = self.services.as_ref() {
+                        svc.engine_restart();
+                    }
+                }
+                Ok(true) => self.st.notify(Icon::Gauge, self.st.accent, "Preset saved", "The engine uses it the next time it starts", 6.0, None),
+                Ok(false) => {}
+                Err(e) => self.st.notify(Icon::Gauge, palette::ORANGE, "Device not set", e, 8.0, None),
+            },
             AppEvent::SpeedStarted(r) => {
                 if let Err(e) = r {
                     self.st.notify(Icon::Download, palette::ORANGE, "Speed test not started", e, 8.0, None);
@@ -5203,6 +5253,7 @@ impl App {
                 Command::SpeedRefresh => self.refresh_speed(),
                 Command::SpeedTest(id) => self.run_speed_test(serde_json::json!({ "id": id }).to_string()),
                 Command::SpeedTestAll => self.run_speed_test(r#"{"kind":"all"}"#.to_string()),
+                Command::EngineDevice(d) => services::models::set_device(self.sink.clone(), poni_core::helper::configured_port(), d),
             }
         }
         self.sync_phone_offer();
