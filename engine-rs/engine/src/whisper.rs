@@ -44,7 +44,75 @@ pub enum Task {
     Translate,
 }
 
-pub struct WhisperAsr {
+/// A loaded speech model: candle (safetensors) or whisper.cpp (GGML, see `crate::ggml`).
+pub enum WhisperAsr {
+    Candle(Box<CandleAsr>),
+    #[cfg(feature = "whisper-cpp")]
+    Ggml(crate::ggml::GgmlAsr),
+}
+
+impl WhisperAsr {
+    /// `cache` holds `model`; `want_gpu` lets a GGML model run on a Vulkan GPU (candle
+    /// takes its device from `device`).
+    pub fn load(model: &str, device: Device, want_gpu: bool, cache: &Path) -> Result<Self> {
+        if let Some(file) = crate::ggml::ggml_file(model) {
+            #[cfg(feature = "whisper-cpp")]
+            {
+                let dir = crate::ggml::hub_dir(cache, model);
+                let path =
+                    crate::ml::hub_file_with(&dir, crate::ggml::GGML_REPO, None, &file, None)?;
+                return Ok(Self::Ggml(crate::ggml::GgmlAsr::load(&path, want_gpu)?));
+            }
+            #[cfg(not(feature = "whisper-cpp"))]
+            {
+                let _ = (file, want_gpu);
+                return Err(anyhow!("this engine build cannot run GGML model {model}"));
+            }
+        }
+        Ok(Self::Candle(Box::new(CandleAsr::load(
+            model, device, cache,
+        )?)))
+    }
+
+    pub fn transcribe(
+        &mut self,
+        pcm: &[f32],
+        language: Option<&str>,
+        task: Task,
+    ) -> Result<Vec<Segment>> {
+        match self {
+            Self::Candle(asr) => asr.transcribe(pcm, language, task),
+            #[cfg(feature = "whisper-cpp")]
+            Self::Ggml(asr) => asr.transcribe(pcm, language, task),
+        }
+    }
+
+    /// What `/health` calls the device: `vulkan` for a GGML model on a GPU.
+    pub fn device_label(&self) -> &'static str {
+        match self {
+            Self::Candle(asr) => crate::ml::device_name(&asr.device),
+            #[cfg(feature = "whisper-cpp")]
+            Self::Ggml(asr) => {
+                if asr.gpu().is_some() {
+                    "vulkan"
+                } else {
+                    "cpu"
+                }
+            }
+        }
+    }
+
+    /// The GPU's name when one runs the model.
+    pub fn gpu_name(&self) -> Option<String> {
+        match self {
+            Self::Candle(_) => None,
+            #[cfg(feature = "whisper-cpp")]
+            Self::Ggml(asr) => asr.gpu().map(str::to_string),
+        }
+    }
+}
+
+pub struct CandleAsr {
     pub repo_id: String,
     model: Whisper,
     tokenizer: Tokenizer,
@@ -226,7 +294,7 @@ fn argmax(values: &[f32]) -> usize {
         .0
 }
 
-impl WhisperAsr {
+impl CandleAsr {
     pub fn load(model: &str, device: Device, cache: &Path) -> Result<Self> {
         let repo_id = repo_for(model);
         let files = fetch_files(cache, &repo_id, None, &mut |_| {})?;
@@ -514,10 +582,6 @@ impl WhisperAsr {
             seek += advance.max(1);
         }
         Ok(out)
-    }
-
-    pub fn detected_device(&self) -> &Device {
-        &self.device
     }
 }
 

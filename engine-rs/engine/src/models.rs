@@ -231,7 +231,7 @@ pub struct Spec {
 
 /// Models the engine can run and `POST /engine/models` accepts. Whisper and Qwen are
 /// multilingual: one download serves every language, so there is no per-language model.
-pub const CATALOG: [Spec; 14] = [
+pub const CATALOG: [Spec; 17] = [
     spec(
         Kind::Asr,
         "openai/whisper-base",
@@ -255,6 +255,26 @@ pub const CATALOG: [Spec; 14] = [
         "openai/whisper-large-v3-turbo",
         "Whisper large-v3 turbo",
         1_620_000_000,
+    ),
+    // GGML files run by whisper.cpp (`crate::ggml`): on a Vulkan GPU when there is one;
+    // q5_0 is quantised to about a third of the size.
+    spec(
+        Kind::Asr,
+        "ggml/whisper-base",
+        "Whisper base (GPU ready)",
+        148_000_000,
+    ),
+    spec(
+        Kind::Asr,
+        "ggml/whisper-medium-q5_0",
+        "Whisper medium q5 (GPU ready)",
+        539_000_000,
+    ),
+    spec(
+        Kind::Asr,
+        "ggml/whisper-large-v3-turbo-q5_0",
+        "Whisper large-v3 turbo q5 (GPU ready)",
+        574_000_000,
     ),
     spec(
         Kind::Translate,
@@ -399,7 +419,12 @@ pub fn manual_dir(repo_id: &str) -> PathBuf {
 }
 
 pub fn cache_state(cache: &Path, repo_id: &str, kind: Kind) -> CacheState {
-    let root = model_root(cache, repo_id);
+    let ggml = crate::ggml::ggml_file(repo_id).filter(|_| kind == Kind::Asr);
+    // A GGML model keeps whisper.cpp's repo inside its own folder (`crate::ggml`).
+    let root = match ggml {
+        Some(_) => model_root(&model_root(cache, repo_id), crate::ggml::GGML_REPO),
+        None => model_root(cache, repo_id),
+    };
     let (mut bytes, mut partial_bytes) = (0, 0);
     for entry in fs::read_dir(root.join("blobs"))
         .into_iter()
@@ -422,13 +447,18 @@ pub fn cache_state(cache: &Path, repo_id: &str, kind: Kind) -> CacheState {
         .flatten()
         .map(|entry| entry.path())
         .collect();
-    let manual = manual_dir(repo_id);
+    let manual = manual_dir(if ggml.is_some() {
+        crate::ggml::GGML_REPO
+    } else {
+        repo_id
+    });
     let have =
         |name: &str| snapshot_file(&snapshots, name).is_some() || manual.join(name).is_file();
     let gguf = crate::translate::gguf_file(repo_id).filter(|_| kind == Kind::Translate);
     let downloaded = match kind {
         // A GGUF carries its config and tokenizer inside.
         _ if gguf.is_some() => gguf.is_some_and(|file| have(&file)),
+        _ if ggml.is_some() => ggml.is_some_and(|file| have(&file)),
         Kind::PairMt => crate::marian::FILES.iter().all(|n| have(n)),
         Kind::Asr => have("model.safetensors") && have("config.json") && have("tokenizer.json"),
         // Sharded repos (Qwen 1.5B and up) name their shards in the index.
@@ -511,6 +541,9 @@ pub fn pull(
     let handler: Progress = (Arc::clone(progress) as Arc<dyn ProgressHandler>).into();
     let mut finished = |path: &Path| progress.file_finished(path);
     match kind {
+        Kind::Asr if crate::ggml::ggml_file(repo_id).is_some() => {
+            crate::ggml::fetch(cache, repo_id, Some(&handler), &mut finished)?;
+        }
         Kind::Asr => {
             crate::whisper::fetch_files(cache, repo_id, Some(&handler), &mut finished)?;
         }

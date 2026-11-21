@@ -1,0 +1,3 @@
+[env]
+# whisper.cpp: build for every x86-64 CPU with AVX2, not only the build machine's (-march=native).
+GGML_NATIVE = "OFF"

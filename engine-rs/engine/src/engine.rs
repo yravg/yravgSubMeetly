@@ -20,6 +20,17 @@ use crate::whisper::DEFAULT_ASR_MODEL;
 use crate::whisper::{repo_for, Segment, Task, WhisperAsr};
 
 pub const ASR_ENGINE: &str = "candle-whisper";
+/// The label of a GGML speech model (`crate::ggml`), run by whisper.cpp.
+pub const ASR_ENGINE_GGML: &str = "whisper.cpp";
+
+/// What `/models` and `/health` call the engine that runs speech model `id`.
+pub fn asr_engine(id: &str) -> &'static str {
+    if crate::ggml::ggml_file(id).is_some() {
+        ASR_ENGINE_GGML
+    } else {
+        ASR_ENGINE
+    }
+}
 pub const MT_ENGINE: &str = "candle-qwen2";
 /// The label of a q4_k_m GGUF translation model (the Qwen3 rows), which runs on candle's quantized path.
 pub const MT_ENGINE_GGUF: &str = "candle-qwen3-gguf";
@@ -49,6 +60,10 @@ pub struct Ml {
     asr_from_env: bool,
     translate_from_env: bool,
     pub device: Device,
+    /// A GPU was asked for (env `DEVICE`, `device.json`): a GGML model then runs on Vulkan.
+    pub want_gpu: bool,
+    /// Device label and GPU name of the loaded speech model, `None` before a load.
+    asr_device: RwLock<Option<(&'static str, Option<String>)>>,
     /// Where each model is stored; a loader asks it for the folder.
     locations: Arc<Locations>,
     /// The loaded model and the id it was loaded for; a changed choice reloads on next use.
@@ -181,8 +196,8 @@ impl Ml {
     /// `saved` is the models chosen through `POST /engine/models`.
     pub fn from_env(device_pref: &str, saved: &SavedModels, locations: Arc<Locations>) -> Self {
         let picked = pick_models(&|key| env::var(key).ok(), saved);
-        let device =
-            crate::ml::pick_device(wants_gpu(env::var("DEVICE").ok().as_deref(), device_pref));
+        let want_gpu = wants_gpu(env::var("DEVICE").ok().as_deref(), device_pref);
+        let device = crate::ml::pick_device(want_gpu);
         Self {
             asr_model: RwLock::new(picked.asr),
             translate_model: RwLock::new(picked.translate),
@@ -190,6 +205,8 @@ impl Ml {
             asr_from_env: picked.asr_from_env,
             translate_from_env: picked.translate_from_env,
             device,
+            want_gpu,
+            asr_device: RwLock::new(None),
             locations,
             asr: Mutex::new(None),
             mt: Mutex::new(None),
@@ -206,6 +223,21 @@ impl Ml {
 
     pub fn device_name(&self) -> &'static str {
         crate::ml::device_name(&self.device)
+    }
+
+    /// The device speech runs on: the loaded model's (`vulkan` for a GGML model on a GPU),
+    /// else the engine's.
+    pub fn asr_device(&self) -> &'static str {
+        read(&self.asr_device)
+            .as_ref()
+            .map_or(self.device_name(), |(label, _)| label)
+    }
+
+    /// The GPU's name when one runs the loaded speech model.
+    pub fn asr_gpu(&self) -> Option<String> {
+        read(&self.asr_device)
+            .as_ref()
+            .and_then(|(_, gpu)| gpu.clone())
     }
 
     pub fn asr_id(&self) -> String {
@@ -372,13 +404,19 @@ impl Ml {
             // Free the old weights first: two Whisper models at once is gigabytes.
             *guard = None;
             *write(&self.asr_loaded_id) = None;
+            *write(&self.asr_device) = None;
             // Not on disk, or its folder is away: say so. Only POST /models/pull downloads.
             let cache = self.downloaded_dir(&want, Kind::Asr)?;
             eprintln!("[asr] loading {want} ...");
             self.asr_loading.store(true, Ordering::Relaxed);
-            let loaded = WhisperAsr::load(&want, self.device.clone(), &cache);
+            let loaded = WhisperAsr::load(&want, self.device.clone(), self.want_gpu, &cache);
             self.asr_loading.store(false, Ordering::Relaxed);
-            *guard = Some((want.clone(), loaded?));
+            let loaded = loaded?;
+            if let Some(gpu) = loaded.gpu_name() {
+                eprintln!("[asr] {want} runs on {gpu}");
+            }
+            *write(&self.asr_device) = Some((loaded.device_label(), loaded.gpu_name()));
+            *guard = Some((want.clone(), loaded));
             *write(&self.asr_loaded_id) = Some(want);
         }
         f(&mut guard.as_mut().expect("loaded above").1)
@@ -407,7 +445,7 @@ impl Ml {
     /// one the engine keeps loaded: the test never swaps the model a caption session is using.
     pub fn load_for_bench_asr(&self, id: &str) -> Result<WhisperAsr> {
         let cache = self.downloaded_dir(id, Kind::Asr)?;
-        WhisperAsr::load(id, self.device.clone(), &cache)
+        WhisperAsr::load(id, self.device.clone(), self.want_gpu, &cache)
     }
 
     /// Same for a translation LLM.
