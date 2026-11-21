@@ -6,7 +6,7 @@
 //! final line, which is translated and kept). Pure: audio in, posts out, no clock; the caller
 //! decides what an interim costs (the island asks the engine for the spoken text only).
 
-use crate::capture::{is_silent, RATE};
+use crate::capture::{is_silent, sounds_like_speech, RATE};
 
 /// One analysis frame: 100 ms of 16 kHz mono.
 const FRAME: usize = RATE as usize / 10;
@@ -174,19 +174,23 @@ impl Utterances {
         // Interims only while there is speech to show: not through a pause that has not yet ended it.
         if every > 0 && self.since_post >= every && self.silent_run == 0 {
             self.since_post = 0;
-            self.posted_interim = true;
-            return Some(Post { samples: self.buf.clone(), last: false });
+            // Music or noise so far: no interim; the next one looks at the whole utterance again.
+            if sounds_like_speech(&self.buf) {
+                self.posted_interim = true;
+                return Some(Post { samples: self.buf.clone(), last: false });
+            }
         }
         None
     }
 
-    /// End the utterance: its final post, or nothing for a blip that never showed.
+    /// End the utterance: its final post, or nothing for a blip, music or noise that never showed.
+    /// One that showed always ends with its final, so its interim is replaced.
     fn finish(&mut self) -> Option<Post> {
         let enough = self.speech_frames >= Self::frames(MIN_SPEECH_S);
         let shown = self.posted_interim;
         let samples = std::mem::take(&mut self.buf);
         (self.speech_frames, self.silent_run, self.since_post, self.posted_interim) = (0, 0, 0, false);
-        (!samples.is_empty() && (enough || shown)).then_some(Post { samples, last: true })
+        (!samples.is_empty() && (shown || (enough && sounds_like_speech(&samples)))).then_some(Post { samples, last: true })
     }
 }
 
@@ -197,7 +201,7 @@ mod tests {
     const R: usize = RATE as usize;
 
     fn speech(seconds: f32) -> Vec<f32> {
-        (0..(seconds * R as f32) as usize).map(|i| 0.2 * ((i as f32) * 0.05).sin()).collect()
+        crate::capture::syllables(seconds, RATE)
     }
 
     fn quiet(seconds: f32) -> Vec<f32> {
