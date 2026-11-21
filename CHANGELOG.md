@@ -1,5 +1,9 @@
 # Riwayat rilis
 
+## 1.4.9 (2026-11-21)
+- **Speech can run on the graphics card.** Three new "GPU ready" Whisper models (base, medium q5, large-v3 turbo q5) run through whisper.cpp on any Vulkan GPU (NVIDIA, AMD, Intel) and fall back to the processor on PCs without one. On an RTX 4060 a 5-second line takes about 0.2 s with large-v3 turbo, against 16 s for Medium on the processor before. The engine no longer needs the VC++ runtime; Setup carries the Vulkan loader (1.7 MB).
+- **Speed test for the Chinese and Japanese language pairs** (OPUS-MT zh→en and ja→en no longer fail with "there are no test sentences for this language pair").
+
 ## 1.4.8 (2026-11-21)
 - **Silence, music and noise no longer become captions.** A voice gate on the island skips windows without speech (a music clip sends 63% fewer windows to the speech model), and Whisper's made-up lines ("Thanks for watching!", "Thank you.", "[Music]", "Subtitles by…", "请不吝点赞…" and ja/zh/ko/id variants) are dropped when they are the whole line. Real sentences that contain "thank you" still show.
 - **Speech models that keep up.** Each speech model gets a speed test on this PC after download. Settings › Models shows its speed ("2.7× real time", or "too slow for live captions" below 1.2×) and offers a one-click switch to the fastest downloaded model that keeps up; captions starting on a too-slow model show one pop-up with the same switch. New Preset row: Battery saver (Base, CPU), Balanced (Small), Best quality (large-v3-turbo or Medium, graphics card only). Your model only changes when you click.
