@@ -612,6 +612,11 @@ impl SoundGate {
 /// videos, a meeting that overruns).
 pub const AUTO_STOP_S: f64 = 90.0;
 
+/// A Stop the person pressed, or an auto start that failed, holds until the reason has been gone
+/// this long. Browsers report paused/playing pairs within a second while seeking or buffering
+/// (poni.log: "meeting source: none" then "media" in the same second), which must not undo a Stop.
+pub const AUTO_HOLD_S: f64 = 30.0;
+
 /// What [`Auto::step`] asks the island to do.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AutoStep {
@@ -622,7 +627,7 @@ pub enum AutoStep {
 
 /// Captions that start by themselves (Settings: `auto_captions`). Captions it started stop once
 /// the reason is gone for [`AUTO_STOP_S`]; captions the person started are never stopped by it,
-/// and a Stop the person presses holds until the reason ends.
+/// and a Stop the person presses holds until the reason has been gone for [`AUTO_HOLD_S`].
 #[derive(Clone, Debug, Default)]
 pub struct Auto {
     started: bool,
@@ -636,11 +641,15 @@ impl Auto {
             // It failed to start or was stopped elsewhere: no retry loop until the reason ends.
             self.started = false;
             self.held = true;
+            self.idle_since = None;
         }
         if !enabled {
             return AutoStep::Nothing;
         }
         if wanted {
+            if self.idle_since.is_some_and(|t| now - t >= AUTO_HOLD_S) {
+                self.held = false;
+            }
             self.idle_since = None;
             if !running && !self.held {
                 self.started = true;
@@ -648,12 +657,8 @@ impl Auto {
             }
             return AutoStep::Nothing;
         }
-        self.held = false;
-        if !self.started {
-            return AutoStep::Nothing;
-        }
         let since = *self.idle_since.get_or_insert(now);
-        if now - since >= AUTO_STOP_S {
+        if self.started && now - since >= AUTO_STOP_S {
             self.started = false;
             self.idle_since = None;
             return AutoStep::Stop;
@@ -661,11 +666,12 @@ impl Auto {
         AutoStep::Nothing
     }
 
-    /// The person pressed Start (`on`) or Stop.
-    pub fn manual(&mut self, on: bool, wanted: bool) {
+    /// The person pressed Start (`on`) or Stop at `now`. A Stop holds whatever plays: nothing
+    /// restarts captions until the reason has been gone for [`AUTO_HOLD_S`] and comes back.
+    pub fn manual(&mut self, on: bool, wanted: bool, now: f64) {
         self.started = false;
-        self.idle_since = None;
-        self.held = !on && wanted;
+        self.held = !on;
+        self.idle_since = (!on && !wanted).then_some(now);
     }
 }
 
@@ -1025,20 +1031,60 @@ mod tests {
         assert_eq!(a.step(true, true, false, 300.0), AutoStep::Start);
         assert_eq!(a.step(true, true, false, 301.0), AutoStep::Nothing);
         assert_eq!(a.step(true, false, false, 302.0), AutoStep::Nothing);
-        assert_eq!(a.step(true, true, false, 303.0), AutoStep::Start);
+        assert_eq!(a.step(true, true, false, 303.0), AutoStep::Nothing, "a flip is not the end of the reason");
+        assert_eq!(a.step(true, false, false, 304.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, true, false, 304.0 + AUTO_HOLD_S), AutoStep::Start);
     }
 
     #[test]
     fn auto_captions_leave_the_persons_own_start_and_stop_alone() {
         let mut a = Auto::default();
-        a.manual(true, false);
+        a.manual(true, false, 0.0);
         assert_eq!(a.step(true, false, true, 0.0), AutoStep::Nothing);
         assert_eq!(a.step(true, false, true, 500.0), AutoStep::Nothing, "a manual start is never auto-stopped");
         // Stop pressed during a video: no restart until that video is over.
-        a.manual(false, true);
+        a.manual(false, true, 599.0);
         assert_eq!(a.step(true, true, false, 600.0), AutoStep::Nothing);
         assert_eq!(a.step(true, false, false, 601.0), AutoStep::Nothing);
-        assert_eq!(a.step(true, true, false, 602.0), AutoStep::Start);
+        assert_eq!(a.step(true, true, false, 602.0), AutoStep::Nothing, "a one-second pause does not undo a Stop");
+        assert_eq!(a.step(true, false, false, 603.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, true, false, 603.0 + AUTO_HOLD_S), AutoStep::Start, "the next video, after a real end");
+        // Stop pressed in silence: the next sound a moment later does not undo it either.
+        a.manual(false, false, 1000.0);
+        assert_eq!(a.step(true, true, false, 1005.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, false, false, 1006.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, true, false, 1006.0 + AUTO_HOLD_S), AutoStep::Start);
+    }
+
+    #[test]
+    fn a_flip_storm_neither_stops_running_captions_nor_restarts_stopped_ones() {
+        // poni.log 2026-11-21 14:43:20-14:47:37: about 30 media/none flips in under 5 minutes.
+        let mut a = Auto::default();
+        assert_eq!(a.step(true, true, false, 0.0), AutoStep::Start);
+        let flips = (1..600).map(|i| (i as f64 * 0.5, i % 2 == 0));
+        for (t, wanted) in flips.clone() {
+            assert_eq!(a.step(true, wanted, true, t), AutoStep::Nothing, "auto-started, flip at {t}");
+        }
+        a.manual(false, true, 300.0);
+        for (t, wanted) in flips {
+            assert_eq!(a.step(true, wanted, false, 300.0 + t), AutoStep::Nothing, "stopped by hand, flip at {t}");
+        }
+    }
+
+    #[test]
+    fn device_loss_keeps_auto_captions_and_a_failed_start_waits_for_the_reason_to_end() {
+        let mut a = Auto::default();
+        assert_eq!(a.step(true, true, false, 0.0), AutoStep::Start);
+        // A headset that goes away is a Warn ("Reconnecting"): the capture still runs.
+        assert_eq!(a.step(true, true, true, 5.0), AutoStep::Nothing);
+        // Capture failed for good (no output device): not retried on each media event.
+        for t in 6..200 {
+            assert_eq!(a.step(true, true, false, t as f64), AutoStep::Nothing, "retry at {t}");
+        }
+        assert_eq!(a.step(true, false, false, 200.0), AutoStep::Nothing);
+        assert_eq!(a.step(true, true, false, 200.0 + AUTO_HOLD_S), AutoStep::Start);
+        // The setting off: nothing starts, nothing is stopped.
+        assert_eq!(a.step(false, false, true, 1000.0), AutoStep::Nothing);
     }
 
     #[test]

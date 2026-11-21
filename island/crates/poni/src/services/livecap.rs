@@ -162,7 +162,7 @@ struct Final {
     span_s: f64,
 }
 
-fn translator(port: u16, langs: Arc<Mutex<(String, String)>>, log: SessionLog, rx: Receiver<Final>, sink: EventSink) {
+fn translator(port: u16, langs: Arc<Mutex<(String, String)>>, log: SessionLog, rx: Receiver<Final>, sink: EventSink, stop: Arc<AtomicBool>) {
     use poni_core::lyric_tr::{parse_translation, translate_path};
     while let Ok(f) = rx.recv() {
         let (src, tgt) = langs.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -174,6 +174,10 @@ fn translator(port: u16, langs: Arc<Mutex<(String, String)>>, log: SessionLog, r
             helper_translate(port, &path, &f.text).and_then(|(c, b)| parse_translation(c, &b).ok()).unwrap_or_default()
         };
         let mut l = log.lock().unwrap_or_else(|e| e.into_inner());
+        // After Stop a late line would land in the next session (Stop sets `stop` before it takes the log).
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
         l.push_with_ms(f.text, translation, f.span_s, asked.elapsed().as_millis().min(u32::MAX as u128) as u32);
         drop(l);
         sink.send(AppEvent::Capture(CaptureEvent::Heard));
@@ -204,8 +208,8 @@ fn run(sink: EventSink, port: u16, langs: Arc<Mutex<(String, String)>>, log: Ses
     // The caption bar leaves the screen; the origin was saved before this runs.
     let _ = move_to(livecap::PARK);
     let (tx, rx) = channel::<Final>();
-    let (l, g, s) = (langs, log.clone(), sink.clone());
-    let tr = std::thread::Builder::new().name("poni-livecap-tr".into()).spawn(move || translator(port, l, g, rx, s));
+    let (l, g, s, st) = (langs, log.clone(), sink.clone(), stop.clone());
+    let tr = std::thread::Builder::new().name("poni-livecap-tr".into()).spawn(move || translator(port, l, g, rx, s, st));
     let mut differ = Differ::new(hang_s);
     let began = Instant::now();
     let mut last_seen = Instant::now();

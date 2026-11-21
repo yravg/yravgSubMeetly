@@ -278,6 +278,27 @@ pub fn add_app(apps: &mut Vec<MeetingApp>, exe_name: &str) -> bool {
     true
 }
 
+/// A media session that stops playing still counts for this long. Opera reports paused and playing
+/// within one second while it seeks or buffers (poni.log 2026-11-21 14:43:22-25: six "meeting
+/// source" flips in three seconds), and each flip toggled the meeting probe.
+pub const MEDIA_GRACE_S: f64 = 5.0;
+
+/// The app that plays now, or the one that played less than [`MEDIA_GRACE_S`] ago.
+#[derive(Clone, Debug, Default)]
+pub struct MediaGrace {
+    last: Option<(String, f64)>,
+}
+
+impl MediaGrace {
+    pub fn see(&mut self, playing: Option<String>, now: f64) -> Option<String> {
+        if let Some(app) = playing {
+            self.last = Some((app.clone(), now));
+            return Some(app);
+        }
+        self.last.as_ref().filter(|(_, t)| now - t < MEDIA_GRACE_S).map(|(a, _)| a.clone())
+    }
+}
+
 /// How long a joined link marks its meeting active.
 pub const JOINED_S: f64 = 600.0;
 
@@ -344,6 +365,17 @@ impl SessionSeen {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pause_of_a_second_is_not_the_end_of_the_media() {
+        let mut g = MediaGrace::default();
+        assert_eq!(g.see(None, 0.0), None);
+        assert_eq!(g.see(Some("Opera".into()), 1.0).as_deref(), Some("Opera"));
+        assert_eq!(g.see(None, 1.5).as_deref(), Some("Opera"), "paused for a seek");
+        assert_eq!(g.see(Some("Opera".into()), 2.0).as_deref(), Some("Opera"));
+        assert_eq!(g.see(None, 2.0 + MEDIA_GRACE_S - 0.1).as_deref(), Some("Opera"));
+        assert_eq!(g.see(None, 2.0 + MEDIA_GRACE_S), None, "a real pause ends it");
+    }
 
     #[test]
     fn a_session_is_a_transcript_only_when_it_heard_media_and_never_a_meeting() {

@@ -461,6 +461,8 @@ pub struct App {
     auto_captions: poni_core::capture::Auto,
     /// What the running captions session heard from: a meeting, or media only (PMM-015).
     session_seen: poni_core::meeting_source::SessionSeen,
+    /// The media that played a moment ago still counts for the meeting source (seek flips).
+    media_grace: poni_core::meeting_source::MediaGrace,
     /// The PC plays sound now (`services::meter`).
     sound_on: bool,
     /// The current press started as a double-click (its click is ignored).
@@ -671,6 +673,7 @@ impl App {
             store_writable,
             auto_captions: Default::default(),
             session_seen: Default::default(),
+            media_grace: Default::default(),
             sound_on: false,
             dbl_press: false,
             high_surrogate: None,
@@ -1945,7 +1948,7 @@ impl App {
     /// Start or Stop pressed by the person: the automatic captions leave that choice alone.
     fn captions_by_hand(&mut self, on: bool, source: Source) {
         let wanted = self.captions_wanted();
-        self.auto_captions.manual(on, wanted);
+        self.auto_captions.manual(on, wanted, self.st.now);
         self.set_captions(on, source);
     }
 
@@ -1995,7 +1998,7 @@ impl App {
     /// joined link; log each change. Tab routing reads `st.meeting_source` (later step).
     fn meeting_source_step(&mut self) {
         use poni_core::meeting_source::{source_kind, Signals, SourceKind};
-        let playing = self.st.media.as_ref().filter(|m| m.is_playing()).map(|m| m.app_id.clone());
+        let playing = self.media_grace.see(self.st.media.as_ref().filter(|m| m.is_playing()).map(|m| m.app_id.clone()), self.st.now);
         if let Some(s) = self.services.as_ref() {
             s.meeting_probe_active(self.sound_on || playing.is_some());
         }
@@ -3226,7 +3229,9 @@ impl App {
                 }
                 self.st.helper.apply_calendar(r);
                 self.calendar_heads_up();
-                // The calendar answers every minute: also the clock that stops captions after a video.
+                // The calendar answers every minute: also the clock that stops captions after a video
+                // and ends a media grace no other event followed.
+                self.meeting_source_step();
                 self.auto_captions_step();
             }
             AppEvent::CalendarNotes(Ok(id)) => {
