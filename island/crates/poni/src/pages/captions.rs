@@ -506,9 +506,10 @@ mod tests {
           {"kind":"translate","id":"Qwen/q","label":"Qwen","approxBytes":988000000},
           {"kind":"translate-pair","id":"Helsinki-NLP/opus-mt-en-id","label":"OPUS-MT English to Indonesian","approxBytes":291000000}]}"#;
         st.models.apply(Ok(poni_core::models::parse(body).unwrap()), 0.0);
-        assert_eq!(rows(&st, 5), [Row::LibSearch, Row::LibModel(0)], "On device by default");
+        assert_eq!(rows(&st, 5).len(), 4, "All by default, as in the Chrome version");
+        st.ui.lib_filter = Filter::OnDevice;
+        assert_eq!(rows(&st, 5), [Row::LibSearch, Row::LibModel(0)], "On device hides the rest");
         st.ui.lib_filter = Filter::All;
-        assert_eq!(rows(&st, 5).len(), 4);
         st.ui.lib_query = "indonesian".into();
         assert_eq!(rows(&st, 5), [Row::LibSearch, Row::LibModel(0)]);
         st.ui.lib_query = "nothing like it".into();

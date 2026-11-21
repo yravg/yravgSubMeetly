@@ -141,10 +141,12 @@ pub enum Section {
     Focus,
     Prayer,
     About,
+    /// Webhooks, the MCP note and the files: last, out of everyone else's way.
+    Developers,
 }
 
 impl Section {
-    pub const ALL: [Section; 13] = [
+    pub const ALL: [Section; 14] = [
         Section::General,
         Section::Appearance,
         Section::Island,
@@ -158,6 +160,7 @@ impl Section {
         Section::Focus,
         Section::Prayer,
         Section::About,
+        Section::Developers,
     ];
 
     pub fn title(self) -> &'static str {
@@ -175,6 +178,7 @@ impl Section {
             Section::Focus => "Focus",
             Section::Prayer => "Prayer times",
             Section::About => "About",
+            Section::Developers => "For developers",
         }
     }
 
@@ -194,6 +198,7 @@ impl Section {
             Section::Focus => "focus",
             Section::Prayer => "prayer",
             Section::About => "about",
+            Section::Developers => "developers",
         }
     }
 
@@ -212,6 +217,7 @@ impl Section {
             Section::Focus => Icon::Timer,
             Section::Prayer => Icon::Moon,
             Section::About => Icon::Gear,
+            Section::Developers => Icon::Script,
         }
     }
 
@@ -231,6 +237,7 @@ impl Section {
             Section::Focus => palette::ORANGE,
             Section::Prayer => Color::hex(0x30B0A0),
             Section::About => Color::hex(0x8E8E93),
+            Section::Developers => Color::hex(0x636366),
         }
     }
 
@@ -276,19 +283,27 @@ fn model_items(m: &poni_core::models::Models, k: Kind) -> Vec<Item> {
     rows
 }
 
-/// Settings › Models › Speech recognition: the preset, the model rows with this PC's measured speed,
-/// and, when the model in use is too slow for live captions here, a one-click switch to the fastest
-/// downloaded one that keeps up. Nothing switches without that click.
+/// Settings › Models › Models in use: the speech model's stepper with this PC's measured speed,
+/// then its download, download-by-hand and folder rows.
+fn speech_in_use(st: &AppState) -> Vec<Item> {
+    use poni_core::model_pick as pick;
+    let mut rows = model_items(&st.models, Kind::Asr);
+    if let (Some(x), Some(first)) = (st.models.chosen(Kind::Asr).as_deref().and_then(|id| pick::speed_of(&st.speed, id)), rows.first_mut()) {
+        first.sub = Some(format!("{} \u{b7} {}", first.sub.take().unwrap_or_default(), pick::speed_note(x)));
+    }
+    rows
+}
+
+/// Settings › Models › Speech, above the model rows: the preset and, when the model in use is too
+/// slow for live captions here, a one-click switch to the fastest downloaded one that keeps up.
+/// Nothing switches without that click.
 fn speech_items(st: &AppState) -> Vec<Item> {
     use poni_core::model_pick::{self as pick, Preset};
     let m = &st.models;
-    let mut rows = model_items(m, Kind::Asr);
+    let mut rows = Vec::new();
     let chosen = m.chosen(Kind::Asr);
-    if let (Some(x), Some(first)) = (chosen.as_deref().and_then(|id| pick::speed_of(&st.speed, id)), rows.first_mut()) {
-        first.sub = Some(format!("{} \u{b7} {}", first.sub.take().unwrap_or_default(), pick::speed_note(x)));
-    }
     if let Some((id, x)) = pick::switch_offer(m, &st.speed) {
-        rows.insert(1, item(Key::SpeechSwitch, &format!("Switch to {}", m.label_of(&id)), Some(&format!("{}: keeps up with live captions on this PC", pick::speed_note(x))), Ctl::Button("Switch")));
+        rows.push(item(Key::SpeechSwitch, &format!("Switch to {}", m.label_of(&id)), Some(&format!("{}: keeps up with live captions on this PC", pick::speed_note(x))), Ctl::Button("Switch")));
     }
     if m.step(Kind::Asr, 1).is_some() {
         let sub = if pick::on_gpu(&st.helper.snap.health.device) {
@@ -403,21 +418,43 @@ fn source_item(source: &str) -> Item {
     item(Key::ModelSource, "Download from", Some("ModelScope when Hugging Face is slow or blocked"), Ctl::Choice(names, at))
 }
 
-/// Advanced settings › Models › Library: the filter, then one row per model it lets through with
-/// its buttons. No search box here: the settings kit has no text field (the pill's group has one).
+/// Settings › Models › Model list: which models the cards below show, and where downloads come from.
+/// No search box here: the settings kit has no text field (the pill's group has one).
 fn library_items(st: &AppState) -> Vec<Item> {
     let f = st.ui.lib_filter;
-    let mut rows = vec![item(Key::LibFilter, "Show", None, Ctl::Choice(Filter::ALL.iter().map(|f| f.label()).collect(), Filter::ALL.iter().position(|x| *x == f)))];
-    let shown = library_shown(st, "");
-    if shown.is_empty() {
+    let mut rows = vec![
+        item(Key::LibFilter, "Show", Some("All models, only the downloaded ones, or the ones picked for your languages"), Ctl::Choice(Filter::ALL.iter().map(|f| f.label()).collect(), Filter::ALL.iter().position(|x| *x == f))),
+        source_item(&st.settings.model_source),
+    ];
+    if library_shown(st, "").is_empty() {
         rows.push(item(Key::LibLang, "No models here", Some("Try All, or start the engine from the tray menu"), Ctl::None));
     }
-    for (i, e) in shown.iter().enumerate().take(u8::MAX as usize) {
+    rows
+}
+
+/// Settings › Models: one card per kind (Speech, Translation, Language pairs), one row per model
+/// the filter lets through, downloaded first (as the Chrome version lists them): name, kind,
+/// languages, state with its size, this PC's speed once tested, and the buttons that fit
+/// (Use, Download, Delete with a confirm; never Delete for the model in use). Speech starts with
+/// its preset and the too-slow switch. `LibModel(i)` is the row's place in `library_shown`.
+fn library_blocks(st: &AppState) -> Vec<Block> {
+    use poni_core::model_pick::{speed_note, speed_of};
+    let mut groups = [("Speech", speech_items(st)), ("Translation", Vec::new()), ("Language pairs", Vec::new())];
+    for (i, e) in library_shown(st, "").iter().enumerate().take(u8::MAX as usize) {
         let acts = e.actions(&st.models);
         let ctl = if acts.is_empty() { Ctl::None } else { Ctl::Choice(acts.iter().map(|a| a.label()).collect(), None) };
-        rows.push(item(Key::LibModel(i as u8), &e.c.label, Some(&e.sub(&st.models)), ctl).lit(&e.c.st));
+        let mut sub = e.sub(&st.models);
+        if let Some(x) = speed_of(&st.speed, &e.c.id) {
+            sub = format!("{sub} \u{b7} {}", speed_note(x));
+        }
+        let g = match (e.pair, e.c.kind) {
+            (true, _) => 2,
+            (false, Kind::Asr) => 0,
+            (false, Kind::Translate) => 1,
+        };
+        groups[g].1.push(item(Key::LibModel(i as u8), &e.c.label, Some(&sub), ctl).lit(&e.c.st));
     }
-    rows
+    groups.into_iter().filter(|(_, rows)| !rows.is_empty()).map(|(h, rows)| Block::Group(Some(h), rows)).collect()
 }
 
 /// The library rows for the filter and `query`, with the person's spoken → translate-into languages.
@@ -442,6 +479,8 @@ pub fn library_act(st: &mut AppState, id: String, kind: Kind, pair: bool, dir: O
             }
         }
         LibAction::Delete => st.models.deleting = Some(id),
+        // The model was put to use while Delete waited: never delete what captions run on.
+        LibAction::Confirm if !pair && st.models.selected(kind).as_deref() == Some(id.as_str()) => st.models.deleting = None,
         LibAction::Confirm => st.cmd(Command::ModelDelete(id)),
         LibAction::Keep | LibAction::Use => st.models.deleting = None,
     }
@@ -790,17 +829,12 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             let mut rows = vec![
                 item(Key::Autostart, AUTOSTART.0, Some(AUTOSTART.1), Ctl::Switch(st.ui.autostart)),
                 switch(Key::Sounds, "Sounds", Some("A soft sound for timers, drops and reminders"), s.sounds),
-                switch(Key::Clock24, "24-hour clock", None, s.use_24h),
+                switch(Key::Clock24, "24-hour clock", Some("13:00 instead of 1:00 PM on the island and its pages"), s.use_24h),
             ];
             if s.system_on() {
                 rows.push(switch(Key::SystemHistory, "Keep System page history", Some("The charts keep the last minute while the page is closed"), s.system_history));
             }
-            vec![
-                Block::Version,
-                Block::Group(None, rows),
-                Block::Group(Some("Webhooks"), webhook_rows(st)),
-                Block::Note("A webhook is a web address the engine calls when a meeting is saved or action items appear (signed with a secret if you set one). The MCP server and the command line are in docs/INTEGRATIONS.md."),
-            ]
+            vec![Block::Version, Block::Group(Some("Start, sounds and clock"), rows), Block::Note("Webhooks, the settings file and the data folder are under For developers, at the bottom.")]
         }
         Section::Appearance => {
             let looks = status::looks(s.theme);
@@ -870,7 +904,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 ],
             ),
             Block::Group(Some("Meeting apps"), meeting_rows(st)),
-            Block::Group(None, vec![switch(Key::OpenMeetingTab, "Open the Meeting tab when a meeting starts", Some("Otherwise captions start on Live and the tab only shows in the row"), s.open_meeting_tab)]),
+            Block::Group(Some("When a meeting starts"), vec![switch(Key::OpenMeetingTab, "Open the Meeting tab when a meeting starts", Some("Otherwise captions start on Live and the tab only shows in the row"), s.open_meeting_tab)]),
             Block::Group(
                 Some("Languages"),
                 vec![
@@ -882,11 +916,11 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             Block::Group(Some("Languages on this PC"), poni_core::library::language_rows(&st.models).into_iter().map(|(name, text)| item(Key::LibLang, name, Some(&text), Ctl::None)).collect()),
         ],
         Section::Overlay => overlay_blocks(&s.overlay),
-        Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
+        Section::Models => [Block::Group(Some("Model list"), library_items(st))]
             .into_iter()
+            .chain(library_blocks(st))
+            .chain([Block::Speed, Block::Group(Some("Models in use: folders and downloads by hand"), [speech_in_use(st), model_items(&st.models, Kind::Translate)].concat())])
             .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai)), Block::Group(Some("Caption translation service"), provider_items(&st.ai)), Block::Group(Some("Speech to text in the cloud"), cloud_speech_items(&st.ai))])
-            .chain([Block::Group(Some("Speech recognition"), speech_items(st)), Block::Group(Some("Translation"), model_items(&st.models, Kind::Translate))])
-            .chain([Block::Speed, Block::Group(Some("Library"), library_items(st))])
             .collect(),
         Section::Popups => vec![Block::Group(
             Some("The island shows a pop-up for"),
@@ -902,7 +936,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
             let start_name = if pages.contains(&start) { start.title() } else { pages.first().map_or("Media", |p| p.title()) };
             let mut open = vec![switch(Key::RememberPage, "Open where you left off", Some("The page you last had open"), s.remember_page)];
             if !s.remember_page {
-                open.push(item(Key::StartPage, "Opens on", None, Ctl::Stepper(start_name.to_string())));
+                open.push(item(Key::StartPage, "Opens on", Some("The page the island shows each time it opens"), Ctl::Stepper(start_name.to_string())));
             }
             // Notifications only in a copy that can read them; off, nothing listens.
             let tabs = crate::pages::hideable_tabs(st)
@@ -912,7 +946,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                         PageKind::Notifications => Some("Messages from WhatsApp, Telegram and your phone"),
                         PageKind::Call => Some("Shown while a meeting is running, and 10 minutes after"),
                         PageKind::Captions => Some("Every caption and translation setting on the pill"),
-                        _ => None,
+                        _ => Some("Show or hide this tab on the island"),
                     };
                     item(Key::Tab(p), p.title(), sub, Ctl::Switch(Some(!st.tab_hidden(p))))
                 })
@@ -925,7 +959,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 item(Key::TabReset, "Reset the order", Some("Back to the built-in order; your templates stay"), Ctl::Button("Reset")),
             ];
             if cur.is_some() {
-                order.push(item(Key::TabDelete, "Delete this template", None, Ctl::Button("Delete")));
+                order.push(item(Key::TabDelete, "Delete this template", Some("The tabs keep their order; only the saved template goes"), Ctl::Button("Delete")));
             }
             vec![
                 Block::Group(Some("When the island opens"), open),
@@ -946,9 +980,9 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                 Block::Group(
                     Some("Lengths"),
                     vec![
-                        item(Key::FocusMin, "Focus", None, Ctl::Stepper(minutes(p.focus_min))),
-                        item(Key::ShortBreak, "Short break", None, Ctl::Stepper(minutes(p.short_break_min))),
-                        item(Key::LongBreak, "Long break", None, Ctl::Stepper(minutes(p.long_break_min))),
+                        item(Key::FocusMin, "Focus", Some("How long one focus session lasts"), Ctl::Stepper(minutes(p.focus_min))),
+                        item(Key::ShortBreak, "Short break", Some("The break after each focus session"), Ctl::Stepper(minutes(p.short_break_min))),
+                        item(Key::LongBreak, "Long break", Some("The longer break after several sessions"), Ctl::Stepper(minutes(p.long_break_min))),
                         item(Key::LongEvery, "Long break after", Some("Focus sessions before a long break"), Ctl::Stepper(every)),
                     ],
                 ),
@@ -969,7 +1003,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
                     Some("When it's time"),
                     vec![
                         item(Key::PrayerSound, "Sound", Some("Subuh plays the tone"), Ctl::Choice(names(&SOUNDS), chosen(&SOUNDS, p.sound))),
-                        switch(Key::PrayerPause, "Pause music for the adzan", None, p.pause_music),
+                        switch(Key::PrayerPause, "Pause music for the adzan", Some("Music stops while the adzan plays"), p.pause_music),
                         item(Key::PrayerCountdown, "Countdown before each prayer", Some("On the closed island"), Ctl::Stepper(countdown)),
                     ],
                 ),
@@ -980,12 +1014,16 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         Section::About => vec![
             Block::Version,
             Block::Group(
-                None,
+                Some("Release notes and credits"),
                 vec![
                     item(Key::ReleaseNotes, "What's new", Some("This version's release notes"), Ctl::Button("Open")),
                     item(Key::LyricsCredit, "Lyrics", Some("Synced lyrics come from LRCLIB"), Ctl::Button("lrclib.net")),
                 ],
             ),
+        ],
+        Section::Developers => vec![
+            Block::Group(Some("Webhooks"), webhook_rows(st)),
+            Block::Note("A webhook is a web address the engine calls when a meeting is saved or action items appear (signed with a secret if you set one). The MCP server and the command line are in docs/INTEGRATIONS.md."),
             Block::Group(
                 Some("Files"),
                 vec![
@@ -1030,10 +1068,10 @@ fn overlay_blocks(o: &poni_core::overlay::OverlaySettings) -> Vec<Block> {
         Block::Group(
             Some("Look"),
             vec![
-                item(Key::OverlayFont, "Text size", None, Ctl::Stepper(format!("{} pt", o.font_size))),
-                item(Key::OverlayOriginalColor, "Original colour", None, Ctl::Choice(TEXT_PRESETS.iter().map(|(n, _)| *n).collect(), at(&TEXT_PRESETS, o.original_color))),
-                item(Key::OverlayTranslationColor, "Translation colour", None, Ctl::Choice(TEXT_PRESETS.iter().map(|(n, _)| *n).collect(), at(&TEXT_PRESETS, o.translation_color))),
-                item(Key::OverlayBackground, "Background", None, Ctl::Choice(BACKGROUND_PRESETS.iter().map(|(n, _)| *n).collect(), at(&BACKGROUND_PRESETS, o.background))),
+                item(Key::OverlayFont, "Text size", Some("How big the caption letters are"), Ctl::Stepper(format!("{} pt", o.font_size))),
+                item(Key::OverlayOriginalColor, "Original colour", Some("The line as it was spoken"), Ctl::Choice(TEXT_PRESETS.iter().map(|(n, _)| *n).collect(), at(&TEXT_PRESETS, o.original_color))),
+                item(Key::OverlayTranslationColor, "Translation colour", Some("The translated line"), Ctl::Choice(TEXT_PRESETS.iter().map(|(n, _)| *n).collect(), at(&TEXT_PRESETS, o.translation_color))),
+                item(Key::OverlayBackground, "Background", Some("The strip behind the text"), Ctl::Choice(BACKGROUND_PRESETS.iter().map(|(n, _)| *n).collect(), at(&BACKGROUND_PRESETS, o.background))),
                 item(Key::OverlayOpacity, "Background opacity", Some("0 leaves only the text"), Ctl::Stepper(format!("{}%", o.background_opacity))),
             ],
         ),
@@ -1790,7 +1828,7 @@ fn draw(ui: &mut Ui, st: &mut AppState, section: Section, frame: Frame, light: b
     if matches!(section, Section::Speech | Section::Models) && st.models.due(st.now) {
         st.cmd(Command::ModelsRefresh);
     }
-    if section == Section::General && st.webhooks.due(st.now) {
+    if section == Section::Developers && st.webhooks.due(st.now) {
         st.cmd(Command::WebhooksRefresh);
     }
 
@@ -1843,8 +1881,13 @@ fn draw_sidebar(ui: &mut Ui, st: &mut AppState, side: Rect, section: Section, to
     ui.c.fill_rrect(Rect::from_center(icon_c, 24.0, 24.0), 6.0, Color::white(0.14));
     ui.c.text("Advanced settings", Rect::new(icon_c.x + 20.0, side.y + top + 20.0, side.w - 60.0, 24.0), &TextStyle::headline());
     let list = sections(st);
-    let about_at = side.bottom() - 12.0 - NAV_H;
-    let row_y = |i: usize, s: Section| if s == Section::About { about_at } else { side.y + top + NAV_Y + i as f32 * (NAV_H + NAV_GAP) };
+    // About and For developers sit at the bottom, developers last.
+    let bottom = side.bottom() - 12.0 - NAV_H;
+    let row_y = |i: usize, s: Section| match s {
+        Section::Developers => bottom,
+        Section::About => bottom - NAV_H - NAV_GAP,
+        _ => side.y + top + NAV_Y + i as f32 * (NAV_H + NAV_GAP),
+    };
     // The highlight, under the rows.
     let sel_key = mkey(wid("settingswin.nav.sel"), K_Y);
     if let Some(i) = list.iter().position(|s| *s == section) {
@@ -2333,7 +2376,7 @@ fn draw_speed(ui: &mut Ui, st: &mut AppState, r: Rect, view: Rect, sf: &Surfaces
     let (x0, x1) = (card.x + ROW_PAD, card.right() - ROW_PAD);
     let mut y = card.y;
     if rows.is_empty() {
-        ui.c.text("Download a model in the Library below, then test how fast it runs here.", Rect::new(x0, y, x1 - x0, SPEED_EMPTY_H), &TextStyle::body().color(palette::TEXT_DIM));
+        ui.c.text("Download a model in the lists above, then test how fast it runs here.", Rect::new(x0, y, x1 - x0, SPEED_EMPTY_H), &TextStyle::body().color(palette::TEXT_DIM));
     }
     let mut index = 0u64;
     for g in Group::ALL {
@@ -2602,7 +2645,7 @@ mod tests {
         use poni_core::webhooks::Webhook;
         let mut st = state();
         st.webhooks.list = vec![Webhook { id: "wh-1".into(), url: "https://hooks.example.com/in".into(), enabled: true, has_secret: true, last_ok: Some(true), last_error: String::new() }];
-        let general = rows(Section::General, &st);
+        let general = rows(Section::Developers, &st);
         let hook = general.iter().find(|i| i.key == Key::Webhook(0)).expect("the hook's row");
         assert_eq!(hook.label, "hooks.example.com");
         assert_eq!(hook.sub.as_deref(), Some("On, last delivery worked. Signed with your secret"));
@@ -2621,7 +2664,7 @@ mod tests {
         apply(&mut st, Key::WebhookRemove(5), Act::Press);
         assert!(st.cmds.is_empty());
         st.webhooks.error = Some("The engine is not answering".into());
-        assert!(rows(Section::General, &st).iter().any(|i| i.key == Key::WebhookInfo));
+        assert!(rows(Section::Developers, &st).iter().any(|i| i.key == Key::WebhookInfo));
     }
 
     fn the_overlay_rows_change_the_overlay_settings() {
@@ -2757,10 +2800,12 @@ mod tests {
                        {"kind":"translate","id":"org/mt-big","label":"Qwen big","approxBytes":6000000000}]}"#;
         st.models.apply(Ok(parse(body).unwrap()), 1.0);
         let lib = |st: &AppState| rows(Section::Models, st).into_iter().filter(|i| matches!(i.key, Key::LibModel(_))).map(|i| (i.label, i.ctl)).collect::<Vec<_>>();
-        // On device first: the one in use has only its folder; another can be used or deleted.
-        assert_eq!(lib(&st), [("Base".into(), Ctl::Choice(vec!["Folder"], None)), ("Small".into(), Ctl::Choice(vec!["Use", "Folder", "Delete"], None))]);
-        apply(&mut st, Key::LibFilter, Act::Pick(1));
+        // All by default, downloaded first: the one in use has only its folder; another can be used or deleted.
+        assert_eq!(lib(&st)[..2], [("Base".into(), Ctl::Choice(vec!["Folder"], None)), ("Small".into(), Ctl::Choice(vec!["Use", "Folder", "Delete"], None))]);
         assert_eq!(lib(&st).len(), 3);
+        apply(&mut st, Key::LibFilter, Act::Pick(0));
+        assert_eq!(lib(&st).len(), 2, "On device hides what is not downloaded");
+        apply(&mut st, Key::LibFilter, Act::Pick(1));
         assert_eq!(lib(&st)[2], ("Qwen big".into(), Ctl::Choice(vec!["Download", "By hand"], None)));
         apply(&mut st, Key::LibModel(1), Act::Pick(0));
         assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelSelect(Kind::Asr, id) if id == "org/speech-small")));
@@ -2771,6 +2816,49 @@ mod tests {
         assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelDelete(id) if id == "org/speech-small")));
         // Languages on this PC: one line per caption language.
         assert!(rows(Section::Speech, &st).iter().any(|i| i.key == Key::LibLang && i.label == "Indonesian" && i.sub.as_deref() == Some("Speech on device · translation off")));
+    }
+
+    #[test]
+    fn models_are_one_card_per_kind_with_speed_and_delete_never_hits_the_model_in_use() {
+        use poni_core::models::parse;
+        use poni_core::speed::Run;
+        let mut st = state();
+        let body = r#"{"models":[{"kind":"asr","id":"org/speech-base","downloaded":true,"bytes":150000000}],
+            "catalog":[{"kind":"asr","id":"org/speech-medium","label":"Medium","approxBytes":1500000000},
+                       {"kind":"asr","id":"org/speech-base","label":"Base","selected":true,"downloaded":true,"bytes":150000000,"dir":"D:/hf"},
+                       {"kind":"asr","id":"org/speech-small","label":"Small","downloaded":true,"bytes":490000000,"dir":"D:/hf"},
+                       {"kind":"translate","id":"org/mt-big","label":"Qwen big","approxBytes":6000000000},
+                       {"kind":"translate-pair","id":"Helsinki-NLP/opus-mt-en-id","label":"English to Indonesian","approxBytes":291000000,"downloaded":true,"bytes":291000000}]}"#;
+        st.models.apply(Ok(parse(body).unwrap()), 1.0);
+        st.speed.report.runs.insert("org/speech-small".into(), vec![Run { speed: 2.5, unit: "x real time".into(), ..Run::default() }]);
+        let cards: Vec<(&str, Vec<String>)> = blocks(Section::Models, &st)
+            .into_iter()
+            .filter_map(|b| match b {
+                Block::Group(Some(h), items) if items.iter().any(|i| matches!(i.key, Key::LibModel(_))) => Some((h, items.into_iter().filter(|i| matches!(i.key, Key::LibModel(_))).map(|i| i.label).collect())),
+                _ => None,
+            })
+            .collect();
+        // One card per kind; in use, then downloaded, then the rest.
+        assert_eq!(cards, [("Speech", vec!["Base".to_string(), "Small".into(), "Medium".into()]), ("Translation", vec!["Qwen big".into()]), ("Language pairs", vec!["English to Indonesian".into()])]);
+        let small = row(Section::Models, &st, Key::LibModel(1)).unwrap();
+        assert_eq!(small.sub.as_deref(), Some("Speech \u{b7} All languages \u{b7} Downloaded, 490 MB \u{b7} 2.5\u{d7} real time"));
+        let medium = row(Section::Models, &st, Key::LibModel(2)).unwrap();
+        assert_eq!(medium.ctl, Ctl::Choice(vec!["Download", "By hand"], None));
+        // Pressing Download on a row downloads that model.
+        apply(&mut st, Key::LibModel(2), Act::Pick(0));
+        assert!(st.cmds.iter().any(|c| matches!(c, Command::ModelPullId(id) if id == "org/speech-medium")));
+        // A confirm that arrives for the model in use (switched while Delete waited) deletes nothing.
+        st.cmds.clear();
+        st.models.deleting = Some("org/speech-base".into());
+        library_act(&mut st, "org/speech-base".into(), Kind::Asr, false, None, LibAction::Confirm);
+        assert!(st.cmds.is_empty());
+        assert_eq!(st.models.deleting, None);
+        // The stepper, folder and by-hand rows moved under Models in use, not dropped.
+        let in_use = blocks(Section::Models, &st).into_iter().find_map(|b| match b {
+            Block::Group(Some("Models in use: folders and downloads by hand"), items) => Some(items.into_iter().map(|i| i.key).collect::<Vec<_>>()),
+            _ => None,
+        });
+        assert!(in_use.is_some_and(|k| k.contains(&Key::ModelPick(Kind::Asr)) && k.contains(&Key::ModelManual(Kind::Asr)) && k.contains(&Key::ModelPick(Kind::Translate))));
     }
 
     #[test]
@@ -2947,11 +3035,33 @@ mod tests {
     }
 
     #[test]
+    fn every_card_has_a_heading_and_developer_rows_sit_last() {
+        let st = state();
+        let mut bare = Vec::new();
+        for s in Section::ALL {
+            for b in blocks(s, &st) {
+                if let Block::Group(h, items) = b {
+                    assert!(h.is_some(), "{s:?} has a card without a heading");
+                    bare.extend(items.into_iter().filter(|i| i.sub.is_none()).map(|i| format!("{s:?}: {}", i.label)));
+                }
+            }
+        }
+        assert!(bare.is_empty(), "rows without a one-line description: {bare:?}");
+        // Webhooks and the files moved, not dropped: under For developers, the last section.
+        let dev: Vec<Key> = rows(Section::Developers, &st).into_iter().map(|i| i.key).collect();
+        for k in [Key::WebhookAdd, Key::SettingsFile, Key::DataFolder] {
+            assert!(dev.contains(&k));
+            assert!(!rows(Section::General, &st).iter().chain(rows(Section::About, &st).iter()).any(|i| i.key == k));
+        }
+        assert_eq!(Section::ALL.last(), Some(&Section::Developers));
+    }
+
+    #[test]
     fn prayer_has_a_section_only_while_its_add_on_is_on() {
         let st = state();
         assert!(!sections(&st).contains(&Section::Prayer));
         assert_eq!(sections(&st).first(), Some(&Section::General));
-        assert_eq!(sections(&st).last(), Some(&Section::About));
+        assert_eq!(sections(&st).last(), Some(&Section::Developers));
     }
 
     #[test]
