@@ -11,6 +11,7 @@ pub mod connector;
 pub mod diarize;
 pub mod engine;
 pub mod export_docs;
+pub mod ggml;
 pub mod heuristic;
 pub mod ics;
 pub mod integrations;

@@ -82,7 +82,7 @@ fn candle_whisper_base_matches_faster_whisper() {
     )
     .expect("parse golden");
 
-    let mut asr = WhisperAsr::load("base", candle_core::Device::Cpu, &hub_cache_dir())
+    let mut asr = WhisperAsr::load("base", candle_core::Device::Cpu, false, &hub_cache_dir())
         .expect("load whisper base");
     let mut failures = Vec::new();
     println!("clip    WER    matched  max|dt|  RTF rust  RTF python");

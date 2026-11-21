@@ -30,6 +30,11 @@
 #ifndef EngineSource
   #define EngineSource "..\..\engine-rs\target\release\submeetly-engine.exe"
 #endif
+; The Vulkan loader (1.7 MB) for PCs whose graphics driver did not install one; the engine loads it from
+; {app}\vulkan only when Windows has none (engine-rs ggml.rs vulkan_loader), so it never shadows the system copy.
+#ifndef VulkanLoader
+  #define VulkanLoader "..\target\vulkan-1.dll"
+#endif
 ; The names people see say Kasi (Start menu, Setup, Apps & features). What carries an install over stays
 ; yravgSubMeetly: the AppId, the folder, the exe, the Run value (AppKey, autostart.rs writes the same name),
 ; the data folders and the island's window class.
@@ -91,6 +96,7 @@ Name: "autostart"; Description: "Start with Windows"; GroupDescription: "Startup
 [Files]
 Source: "{#ExeSource}"; DestDir: "{app}"; DestName: "{#AppExe}"; Flags: ignoreversion
 Source: "{#EngineSource}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#VulkanLoader}"; DestDir: "{app}\vulkan"; Flags: ignoreversion
 Source: "submeetly-host.bat"; DestDir: "{app}"; Flags: ignoreversion
 ; The built extension, loaded unpacked from here (Chrome: chrome://extensions > Load unpacked). The engine also
 ; serves its pages at /app/<file>, so the Minutes register opens without the extension.

@@ -252,6 +252,9 @@ fn catalog_lists_the_fixed_choices_and_marks_the_selected_ones() {
             "openai/whisper-small",
             "openai/whisper-medium",
             "openai/whisper-large-v3-turbo",
+            "ggml/whisper-base",
+            "ggml/whisper-medium-q5_0",
+            "ggml/whisper-large-v3-turbo-q5_0",
             "Qwen/Qwen2.5-0.5B-Instruct",
             "Qwen/Qwen2.5-1.5B-Instruct",
             "Qwen/Qwen2.5-3B-Instruct",
@@ -294,7 +297,7 @@ fn the_chosen_models_are_validated_applied_and_survive_a_restart() {
     );
     assert_eq!(status, 400);
     // OPUS-MT pair models are pulled, never chosen.
-    assert_eq!(body["allowed"].as_array().map(Vec::len), Some(9));
+    assert_eq!(body["allowed"].as_array().map(Vec::len), Some(12));
     let (status, _) = call(
         &app,
         "POST",

@@ -16,7 +16,7 @@ use serde_json::{json, Map, Value};
 use crate::audio::pcm_f32_le;
 use crate::bench::{Bench, MlRunner};
 use crate::calendar::{Calendar, Fail};
-use crate::engine::{mt_engine, segments_json, Jobs, Ml, SavedModels, ASR_ENGINE};
+use crate::engine::{asr_engine, mt_engine, segments_json, Jobs, Ml, SavedModels, ASR_ENGINE};
 use crate::heuristic::heuristic_notes;
 use crate::locations::{
     dir_status, free_bytes, legacy_hubs, migrate_legacy, move_model, move_needs, probe_dir,
@@ -1190,9 +1190,10 @@ impl App {
         let mut asr_row = json!({
             "key": "asr",
             "kind": "asr",
+            "engine": asr_engine(&asr),
             "id": asr,
-            "engine": ASR_ENGINE,
-            "device": device,
+            "device": self.ml.asr_device(),
+            "gpu": self.ml.asr_gpu(),
             "available": true,
             "loaded": self.ml.asr_loaded(),
             "loading": self.ml.asr_loading(),
@@ -1979,10 +1980,10 @@ impl App {
 
     fn health(&self) -> Value {
         let mt = self.ml.translate_available();
-        json!({
+        let mut health = json!({
             "ok": true,
-            "engine": ASR_ENGINE,
-            "engine_label": ASR_ENGINE,
+            "engine": asr_engine(&self.ml.asr_id()),
+            "engine_label": asr_engine(&self.ml.asr_id()),
             "model": self.ml.asr_id(),
             // Media is decoded in-process (symphonia), not by ffmpeg.
             "ffmpeg": false,
@@ -1990,7 +1991,7 @@ impl App {
             "translate": mt,
             "translate_model": self.ml.translate_id(),
             "draft_model": Value::Null,
-            "device": self.ml.device_name(),
+            "device": self.ml.asr_device(),
             "compute": "float32",
             "engine_mode": self.load_engine_mode(),
             "platform": env::consts::OS,
@@ -2007,7 +2008,12 @@ impl App {
                 "ui_prefs": true,
                 "models": true,
             },
-        })
+        });
+        // Only with a GPU, so the CPU answer stays as it was.
+        if let Some(gpu) = self.ml.asr_gpu() {
+            health["gpu"] = gpu.into();
+        }
+        health
     }
 
     fn device_state(&self) -> Value {
