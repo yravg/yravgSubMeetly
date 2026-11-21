@@ -193,6 +193,8 @@ pub struct Measured {
     pub latency_ms: f64,
     pub load_ms: f64,
     pub samples: usize,
+    /// Set when the test knows better than the engine (a GGML speech model on the GPU).
+    pub device: Option<&'static str>,
 }
 
 pub fn kind_label(kind: Kind) -> &'static str {
@@ -345,7 +347,7 @@ impl Bench {
                     latency_ms: round1(m.latency_ms),
                     load_ms: round1(m.load_ms),
                     samples: m.samples,
-                    device: runner.device(),
+                    device: m.device.map_or_else(|| runner.device(), str::to_string),
                     at: crate::state::now_utc_iso(),
                     engine_version: env!("CARGO_PKG_VERSION").to_string(),
                 }),
@@ -407,6 +409,7 @@ impl Runner for MlRunner {
                     latency_ms: latency,
                     load_ms,
                     samples: window_ms.len(),
+                    device: Some(asr.device_label()),
                 })
             }
             Kind::Translate => {
@@ -431,6 +434,7 @@ impl Runner for MlRunner {
                     latency_ms: mean(&each),
                     load_ms,
                     samples: each.len(),
+                    device: None,
                 })
             }
             Kind::PairMt => {
@@ -459,6 +463,7 @@ impl Runner for MlRunner {
                     latency_ms: mean(&each),
                     load_ms,
                     samples: each.len(),
+                    device: None,
                 })
             }
         }
@@ -504,6 +509,7 @@ mod tests {
                     latency_ms: 497.46,
                     load_ms: 1200.0,
                     samples: 3,
+                    device: None,
                 },
                 _ => Measured {
                     speed: 41.26,
@@ -511,6 +517,7 @@ mod tests {
                     latency_ms: 250.0,
                     load_ms: 800.0,
                     samples: 8,
+                    device: None,
                 },
             })
         }

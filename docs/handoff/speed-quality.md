@@ -13,7 +13,8 @@ Roadmap: `docs/roadmap/speed-quality.md`.
 | D Right model | done, installed in 1.4.8 | worker wp-d-model, branch worktree-agent-a74d1b5539e9da413: poni-core `model_pick` (1.2x line, switch offer, bench after download / first use, presets), Settings › Models › Speech recognition rows; latency readout already existed (Captions › Display) |
 | C Cloud speech | done, installed in 1.4.8 | 06b72a7; test cloud_speech::after_a_failure_the_cloud_rests… flaky under load |
 | 1.4.9 installer (A + zh/ja pair bench) | installed 2026-11-21 15:26; laptop now on ggml large-v3-turbo-q5 on the RTX 4060 (Vulkan): zh clip ASR 0.36-0.58 s, whole line 1.5 s (translation Qwen2.5-0.5B CPU 1.2 s is now the slow part) | Kasi-Setup-1.4.9.exe sha256 d5683ca4…a0fc |
-| I Settings, J BYOA, K Stable | merged to main, island tests 334 + 659 pass; NOT yet built or installed: E: is full (0 MB), engine test run failed with os error 112 | merges after 1.4.9 |
+| I Settings, J BYOA, K Stable | done: 1.5.0 installed 2026-11-21 17:17 (Kasi-Setup-1.5.0.exe sha256 055b24a2…e321); engine tests pass except pre-existing golden + models::a_plain_path, and 2 agent_cli fake-CLI tests that fail only under cargo test on this laptop (pass when the test binary runs directly) | built with windows crate at opt-level 1 (rustc ran out of commit memory at opt 3) |
+| Bench 2026-11-21 (RTX 4060, Vulkan) | large-v3-turbo-q5 ASR 150 ms per 4 s window (26.7x real time); Base CPU 3.1x, Small CPU 1.0x, Medium CPU 0.3x; Qwen2.5-0.5B 12.5 tok/s (1.3 s/line), Qwen3-1.7B 18.9 tok/s, OPUS-MT id-en 137 ms, ja-en 156 ms; zh clip end-to-end 1.5-1.6 s (translation 1.2-1.4 s) | Qwen 0.5B adds words not spoken ("We will start with a brief overview" for 我们先看) |
 | E Better words | open | |
 | F Live feel | open | |
 | G Use it everywhere | open | |

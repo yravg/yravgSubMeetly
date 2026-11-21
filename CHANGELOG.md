@@ -1,5 +1,12 @@
 # Riwayat rilis
 
+## 1.5.0 (2026-11-21)
+- **Settings › Models is one model list, like the Chrome version.** Every speech and translation model shows its state, size and measured speed, with Use, Download and Delete on the row. Delete asks first and never removes the model in use.
+- **Advanced settings revamped.** Grouped under headings, one plain line under every row, developer-only switches moved to "For developers" at the bottom. Nothing was removed.
+- **Bring your own agent.** Settings › Models › Agent on this computer lists the agent CLIs installed here (Claude Code, Codex, Gemini CLI, OpenCode) and uses your own subscription for summaries and Ask. Caption translations only go to the agent when "Also polish caption translations" is on; the local model takes over when the agent fails or takes longer than 180 s.
+- **Stop really stops, Start says why.** A short pause in a video no longer restarts captions, a line that arrives after Stop no longer lands in the next session, and Start reports within about a second when the engine is not answering.
+- **Speed tests name the graphics card.** A GPU-ready speech model tested on the graphics card is now marked "vulkan" instead of "cpu".
+
 ## 1.4.9 (2026-11-21)
 - **Speech can run on the graphics card.** Three new "GPU ready" Whisper models (base, medium q5, large-v3 turbo q5) run through whisper.cpp on any Vulkan GPU (NVIDIA, AMD, Intel) and fall back to the processor on PCs without one. On an RTX 4060 a 5-second line takes about 0.2 s with large-v3 turbo, against 16 s for Medium on the processor before. The engine no longer needs the VC++ runtime; Setup carries the Vulkan loader (1.7 MB).
 - **Speed test for the Chinese and Japanese language pairs** (OPUS-MT zh→en and ja→en no longer fail with "there are no test sentences for this language pair").
