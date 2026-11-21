@@ -29,6 +29,21 @@ pub struct AiView {
     pub provider: ProviderView,
     /// Cloud speech-to-text with the person's own key (`/speech/provider`, same shape).
     pub speech: ProviderView,
+    /// The agent CLI used instead of the endpoint (`""` = none), and whether it also polishes captions.
+    pub agent: String,
+    pub refine_captions: bool,
+    /// The agent CLIs installed on this computer (`/ai/agents`).
+    pub agents: Vec<AgentView>,
+}
+
+/// An installed agent CLI: Claude Code, Codex, Gemini CLI or OpenCode.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct AgentView {
+    pub id: String,
+    pub label: String,
+    /// Whose subscription it uses, said in the row ("your Claude subscription (Anthropic)").
+    pub plan: String,
+    pub version: String,
 }
 
 /// The engine's caption translation provider, without its secrets.
@@ -116,6 +131,18 @@ impl ProvField {
 }
 
 impl AiView {
+    /// The chosen agent, if it is still installed.
+    pub fn agent_view(&self) -> Option<&AgentView> {
+        self.agents.iter().find(|a| a.id == self.agent)
+    }
+
+    /// The agent one step on (`step` = ±1) through "Off" then each installed agent.
+    pub fn step_agent(&self, step: i32) -> String {
+        let ids: Vec<&str> = std::iter::once("").chain(self.agents.iter().map(|a| a.id.as_str())).collect();
+        let at = ids.iter().position(|i| *i == self.agent).unwrap_or(0) as i32;
+        ids[(at + step).rem_euclid(ids.len() as i32) as usize].to_string()
+    }
+
     /// The default template's index in `templates` (-1 = none, so the stepper can show "Plain").
     pub fn template_name(&self) -> String {
         self.default_template.as_ref().and_then(|id| self.templates.iter().find(|(i, _)| i == id)).map_or_else(|| "Plain notes".to_string(), |(_, n)| n.clone())
@@ -157,6 +184,9 @@ pub enum AiCmd {
     SpeechPaste(ProvField),
     SpeechSet(ProvField, String),
     SpeechTest,
+    /// Use this agent CLI for summaries and Ask (`""` = none), and let it polish captions.
+    AgentPick(String),
+    AgentRefine(bool),
 }
 
 /// Carry out a command from Settings: a paste reads `clipboard` first (nothing copied is said, not guessed).
@@ -205,8 +235,17 @@ fn read(port: u16) -> Result<AiView, String> {
         model: c["model"].as_str().unwrap_or("").to_string(),
         has_key: c["hasKey"].as_bool().unwrap_or(false),
         key_hint: c["keyHint"].as_str().unwrap_or("").to_string(),
+        agent: c["agent"].as_str().unwrap_or("").to_string(),
+        refine_captions: c["refineCaptions"].as_bool().unwrap_or(false),
         ..AiView::default()
     };
+    // Older engines have no agent route: no agent rows to pick from.
+    if let Ok((200, t)) = helper::request(port, "GET", "/ai/agents", None) {
+        if let Ok(v) = serde_json::from_str::<Value>(&t) {
+            let text = |a: &Value, k: &str| a[k].as_str().unwrap_or("").to_string();
+            view.agents = v["agents"].as_array().map(|a| a.iter().filter(|a| a["installed"].as_bool() == Some(true)).map(|a| AgentView { id: text(a, "id"), label: text(a, "label"), plan: text(a, "plan"), version: text(a, "version") }).collect()).unwrap_or_default();
+        }
+    }
     // An engine older than this feature has no templates route: the connector rows still work.
     if let Ok((200, t)) = helper::request(port, "GET", "/notes/templates", None) {
         if let Ok(v) = serde_json::from_str::<Value>(&t) {
@@ -315,6 +354,17 @@ pub fn run(sink: EventSink, port: u16, cmd: AiCmd) {
                         Err(v["error"].as_str().unwrap_or("The service did not answer.").to_string())
                     }
                 }),
+                AiCmd::AgentPick(id) => post("/ai/connector", if id.is_empty() { json!({ "agent": "" }) } else { json!({ "agent": id, "enabled": true }) }).and_then(|(c, b)| if c == 200 { Ok(b) } else { Err(error_text(&b, c)) }).map(|b| {
+                    if !id.is_empty() {
+                        let note = serde_json::from_str::<Value>(&b).ok().and_then(|v| v["note"].as_str().map(str::to_string)).unwrap_or_default();
+                        notice = Some((true, "Agent on".into(), note));
+                    }
+                }),
+                AiCmd::AgentRefine(on) => post("/ai/connector", json!({ "refineCaptions": on })).and_then(|(c, b)| if c == 200 { Ok(()) } else { Err(error_text(&b, c)) }).map(|()| {
+                    if *on {
+                        notice = Some((true, "Captions go to your agent".into(), "Each caption line's text is sent to it for a better translation. The local model answers if it fails".into()));
+                    }
+                }),
                 AiCmd::SetTemplate(id) => post("/notes/templates/default", json!({ "id": id })).and_then(|(c, b)| if c == 200 { Ok(()) } else { Err(error_text(&b, c)) }),
             };
             if let Err(e) = step {
@@ -354,5 +404,18 @@ mod tests {
         assert_eq!(view(Some("standup")).template_name(), "Standup");
         // A default that no longer exists reads as plain notes.
         assert_eq!(view(Some("gone")).template_name(), "Plain notes");
+    }
+
+    #[test]
+    fn the_agent_stepper_goes_through_off_then_each_installed_agent() {
+        let claude = AgentView { id: "claude".into(), label: "Claude Code".into(), ..AgentView::default() };
+        let v = AiView { agents: vec![claude.clone(), AgentView { id: "gemini".into(), ..AgentView::default() }], ..AiView::default() };
+        assert_eq!(v.step_agent(1), "claude");
+        assert_eq!(v.step_agent(-1), "gemini");
+        assert_eq!(AiView { agent: "gemini".into(), ..v.clone() }.step_agent(1), "");
+        assert_eq!(AiView { agent: "claude".into(), ..v.clone() }.agent_view(), Some(&claude));
+        // An agent that was uninstalled reads as none.
+        assert_eq!(AiView { agent: "codex".into(), ..v }.agent_view(), None);
+        assert_eq!(AiView::default().step_agent(1), "");
     }
 }

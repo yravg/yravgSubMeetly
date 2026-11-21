@@ -24,6 +24,23 @@ Any OpenAI-compatible chat endpoint: OpenAI, OpenRouter, Ollama (`http://localho
 
 In the island the three text fields are filled from the clipboard (copy, then press **Paste URL / Paste name / Paste key**), because Settings has no text boxes.
 
+## Agent on this computer (bring your own agent)
+
+Someone who already pays for an AI subscription can use it instead of an endpoint and key: the engine runs the agent CLI installed on this computer in its non-interactive mode, prompt on stdin, answer on stdout (`engine-rs/engine/src/agent_cli.rs`).
+
+| Agent | Command the engine runs | Uses |
+|---|---|---|
+| Claude Code | `claude -p --output-format text` | the Claude subscription |
+| OpenAI Codex | `codex exec --skip-git-repo-check -` | the ChatGPT subscription |
+| Gemini CLI | `gemini -p "<fixed text>"` | the Google account |
+| OpenCode | `opencode run "<fixed text>"` | the provider signed in to OpenCode |
+
+- Arguments are fixed lists; no user text is ever on a command line, and no shell string is built. The agent runs in the temp folder, with a 180 s hard timeout that kills its whole process tree.
+- `GET /ai/agents` lists each CLI with `installed` and `version` (PATH lookup plus `--version`, 5 s; kept for a minute). `POST /ai/connector` takes `agent` (`""` = none) and `refineCaptions`. With an agent picked and the connector on, `/notes/summarize` and `/ask` go to the agent instead of the endpoint; dropping the agent with no endpoint set turns the connector off.
+- **Captions** reach the agent only when `refineCaptions` is on too: `/translate_refine` then asks the agent and falls back to the local model on any failure. Off by default.
+- Island: Settings › Models › Agent on this computer (picker of installed agents, and "Also polish caption translations" once one is picked). The row names the agent and whose subscription it uses.
+- The answer arrives whole, not streamed (Ask shows it at once when the agent finishes).
+
 ## Summary templates
 
 Seven built-ins (General, Standup, 1:1, Sales call, Interview, Retrospective, Project status; read-only) plus the person's own (`note-templates.json`). A template is a name, a style (`bullets` or `prose`) and 1 to 12 sections; a section is a heading, a prompt for the model, and a `kind` (`summary`, `decisions`, `actions`, `questions`, `risks`, `topics`, `notes`) that the local keyword renderer uses.

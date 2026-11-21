@@ -25,11 +25,21 @@ pub struct Config {
     pub base_url: String,
     pub api_key: String,
     pub model: String,
+    /// An agent CLI on this computer (`agent_cli::AGENTS` id) used instead of the endpoint; "" = none.
+    pub agent: String,
+    /// Also let the agent refine caption translations (sends caption text; off unless turned on).
+    pub refine_captions: bool,
 }
 
 impl Config {
     pub fn usable(&self) -> bool {
-        self.enabled && !self.base_url.is_empty() && !self.model.is_empty()
+        self.enabled
+            && (!self.agent.is_empty() || (!self.base_url.is_empty() && !self.model.is_empty()))
+    }
+
+    /// The agent refines captions only when both the connector and that switch are on.
+    pub fn agent_refines(&self) -> bool {
+        self.usable() && !self.agent.is_empty() && self.refine_captions
     }
 
     /// What the API shows: never the key.
@@ -49,7 +59,12 @@ impl Config {
             "model": self.model,
             "hasKey": !key.is_empty(),
             "keyHint": if key.chars().count() > 8 { hint } else { String::new() },
-            "note": "Off by default. When on, transcripts and questions are sent to this endpoint instead of the local model.",
+            "agent": self.agent,
+            "refineCaptions": self.refine_captions,
+            "note": match crate::agent_cli::find(&self.agent) {
+                Some(a) => format!("Off by default. When on, transcripts and questions go to {} on this computer, which uses {}.", a.label, a.plan),
+                None => "Off by default. When on, transcripts and questions are sent to this endpoint instead of the local model.".to_string(),
+            },
         })
     }
 }
@@ -77,11 +92,16 @@ pub fn load(dir: &Path) -> Config {
         base_url: s("baseUrl"),
         api_key: s("apiKey"),
         model: s("model"),
+        agent: s("agent"),
+        refine_captions: v
+            .get("refineCaptions")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
     }
 }
 
 pub fn save(dir: &Path, cfg: &Config) -> Result<()> {
-    let body = json!({ "enabled": cfg.enabled, "baseUrl": cfg.base_url, "apiKey": cfg.api_key, "model": cfg.model });
+    let body = json!({ "enabled": cfg.enabled, "baseUrl": cfg.base_url, "apiKey": cfg.api_key, "model": cfg.model, "agent": cfg.agent, "refineCaptions": cfg.refine_captions });
     write_private(dir, &path(dir), &body.to_string())
 }
 
@@ -129,10 +149,27 @@ pub fn apply_patch(current: &Config, patch: &Value) -> Result<Config> {
     if patch.get("clearKey").and_then(Value::as_bool) == Some(true) {
         cfg.api_key.clear();
     }
+    if let Some(a) = patch.get("agent").and_then(Value::as_str) {
+        let a = a.trim();
+        if !a.is_empty() && crate::agent_cli::find(a).is_none() {
+            bail!("unknown agent {a}");
+        }
+        // Dropping the agent with no endpoint set turns the connector off rather than failing.
+        if a.is_empty()
+            && !cfg.agent.is_empty()
+            && (cfg.base_url.is_empty() || cfg.model.is_empty())
+        {
+            cfg.enabled = false;
+        }
+        cfg.agent = a.to_string();
+    }
+    if let Some(r) = patch.get("refineCaptions").and_then(Value::as_bool) {
+        cfg.refine_captions = r;
+    }
     if let Some(e) = patch.get("enabled").and_then(Value::as_bool) {
         cfg.enabled = e;
     }
-    if cfg.enabled && (cfg.base_url.is_empty() || cfg.model.is_empty()) {
+    if cfg.enabled && cfg.agent.is_empty() && (cfg.base_url.is_empty() || cfg.model.is_empty()) {
         bail!("set the base URL and the model name before turning the connector on");
     }
     Ok(cfg)
@@ -170,6 +207,12 @@ pub fn chat(
     max_tokens: u32,
     on_piece: &mut dyn FnMut(&str),
 ) -> Result<String> {
+    if !cfg.agent.is_empty() {
+        // shortcut: the agent's answer arrives whole, not streamed; stream its stdout if Ask feels slow.
+        let answer = crate::agent_cli::chat(&cfg.agent, system, turns)?;
+        on_piece(&answer);
+        return Ok(answer);
+    }
     if cfg.base_url.is_empty() || cfg.model.is_empty() {
         bail!("the connector has no base URL or model");
     }
@@ -298,7 +341,7 @@ pub fn test(cfg: &Config) -> Value {
         &mut |p| sample.push_str(p),
     ) {
         Ok(text) => {
-            json!({ "ok": true, "model": cfg.model, "sample": text.trim().chars().take(40).collect::<String>(), "ms": started.elapsed().as_millis() as u64 })
+            json!({ "ok": true, "model": crate::agent_cli::find(&cfg.agent).map_or(cfg.model.as_str(), |a| a.label), "sample": text.trim().chars().take(40).collect::<String>(), "ms": started.elapsed().as_millis() as u64 })
         }
         Err(e) => json!({ "ok": false, "error": format!("{e:#}") }),
     }
@@ -358,6 +401,7 @@ mod tests {
             base_url: url,
             api_key: "sk-secret-key-123".into(),
             model: "m1".into(),
+            ..Config::default()
         }
     }
 
@@ -438,6 +482,31 @@ mod tests {
         assert!(apply_patch(&Config::default(), &json!({ "baseUrl": "ftp://x" })).is_err());
         assert!(apply_patch(&Config::default(), &json!({ "enabled": true })).is_err());
         assert!(!Config::default().usable());
+    }
+
+    #[test]
+    fn an_agent_needs_no_endpoint_and_refines_captions_only_when_asked() {
+        assert!(apply_patch(&Config::default(), &json!({ "agent": "rm -rf" })).is_err());
+        let on = apply_patch(
+            &Config::default(),
+            &json!({ "agent": "claude", "enabled": true }),
+        )
+        .unwrap();
+        assert!(on.usable() && !on.agent_refines());
+        assert!(on.public()["note"]
+            .as_str()
+            .unwrap()
+            .contains("Claude subscription"));
+        assert!(apply_patch(&on, &json!({ "refineCaptions": true }))
+            .unwrap()
+            .agent_refines());
+        // Dropping the agent without an endpoint turns the connector off instead of failing.
+        let off = apply_patch(&on, &json!({ "agent": "" })).unwrap();
+        assert!(!off.enabled && off.agent.is_empty());
+        let dir = std::env::temp_dir().join(format!("ysm-conn-agent-{}", std::process::id()));
+        save(&dir, &on).unwrap();
+        assert_eq!(load(&dir), on);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

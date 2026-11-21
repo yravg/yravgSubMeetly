@@ -85,7 +85,12 @@ pub const SENTENCES_JA: [&str; 8] = [
 
 /// The test sentences in the source language of an `opus-mt-<src>-<tgt>` pair model.
 fn pair_sentences(id: &str) -> Option<&'static [&'static str]> {
-    let src = id.rsplit('/').next()?.strip_prefix("opus-mt-")?.split('-').next()?;
+    let src = id
+        .rsplit('/')
+        .next()?
+        .strip_prefix("opus-mt-")?
+        .split('-')
+        .next()?;
     Some(match src {
         "en" => &SENTENCES_EN,
         "id" => &SENTENCES_ID,
@@ -467,10 +472,16 @@ mod tests {
 
     #[test]
     fn every_catalog_pair_has_test_sentences_in_its_source_language() {
-        for spec in crate::models::CATALOG.iter().filter(|s| s.kind == Kind::PairMt) {
+        for spec in crate::models::CATALOG
+            .iter()
+            .filter(|s| s.kind == Kind::PairMt)
+        {
             assert!(pair_sentences(spec.id).is_some(), "{}", spec.id);
         }
-        assert_eq!(pair_sentences("Helsinki-NLP/opus-mt-ja-en"), Some(&SENTENCES_JA[..]));
+        assert_eq!(
+            pair_sentences("Helsinki-NLP/opus-mt-ja-en"),
+            Some(&SENTENCES_JA[..])
+        );
         assert_eq!(pair_sentences("Helsinki-NLP/opus-mt-fr-en"), None);
     }
 
