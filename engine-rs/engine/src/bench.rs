@@ -59,6 +59,42 @@ pub const SENTENCES_ID: [&str; 8] = [
     "Terima kasih semuanya, sampai jumpa lagi minggu depan.",
 ];
 
+/// The same eight in Chinese, for the zh→en pair model.
+pub const SENTENCES_ZH: [&str; 8] = [
+    "大家早上好，我们开始开会吧。",
+    "你能分享一下屏幕，让我们看看这些数字吗？",
+    "因为审核，截止日期推迟到了下周五。",
+    "我今天下午会发送会议纪要和行动事项。",
+    "我们同意先在两个平台上测试新版本。",
+    "不发言的时候请把麦克风静音。",
+    "预算已经批准了，但我们还需要一份最终报价。",
+    "谢谢大家，下周再见。",
+];
+
+/// The same eight in Japanese, for the ja→en pair model.
+pub const SENTENCES_JA: [&str; 8] = [
+    "皆さん、おはようございます。会議を始めましょう。",
+    "数字が見えるように画面を共有していただけますか？",
+    "レビューのため、締め切りは来週の金曜日に延びました。",
+    "今日の午後に議事録とアクションアイテムを送ります。",
+    "まず両方のプラットフォームで新しいリリースを試すことに合意しました。",
+    "話していないときはマイクをミュートにしてください。",
+    "予算は承認されましたが、まだ最終見積もりが必要です。",
+    "皆さん、ありがとうございました。また来週お会いしましょう。",
+];
+
+/// The test sentences in the source language of an `opus-mt-<src>-<tgt>` pair model.
+fn pair_sentences(id: &str) -> Option<&'static [&'static str]> {
+    let src = id.rsplit('/').next()?.strip_prefix("opus-mt-")?.split('-').next()?;
+    Some(match src {
+        "en" => &SENTENCES_EN,
+        "id" => &SENTENCES_ID,
+        "zh" => &SENTENCES_ZH,
+        "ja" => &SENTENCES_JA,
+        _ => return None,
+    })
+}
+
 // ---------------------------------------------------------------- the maths
 
 /// Audio seconds produced per second of compute ("x real time"). 0 for a zero or negative time.
@@ -393,11 +429,7 @@ impl Runner for MlRunner {
                 })
             }
             Kind::PairMt => {
-                let sentences: &[&str] = if id.contains("opus-mt-en-") {
-                    &SENTENCES_EN
-                } else if id.contains("opus-mt-id-en") {
-                    &SENTENCES_ID
-                } else {
+                let Some(sentences) = pair_sentences(id) else {
                     return Err(anyhow!(
                         "there are no test sentences for this language pair"
                     ));
@@ -432,6 +464,15 @@ impl Runner for MlRunner {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn every_catalog_pair_has_test_sentences_in_its_source_language() {
+        for spec in crate::models::CATALOG.iter().filter(|s| s.kind == Kind::PairMt) {
+            assert!(pair_sentences(spec.id).is_some(), "{}", spec.id);
+        }
+        assert_eq!(pair_sentences("Helsinki-NLP/opus-mt-ja-en"), Some(&SENTENCES_JA[..]));
+        assert_eq!(pair_sentences("Helsinki-NLP/opus-mt-fr-en"), None);
+    }
 
     struct Fake {
         fail: Option<&'static str>,
