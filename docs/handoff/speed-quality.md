@@ -12,6 +12,8 @@ Roadmap: `docs/roadmap/speed-quality.md`.
 | B Clean input | done, installed in 1.4.8 | 7cea3a0, 0f6d1ad (voice gate island, false-line filter engine) |
 | D Right model | done, installed in 1.4.8 | worker wp-d-model, branch worktree-agent-a74d1b5539e9da413: poni-core `model_pick` (1.2x line, switch offer, bench after download / first use, presets), Settings › Models › Speech recognition rows; latency readout already existed (Captions › Display) |
 | C Cloud speech | done, installed in 1.4.8 | 06b72a7; test cloud_speech::after_a_failure_the_cloud_rests… flaky under load |
+| 1.4.9 installer (A + zh/ja pair bench) | installed 2026-11-21 15:26; laptop now on ggml large-v3-turbo-q5 on the RTX 4060 (Vulkan): zh clip ASR 0.36-0.58 s, whole line 1.5 s (translation Qwen2.5-0.5B CPU 1.2 s is now the slow part) | Kasi-Setup-1.4.9.exe sha256 d5683ca4…a0fc |
+| I Settings, J BYOA, K Stable | merged to main, island tests 334 + 659 pass; NOT yet built or installed: E: is full (0 MB), engine test run failed with os error 112 | merges after 1.4.9 |
 | E Better words | open | |
 | F Live feel | open | |
 | G Use it everywhere | open | |
