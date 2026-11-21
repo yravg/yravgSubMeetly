@@ -367,6 +367,34 @@ fn provider_items(ai: &crate::ai::AiView) -> Vec<Item> {
     rows
 }
 
+/// Settings › Models › Speech to text in the cloud: on this device (default), or Groq or an
+/// OpenAI-compatible service with the person's own key. The switch says where the audio goes.
+fn cloud_speech_items(ai: &crate::ai::AiView) -> Vec<Item> {
+    let sv = &ai.speech;
+    let mut rows = vec![item(Key::SpeechPick, "Hear captions with", Some("On this device by default. Groq or OpenAI-compatible: faster, with your own key"), Ctl::Stepper(sv.name()))];
+    if sv.is_local() {
+        return rows;
+    }
+    let to = if sv.sent_to.is_empty() { sv.name() } else { sv.sent_to.clone() };
+    let privacy = if sv.off_device { format!("On: Audio is sent to {to}. Off: it stays on this computer. This computer answers when it fails") } else { format!("On: captions use {to} (it runs on this computer)") };
+    rows.push(switch(Key::SpeechEnabled, "Use it for captions", Some(&privacy), sv.enabled));
+    if sv.needs("baseUrl") {
+        let t = if sv.base_url.is_empty() { format!("Default {}. Copy a URL, then press Paste to change it", sv.default_base_url) } else { sv.base_url.clone() };
+        rows.push(item(Key::SpeechUrl, "Server URL", Some(&t), Ctl::Button("Paste URL")));
+    }
+    if sv.needs("model") {
+        rows.push(item(Key::SpeechModel, "Model name", Some(&sv.model), Ctl::Button("Paste name")));
+    }
+    let key = match (sv.has_key, sv.key_hint.is_empty()) {
+        (true, false) => format!("Saved, ends in {}. Never shown again.", sv.key_hint),
+        (true, true) => "Saved. Never shown again.".to_string(),
+        _ => "Not set".to_string(),
+    };
+    rows.push(item(Key::SpeechKey, "API key", Some(&key), Ctl::Button("Paste key")));
+    rows.push(item(Key::SpeechTest, "Check the service", Some("Sends one second of silence"), Ctl::Button("Test")));
+    rows
+}
+
 /// Settings › Models › Download from: Hugging Face or ModelScope (modelscope.cn mirrors the
 /// catalog and answers where huggingface.co is slow or blocked).
 fn source_item(source: &str) -> Item {
@@ -500,6 +528,12 @@ pub enum Key {
     ProviderKey,
     ProviderSecret,
     ProviderTest,
+    SpeechPick,
+    SpeechEnabled,
+    SpeechUrl,
+    SpeechModel,
+    SpeechKey,
+    SpeechTest,
     /// Model library: a row's buttons; the index into the filtered list.
     LibModel(u8),
     /// Languages on this PC: a line that only says something.
@@ -850,7 +884,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         Section::Overlay => overlay_blocks(&s.overlay),
         Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
-            .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai)), Block::Group(Some("Caption translation service"), provider_items(&st.ai))])
+            .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai)), Block::Group(Some("Caption translation service"), provider_items(&st.ai)), Block::Group(Some("Speech to text in the cloud"), cloud_speech_items(&st.ai))])
             .chain([Block::Group(Some("Speech recognition"), speech_items(st)), Block::Group(Some("Translation"), model_items(&st.models, Kind::Translate))])
             .chain([Block::Speed, Block::Group(Some("Library"), library_items(st))])
             .collect(),
@@ -1129,6 +1163,34 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::ProviderTest => {
             st.cmd(Command::Ai(crate::ai::AiCmd::ProviderTest));
+            return;
+        }
+        Key::SpeechPick => {
+            if step != 0 {
+                match st.ai.speech.step(step) {
+                    Some(id) => st.cmd(Command::Ai(crate::ai::AiCmd::SpeechPick(id))),
+                    None => st.cmd(Command::Ai(crate::ai::AiCmd::Refresh)),
+                }
+            }
+            return;
+        }
+        Key::SpeechEnabled => {
+            let on = !st.ai.speech.enabled;
+            st.cmd(Command::Ai(crate::ai::AiCmd::SpeechEnable(on)));
+            return;
+        }
+        Key::SpeechUrl | Key::SpeechModel | Key::SpeechKey => {
+            use crate::ai::ProvField;
+            let field = match key {
+                Key::SpeechUrl => ProvField::Url,
+                Key::SpeechModel => ProvField::Model,
+                _ => ProvField::Key,
+            };
+            st.cmd(Command::Ai(crate::ai::AiCmd::SpeechPaste(field)));
+            return;
+        }
+        Key::SpeechTest => {
+            st.cmd(Command::Ai(crate::ai::AiCmd::SpeechTest));
             return;
         }
         Key::SummaryTemplate => {
@@ -2458,7 +2520,7 @@ mod tests {
                     // Paste reads the clipboard and Pick lists running apps: the app does both.
                     Key::MeetingAddLink => assert!(st.cmds.contains(&Command::MeetingAddLink)),
                     // The AI connector's rows ask the engine through the app.
-                    Key::AiEnabled | Key::AiUrl | Key::AiModel | Key::AiKey | Key::AiTest | Key::SummaryTemplate | Key::ProviderPick | Key::ProviderEnabled | Key::ProviderUrl | Key::ProviderAppId | Key::ProviderModel | Key::ProviderKey | Key::ProviderSecret | Key::ProviderTest => assert!(st.cmds.iter().any(|c| matches!(c, Command::Ai(_))), "{:?}", it.key),
+                    Key::AiEnabled | Key::AiUrl | Key::AiModel | Key::AiKey | Key::AiTest | Key::SummaryTemplate | Key::ProviderPick | Key::ProviderEnabled | Key::ProviderUrl | Key::ProviderAppId | Key::ProviderModel | Key::ProviderKey | Key::ProviderSecret | Key::ProviderTest | Key::SpeechPick | Key::SpeechEnabled | Key::SpeechUrl | Key::SpeechModel | Key::SpeechKey | Key::SpeechTest => assert!(st.cmds.iter().any(|c| matches!(c, Command::Ai(_))), "{:?}", it.key),
                     Key::MeetingPickApps => assert!(st.cmds.contains(&Command::MeetingPickApps)),
                     // The webhooks live in the engine: the app asks it, nothing goes to the settings file.
                     Key::WebhookAdd => assert!(st.cmds.contains(&Command::WebhookAddFromClipboard) && !saved),
@@ -2506,6 +2568,33 @@ mod tests {
         // The row about privacy says where the text goes.
         let enabled = rows(Section::Models, &st).into_iter().find(|i| i.key == Key::ProviderEnabled).unwrap();
         assert!(enabled.sub.as_deref().is_some_and(|t| t.contains("sent to the service")), "{:?}", enabled.sub);
+    }
+
+    #[test]
+    fn the_cloud_speech_rows_say_where_the_audio_goes_and_ask_the_engine() {
+        use crate::ai::{AiCmd, ProvField, ProviderView};
+        let mut st = state();
+        let keys = |st: &AppState| rows(Section::Models, st).iter().map(|i| i.key).collect::<Vec<_>>();
+        assert!(keys(&st).contains(&Key::SpeechPick) && !keys(&st).contains(&Key::SpeechEnabled), "on this device: only the picker");
+        st.ai.speech = ProviderView {
+            id: "groq".into(),
+            label: "Groq".into(),
+            needs: vec!["key".into()],
+            off_device: true,
+            sent_to: "Groq".into(),
+            providers: vec![("local".into(), "On this device".into()), ("groq".into(), "Groq".into()), ("openai".into(), "OpenAI-compatible".into())],
+            ..ProviderView::default()
+        };
+        let k = keys(&st);
+        assert!(k.contains(&Key::SpeechEnabled) && k.contains(&Key::SpeechKey) && k.contains(&Key::SpeechTest) && !k.contains(&Key::SpeechUrl), "only what Groq needs");
+        let on = rows(Section::Models, &st).into_iter().find(|i| i.key == Key::SpeechEnabled).unwrap();
+        assert!(on.sub.as_deref().is_some_and(|t| t.contains("Audio is sent to Groq")), "{:?}", on.sub);
+        apply(&mut st, Key::SpeechPick, Act::Step(1));
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::SpeechPick("openai".into()))));
+        apply(&mut st, Key::SpeechEnabled, Act::Toggle);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::SpeechEnable(true))));
+        apply(&mut st, Key::SpeechKey, Act::Press);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::SpeechPaste(ProvField::Key))));
     }
 
     #[test]

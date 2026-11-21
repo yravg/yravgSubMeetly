@@ -20,6 +20,7 @@
   .row time { color: var(--dim); font-variant-numeric: tabular-nums; font-size: .87em; padding-top: .15em; }
   .src { margin: 0; }
   .tr { margin: 2px 0 0; color: var(--accent); }
+  .cloud { margin-left: 6px; padding: 0 6px; font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; vertical-align: 1px; }
   body[data-show="original"] .tr, body[data-show="translation"] .src:not(:only-child) { display: none; }
   .row:last-child .src, .row:last-child .tr { font-weight: 600; }
   #empty { color: var(--dim); padding: 30px 0; text-align: center; }
@@ -89,6 +90,8 @@ function add(l) {
   const t = document.createElement('time'); t.dateTime = new Date(l.at).toISOString(); t.textContent = clock(l.at);
   const body = document.createElement('div');
   const s = document.createElement('p'); s.className = 'src'; s.textContent = l.source; body.append(s);
+  // A line the person's cloud speech service heard (asr_via "groq", "openai"), not this computer.
+  if (l.asr_via && l.asr_via !== 'local') { const c = document.createElement('span'); c.className = 'cloud'; c.textContent = 'cloud'; c.title = 'Heard in the cloud (' + l.asr_via + ')'; c.setAttribute('aria-label', c.title); s.append(c); }
   if (l.translation && l.translation !== l.source) { const r = document.createElement('p'); r.className = 'tr'; r.textContent = l.translation; body.append(r); }
   row.append(t, body); list.append(row);
 }

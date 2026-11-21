@@ -6,6 +6,7 @@ pub mod bench;
 pub mod calendar;
 pub mod cli;
 pub mod client;
+pub mod cloud_speech;
 pub mod connector;
 pub mod diarize;
 pub mod engine;

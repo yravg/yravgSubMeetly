@@ -261,10 +261,10 @@ impl Services {
     }
 
     /// Whether the last of `session_tail` is the utterance still being spoken, and the latency readout
-    /// of each line of `session_tail(n)`.
-    pub fn session_extras(&self, n: usize) -> (bool, Vec<Option<u32>>) {
+    /// and cloud mark of each line of `session_tail(n)`.
+    pub fn session_extras(&self, n: usize) -> (bool, Vec<Option<u32>>, Vec<bool>) {
         let l = self.session.lock().unwrap_or_else(|e| e.into_inner());
-        (l.interim_shown(), l.tail_ms(n))
+        (l.interim_shown(), l.tail_ms(n), l.tail_cloud(n))
     }
 
     /// The running session's lines so far, for a notes refresh.

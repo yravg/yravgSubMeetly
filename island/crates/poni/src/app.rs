@@ -2132,7 +2132,7 @@ impl App {
         let (n, tail) = svc.session_tail(crate::pages::call::LINES);
         if !(self.st.call.room && self.st.helper.paused()) {
             self.st.call.lines = tail;
-            (self.st.call.interim, self.st.call.ms) = svc.session_extras(crate::pages::call::LINES);
+            (self.st.call.interim, self.st.call.ms, self.st.call.cloud) = svc.session_extras(crate::pages::call::LINES);
         }
         Some(n)
     }

@@ -1109,6 +1109,8 @@ pub struct CallState {
     pub interim: bool,
     /// The latency readout of each of `lines` (ms), when it was measured.
     pub ms: Vec<Option<u32>>,
+    /// Which of `lines` the person's cloud speech service heard (a small "cloud" after the line).
+    pub cloud: Vec<bool>,
     pub heard: usize,
     /// "Notes so far": the engine's draft and the person's items.
     pub notes: poni_core::live_notes::LiveNotes,

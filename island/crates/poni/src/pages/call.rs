@@ -212,15 +212,21 @@ fn captions(ui: &mut Ui, st: &AppState, r: Rect) {
             ui.c.text(u, Rect::new(r.x + 0.0, y + sh + 2.0, r.w, th), &tst);
         }
         let ms = st.call.ms.get(i).copied().flatten().filter(|_| st.settings.caption_readout && !interim);
-        if interim || ms.is_some() {
+        let cloud = !interim && st.call.cloud.get(i).copied().unwrap_or(false);
+        if interim || ms.is_some() || cloud {
             let (ex, ey) = end_of_text(ui, main, &src, r.w);
             if interim {
                 // Blinks once a second; a caret that is not drawn this half-second leaves the line as it is.
                 if st.now.fract() < 0.5 {
                     ui.c.fill_rrect(Rect::new((r.x + ex + 2.0).min(r.right() - 2.0), y + ey + 2.0, 2.0, src.size), 1.0, st.accent);
                 }
-            } else if let Some(ms) = ms {
-                let label = poni_core::capture::readout(ms);
+            } else {
+                // "cloud": the person's cloud speech service heard this line, not this computer.
+                let label = match ms {
+                    Some(ms) if cloud => format!("{} cloud", poni_core::capture::readout(ms)),
+                    Some(ms) => poni_core::capture::readout(ms),
+                    None => "cloud".to_string(),
+                };
                 let rs = TextStyle::caption().weight(Weight::Semibold).color(palette::TEXT_DIM);
                 let w = ui.c.measure(&label, &rs, 200.0).0.ceil();
                 let x = (r.x + ex + 8.0).min(r.right() - w);

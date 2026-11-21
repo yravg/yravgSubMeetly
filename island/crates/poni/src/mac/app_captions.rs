@@ -101,11 +101,11 @@ impl App {
     fn call_lines(&mut self) -> Option<usize> {
         let log = self.session.lock().unwrap_or_else(|e| e.into_inner());
         let (n, tail) = log.tail(crate::pages::call::LINES);
-        let (interim, ms) = (log.interim_shown(), log.tail_ms(crate::pages::call::LINES));
+        let (interim, ms, cloud) = (log.interim_shown(), log.tail_ms(crate::pages::call::LINES), log.tail_cloud(crate::pages::call::LINES));
         drop(log);
         if !(self.st.call.room && self.st.helper.paused()) {
             self.st.call.lines = tail;
-            (self.st.call.interim, self.st.call.ms) = (interim, ms);
+            (self.st.call.interim, self.st.call.ms, self.st.call.cloud) = (interim, ms, cloud);
         }
         Some(n)
     }
