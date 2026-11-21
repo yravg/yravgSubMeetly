@@ -366,7 +366,7 @@ mod tests {
             .collect();
         assert_eq!(
             labels,
-            ["Kasi by yravg", "Open Kasi", "Open Minutes register", "Live captions", "Meeting", "Minutes", "Inbox", "Subtitle overlay", "Pause or resume the overlay", "Copy the current caption", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…", "Copy caption"]
+            ["Kasi by yravg", "Open Kasi", "Open Minutes register", "Captions window", "Live captions", "Meeting", "Minutes", "Inbox", "Subtitle overlay", "Pause or resume the overlay", "Copy the current caption", "Engine: running (Rust) on 17865", "Start live captions (what this PC plays)", "Restart engine", "Set up Chrome extension…", "Check for updates…", "Copy caption"]
         );
     }
 
