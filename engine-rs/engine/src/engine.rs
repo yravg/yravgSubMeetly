@@ -154,6 +154,16 @@ fn wants_gpu(env_device: Option<&str>, pref: &str) -> bool {
     env_device.unwrap_or(pref) != "cpu"
 }
 
+/// The segments' text as one line.
+fn joined(segs: &[Segment]) -> String {
+    segs.iter()
+        .map(|s| s.text.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .to_string()
+}
+
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }
@@ -303,8 +313,50 @@ impl Ml {
     }
 
     pub fn with_asr<R>(&self, f: impl FnOnce(&mut WhisperAsr) -> Result<R>) -> Result<R> {
+        self.asr_in(lock(&self.asr), f)
+    }
+
+    /// [`Self::with_asr`] that gives up (`None`) when the model stays busy past `wait`.
+    /// A live caption is only worth its turn while someone still waits for it: queued
+    /// behind a slow model, every abandoned window made each later one later still.
+    pub fn with_asr_within<R>(
+        &self,
+        wait: std::time::Duration,
+        f: impl FnOnce(&mut WhisperAsr) -> Result<R>,
+    ) -> Result<Option<R>> {
+        let until = std::time::Instant::now() + wait;
+        loop {
+            match self.asr.try_lock() {
+                Ok(guard) => return self.asr_in(guard, f).map(Some),
+                Err(std::sync::TryLockError::Poisoned(p)) => {
+                    return self.asr_in(p.into_inner(), f).map(Some)
+                }
+                Err(std::sync::TryLockError::WouldBlock) if std::time::Instant::now() < until => {
+                    std::thread::sleep(std::time::Duration::from_millis(20))
+                }
+                Err(std::sync::TryLockError::WouldBlock) => return Ok(None),
+            }
+        }
+    }
+
+    /// [`Self::text`] through [`Self::with_asr_within`].
+    pub fn text_within(
+        &self,
+        pcm: &[f32],
+        language: Option<&str>,
+        task: Task,
+        wait: std::time::Duration,
+    ) -> Result<Option<String>> {
+        self.with_asr_within(wait, |asr| asr.transcribe(pcm, language, task))
+            .map(|segs| segs.map(|s| joined(&s)))
+    }
+
+    fn asr_in<R>(
+        &self,
+        mut guard: MutexGuard<'_, Option<(String, WhisperAsr)>>,
+        f: impl FnOnce(&mut WhisperAsr) -> Result<R>,
+    ) -> Result<R> {
         let want = self.asr_id();
-        let mut guard = lock(&self.asr);
         if guard.as_ref().map(|(id, _)| id) != Some(&want) {
             // Free the old weights first: two Whisper models at once is gigabytes.
             *guard = None;
@@ -388,14 +440,7 @@ impl Ml {
 
     /// `asr_array`: joined text of the segments.
     pub fn text(&self, pcm: &[f32], language: Option<&str>, task: Task) -> Result<String> {
-        let segs = self.segments(pcm, language, task)?;
-        Ok(segs
-            .iter()
-            .map(|s| s.text.as_str())
-            .collect::<Vec<_>>()
-            .join(" ")
-            .trim()
-            .to_string())
+        Ok(joined(&self.segments(pcm, language, task)?))
     }
 
     /// `asr_file`: whole file in one pass.

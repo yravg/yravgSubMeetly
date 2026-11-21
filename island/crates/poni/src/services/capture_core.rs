@@ -448,13 +448,20 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
                 speech.shut();
                 health.engine(Some(e));
             }
+            // A busy interim is just skipped: the next window carries the same words.
+            Err(e) if e == poni_core::capture::ENGINE_BUSY && !last => {}
+            Err(e) if e == poni_core::capture::ENGINE_BUSY => {
+                let slow = engine_body(port, "/health").and_then(|b| poni_core::capture::slow_notice(&b));
+                health.engine(Some(slow.unwrap_or(e)));
+            }
             Err(e) => {
                 crate::pinfo!("capture: /draft failed: {e}");
                 speech.ok = false;
                 // A request that got no answer in its 25 s while /health still answers is a model loading.
                 // (On Windows a read timeout reads "os error 10060", so the test is `engine_unreachable`.)
-                let loading = engine_unreachable(&e).then(|| helper::request(port, "GET", "/health", None).ok()).flatten().filter(|(c, _)| *c == 200).and_then(|(_, b)| poni_core::capture::loading_notice(&b, src != tgt));
-                health.engine(Some(loading.unwrap_or_else(|| engine_problem(&e))));
+                // Loading, else loaded but too slow to answer in time, else really not answering.
+                let notice = engine_unreachable(&e).then(|| engine_body(port, "/health")).flatten().and_then(|b| poni_core::capture::loading_notice(&b, src != tgt).or_else(|| poni_core::capture::slow_notice(&b)));
+                health.engine(Some(notice.unwrap_or_else(|| engine_problem(&e))));
             }
         }
     }

@@ -65,6 +65,22 @@ pub fn loading_notice(health_body: &str, translating: bool) -> Option<String> {
     None
 }
 
+/// `/draft` answered 503 `busy`: the speech model was still on an earlier window.
+pub const ENGINE_BUSY: &str = "The speech model is still on an earlier caption.";
+
+/// The engine answers but the speech model cannot keep up (a busy answer, or no answer in
+/// time with the model loaded). `None` when the health body does not say the model is loaded.
+pub fn slow_notice(health_body: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(health_body).ok()?;
+    if v.get("loaded").and_then(|l| l.get("asr")).and_then(|b| b.as_bool()) != Some(true) {
+        return None;
+    }
+    let model = v.get("model").and_then(|m| m.as_str()).unwrap_or("The speech model");
+    let model = model.rsplit('/').next().unwrap_or(model);
+    let on = if v.get("device").and_then(|d| d.as_str()) == Some("cpu") { " on this computer's processor" } else { "" };
+    Some(format!("Captions are falling behind: {model} is too slow{on}. Pick a smaller speech model in Settings \u{203a} Models."))
+}
+
 /// Average the channels of interleaved frames into one.
 pub fn downmix(interleaved: &[f32], channels: usize) -> Vec<f32> {
     let ch = channels.max(1);
@@ -683,6 +699,9 @@ mod tests {
     #[test]
     fn only_the_missing_model_sentence_asks_for_a_download() {
         assert!(CaptureState::Warn(SPEECH_MISSING.into()).needs_model());
+        let health = r#"{"ok":true,"model":"openai/whisper-medium","device":"cpu","loaded":{"asr":true}}"#;
+        assert_eq!(slow_notice(health).as_deref(), Some("Captions are falling behind: whisper-medium is too slow on this computer's processor. Pick a smaller speech model in Settings \u{203a} Models."));
+        assert_eq!(slow_notice(r#"{"ok":true,"loaded":{"asr":false}}"#), None);
         assert!(!CaptureState::Warn("Loading the speech model.".into()).needs_model());
         assert!(!CaptureState::On.needs_model());
     }

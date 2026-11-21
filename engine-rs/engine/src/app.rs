@@ -27,7 +27,8 @@ use crate::models::{
     ModelNotDownloaded, PullProgress, CATALOG,
 };
 use crate::notes::{
-    export_note_csv, export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy, safe_filename,
+    export_note_csv, export_note_md, export_note_txt, normalize_note_doc, py_str, py_truthy,
+    safe_filename,
 };
 use crate::protocol::{AskReply, Request, Response};
 use crate::state::{now_epoch_secs, now_utc_iso};
@@ -38,7 +39,18 @@ const ENGINE_MODES: [&str; 3] = ["fast", "balanced", "accurate"];
 const DEVICE_CHOICES: [&str; 3] = ["auto", "cpu", "cuda"];
 const UI_THEMES: [&str; 3] = ["auto", "light", "dark"];
 const UI_RESKINS: [&str; 12] = [
-    "tide", "teal", "azure", "violet", "sunset", "rose", "sand", "slate", "citrus", "yraverage", "coretax", "modern",
+    "tide",
+    "teal",
+    "azure",
+    "violet",
+    "sunset",
+    "rose",
+    "sand",
+    "slate",
+    "citrus",
+    "yraverage",
+    "coretax",
+    "modern",
 ];
 const UI_SURFACES: [&str; 3] = ["overlay", "island", "both"];
 const TARGET_LANGS: [&str; 11] = [
@@ -703,7 +715,21 @@ impl App {
         }
         let language = q.get("language").map(String::as_str).unwrap_or(src);
         let language = (!language.is_empty() && language != "auto").then_some(language);
-        let source = self.ml.text(&pcm, language, Task::Transcribe)?;
+        // An interim only goes when the model is free; a final waits less than the island's 25 s.
+        let wait = if interim { 0 } else { 20 };
+        let Some(source) = self.ml.text_within(
+            &pcm,
+            language,
+            Task::Transcribe,
+            std::time::Duration::from_secs(wait),
+        )?
+        else {
+            return Ok(self.json_response(
+                request,
+                503,
+                json!({ "code": "busy", "error": "the speech model is still on an earlier caption" }),
+            ));
+        };
         let asr_ms = ms();
         if !draft_source_ok(&source, pcm.len()) {
             return Ok(self.json_response(
@@ -2208,7 +2234,10 @@ impl App {
             Some(Value::String(text)) if !text.is_empty() => text.to_lowercase(),
             _ => "md".to_string(),
         };
-        if !matches!(format.as_str(), "txt" | "md" | "markdown" | "docx" | "pdf" | "csv") {
+        if !matches!(
+            format.as_str(),
+            "txt" | "md" | "markdown" | "docx" | "pdf" | "csv"
+        ) {
             return self.json_response(
                 request,
                 400,
