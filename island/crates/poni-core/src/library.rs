@@ -10,8 +10,9 @@ use crate::phonedrop::fmt_bytes;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Filter {
-    #[default]
     OnDevice,
+    /// The default, as in the Chrome version: every model, downloaded ones first in each kind.
+    #[default]
     All,
     Recommended,
 }
@@ -170,8 +171,8 @@ impl Entry<'_> {
             return format!("Failed: {e}");
         }
         match (st.downloaded, self.in_use(m)) {
-            (true, true) => format!("In use · on device, {}", fmt_bytes(st.bytes)),
-            (true, false) => format!("On device, {}", fmt_bytes(st.bytes)),
+            (true, true) => format!("In use · downloaded, {}", fmt_bytes(st.bytes)),
+            (true, false) => format!("Downloaded, {}", fmt_bytes(st.bytes)),
             _ if st.partial > 0 => format!("Part downloaded, {} of about {}", fmt_bytes(st.partial), fmt_bytes(c.approx_bytes)),
             _ => format!("Not downloaded, about {}", fmt_bytes(c.approx_bytes)),
         }
@@ -218,15 +219,37 @@ impl Entry<'_> {
         }
     }
 
+    /// Where the row sits in its kind: in use, downloaded, downloading, stopped or failed, absent.
+    fn rank(&self, m: &Models) -> u8 {
+        let st = &self.c.st;
+        match () {
+            _ if st.downloaded && self.in_use(m) => 0,
+            _ if st.downloaded => 1,
+            _ if st.pulling || st.moving => 2,
+            _ if st.partial > 0 || st.error.is_some() => 3,
+            _ => 4,
+        }
+    }
+
+    /// Speech, translation, then the pairs: the order Settings › Models groups them in.
+    fn group(&self) -> u8 {
+        match (self.pair, self.c.kind) {
+            (true, _) => 2,
+            (false, Kind::Asr) => 0,
+            (false, Kind::Translate) => 1,
+        }
+    }
+
     fn matches(&self, q: &str) -> bool {
         [self.c.label.as_str(), self.c.id.as_str(), self.kind(), &self.languages()].iter().any(|h| h.to_lowercase().contains(q))
     }
 }
 
-/// The rows the filter and the search box let through. `src`/`tgt`: the shared languages.
+/// The rows the filter and the search box let through, by kind and downloaded first.
+/// `src`/`tgt`: the shared languages.
 pub fn shown<'a>(m: &'a Models, filter: Filter, query: &str, src: &str, tgt: &str) -> Vec<Entry<'a>> {
     let q = query.trim().to_lowercase();
-    entries(m)
+    let mut rows: Vec<Entry<'a>> = entries(m)
         .into_iter()
         .filter(|e| match filter {
             Filter::OnDevice => e.c.st.downloaded,
@@ -234,7 +257,9 @@ pub fn shown<'a>(m: &'a Models, filter: Filter, query: &str, src: &str, tgt: &st
             Filter::Recommended => e.recommended(m, src, tgt),
         })
         .filter(|e| q.is_empty() || e.matches(&q))
-        .collect()
+        .collect();
+    rows.sort_by_key(|e| (e.group(), e.rank(m)));
+    rows
 }
 
 /// PMM-029: for each caption language, what it needs and whether that is on this PC.
@@ -319,15 +344,29 @@ mod tests {
     }
 
     #[test]
+    fn downloaded_models_come_first_in_each_kind_and_all_is_the_default() {
+        let mut m = models();
+        assert_eq!(Filter::default(), Filter::All);
+        // Whisper base no longer on disk: Whisper small (downloaded) moves above it; kinds stay grouped.
+        m.catalog[0].st = Status::default();
+        m.catalog[0].selected = false;
+        let all = shown(&m, Filter::All, "", "en", "id");
+        assert_eq!(ids(&all), ["whisper-small", "whisper-base", "q-small", "q-big", "q-mid", "opus-mt-en-id", "opus-mt-ja-en"]);
+        // A downloaded pair listed later by the engine still sorts above one that is not.
+        m.pairs.swap(0, 1);
+        assert_eq!(ids(&shown(&m, Filter::All, "", "en", "id"))[5..], ["opus-mt-en-id", "opus-mt-ja-en"]);
+    }
+
+    #[test]
     fn each_row_says_kind_languages_and_state() {
         let m = models();
         let all = shown(&m, Filter::All, "", "en", "id");
         let sub: Vec<String> = all.iter().map(|e| e.sub(&m)).collect();
-        assert_eq!(sub[0], "Speech · All languages · In use · on device, 290 MB");
-        assert_eq!(sub[1], "Speech · All languages · On device, 967 MB");
+        assert_eq!(sub[0], "Speech · All languages · In use · downloaded, 290 MB");
+        assert_eq!(sub[1], "Speech · All languages · Downloaded, 967 MB");
         assert_eq!(sub[3], "Translation · All languages · Downloading 42%");
         assert_eq!(sub[4], "Translation · All languages · Failed: download failed: timed out");
-        assert_eq!(sub[5], "Language pair · English → Indonesian · On device, 291 MB");
+        assert_eq!(sub[5], "Language pair · English → Indonesian · Downloaded, 291 MB");
         assert_eq!(sub[6], "Language pair · Japanese → English · Not downloaded, about 303 MB");
     }
 
