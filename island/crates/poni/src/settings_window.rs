@@ -326,6 +326,23 @@ fn ai_items(ai: &crate::ai::AiView) -> Vec<Item> {
     ]
 }
 
+/// Settings › Models › Agent on this computer: an installed agent CLI (Claude Code, Codex, Gemini
+/// CLI, OpenCode) answers summaries and Ask with the person's own subscription.
+fn agent_items(ai: &crate::ai::AiView) -> Vec<Item> {
+    let picked = ai.agent_view();
+    let name = picked.map_or("Off".to_string(), |a| a.label.clone());
+    let sub = match picked {
+        Some(a) => format!("{} {}: summaries and Ask run through it and use {}. Used instead of the endpoint above", a.label, a.version, a.plan),
+        None if ai.agents.is_empty() => "None found. Install Claude Code, Codex, Gemini CLI or OpenCode and sign in to it, then come back".to_string(),
+        None => "Off. Pick an installed agent to use your own AI subscription for summaries and Ask".to_string(),
+    };
+    let mut rows = vec![item(Key::AgentPick, "Agent", Some(&sub), Ctl::Stepper(name))];
+    if let Some(a) = picked {
+        rows.push(switch(Key::AgentRefine, "Also polish caption translations", Some(&format!("Off: captions stay on this computer. On: each caption line's text is sent to {}, slower than the local model", a.label)), ai.refine_captions));
+    }
+    rows
+}
+
 /// Settings › Models › Caption translation service: on this device (default) or an online or
 /// self-hosted service. Only the fields the chosen provider needs are shown.
 fn provider_items(ai: &crate::ai::AiView) -> Vec<Item> {
@@ -520,6 +537,9 @@ pub enum Key {
     AiKey,
     AiTest,
     SummaryTemplate,
+    /// Agent on this computer: which agent CLI, and whether it also polishes captions.
+    AgentPick,
+    AgentRefine,
     ProviderPick,
     ProviderEnabled,
     ProviderUrl,
@@ -884,7 +904,7 @@ pub fn blocks(section: Section, st: &AppState) -> Vec<Block> {
         Section::Overlay => overlay_blocks(&s.overlay),
         Section::Models => [Block::Group(Some("Downloads"), vec![source_item(&s.model_source)])]
             .into_iter()
-            .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai)), Block::Group(Some("Caption translation service"), provider_items(&st.ai)), Block::Group(Some("Speech to text in the cloud"), cloud_speech_items(&st.ai))])
+            .chain([Block::Group(Some("Summaries and AI"), ai_items(&st.ai)), Block::Group(Some("Agent on this computer"), agent_items(&st.ai)), Block::Group(Some("Caption translation service"), provider_items(&st.ai)), Block::Group(Some("Speech to text in the cloud"), cloud_speech_items(&st.ai))])
             .chain([Block::Group(Some("Speech recognition"), speech_items(st)), Block::Group(Some("Translation"), model_items(&st.models, Kind::Translate))])
             .chain([Block::Speed, Block::Group(Some("Library"), library_items(st))])
             .collect(),
@@ -1191,6 +1211,18 @@ pub fn apply(st: &mut AppState, key: Key, act: Act) {
         }
         Key::SpeechTest => {
             st.cmd(Command::Ai(crate::ai::AiCmd::SpeechTest));
+            return;
+        }
+        Key::AgentPick => {
+            if step != 0 {
+                let next = st.ai.step_agent(step);
+                st.cmd(Command::Ai(crate::ai::AiCmd::AgentPick(next)));
+            }
+            return;
+        }
+        Key::AgentRefine => {
+            let on = !st.ai.refine_captions;
+            st.cmd(Command::Ai(crate::ai::AiCmd::AgentRefine(on)));
             return;
         }
         Key::SummaryTemplate => {
@@ -2520,7 +2552,7 @@ mod tests {
                     // Paste reads the clipboard and Pick lists running apps: the app does both.
                     Key::MeetingAddLink => assert!(st.cmds.contains(&Command::MeetingAddLink)),
                     // The AI connector's rows ask the engine through the app.
-                    Key::AiEnabled | Key::AiUrl | Key::AiModel | Key::AiKey | Key::AiTest | Key::SummaryTemplate | Key::ProviderPick | Key::ProviderEnabled | Key::ProviderUrl | Key::ProviderAppId | Key::ProviderModel | Key::ProviderKey | Key::ProviderSecret | Key::ProviderTest | Key::SpeechPick | Key::SpeechEnabled | Key::SpeechUrl | Key::SpeechModel | Key::SpeechKey | Key::SpeechTest => assert!(st.cmds.iter().any(|c| matches!(c, Command::Ai(_))), "{:?}", it.key),
+                    Key::AiEnabled | Key::AiUrl | Key::AiModel | Key::AiKey | Key::AiTest | Key::SummaryTemplate | Key::AgentPick | Key::AgentRefine | Key::ProviderPick | Key::ProviderEnabled | Key::ProviderUrl | Key::ProviderAppId | Key::ProviderModel | Key::ProviderKey | Key::ProviderSecret | Key::ProviderTest | Key::SpeechPick | Key::SpeechEnabled | Key::SpeechUrl | Key::SpeechModel | Key::SpeechKey | Key::SpeechTest => assert!(st.cmds.iter().any(|c| matches!(c, Command::Ai(_))), "{:?}", it.key),
                     Key::MeetingPickApps => assert!(st.cmds.contains(&Command::MeetingPickApps)),
                     // The webhooks live in the engine: the app asks it, nothing goes to the settings file.
                     Key::WebhookAdd => assert!(st.cmds.contains(&Command::WebhookAddFromClipboard) && !saved),
@@ -2533,6 +2565,24 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn the_agent_rows_name_the_subscription_and_ask_the_engine() {
+        use crate::ai::{AgentView, AiCmd};
+        let mut st = state();
+        let find = |st: &AppState, k: Key| rows(Section::Models, st).into_iter().find(|i| i.key == k);
+        assert!(find(&st, Key::AgentPick).is_some() && find(&st, Key::AgentRefine).is_none(), "no agent: only the picker");
+        st.ai.agents = vec![AgentView { id: "claude".into(), label: "Claude Code".into(), plan: "your Claude subscription (Anthropic)".into(), version: "2.1".into() }];
+        apply(&mut st, Key::AgentPick, Act::Step(1));
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::AgentPick("claude".into()))));
+        st.ai.agent = "claude".into();
+        let pick = find(&st, Key::AgentPick).unwrap();
+        assert!(pick.sub.as_deref().is_some_and(|t| t.contains("Claude subscription")), "{:?}", pick.sub);
+        let refine = find(&st, Key::AgentRefine).unwrap();
+        assert!(refine.sub.as_deref().is_some_and(|t| t.contains("captions stay on this computer")), "{:?}", refine.sub);
+        apply(&mut st, Key::AgentRefine, Act::Toggle);
+        assert_eq!(st.cmds.pop(), Some(Command::Ai(AiCmd::AgentRefine(true))));
     }
 
     #[test]

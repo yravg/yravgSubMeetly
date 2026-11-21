@@ -843,6 +843,7 @@ pub fn translate(cfg: &Config, text: &str, src: &str, tgt: &str) -> Result<Strin
                 base_url: base,
                 api_key: p.api_key.clone(),
                 model: p.model.clone(),
+                ..Default::default()
             };
             let system = format!(
                 "You are a live-caption translator. Translate the user's text from {} to {}. Reply with the translation only: no notes, no quotes, no explanation.",

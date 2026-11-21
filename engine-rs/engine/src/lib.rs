@@ -1,5 +1,6 @@
 //! yravgSubMeetly local engine: HTTP contract, candle ASR/translation, Native Messaging host.
 
+pub mod agent_cli;
 pub mod app;
 pub mod audio;
 pub mod bench;

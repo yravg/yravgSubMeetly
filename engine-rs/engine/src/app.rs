@@ -716,6 +716,20 @@ impl App {
                 if text.is_empty() {
                     return Ok(self.json_response(request, 200, json!({ "text": draft })));
                 }
+                // Caption text reaches the person's agent only when they turned that on; any failure stays local.
+                let conn = crate::connector::load(&self.state_dir);
+                if conn.agent_refines() {
+                    let (system, user) = crate::translate::refine_prompt(&text, &draft, &src, &tgt);
+                    if let Ok(out) =
+                        crate::agent_cli::chat(&conn.agent, &system, &[("user".into(), user)])
+                    {
+                        return Ok(self.json_response(
+                            request,
+                            200,
+                            json!({ "text": out, "via": "agent" }),
+                        ));
+                    }
+                }
                 let out = self
                     .ml
                     .with_translator(|mt| mt.refine(&text, &draft, &src, &tgt))?;
@@ -1855,6 +1869,7 @@ impl App {
             "/notes/templates" => {
                 Some(self.json_response(request, 200, crate::templates::list_json(&self.state_dir)))
             }
+            "/ai/agents" => Some(self.json_response(request, 200, crate::agent_cli::detect())),
             "/translate/provider" => Some(self.json_response(
                 request,
                 200,
