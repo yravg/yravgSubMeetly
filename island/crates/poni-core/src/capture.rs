@@ -1,7 +1,7 @@
 //! System-audio captions, the pure half (ISL-002 on Windows): what the loopback
 //! capture hands over (interleaved f32 at the device's rate) becomes the
 //! windows the engine's `POST /draft` takes (16 kHz mono f32 little-endian,
-//! about 4 s each, silence skipped). The WASAPI side is `poni`'s
+//! about 4 s each, silence and sound that is not speech skipped). The WASAPI side is `poni`'s
 //! `services::capture`.
 
 /// What the engine's `/draft` wants.
@@ -98,6 +98,51 @@ pub fn is_silent(samples: &[f32]) -> bool {
     rms(samples) < SILENCE_RMS
 }
 
+/// Speech keeps switching between voiced sounds (few zero crossings) and hiss such as s, f, t
+/// (many), so the zero-crossing rate of its 20 ms slices spreads; a tone, a ringtone, a melody over
+/// drums or steady noise keeps it nearly flat. The spread (standard deviation) measured on the SAPI
+/// voices David and Huihui: 0.04-0.23 per 1.2 s; Windows' own ringtones and alarms mostly under
+/// 0.035, a pure tone 0.002, white noise 0.03.
+pub const VOICE_ZCR_SPREAD: f32 = 0.035;
+
+/// Worth asking the speech model about: at least 100 ms of sound, and varied the way speech is
+/// ([`VOICE_ZCR_SPREAD`]). What it turns away never reaches Whisper, which writes "Thanks for
+/// watching!"-type lines over music and noise.
+/// shortcut: a hand-made gate, not a trained voice detector: music with its own hiss (a singer,
+/// a breathy flute) can still pass. Upgrade to Silero VAD once an ONNX runtime is a dependency.
+pub fn sounds_like_speech(samples: &[f32]) -> bool {
+    const SLICE: usize = RATE as usize / 50;
+    let rates: Vec<f32> = samples
+        .chunks_exact(SLICE)
+        .filter(|s| !is_silent(s))
+        .map(|s| s.windows(2).filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0)).count() as f32 / (SLICE - 1) as f32)
+        .collect();
+    if rates.len() < 5 {
+        return false;
+    }
+    let n = rates.len() as f32;
+    let mean = rates.iter().sum::<f32>() / n;
+    (rates.iter().map(|r| (r - mean).powi(2)).sum::<f32>() / n).sqrt() >= VOICE_ZCR_SPREAD
+}
+
+/// Speech-shaped test sound at `rate`: 140 ms of a voiced buzz (150 Hz and three harmonics), then
+/// 60 ms of hiss, over and over.
+#[cfg(test)]
+pub(crate) fn syllables(seconds: f32, rate: u32) -> Vec<f32> {
+    let mut seed = 0x2545_f491u32;
+    (0..(seconds * rate as f32) as usize)
+        .map(|i| {
+            let t = i as f32 / rate as f32;
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            if t % 0.2 < 0.14 {
+                (1..=4).map(|h| 0.08 / h as f32 * (std::f32::consts::TAU * 150.0 * h as f32 * t).sin()).sum()
+            } else {
+                0.1 * ((seed >> 8) as f32 / (1u32 << 24) as f32 - 0.5)
+            }
+        })
+        .collect()
+}
+
 /// Streaming linear-interpolation resampler to [`RATE`]. Chunk boundaries do not
 /// show: the position and the last sample carry over.
 /// shortcut: no low-pass before decimating, so energy above 8 kHz aliases into
@@ -157,7 +202,7 @@ impl Chunker {
     }
 }
 
-/// Device buffers in, engine windows out: downmix, resample, cut, drop silence.
+/// Device buffers in, engine windows out: downmix, resample, cut, drop what is not speech.
 pub struct Pipeline {
     channels: usize,
     resampler: Resampler,
@@ -172,7 +217,7 @@ impl Pipeline {
     pub fn feed(&mut self, interleaved: &[f32]) -> Vec<Vec<f32>> {
         let out = self.mono(interleaved);
         let mut windows = self.chunker.push(&out);
-        windows.retain(|w| !is_silent(w));
+        windows.retain(|w| sounds_like_speech(w));
         windows
     }
 
@@ -314,7 +359,7 @@ impl Mixer {
             let p: Vec<f32> = self.pc.drain(..window.min(self.pc.len())).collect();
             let side = if rms(&p) > rms(&m) { Side::Online } else { Side::Room };
             let mixed: Vec<f32> = m.iter().enumerate().map(|(i, s)| (s + p.get(i).copied().unwrap_or(0.0)).clamp(-1.0, 1.0)).collect();
-            if !is_silent(&mixed) {
+            if sounds_like_speech(&mixed) {
                 out.push((mixed, side));
             }
         }
@@ -652,22 +697,26 @@ mod tests {
     #[test]
     fn both_mixes_the_room_and_the_pc_and_says_which_was_louder() {
         let w = WINDOW_S * RATE as usize;
+        let talk = syllables(WINDOW_S as f32, RATE);
+        let scaled = |k: f32| -> Vec<f32> { talk.iter().map(|s| s * k).collect() };
         let mut m = Mixer::default();
-        // Room speech, the PC quiet: one window, tagged Room, the mix is the mic.
-        let out = m.push(&vec![0.2; w], &vec![0.01; w]);
+        // Room speech, the PC quiet: one window, tagged Room, the mix is the sum.
+        let out = m.push(&talk, &scaled(0.1));
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].1, Side::Room);
-        assert!((out[0].0[0] - 0.21).abs() < 1e-6);
+        assert!((out[0].0[100] - talk[100] * 1.1).abs() < 1e-6);
         // The call louder than the room: Online.
-        let out = m.push(&vec![0.01; w], &vec![0.3; w]);
+        let out = m.push(&scaled(0.1), &scaled(2.0));
         assert_eq!(out[0].1, Side::Online);
         // Loopback gives nothing while the PC plays nothing: the mic still makes windows.
-        let out = m.push(&vec![0.2; w], &[]);
+        let out = m.push(&talk, &[]);
         assert_eq!((out.len(), out[0].1), (1, Side::Room));
-        // Silence from both is dropped, like a single source's.
+        // Silence from both is dropped, like a single source's, and so is a steady hum.
         assert!(m.push(&vec![0.0; w], &vec![0.0; w]).is_empty());
+        assert!(m.push(&vec![0.2; w], &vec![0.01; w]).is_empty());
         // Sums past full scale are clipped, not wrapped.
-        assert_eq!(m.push(&vec![0.9; w], &vec![0.9; w])[0].0[0], 1.0);
+        let out = m.push(&scaled(15.0), &scaled(15.0));
+        assert!(out[0].0.iter().all(|s| s.abs() <= 1.0) && out[0].0.contains(&1.0));
     }
 
     #[test]
@@ -782,15 +831,97 @@ mod tests {
         assert!(is_silent(&[0.001; 100]));
         assert!(!is_silent(&[0.05; 100]));
         assert!(is_silent(&[]));
-        // Stereo 48 kHz: 2 s loud then 6 s quiet = two 4 s windows; only the first carries sound.
+        // Stereo 48 kHz: 2 s speech then 6 s quiet = two 4 s windows; only the first carries sound.
         let mut p = Pipeline::new(48_000, 2);
-        let loud: Vec<f32> = (0..96_000 * 2).map(|i| if i % 4 < 2 { 0.2 } else { -0.2 }).collect();
+        let loud: Vec<f32> = syllables(2.0, 48_000).iter().flat_map(|s| [*s, *s]).collect();
         let quiet = vec![0.0f32; 96_000 * 6];
         assert!(p.feed(&loud).is_empty(), "2 s is not a window yet");
         let got = p.feed(&quiet);
         assert_eq!(got.len(), 1, "the quiet window is dropped");
         assert_eq!(got[0].len(), WINDOW_S * RATE as usize);
         assert!(!is_silent(&got[0]));
+    }
+
+    /// A 16-bit mono PCM WAV fixture (the SAPI voices, 16 kHz) as samples.
+    fn wav(bytes: &[u8]) -> Vec<f32> {
+        let at = bytes.windows(4).position(|w| w == b"data").expect("a data chunk") + 8;
+        bytes[at..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect()
+    }
+
+    const DAVID: &[u8] = include_bytes!("../tests/fixtures/voice/david-en.wav");
+    const HUIHUI: &[u8] = include_bytes!("../tests/fixtures/voice/huihui-zh.wav");
+
+    #[test]
+    fn the_voice_gate_lets_both_sapi_voices_through() {
+        for (name, clip) in [("David", wav(DAVID)), ("Huihui", wav(HUIHUI))] {
+            assert!(sounds_like_speech(&clip), "{name}, all 4 s");
+            // 1.2 s, what an early interim holds: a stretch of vowels alone (Huihui's third) may wait
+            // for more speech, since the final looks at the whole utterance.
+            let parts: Vec<bool> = clip.chunks_exact(19_200).map(sounds_like_speech).collect();
+            assert!(parts.iter().filter(|p| **p).count() * 3 >= parts.len() * 2, "{name}: {parts:?}");
+        }
+    }
+
+    #[test]
+    fn the_voice_gate_turns_away_a_tone_noise_and_a_melody_over_drums() {
+        let tau = std::f32::consts::TAU;
+        let t = |i: usize| i as f32 / RATE as f32;
+        let n = 4 * RATE as usize;
+        let mut seed = 7u32;
+        let mut noise = || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 8) as f32 / (1u32 << 24) as f32 - 0.5
+        };
+        let tone: Vec<f32> = (0..n).map(|i| 0.2 * (tau * 440.0 * t(i)).sin()).collect();
+        let hiss: Vec<f32> = (0..n).map(|_| 0.1 * noise()).collect();
+        // A note every 0.5 s (with harmonics, decaying), a kick on each note, a hi-hat every 0.25 s.
+        let band: Vec<f32> = (0..n)
+            .map(|i| {
+                let (note, beat) = (t(i) % 0.5, t(i) % 0.25);
+                let f = [262.0, 330.0, 392.0, 523.0][(t(i) / 0.5) as usize % 4];
+                let melody = 0.15 * (-note * 3.0).exp() * ((tau * f * note).sin() + 0.5 * (2.0 * tau * f * note).sin());
+                let kick = 0.3 * (-note * 25.0).exp() * (tau * 70.0 * note).sin();
+                let hat = if beat < 0.04 { 0.05 * (-beat * 80.0).exp() * noise() } else { 0.0 };
+                melody + kick + hat
+            })
+            .collect();
+        for (name, clip) in [("silence", vec![0.0; n]), ("tone", tone), ("white noise", hiss), ("melody over drums", band)] {
+            assert!(!sounds_like_speech(&clip), "{name}");
+        }
+        assert!(sounds_like_speech(&syllables(1.2, RATE)), "the synthetic speech the other tests use");
+    }
+
+    /// Before/after on music: Windows' own ringtones, alarms and theme sounds (16-bit PCM WAVs under
+    /// C:\Windows\Media), cut into the 4 s windows of [`Pipeline`] and through [`Utterances`].
+    /// `cargo test -p poni-core -- --ignored --nocapture music_windows`
+    #[test]
+    #[ignore = "measures local files"]
+    fn music_windows_before_and_after_the_voice_gate() {
+        let (mut before, mut after, mut windows, mut posts, mut finals) = (0, 0, 0, 0, 0);
+        let mut paths: Vec<_> = std::fs::read_dir(r"C:\Windows\Media").into_iter().flatten().flatten().map(|e| e.path()).collect();
+        paths.sort();
+        for path in paths.iter().filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("wav"))) {
+            let Ok(bytes) = std::fs::read(path) else { continue };
+            // fmt chunk: channels at 22, rate at 24, bits at 34.
+            if bytes.len() < 44 || u16::from_le_bytes([bytes[34], bytes[35]]) != 16 {
+                continue;
+            }
+            let channels = u16::from_le_bytes([bytes[22], bytes[23]]) as usize;
+            let rate = u32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]);
+            let mut mono = Pipeline::new(rate, channels).mono(&wav(&bytes));
+            // Played twice over: most of these are shorter than one window.
+            mono.extend(mono.clone());
+            for w in mono.chunks_exact(WINDOW_S * RATE as usize) {
+                windows += 1;
+                before += usize::from(!is_silent(w));
+                after += usize::from(sounds_like_speech(w));
+            }
+            let mut u = crate::utterance::Utterances::new(Default::default());
+            let got = u.push(&mono);
+            finals += got.iter().filter(|p| p.last).count() + usize::from(u.flush().is_some());
+            posts = posts + got.len();
+        }
+        println!("4 s windows: {windows}; sent before {before}, after {after}; utterance posts {posts} (finals {finals})");
     }
 
     #[test]

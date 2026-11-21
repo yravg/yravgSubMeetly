@@ -2547,9 +2547,96 @@ fn draft_translation(
     (mt, state)
 }
 
+/// Lines Whisper writes over silence, music or noise (the end credits of the videos it learned
+/// from), as `line_key` gives them. A caption made of these alone is dropped; a sentence that only
+/// contains one ("thank you for the update") is real and stays.
+const FALSE_LINES: &[&str] = &[
+    // en
+    "you",
+    "thankyou",
+    "thankyouverymuch",
+    "thanksforwatching",
+    "thankyouforwatching",
+    "thankyousomuchforwatching",
+    "pleasesubscribe",
+    "likeandsubscribe",
+    "dontforgettosubscribe",
+    "seeyouinthenextvideo",
+    "music",
+    // id
+    "terimakasih",
+    "terimakasihtelahmenonton",
+    "terimakasihsudahmenonton",
+    "sampaijumpadivideoberikutnya",
+    // zh
+    "谢谢",
+    "谢谢观看",
+    "谢谢收看",
+    "感谢观看",
+    "谢谢大家",
+    "謝謝",
+    "謝謝觀看",
+    "謝謝收看",
+    // ja
+    "ありがとうございました",
+    "ご視聴ありがとうございました",
+    "ご視聴ありがとうございます",
+    "チャンネル登録お願いします",
+    "チャンネル登録よろしくお願いします",
+    // ko
+    "감사합니다",
+    "시청해주셔서감사합니다",
+    "구독과좋아요부탁드립니다",
+];
+
+/// Credits that open a made-up line, followed by a name: nobody says them live.
+const FALSE_LINE_STARTS: &[&str] = &[
+    "subtitlesby",
+    "captionsby",
+    "transcribedby",
+    "请不吝点赞",
+    "字幕由",
+    "字幕提供",
+    "字幕製作",
+    "優優獨播劇場",
+    "优优独播剧场",
+    "시청해주셔서",
+];
+
+/// A line as `FALSE_LINES` compares it: lower case, letters and digits only.
+fn line_key(line: &str) -> String {
+    line.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// Whisper's made-up line: only `FALSE_LINES` (once or repeated, "Thank you. Thank you."),
+/// a credit from `FALSE_LINE_STARTS` with whatever follows it, or no words at all ("♪♪").
+fn false_line(line: &str) -> bool {
+    let key = line_key(line);
+    let mut rest = key.as_str();
+    while !rest.is_empty() {
+        if FALSE_LINE_STARTS.iter().any(|s| rest.starts_with(s)) {
+            return true;
+        }
+        // The longest phrase first, so "thankyouforwatching" is not read as "thankyou" + more.
+        let Some(len) = FALSE_LINES
+            .iter()
+            .filter(|p| rest.starts_with(**p))
+            .map(|p| p.len())
+            .max()
+        else {
+            return false;
+        };
+        rest = &rest[len..];
+    }
+    true
+}
+
 fn draft_source_ok(source: &str, samples: usize) -> bool {
     let s = source.trim();
-    if s.is_empty() {
+    if s.is_empty() || false_line(s) {
         return false;
     }
     let max_chars = 40usize.max((samples as f64 / 16000.0 * 25.0) as usize + 20);
@@ -2750,6 +2837,42 @@ fn hex_value(byte: u8) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn whispers_made_up_lines_are_dropped_and_real_sentences_stay() {
+        for line in [
+            "Thank you.",
+            "Thanks for watching!",
+            "Thank you for watching. Please subscribe!",
+            "Thank you. Thank you. Thank you.",
+            " you ",
+            "Subtitles by the Amara.org community",
+            "请不吝点赞 订阅 转发 打赏支持明镜与点点栏目",
+            "字幕由Amara.org社区提供",
+            "谢谢观看！",
+            "ご視聴ありがとうございました",
+            "시청해 주셔서 감사합니다.",
+            "Terima kasih telah menonton!",
+            "[Music]",
+            "♪ ♪",
+            "...",
+        ] {
+            assert!(false_line(line), "{line}");
+            assert!(!draft_source_ok(line, 64_000), "{line}");
+        }
+        for line in [
+            "Thank you for the update on the budget.",
+            "Thank you, Maria, for joining us today.",
+            "You can see the numbers on the next slide.",
+            "Subtitles are on for this meeting.",
+            "谢谢大家参加今天的会议。",
+            "Terima kasih atas laporannya, Budi.",
+            "YouTube",
+        ] {
+            assert!(!false_line(line), "{line}");
+            assert!(draft_source_ok(line, 64_000), "{line}");
+        }
+    }
 
     #[test]
     fn loopback_hosts_follow_the_python_rules() {
