@@ -19,6 +19,13 @@ Learned from Handy, FluidVoice, OpenWhispr (owner agreed to all 20 items on 2026
 | F Live feel | 10 keep model warm, 11 word-by-word streaming | First caption after start under 3 s on Base CPU; interim text grows while a sentence is spoken. |
 | G Use it everywhere | 14 push-to-talk dictation, 17 history search and re-run, 18 SRT/VTT export of a live session | Global hotkey types speech into the focused app; Captions window exports SRT/VTT. |
 
+| H Other speech models | SenseVoice-Small (zh/ja/ko/en/yue, non-autoregressive) and Parakeet-TDT v3 (25 European languages) through sherpa-onnx, DirectML/CPU | 4.8 s zh clip under 0.3 s on CPU; models listed and chosen like Whisper; falls back cleanly |
+| I Settings | Model manager like the Chrome version (use, download, delete, state, speed); Advanced tab revamp | every old control still reachable; delete asks; keyboard and screen reader work |
+| J BYOA | Use the person's own agent subscription (Claude Code, Codex, Gemini CLI, OpenCode) for summaries, Ask, refine | detected CLIs listed; fake-CLI tests for success, timeout, missing |
+| K Stable input | Real Stop and Start; debounce Auto and meeting-source flips; device changes | Stop is immediate and sticky; Start runs in 1 s or says why; state-machine tests |
+
+Owner asks added 2026-11-21 (afternoon): H, I, J, K. Started I, J, K; H after A merges (both touch the speech engine).
+
 Order: A, B, D first (speed and uptime), then C, E, F, G.
 
 ## Rules for every worker
