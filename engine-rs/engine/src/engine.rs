@@ -283,7 +283,18 @@ impl Ml {
     /// The folder holding a fully downloaded `id`. A loader never fetches: a model that is
     /// not on disk (or whose folder is away) is an error the route reports at once.
     fn downloaded_dir(&self, id: &str, kind: Kind) -> Result<std::path::PathBuf> {
-        let cache = self.locations.usable_dir(id)?;
+        let cache = match self.locations.usable_dir(id) {
+            Ok(dir) => dir,
+            // Its chosen folder is away (a drive not plugged in), but a full copy sits in the
+            // default cache: captions keep running from that one instead of stopping.
+            Err(away) => {
+                let home = crate::models::hub_cache_dir();
+                if !cache_state(&home, id, kind).downloaded {
+                    return Err(away.into());
+                }
+                home
+            }
+        };
         if !cache_state(&cache, id, kind).downloaded {
             return Err(ModelNotDownloaded {
                 id: id.to_string(),
