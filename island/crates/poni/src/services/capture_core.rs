@@ -386,6 +386,11 @@ impl Health {
         self.st.lock().unwrap_or_else(|e| e.into_inner()).silenced = true;
     }
 
+    /// Stop was pressed: the poster sends nothing more and keeps no answer that comes back late.
+    pub fn stopped(&self) -> bool {
+        self.st.lock().unwrap_or_else(|e| e.into_inner()).silenced
+    }
+
     pub fn heard(&self) {
         if !self.st.lock().unwrap_or_else(|e| e.into_inner()).silenced {
             self.sink.send(AppEvent::Capture(CaptureEvent::Heard));
@@ -430,7 +435,15 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
     // it says it is (a download the person pressed). The translation model is not a gate: the
     // engine captions without it and each answer says so in `translateState`.
     let mut speech = Gate::default();
+    // Start says at once when the engine does not answer, not after the first window's 25 s wait.
+    if engine_body(port, "/health").is_none() {
+        health.engine(Some(engine_problem("no response")));
+    }
     while wake.recv().is_ok() {
+        // A window queued before Stop is not sent after it (it would hold the engine from the next Start).
+        if health.stopped() {
+            break;
+        }
         let Some(Job { audio: window, side, who, last }) = slot.lock().unwrap_or_else(|e| e.into_inner()).take() else { continue };
         let (src, tgt) = langs.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let (src, tgt) = (src.as_str(), tgt.as_str());
@@ -439,13 +452,21 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
             continue;
         }
         let asked = Instant::now();
-        match helper::post_draft(port, src, tgt, !last, &pcm_bytes(&window)) {
+        let answer = helper::post_draft(port, src, tgt, !last, &pcm_bytes(&window));
+        // The log is locked before the check: Stop sets `stopped` before it takes the session from
+        // this log, so an answer kept here is saved with this session and never lands in the next.
+        let mut l = log.lock().unwrap_or_else(|e| e.into_inner());
+        if health.stopped() {
+            break;
+        }
+        match answer {
             Ok(d) if !last => {
                 // An interim carries the spoken text only: it shows, and the next post replaces it.
                 // Its answer says nothing of the translation, so the hint is left alone.
                 health.engine(None);
                 let text = (!d.source.is_empty()).then(|| poni_core::capture::tagged(side, &d.source));
-                log.lock().unwrap_or_else(|e| e.into_inner()).set_interim(text);
+                l.set_interim(text);
+                drop(l);
                 health.interim();
             }
             Ok(d) => {
@@ -453,12 +474,12 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
                 health.hint(poni_core::capture::translation_hint(d.translate, src, tgt));
                 if d.source.is_empty() {
                     // The utterance ended with nothing heard in it: the interim goes.
-                    log.lock().unwrap_or_else(|e| e.into_inner()).set_interim(None);
+                    l.set_interim(None);
+                    drop(l);
                     health.interim();
                 } else {
                     let span = window.len() as f64 / poni_core::capture::RATE as f64;
                     let cloud = d.cloud();
-                    let mut l = log.lock().unwrap_or_else(|e| e.into_inner());
                     l.push(poni_core::capture::tagged(side, &d.source), d.translation, span);
                     l.set_last_speaker(who);
                     l.set_last_ms(asked.elapsed().as_millis().min(u32::MAX as u128) as u32);
@@ -468,16 +489,19 @@ fn post_loop(port: u16, langs: Arc<Mutex<(String, String)>>, wake: Receiver<()>,
                 }
             }
             Err(e) if e == poni_core::capture::SPEECH_MISSING => {
+                drop(l);
                 speech.shut();
                 health.engine(Some(e));
             }
             // A busy interim is just skipped: the next window carries the same words.
             Err(e) if e == poni_core::capture::ENGINE_BUSY && !last => {}
             Err(e) if e == poni_core::capture::ENGINE_BUSY => {
+                drop(l);
                 let slow = engine_body(port, "/health").and_then(|b| poni_core::capture::slow_notice(&b));
                 health.engine(Some(slow.unwrap_or(e)));
             }
             Err(e) => {
+                drop(l);
                 crate::pinfo!("capture: /draft failed: {e}");
                 speech.ok = false;
                 // A request that got no answer in its 25 s while /health still answers is a model loading.
@@ -651,5 +675,58 @@ mod tests {
     fn a_dead_engine_and_an_engine_error_read_differently() {
         assert!(engine_problem("No connection could be made (os error 10061)").contains("not answering"));
         assert!(engine_problem("Error: model missing").contains("model missing"));
+    }
+
+    /// A fake engine: answers /health at once and holds each /draft until `release` says go.
+    fn held_engine() -> (u16, Receiver<()>, Sender<()>, Arc<AtomicU32>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (got_tx, got) = channel();
+        let (release, release_rx) = channel::<()>();
+        let drafts = Arc::new(AtomicU32::new(0));
+        let n = drafts.clone();
+        std::thread::spawn(move || {
+            for mut s in listener.incoming().flatten() {
+                let mut buf = [0u8; 65536];
+                let len = s.read(&mut buf).unwrap_or(0);
+                let body = if buf[..len].starts_with(b"POST /draft") {
+                    n.fetch_add(1, Ordering::SeqCst);
+                    let _ = got_tx.send(());
+                    let _ = release_rx.recv();
+                    r#"{"source":"a late line","translation":""}"#
+                } else {
+                    r#"{"loaded":{"asr":true}}"#
+                };
+                let _ = write!(s, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+            }
+        });
+        (port, got, release, drafts)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn stop_abandons_the_request_in_flight_and_the_window_queued_behind_it() {
+        let (port, got, release, drafts) = held_engine();
+        let (tx, _rx) = channel();
+        let sink = EventSink::new(tx, crate::events::SendHwnd(0));
+        let log: SessionLog = Arc::default();
+        let job = || Job { audio: vec![0.1; 1600], side: None, who: "Others", last: true };
+        let svc = CaptureService::spawn(sink, port, "en".into(), "en".into(), log.clone(), Latency::default(), move |c| {
+            offer(&c.slot, &c.wake, job());
+            std::thread::sleep(Duration::from_millis(300));
+            offer(&c.slot, &c.wake, job()); // queued while the first is answered
+            let _ = c.stop.recv();
+        })
+        .unwrap();
+        got.recv_timeout(Duration::from_secs(5)).expect("the first window reached the engine");
+        std::thread::sleep(Duration::from_millis(400));
+        let t = Instant::now();
+        drop(svc);
+        assert!(t.elapsed() < Duration::from_secs(1), "Stop took {:?}", t.elapsed());
+        release.send(()).unwrap();
+        std::thread::sleep(Duration::from_millis(500));
+        assert!(log.lock().unwrap().lines().is_empty(), "the late answer landed in the session after Stop");
+        assert_eq!(drafts.load(Ordering::SeqCst), 1, "the window queued before Stop was sent after it");
     }
 }
