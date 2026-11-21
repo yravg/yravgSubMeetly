@@ -56,5 +56,3 @@ qa/evidence/*
 # Rust build output of the island
 island/target/
 island/build/
-# graft's local graph cache — regenerable, not committed (run `graft build`).
-/graft/
