@@ -22,3 +22,5 @@ rule (pass to every worker): no media URL via default browser/start/explorer/Sta
 workers running: pmm-minutes (step 4.8, island, D:\cargo-target\pmm-minutes, ckpt .checkpoints/pmm-minutes.md); pmm-speed (step 4.7 engine half, engine-rs, D:\cargo-target\pmm-speed, port 17899, ckpt .checkpoints/pmm-speed.md)
 build recipe change: E: full -> CARGO_TARGET_DIR on D:, installer /OD:\sm-dist
 next: review + commit each worker's result; then 4.7 island half (interim text, PMM-026 options), 4.8
+done: VPS vps-pmm finished; main fast-forwarded to a89e252 (pushed); laptop identical WIP stashed (stash@{0}); installers 1.3.7 + 1.3.8 in island/dist; VPS tmux vps-pmm + pmm-xbuild stopped
+next (latest): owner tries 1.3.8 (GNU build); owner answers 4 audit questions (VPS .ref/REPORT.md); run the 4 wine-only poni tests natively (D: drive absent today)

@@ -18,7 +18,6 @@ Learned from Handy, FluidVoice, OpenWhispr (owner agreed to all 20 items on 2026
 | E Better words | 12 custom vocabulary, 13 AI clean-up (OpenRouter etc.) | Words list in Settings reaches Whisper's prompt; optional clean-up pass rewrites finished lines through the translation provider. |
 | F Live feel | 10 keep model warm, 11 word-by-word streaming | First caption after start under 3 s on Base CPU; interim text grows while a sentence is spoken. |
 | G Use it everywhere | 14 push-to-talk dictation, 17 history search and re-run, 18 SRT/VTT export of a live session | Global hotkey types speech into the focused app; Captions window exports SRT/VTT. |
-
 | H Other speech models | SenseVoice-Small (zh/ja/ko/en/yue, non-autoregressive) and Parakeet-TDT v3 (25 European languages) through sherpa-onnx, DirectML/CPU | 4.8 s zh clip under 0.3 s on CPU; models listed and chosen like Whisper; falls back cleanly |
 | I Settings | Model manager like the Chrome version (use, download, delete, state, speed); Advanced tab revamp | every old control still reachable; delete asks; keyboard and screen reader work |
 | J BYOA | Use the person's own agent subscription (Claude Code, Codex, Gemini CLI, OpenCode) for summaries, Ask, refine | detected CLIs listed; fake-CLI tests for success, timeout, missing |
