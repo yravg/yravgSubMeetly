@@ -67,7 +67,7 @@ pub fn open_now(path: &str) {
     }
     let url = format!("http://127.0.0.1:{port}{path}");
     // Minutes and the app shell are the app's own windows; the setup page stays in the browser, next to chrome://extensions.
-    if path == "/app/minutes.html" || path == "/app/app.html" {
+    if matches!(path, "/app/minutes.html" | "/app/app.html" | "/app/captions.html") {
         crate::shell::open_app_window(&url);
     } else {
         crate::shell::open(&url);

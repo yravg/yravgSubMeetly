@@ -55,6 +55,7 @@ pub enum MenuCmd {
     /// service to start, so most of them open a page or do nothing).
     OpenApp,
     OpenMinutes,
+    OpenCaptionsWindow,
     OpenLive,
     OpenCall,
     OpenMeeting,
@@ -117,6 +118,7 @@ pub fn menu_items(s: &Settings, pinned: bool, login: Login, update: UpdateLine) 
         MenuItem::Info { label: "Kasi by yravg".into() },
         item("Open Kasi", MenuCmd::OpenApp, false),
         item("Open Minutes register", MenuCmd::OpenMinutes, false),
+        item("Captions window", MenuCmd::OpenCaptionsWindow, false),
         item("Live captions", MenuCmd::OpenLive, false),
         item("Meeting", MenuCmd::OpenCall, false),
         item("Minutes", MenuCmd::OpenMeeting, false),

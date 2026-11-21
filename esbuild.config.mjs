@@ -53,6 +53,7 @@ const statics = [
   ['src/theme-tide.css', 'theme-tide.css'],
   ['src/palettes.css', 'palettes.css'],
   ['src/app.html', 'app.html'],
+  ['src/captions.html', 'captions.html'],
   ['src/app.css', 'app.css'],
   ['src/minutes-tide.css', 'minutes-tide.css'],
   ['src/app-pages/pages.css', 'pages.css'],

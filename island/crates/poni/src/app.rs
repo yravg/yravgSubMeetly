@@ -2892,6 +2892,12 @@ impl App {
                 }
                 crate::services::engine::open_when_ready("/app/minutes.html");
             }
+            OpenCaptionsWindow => {
+                if let Some(svc) = &self.services {
+                    svc.engine_start();
+                }
+                crate::services::engine::open_when_ready("/app/captions.html");
+            }
             StartEngine => {
                 if let Some(svc) = &self.services {
                     svc.engine_start();

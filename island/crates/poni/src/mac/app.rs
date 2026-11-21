@@ -1301,6 +1301,10 @@ impl App {
                 self.engine_start();
                 services::webwindow::open("/app/minutes.html", "Minutes register");
             }
+            MenuCmd::OpenCaptionsWindow => {
+                self.engine_start();
+                services::webwindow::open("/app/captions.html", "Captions");
+            }
             MenuCmd::SetupExtension
             | MenuCmd::OpenCaptionsPanel
             => {}

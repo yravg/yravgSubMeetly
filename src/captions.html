@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Captions · Kasi</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fbfbfa; --fg: #1d1d1f; --dim: #5c5f66; --line: #e4e4e7; --accent: #c2410c; --chip: #f1f1f3; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #18181b; --fg: #f4f4f5; --dim: #a1a1aa; --line: #2e2e33; --accent: #fb923c; --chip: #27272a; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0 auto 0 0; font-weight: 600; }
+  button, select { font: inherit; font-size: 13px; color: var(--fg); background: var(--chip); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  button:focus-visible, select:focus-visible, #list:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #state { font-size: 12px; color: var(--dim); }
+  #list { flex: 1; overflow-y: auto; padding: 6px 14px 40px; }
+  .row { display: grid; grid-template-columns: 5.2em 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .row time { color: var(--dim); font-variant-numeric: tabular-nums; font-size: .87em; padding-top: .15em; }
+  .src { margin: 0; }
+  .tr { margin: 2px 0 0; color: var(--accent); }
+  body[data-show="original"] .tr, body[data-show="translation"] .src:not(:only-child) { display: none; }
+  .row:last-child .src, .row:last-child .tr { font-weight: 600; }
+  #empty { color: var(--dim); padding: 30px 0; text-align: center; }
+  #latest { position: fixed; right: 16px; bottom: 16px; background: var(--accent); color: #fff; border: 0; box-shadow: 0 2px 8px #0003; }
+  #latest[hidden] { display: none; }
+  @media (prefers-reduced-motion: no-preference) { #list { scroll-behavior: smooth; } }
+</style>
+</head>
+<body data-show="both">
+<header>
+  <h1>Captions</h1>
+  <span id="state" role="status">Connecting…</span>
+  <label>Show <select id="show" aria-label="Show">
+    <option value="both">Both</option><option value="original">Original</option><option value="translation">Translation</option>
+  </select></label>
+  <button id="smaller" aria-label="Smaller text">A−</button>
+  <button id="bigger" aria-label="Bigger text">A+</button>
+  <button id="copy">Copy all</button>
+</header>
+<main id="list" tabindex="0" aria-label="Caption history, newest at the bottom" aria-live="polite" aria-relevant="additions">
+  <p id="empty">Captions appear here line by line, with the time each was heard. Scroll up to read back.</p>
+</main>
+<button id="latest" hidden>Jump to latest ↓</button>
+<script>
+// Polls the engine's GET /live/lines (this page is served by the engine at /app/captions.html).
+const list = document.getElementById('list'), empty = document.getElementById('empty');
+const state = document.getElementById('state'), latest = document.getElementById('latest');
+const prefs = JSON.parse(localStorage.getItem('ysmCaptionsWindow') || '{}');
+let size = prefs.size || 15, lastSeq = 0, follow = true, lines = [];
+const save = () => localStorage.setItem('ysmCaptionsWindow', JSON.stringify({ size, show: document.body.dataset.show }));
+const applySize = () => { list.style.fontSize = size + 'px'; };
+document.getElementById('show').value = document.body.dataset.show = prefs.show || 'both';
+applySize();
+document.getElementById('show').onchange = (e) => { document.body.dataset.show = e.target.value; save(); };
+document.getElementById('smaller').onclick = () => { size = Math.max(11, size - 1); applySize(); save(); };
+document.getElementById('bigger').onclick = () => { size = Math.min(40, size + 1); applySize(); save(); };
+document.getElementById('copy').onclick = async () => {
+  const text = lines.map((l) => clock(l.at) + '  ' + l.source + (l.translation && l.translation !== l.source ? '\n          ' + l.translation : '')).join('\n');
+  try { await navigator.clipboard.writeText(text); state.textContent = 'Copied ' + lines.length + ' lines'; } catch { state.textContent = 'Copy was blocked'; }
+};
+const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+list.addEventListener('scroll', () => { follow = atBottom(); latest.hidden = follow; });
+latest.onclick = () => { follow = true; latest.hidden = true; list.scrollTop = list.scrollHeight; list.focus(); };
+function clock(ms) { return ms ? new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : ''; }
+function add(l) {
+  const row = document.createElement('div'); row.className = 'row';
+  const t = document.createElement('time'); t.dateTime = new Date(l.at).toISOString(); t.textContent = clock(l.at);
+  const body = document.createElement('div');
+  const s = document.createElement('p'); s.className = 'src'; s.textContent = l.source; body.append(s);
+  if (l.translation && l.translation !== l.source) { const r = document.createElement('p'); r.className = 'tr'; r.textContent = l.translation; body.append(r); }
+  row.append(t, body); list.append(row);
+}
+async function poll() {
+  try {
+    const r = await fetch('/live/lines?after=' + lastSeq, { cache: 'no-store' });
+    const { lines: fresh } = await r.json();
+    if (fresh.length && fresh[0].seq <= lastSeq) { lastSeq = 0; }
+    for (const l of fresh) { if (l.seq > lastSeq) { add(l); lines.push(l); lastSeq = l.seq; } }
+    if (lines.length) empty.remove();
+    if (fresh.length && follow) list.scrollTop = list.scrollHeight;
+    state.textContent = lines.length ? lines.length + ' lines' : 'Waiting for captions…';
+  } catch { state.textContent = 'Engine not answering, retrying…'; }
+  setTimeout(poll, 700);
+}
+poll();
+</script>
+</body>
+</html>

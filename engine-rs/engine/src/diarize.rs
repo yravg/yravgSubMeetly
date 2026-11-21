@@ -55,7 +55,9 @@ pub fn label_by_channel(channel: &str) -> &'static str {
 }
 
 fn hann(n: usize) -> Vec<f64> {
-    (0..n).map(|i| 0.5 - 0.5 * (2.0 * std::f64::consts::PI * i as f64 / (n as f64 - 1.0)).cos()).collect()
+    (0..n)
+        .map(|i| 0.5 - 0.5 * (2.0 * std::f64::consts::PI * i as f64 / (n as f64 - 1.0)).cos())
+        .collect()
 }
 
 /// Edges (Hz) of `BANDS` mel-spaced bands between 100 Hz and 4 kHz (speech's useful range).
@@ -63,12 +65,19 @@ fn band_edges() -> Vec<f64> {
     let mel = |f: f64| 2595.0 * (1.0 + f / 700.0).log10();
     let inv = |m: f64| 700.0 * (10f64.powf(m / 2595.0) - 1.0);
     let (lo, hi) = (mel(100.0), mel(4000.0));
-    (0..=BANDS).map(|i| inv(lo + (hi - lo) * i as f64 / BANDS as f64)).collect()
+    (0..=BANDS)
+        .map(|i| inv(lo + (hi - lo) * i as f64 / BANDS as f64))
+        .collect()
 }
 
 /// A frame's voice features: cepstral coefficients of the band energies, then log pitch and
 /// spectral centroid (both 0 when the frame has no clear pitch).
-fn frame_features(frame: &[f32], win: &[f64], edges: &[f64], cos_table: &[Vec<f64>]) -> Option<Vec<f64>> {
+fn frame_features(
+    frame: &[f32],
+    win: &[f64],
+    edges: &[f64],
+    cos_table: &[Vec<f64>],
+) -> Option<Vec<f64>> {
     let x: Vec<f64> = frame.iter().zip(win).map(|(s, w)| *s as f64 * w).collect();
     let energy: f64 = x.iter().map(|v| v * v).sum::<f64>() / x.len() as f64;
     if energy < 1e-9 {
@@ -108,7 +117,12 @@ fn frame_features(frame: &[f32], win: &[f64], edges: &[f64], cos_table: &[Vec<f6
     }
     let mut feat = Vec::with_capacity(CEPS + 2);
     for row in cos_table.iter().take(CEPS) {
-        feat.push(row.iter().zip(bands.iter()).map(|(c, b)| c * b).sum::<f64>());
+        feat.push(
+            row.iter()
+                .zip(bands.iter())
+                .map(|(c, b)| c * b)
+                .sum::<f64>(),
+        );
     }
     // Pitch by autocorrelation over 70..400 Hz.
     let (min_lag, max_lag) = (SAMPLE_RATE / 400, SAMPLE_RATE / 70);
@@ -120,9 +134,22 @@ fn frame_features(frame: &[f32], win: &[f64], edges: &[f64], cos_table: &[Vec<f6
             best = (r, lag);
         }
     }
-    let pitch = if zero > 0.0 && best.0 / zero > 0.3 { SAMPLE_RATE as f64 / best.1 as f64 } else { 0.0 };
+    let pitch = if zero > 0.0 && best.0 / zero > 0.3 {
+        SAMPLE_RATE as f64 / best.1 as f64
+    } else {
+        0.0
+    };
     let total: f64 = power.iter().sum();
-    let centroid = if total > 0.0 { power.iter().enumerate().map(|(k, p)| k as f64 * bin_hz * p).sum::<f64>() / total } else { 0.0 };
+    let centroid = if total > 0.0 {
+        power
+            .iter()
+            .enumerate()
+            .map(|(k, p)| k as f64 * bin_hz * p)
+            .sum::<f64>()
+            / total
+    } else {
+        0.0
+    };
     feat.push(if pitch > 0.0 { pitch.ln() } else { 0.0 });
     feat.push(centroid / 1000.0);
     Some(feat)
@@ -130,13 +157,24 @@ fn frame_features(frame: &[f32], win: &[f64], edges: &[f64], cos_table: &[Vec<f6
 
 fn dct_table() -> Vec<Vec<f64>> {
     (0..CEPS)
-        .map(|k| (0..BANDS).map(|b| (std::f64::consts::PI * (k as f64 + 1.0) * (b as f64 + 0.5) / BANDS as f64).cos()).collect())
+        .map(|k| {
+            (0..BANDS)
+                .map(|b| {
+                    (std::f64::consts::PI * (k as f64 + 1.0) * (b as f64 + 0.5) / BANDS as f64)
+                        .cos()
+                })
+                .collect()
+        })
         .collect()
 }
 
 /// Voiced stretches (start, end) in frame indices, from a gate set relative to the loudest frames.
 fn stretches(samples: &[f32]) -> Vec<(usize, usize)> {
-    let frames = if samples.len() >= FRAME { (samples.len() - FRAME) / HOP + 1 } else { 0 };
+    let frames = if samples.len() >= FRAME {
+        (samples.len() - FRAME) / HOP + 1
+    } else {
+        0
+    };
     let rms: Vec<f64> = (0..frames)
         .map(|i| {
             let f = &samples[i * HOP..i * HOP + FRAME];
@@ -175,11 +213,17 @@ fn stretches(samples: &[f32]) -> Vec<(usize, usize)> {
     if let Some(s) = start {
         out.push((s, last_voiced));
     }
-    out.into_iter().filter(|(a, b)| (*b - *a) as f64 / 100.0 >= MIN_STRETCH_S).collect()
+    out.into_iter()
+        .filter(|(a, b)| (*b - *a) as f64 / 100.0 >= MIN_STRETCH_S)
+        .collect()
 }
 
 fn dist(a: &[f64], b: &[f64]) -> f64 {
-    a.iter().zip(b).map(|(x, y)| (x - y).powi(2)).sum::<f64>().sqrt()
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| (x - y).powi(2))
+        .sum::<f64>()
+        .sqrt()
 }
 
 /// Cut `samples` (16 kHz mono) into voiced stretches and group them by voice.
@@ -227,7 +271,13 @@ pub fn diarize(samples: &[f32], max_speakers: usize) -> Vec<Turn> {
         let var = prints.iter().map(|p| (p[d] - mean).powi(2)).sum::<f64>() / prints.len() as f64;
         // A floor on the spread, so one person's small natural variation is not stretched into
         // "two speakers": cepstra (log-power scale), log pitch (~10 %), centroid (kHz).
-        let floor = if d < CEPS { 2.0 } else if d == CEPS { 0.1 } else { 0.25 };
+        let floor = if d < CEPS {
+            2.0
+        } else if d == CEPS {
+            0.1
+        } else {
+            0.25
+        };
         let sd = var.sqrt().max(floor);
         for p in prints.iter_mut() {
             p[d] = (p[d] - mean) / sd;
@@ -243,7 +293,11 @@ pub fn diarize(samples: &[f32], max_speakers: usize) -> Vec<Turn> {
                 order.push(l);
                 order.len() - 1
             });
-            Turn { t0: *a as f64 / 100.0, t1: (*b * HOP + FRAME) as f64 / SAMPLE_RATE as f64, speaker: idx }
+            Turn {
+                t0: *a as f64 / 100.0,
+                t1: (*b * HOP + FRAME) as f64 / SAMPLE_RATE as f64,
+                speaker: idx,
+            }
         })
         .collect()
 }
@@ -252,11 +306,17 @@ pub fn diarize(samples: &[f32], max_speakers: usize) -> Vec<Turn> {
 fn cluster(points: &[Vec<f64>], max_speakers: usize) -> Vec<usize> {
     let n = points.len();
     let mut groups: Vec<Vec<usize>> = (0..n).map(|i| vec![i]).collect();
-    let limit = if max_speakers == 0 { MAX_SPEAKERS } else { max_speakers.min(MAX_SPEAKERS) };
+    let limit = if max_speakers == 0 {
+        MAX_SPEAKERS
+    } else {
+        max_speakers.min(MAX_SPEAKERS)
+    };
     // With no stated count the tail of single-voice noise must not split one person in two:
     // the threshold scales with the spread of the data (a lone voice has a small spread).
     let spread = {
-        let c: Vec<f64> = (0..points[0].len()).map(|d| points.iter().map(|p| p[d]).sum::<f64>() / n as f64).collect();
+        let c: Vec<f64> = (0..points[0].len())
+            .map(|d| points.iter().map(|p| p[d]).sum::<f64>() / n as f64)
+            .collect();
         points.iter().map(|p| dist(p, &c)).sum::<f64>() / n as f64
     };
     loop {
@@ -309,7 +369,10 @@ pub fn speaker_at(turns: &[Turn], t0: f64, t1: f64) -> Option<usize> {
             }
         }
     }
-    score.into_iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).map(|(s, _)| s)
+    score
+        .into_iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .map(|(s, _)| s)
 }
 
 /// Label transcript segments `[{t0, t1, text?, channel?}]`. A `channel` ("mic" / "system") wins
@@ -321,7 +384,10 @@ pub fn label_segments(segments: &[Value], turns: &[Turn]) -> Vec<Value> {
         .map(|seg| {
             let mut out = seg.clone();
             let num = |k: &str| seg.get(k).and_then(Value::as_f64).unwrap_or(0.0);
-            let channel = seg.get("channel").and_then(Value::as_str).filter(|c| !c.trim().is_empty());
+            let channel = seg
+                .get("channel")
+                .and_then(Value::as_str)
+                .filter(|c| !c.trim().is_empty());
             let speaker = match channel {
                 Some(c) => Some(label_by_channel(c).to_string()),
                 None => speaker_at(turns, num("t0"), num("t1")).map(speaker_name),
@@ -350,7 +416,11 @@ mod tests {
                 if hf > 4000.0 {
                     break;
                 }
-                let gain: f64 = formants.iter().map(|c| (-((hf - c) / 250.0).powi(2)).exp()).sum::<f64>() + 0.05;
+                let gain: f64 = formants
+                    .iter()
+                    .map(|c| (-((hf - c) / 250.0).powi(2)).exp())
+                    .sum::<f64>()
+                    + 0.05;
                 v += gain * (2.0 * std::f64::consts::PI * hf * t).sin() / h as f64;
             }
             out.push((v * 0.3) as f32);
@@ -358,7 +428,10 @@ mod tests {
     }
 
     fn silence(secs: f64, out: &mut Vec<f32>) {
-        out.extend(std::iter::repeat_n(0.0, (secs * SAMPLE_RATE as f64) as usize));
+        out.extend(std::iter::repeat_n(
+            0.0,
+            (secs * SAMPLE_RATE as f64) as usize,
+        ));
     }
 
     fn conversation() -> (Vec<f32>, Vec<usize>) {
@@ -386,7 +459,11 @@ mod tests {
     fn two_different_voices_become_two_speakers() {
         let (audio, truth) = conversation();
         let turns = diarize(&audio, 0);
-        assert_eq!(turns.len(), truth.len(), "one turn per utterance: {turns:?}");
+        assert_eq!(
+            turns.len(),
+            truth.len(),
+            "one turn per utterance: {turns:?}"
+        );
         let ids: std::collections::BTreeSet<_> = turns.iter().map(|t| t.speaker).collect();
         assert_eq!(ids.len(), 2, "two speakers: {turns:?}");
         // The labels follow the utterances (speaker numbers are by first appearance, truth starts at 0).
@@ -424,7 +501,10 @@ mod tests {
     fn channels_label_you_and_others() {
         assert_eq!(label_by_channel("mic"), "You");
         assert_eq!(label_by_channel("System"), "Others");
-        let segs = vec![json!({"t0": 0.0, "t1": 1.0, "text": "hi", "channel": "mic"}), json!({"t0": 1.0, "t1": 2.0, "text": "yo", "channel": "system"})];
+        let segs = vec![
+            json!({"t0": 0.0, "t1": 1.0, "text": "hi", "channel": "mic"}),
+            json!({"t0": 1.0, "t1": 2.0, "text": "yo", "channel": "system"}),
+        ];
         let out = label_segments(&segs, &[]);
         assert_eq!(out[0]["speaker"], "You");
         assert_eq!(out[1]["speaker"], "Others");
@@ -432,8 +512,23 @@ mod tests {
 
     #[test]
     fn segments_take_the_speaker_they_overlap_most() {
-        let turns = vec![Turn { t0: 0.0, t1: 2.0, speaker: 0 }, Turn { t0: 2.0, t1: 5.0, speaker: 1 }];
-        let segs = vec![json!({"t0": 0.5, "t1": 1.5, "text": "a"}), json!({"t0": 1.8, "t1": 4.0, "text": "b"}), json!({"t0": 9.0, "t1": 10.0, "text": "c"})];
+        let turns = vec![
+            Turn {
+                t0: 0.0,
+                t1: 2.0,
+                speaker: 0,
+            },
+            Turn {
+                t0: 2.0,
+                t1: 5.0,
+                speaker: 1,
+            },
+        ];
+        let segs = vec![
+            json!({"t0": 0.5, "t1": 1.5, "text": "a"}),
+            json!({"t0": 1.8, "t1": 4.0, "text": "b"}),
+            json!({"t0": 9.0, "t1": 10.0, "text": "c"}),
+        ];
         let out = label_segments(&segs, &turns);
         assert_eq!(out[0]["speaker"], "Speaker 1");
         assert_eq!(out[1]["speaker"], "Speaker 2");

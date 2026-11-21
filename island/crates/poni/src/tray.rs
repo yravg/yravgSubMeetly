@@ -92,6 +92,8 @@ pub enum MenuCmd {
     /// Our own parts, from the product group of the menu.
     OpenApp,
     OpenMinutes,
+    /// The captions window: every line with its time, to scroll back through.
+    OpenCaptionsWindow,
     OpenLive,
     /// The Meeting tab (the call running now); "Minutes" is `OpenMeeting`.
     OpenCall,
@@ -171,7 +173,7 @@ pub fn menu_items(s: &Settings, pinned: bool, update: UpdateLine, engine: &Engin
     let theme = |label: &str, t: Theme| item(label, MenuCmd::SetTheme(t), s.theme == t);
     let fullscreen = |label: &str, hide: bool| item(label, MenuCmd::SetHideFullscreen(hide), s.hide_in_fullscreen == hide);
     let mut items = vec![MenuItem::Info { label: "Kasi by yravg".into() }];
-    for (label, cmd) in [("Open Kasi", MenuCmd::OpenApp), ("Open Minutes register", MenuCmd::OpenMinutes), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenCall), ("Minutes", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
+    for (label, cmd) in [("Open Kasi", MenuCmd::OpenApp), ("Open Minutes register", MenuCmd::OpenMinutes), ("Captions window", MenuCmd::OpenCaptionsWindow), ("Live captions", MenuCmd::OpenLive), ("Meeting", MenuCmd::OpenCall), ("Minutes", MenuCmd::OpenMeeting), ("Inbox", MenuCmd::OpenInbox)] {
         items.push(item(label, cmd, false));
     }
     items.push(MenuItem::Separator);

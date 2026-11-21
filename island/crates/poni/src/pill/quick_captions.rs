@@ -284,7 +284,18 @@ pub fn aa_button(ui: &mut Ui, st: &mut AppState, right: f32, cy: f32) -> f32 {
         st.ui.quick = QuickUi::default();
         st.cmd(Command::SaveSettings);
     }
-    history_button(ui, st, b.x - PILL_GAP, cy)
+    let p = popout_button(ui, st, b.x - PILL_GAP, cy);
+    history_button(ui, st, p - PILL_GAP, cy)
+}
+
+/// "Pop out": the captions window, every line with its time, scrollable (`/app/captions.html`).
+pub fn popout_button(ui: &mut Ui, st: &mut AppState, right: f32, cy: f32) -> f32 {
+    let w = ui.pill_width("Pop out", false, true);
+    let b = Rect::new(right - w, cy - PILL_SMALL / 2.0, w, PILL_SMALL);
+    if ui.pill(wid("qc.popout"), b, "Pop out", None, PillStyle::Utility).clicked {
+        st.cmd(Command::Menu(crate::tray::MenuCmd::OpenCaptionsWindow));
+    }
+    b.x
 }
 
 fn chip_text() -> TextStyle {

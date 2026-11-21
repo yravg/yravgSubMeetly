@@ -1,6 +1,7 @@
 # Riwayat rilis
 
-## Unreleased
+## 1.4.7 (2026-11-21)
+- **Captions window ("Pop out").** A Pop out button beside History on Live, Meeting and the Media captions column (and "Captions window" in the tray / menu bar) opens a window of its own with every caption line and the time it was heard, its translation under it. Scroll up to read back; it stops following while you read and a "Jump to latest" button brings you back. Show Both / Original / Translation, text size A− / A+ (remembered), Copy all. Keyboard and screen reader friendly (focusable list, polite live region, focus rings, reduced motion respected). The engine keeps the last 1000 final lines for it (`GET /live/lines?after=<seq>`).
 - **Live captions no longer stall behind a slow speech model.** With Whisper Medium on a laptop CPU (about 0.3x real time) each window took longer than the island's 25 s wait; the engine kept working on every abandoned window, so the queue grew and nothing came out ("The engine is not answering"). `/draft` now skips an interim while the model is busy and gives up on a final after 20 s with `503 busy`, so at most one stale window waits. The pill now says "Captions are falling behind: whisper-medium is too slow on this computer's processor. Pick a smaller speech model in Settings › Models." instead of "not answering".
 
 ## 1.4.6 (2026-11-15)

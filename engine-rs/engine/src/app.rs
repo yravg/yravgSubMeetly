@@ -59,6 +59,8 @@ const TARGET_LANGS: [&str; 11] = [
 /// Turns of the conversation the model sees, and the longest answer it gives.
 const ASK_HISTORY: usize = 6;
 const ASK_MAX_TOKENS: usize = 512;
+/// Final captions `GET /live/lines` keeps (about an hour of speech).
+const LIVE_LINES_KEPT: usize = 1000;
 const NO_TRANSLATE: &str = "no translation model (set TRANSLATE=on)";
 const CUDA_WARNING: &str = "CUDA tidak terdeteksi — helper akan jatuh ke CPU saat start";
 
@@ -129,6 +131,8 @@ pub struct App {
     jobs: Jobs,
     shutdown: AtomicBool,
     live: Mutex<Value>,
+    /// The last final captions, oldest first, for the captions window (`GET /live/lines`).
+    live_lines: Mutex<std::collections::VecDeque<Value>>,
     calendar: Calendar,
     integrations: crate::integrations::Integrations,
 }
@@ -195,6 +199,7 @@ impl App {
             jobs: Jobs::default(),
             shutdown: AtomicBool::new(false),
             live: Mutex::new(live_idle()),
+            live_lines: Mutex::new(std::collections::VecDeque::new()),
             integrations: crate::integrations::Integrations::new(env_path(
                 "INTEGRATIONS_PATH",
                 integrations_path,
@@ -341,6 +346,18 @@ impl App {
             "/live" => {
                 let live = self.live.lock().unwrap_or_else(|e| e.into_inner()).clone();
                 self.json_response(request, 200, live)
+            }
+            "/live/lines" => {
+                let after = query(&request.target)
+                    .get("after")
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .unwrap_or(0);
+                let lines = self.live_lines.lock().unwrap_or_else(|e| e.into_inner());
+                let fresh: Vec<&Value> = lines
+                    .iter()
+                    .filter(|l| l["seq"].as_u64().unwrap_or(0) > after)
+                    .collect();
+                self.json_response(request, 200, json!({ "lines": fresh }))
             }
             "/notes" => self.json_response(request, 200, json!({ "notes": self.load_notes() })),
             "/calendar" => self.get_calendar(request),
@@ -870,6 +887,22 @@ impl App {
         let round3 = |x: f64| (x * 1000.0).round() / 1000.0;
         let mut live = self.live.lock().unwrap_or_else(|e| e.into_inner());
         let seq = live["seq"].as_u64().unwrap_or(0) + 1;
+        let at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        let mut lines = self.live_lines.lock().unwrap_or_else(|e| e.into_inner());
+        if lines.len() >= LIVE_LINES_KEPT {
+            lines.pop_front();
+        }
+        lines.push_back(json!({
+            "seq": seq,
+            "at": at,
+            "audio_s": round3(audio_s),
+            "source": source.trim(),
+            "translation": translation.trim(),
+        }));
+        drop(lines);
         *live = json!({
             "seq": seq,
             "source": source.trim(),
