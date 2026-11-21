@@ -221,6 +221,24 @@ impl App {
         }
     }
 
+    /// Loads the speech and translation models at start (when on disk), so the first caption
+    /// does not wait for a cold load. Failures only log: the first /draft reports them.
+    pub fn warm_up(&self) -> impl FnOnce() + Send + 'static {
+        let ml = Arc::clone(&self.ml);
+        move || {
+            if ml.require_asr().is_ok() {
+                if let Err(e) = ml.with_asr(|_| Ok(())) {
+                    eprintln!("[asr] warm-up failed: {e:#}");
+                }
+            }
+            if ml.translate_downloaded() {
+                if let Err(e) = ml.with_translator(|_| Ok(())) {
+                    eprintln!("[translate] warm-up failed: {e:#}");
+                }
+            }
+        }
+    }
+
     pub fn set_hf_cache(&mut self, dir: PathBuf) {
         self.locations.set_default(dir);
     }

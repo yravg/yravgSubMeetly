@@ -40,6 +40,9 @@ pub fn run(app: App) -> io::Result<()> {
     let _ = thread::Builder::new()
         .name("legacy-models".into())
         .spawn(app.legacy_migration());
+    let _ = thread::Builder::new()
+        .name("warm-up".into())
+        .spawn(app.warm_up());
     println!(
         "listening on http://{}:{}   (Ctrl-C to stop)",
         host,
